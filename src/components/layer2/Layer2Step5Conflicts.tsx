@@ -32,8 +32,9 @@ export function Layer2Step5Conflicts({ rulePack, onBack, onNext }: Props) {
     let idx = 0;
     const interval = setInterval(() => {
       if (idx >= items.length) { clearInterval(interval); setIsChecking(false); return; }
-      setResults((prev) => [...prev, items[idx]]);
+      const current = items[idx];
       idx++;
+      setResults((prev) => [...prev, current]);
     }, 600);
   };
 

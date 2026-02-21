@@ -51,8 +51,9 @@ export function Layer2Step7Push({ rulePack, onBack, onFinish }: Props) {
         setAllDone(true);
         return;
       }
-      setModules((prev) => prev.map((m, i) => i === idx ? { ...m, status: "pushed" } : m));
+      const currentIdx = idx;
       idx++;
+      setModules((prev) => prev.map((m, i) => i === currentIdx ? { ...m, status: "pushed" } : m));
     }, 400);
   };
 

@@ -33,8 +33,9 @@ export function Layer2Step4Limits({ rulePack, onBack, onNext }: Props) {
     let idx = 0;
     const interval = setInterval(() => {
       if (idx >= items.length) { clearInterval(interval); setIsChecking(false); return; }
-      setCaps((prev) => [...prev, items[idx]]);
+      const current = items[idx];
       idx++;
+      setCaps((prev) => [...prev, current]);
     }, 500);
   };
 

@@ -178,10 +178,10 @@ const Index = () => {
               </div>
             </div>
             <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-              Good evening, Case Manager
+              Good evening, Kathy
             </h1>
             <p className="text-muted-foreground text-lg">
-              Your <span className="text-primary font-medium">AI companion</span> is ready to assist your shift
+              Your <span className="text-primary font-medium">AI case manager</span> is ready to assist you
             </p>
           </motion.div>
 

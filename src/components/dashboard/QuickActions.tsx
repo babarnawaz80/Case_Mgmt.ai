@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   FileText,
   DollarSign,
@@ -32,21 +33,23 @@ const quickActions = [
 ];
 
 const modules = [
-  { title: "Announcements", icon: Bell },
-  { title: "Attendance", icon: Calendar },
-  { title: "Documents", icon: FolderOpen },
-  { title: "Care Tracker", icon: Heart },
-  { title: "Custom Forms", icon: BookOpen },
-  { title: "Incidents", icon: AlertTriangle },
-  { title: "My Sites", icon: Building2 },
-  { title: "People Supported", icon: Users },
-  { title: "Outreach", icon: Send },
-  { title: "Training", icon: GraduationCap },
-  { title: "Plan of Correction", icon: Shield },
-  { title: "SnapTag", icon: Tag },
+  { title: "Announcements", icon: Bell, url: "" },
+  { title: "Attendance", icon: Calendar, url: "" },
+  { title: "Documents", icon: FolderOpen, url: "" },
+  { title: "Care Tracker", icon: Heart, url: "" },
+  { title: "Custom Forms", icon: BookOpen, url: "" },
+  { title: "Incidents", icon: AlertTriangle, url: "" },
+  { title: "My Sites", icon: Building2, url: "" },
+  { title: "People Supported", icon: Users, url: "/people" },
+  { title: "Outreach", icon: Send, url: "" },
+  { title: "Training", icon: GraduationCap, url: "" },
+  { title: "Plan of Correction", icon: Shield, url: "" },
+  { title: "SnapTag", icon: Tag, url: "" },
 ];
 
 export function QuickActions() {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       {/* Quick Actions */}
@@ -82,6 +85,7 @@ export function QuickActions() {
               transition={{ delay: 0.7 + i * 0.04 }}
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => mod.url && navigate(mod.url)}
               className="glass rounded-xl p-4 flex flex-col items-center gap-3 hover:bg-secondary/80 transition-all duration-200"
             >
               <mod.icon className="w-5 h-5 text-muted-foreground" />

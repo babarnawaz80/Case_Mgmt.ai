@@ -24,7 +24,7 @@ const navGroups = [
   {
     label: "Overview",
     items: [
-      { title: "Dashboard", url: "/", icon: Home },
+      { title: "Dashboard", url: "/dashboard", icon: Home },
       { title: "My Work", url: "/my-work", icon: Target },
       { title: "Announcements", url: "/announcements", icon: Bell },
     ],

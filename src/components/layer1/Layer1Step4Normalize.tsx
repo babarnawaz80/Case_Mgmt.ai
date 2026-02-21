@@ -28,8 +28,12 @@ export function Layer1Step4Normalize({ rulePacks, onRulePacksUpdated, onBack, on
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 4 — Normalize & De-duplicate</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Standardize service names while preserving originals in <code className="text-primary text-xs">source_service_name</code>. Detect and merge duplicates.
+          Cleans up naming inconsistencies (e.g. "Job Development" vs "Employment Job Development") while keeping the original label.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">If service names don't match your system, the Case Manager agent can't reliably find the correct rules.</p>
+        </div>
       </div>
 
       {!normalized ? (

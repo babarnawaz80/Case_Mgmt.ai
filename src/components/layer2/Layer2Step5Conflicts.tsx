@@ -46,8 +46,12 @@ export function Layer2Step5Conflicts({ rulePack, onBack, onNext }: Props) {
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 5 — Conflict Engine</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Cross-checking <span className="font-medium text-foreground">{rulePack?.service_name}</span> against existing services, schedule, and attendance records.
+          Checks if <span className="font-medium text-foreground">{rulePack?.service_name}</span> conflicts with another service (same-time or same-day billing restrictions).
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Many guidelines prohibit billing two specific services at the same time or same day. This is one of the biggest causes of billing denials. <span className="italic text-muted-foreground/80">"You can't bill Service A at the same time as Service B — this catches that before it becomes a problem."</span></p>
+        </div>
       </div>
 
       {results.length === 0 && (

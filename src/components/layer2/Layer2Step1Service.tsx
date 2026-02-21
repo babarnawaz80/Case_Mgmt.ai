@@ -74,8 +74,12 @@ export function Layer2Step1Service({ selectedRulePack, onRulePackSelected, onNex
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 1 — Identify Service & Context</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Select a service from the published Rule Pack library. The matching rule pack will be loaded with all compliance rules.
+          Select the service you're working on. The agent loads the person's profile, PCP, existing services, and schedule.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Compliance is always service-specific and person-specific. The agent must know which service and who it's for before it can apply the right rules.</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 p-1.5 rounded-xl bg-primary/5 border border-primary/20">

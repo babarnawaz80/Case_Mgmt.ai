@@ -49,8 +49,12 @@ export function Layer2Step3PCP({ rulePack, onBack, onNext }: Props) {
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 3 — PCP Alignment Check</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Comparing rule pack PCP requirements against current Person-Centered Plan for <span className="font-medium text-foreground">{rulePack?.service_name}</span>.
+          Confirms the Person-Centered Plan supports <span className="font-medium text-foreground">{rulePack?.service_name}</span>: justification, goals, and required language.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Many state rules require the PCP to justify the service. If the PCP doesn't support it, it can fail authorization or audit review — even if services were delivered. <span className="italic text-muted-foreground/80">"Does the plan explain why we're doing this service?"</span></p>
+        </div>
       </div>
 
       {checks.length === 0 && (

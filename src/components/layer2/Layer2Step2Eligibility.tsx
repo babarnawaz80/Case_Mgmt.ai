@@ -52,8 +52,12 @@ export function Layer2Step2Eligibility({ rulePack, onBack, onNext }: Props) {
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 2 — Eligibility & Prerequisites</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Running <span className="font-medium text-foreground">{rulePack?.service_name}</span> eligibility rules and prerequisite requirements.
+          Checks if the individual qualifies for <span className="font-medium text-foreground">{rulePack?.service_name}</span> and whether required prerequisites are met.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">If eligibility or prerequisites aren't met, the authorization can be denied or the service billed incorrectly. This step prevents "starting off wrong." <span className="italic text-muted-foreground/80">In plain terms: "Is this person allowed to receive this service?"</span></p>
+        </div>
       </div>
 
       {checks.length === 0 && (

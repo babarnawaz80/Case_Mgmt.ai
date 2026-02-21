@@ -28,8 +28,12 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 6 — Publish Rule Packs</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Activate rule packs to make them available for Layer 2 Case Manager Compliance Agents. This is an admin action.
+          Marks the rule packs as "approved" so case managers can use them.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Your compliance rules should never change without oversight — this protects you legally and operationally. Admin gets final say.</p>
+        </div>
       </div>
 
       {/* Summary card */}

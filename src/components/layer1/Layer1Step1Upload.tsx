@@ -54,6 +54,10 @@ export function Layer1Step1Upload({
         <p className="text-sm text-muted-foreground">
           Upload the state guideline PDF (required). Optionally add templates, service lists, and billing code mappings.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">The AI reads the uploaded guideline PDF and understands its sections and structure. If it doesn't read the guideline carefully first, it can't reliably extract rules like billing units, limits, and documentation requirements.</p>
+        </div>
       </div>
 
       {/* Required: State Guideline PDF */}

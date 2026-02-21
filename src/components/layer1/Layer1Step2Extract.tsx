@@ -71,7 +71,11 @@ export function Layer1Step2Extract({ rulePacks, onRulePacksGenerated, onBack, on
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 2 — Extract Services</h2>
-        <p className="text-sm text-muted-foreground mt-1">AI reads the full PDF and identifies all distinct services and headings.</p>
+        <p className="text-sm text-muted-foreground mt-1">Finds every service described in the guideline (one by one) and lists them.</p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">The guideline is organized by service. If we miss a service, we miss rules — and that creates billing denials or audit risk.</p>
+        </div>
       </div>
 
       {displayList.length === 0 && (

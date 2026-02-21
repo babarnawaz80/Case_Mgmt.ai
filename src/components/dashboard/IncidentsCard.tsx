@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 export function IncidentsCard() {
   return (
@@ -7,30 +7,33 @@ export function IncidentsCard() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="glass rounded-xl p-6"
+      className="rounded-2xl bg-card border border-border/40 p-5 h-full flex flex-col"
     >
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-display font-semibold text-foreground text-lg">Incidents</h3>
-          <p className="text-sm text-muted-foreground">1/20/2026 – 2/20/2026</p>
-        </div>
+        <h3 className="font-display font-semibold text-foreground text-sm">Incidents</h3>
+        <span className="text-[10px] text-muted-foreground">Jan 20 – Feb 20</span>
       </div>
 
-      <div className="flex items-center justify-center py-6">
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
         <div className="relative">
-          <div className="w-28 h-28 rounded-full border-4 border-secondary flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-3xl font-display font-bold text-foreground">0</p>
-              <p className="text-xs text-muted-foreground mt-0.5"># reported</p>
-            </div>
+          <div className="w-16 h-16 rounded-2xl bg-[hsl(152,55%,42%)]/10 border border-[hsl(152,55%,42%)]/20 flex items-center justify-center">
+            <ShieldCheck className="w-7 h-7 text-[hsl(152,55%,42%)]" />
           </div>
-          <div className="absolute -top-1 -right-1 p-1.5 rounded-full bg-success/20">
-            <AlertTriangle className="w-4 h-4 text-success" />
+          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[hsl(152,55%,42%)] flex items-center justify-center">
+            <span className="text-[9px] font-bold text-white">0</span>
           </div>
+        </div>
+        <div className="text-center">
+          <p className="text-2xl font-display font-bold text-foreground">0</p>
+          <p className="text-[11px] text-muted-foreground">Reported this period</p>
         </div>
       </div>
 
-      <p className="text-center text-sm text-muted-foreground">No incidents reported this period</p>
+      <div className="mt-auto pt-3 border-t border-border/40">
+        <p className="text-[10px] text-[hsl(152,55%,42%)] font-medium text-center flex items-center justify-center gap-1">
+          <ShieldCheck className="w-3 h-3" /> All clear — no incidents
+        </p>
+      </div>
     </motion.div>
   );
 }

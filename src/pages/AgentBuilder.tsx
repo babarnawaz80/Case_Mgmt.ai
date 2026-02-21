@@ -11,6 +11,7 @@ import {
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
 import { Step1GuidelineIngestion } from "@/components/agentbuilder/Step1GuidelineIngestion";
 import { Step2WorkflowGenerator } from "@/components/agentbuilder/Step2WorkflowGenerator";
+import { Step3DataMapping } from "@/components/agentbuilder/Step3DataMapping";
 import { Step3PCPValidation } from "@/components/agentbuilder/Step3PCPValidation";
 import { Step4LimitsEngine } from "@/components/agentbuilder/Step4LimitsEngine";
 import { Step5ConflictEngine } from "@/components/agentbuilder/Step5ConflictEngine";
@@ -22,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 const STEPS = [
   { label: "Guideline Ingestion", description: "Upload & parse documents" },
   { label: "Workflow Generator", description: "Auto-build workflow nodes" },
+  { label: "Data Mapping", description: "Map to iCM modules" },
   { label: "PCP Validation", description: "Validate plan compliance" },
   { label: "Limits & Caps", description: "Calculate service caps" },
   { label: "Conflict Engine", description: "Cross-check services" },
@@ -44,7 +46,7 @@ export default function AgentBuilder() {
   const handleFinish = () => {
     toast({
       title: "Agent Deployed Successfully",
-      description: `Compliance agent with ${state.workflowNodes.length} workflow nodes, 7-step validation pipeline, and auto-generated documentation is now active.`,
+      description: `Compliance agent with ${state.workflowNodes.length} workflow nodes, 8-step validation pipeline, and auto-generated documentation is now active.`,
     });
     navigate("/lifeplan");
   };
@@ -67,12 +69,8 @@ export default function AgentBuilder() {
               <Bot className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">
-                Agent Builder
-              </h2>
-              <p className="text-[11px] text-muted-foreground">
-                Dynamic State Compliance Agent
-              </p>
+              <h2 className="font-display font-semibold text-foreground text-sm">Agent Builder</h2>
+              <p className="text-[11px] text-muted-foreground">Dynamic State Compliance Agent</p>
             </div>
           </div>
         </div>
@@ -103,7 +101,7 @@ export default function AgentBuilder() {
 
       {/* Step Indicator */}
       <div className="px-6 py-4 border-b border-border/60 bg-card/50">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <StepIndicator currentStep={state.step} steps={STEPS} />
         </div>
       </div>
@@ -132,19 +130,22 @@ export default function AgentBuilder() {
             />
           )}
           {state.step === 3 && (
-            <Step3PCPValidation rulePacks={state.rulePacks} onBack={() => goTo(2)} onNext={() => goTo(4)} />
+            <Step3DataMapping rulePacks={state.rulePacks} onBack={() => goTo(2)} onNext={() => goTo(4)} />
           )}
           {state.step === 4 && (
-            <Step4LimitsEngine rulePacks={state.rulePacks} onBack={() => goTo(3)} onNext={() => goTo(5)} />
+            <Step3PCPValidation rulePacks={state.rulePacks} onBack={() => goTo(3)} onNext={() => goTo(5)} />
           )}
           {state.step === 5 && (
-            <Step5ConflictEngine onBack={() => goTo(4)} onNext={() => goTo(6)} />
+            <Step4LimitsEngine rulePacks={state.rulePacks} onBack={() => goTo(4)} onNext={() => goTo(6)} />
           )}
           {state.step === 6 && (
-            <Step6DocumentationGenerator onBack={() => goTo(5)} onNext={() => goTo(7)} />
+            <Step5ConflictEngine onBack={() => goTo(5)} onNext={() => goTo(7)} />
           )}
           {state.step === 7 && (
-            <Step7AuthorizationOutput onBack={() => goTo(6)} onFinish={handleFinish} />
+            <Step6DocumentationGenerator onBack={() => goTo(6)} onNext={() => goTo(8)} />
+          )}
+          {state.step === 8 && (
+            <Step7AuthorizationOutput onBack={() => goTo(7)} onFinish={handleFinish} />
           )}
         </div>
       </main>

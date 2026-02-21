@@ -11,14 +11,22 @@ import {
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
 import { Step1GuidelineIngestion } from "@/components/agentbuilder/Step1GuidelineIngestion";
 import { Step2WorkflowGenerator } from "@/components/agentbuilder/Step2WorkflowGenerator";
+import { Step3PCPValidation } from "@/components/agentbuilder/Step3PCPValidation";
+import { Step4LimitsEngine } from "@/components/agentbuilder/Step4LimitsEngine";
+import { Step5ConflictEngine } from "@/components/agentbuilder/Step5ConflictEngine";
+import { Step6DocumentationGenerator } from "@/components/agentbuilder/Step6DocumentationGenerator";
+import { Step7AuthorizationOutput } from "@/components/agentbuilder/Step7AuthorizationOutput";
 import { AgentBuilderState } from "@/types/rulePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
   { label: "Guideline Ingestion", description: "Upload & parse documents" },
   { label: "Workflow Generator", description: "Auto-build workflow nodes" },
-  { label: "Data Mapping", description: "Coming soon" },
-  { label: "Module Push", description: "Coming soon" },
+  { label: "PCP Validation", description: "Validate plan compliance" },
+  { label: "Limits & Caps", description: "Calculate service caps" },
+  { label: "Conflict Engine", description: "Cross-check services" },
+  { label: "Doc Generator", description: "Auto-generate templates" },
+  { label: "Authorization", description: "Final output & tasks" },
 ];
 
 export default function AgentBuilder() {
@@ -35,11 +43,13 @@ export default function AgentBuilder() {
 
   const handleFinish = () => {
     toast({
-      title: "Agent Created",
-      description: `Workflow with ${state.workflowNodes.length} nodes has been saved. Steps 3-4 coming soon.`,
+      title: "Agent Deployed Successfully",
+      description: `Compliance agent with ${state.workflowNodes.length} workflow nodes, 7-step validation pipeline, and auto-generated documentation is now active.`,
     });
     navigate("/lifeplan");
   };
+
+  const goTo = (step: number) => setState((s) => ({ ...s, step }));
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
@@ -93,7 +103,7 @@ export default function AgentBuilder() {
 
       {/* Step Indicator */}
       <div className="px-6 py-4 border-b border-border/60 bg-card/50">
-        <div className="max-w-[1000px] mx-auto">
+        <div className="max-w-[1100px] mx-auto">
           <StepIndicator currentStep={state.step} steps={STEPS} />
         </div>
       </div>
@@ -106,29 +116,35 @@ export default function AgentBuilder() {
               uploadedFiles={state.uploadedFiles}
               rulePacks={state.rulePacks}
               isProcessing={state.isProcessing}
-              onFilesUploaded={(files) =>
-                setState((s) => ({ ...s, uploadedFiles: files }))
-              }
-              onRulePacksGenerated={(packs) =>
-                setState((s) => ({ ...s, rulePacks: packs }))
-              }
-              onProcessingChange={(p) =>
-                setState((s) => ({ ...s, isProcessing: p }))
-              }
-              onNext={() => setState((s) => ({ ...s, step: 2 }))}
+              onFilesUploaded={(files) => setState((s) => ({ ...s, uploadedFiles: files }))}
+              onRulePacksGenerated={(packs) => setState((s) => ({ ...s, rulePacks: packs }))}
+              onProcessingChange={(p) => setState((s) => ({ ...s, isProcessing: p }))}
+              onNext={() => goTo(2)}
             />
           )}
-
           {state.step === 2 && (
             <Step2WorkflowGenerator
               rulePacks={state.rulePacks}
               workflowNodes={state.workflowNodes}
-              onWorkflowGenerated={(nodes) =>
-                setState((s) => ({ ...s, workflowNodes: nodes }))
-              }
-              onBack={() => setState((s) => ({ ...s, step: 1 }))}
-              onFinish={handleFinish}
+              onWorkflowGenerated={(nodes) => setState((s) => ({ ...s, workflowNodes: nodes }))}
+              onBack={() => goTo(1)}
+              onFinish={() => goTo(3)}
             />
+          )}
+          {state.step === 3 && (
+            <Step3PCPValidation rulePacks={state.rulePacks} onBack={() => goTo(2)} onNext={() => goTo(4)} />
+          )}
+          {state.step === 4 && (
+            <Step4LimitsEngine rulePacks={state.rulePacks} onBack={() => goTo(3)} onNext={() => goTo(5)} />
+          )}
+          {state.step === 5 && (
+            <Step5ConflictEngine onBack={() => goTo(4)} onNext={() => goTo(6)} />
+          )}
+          {state.step === 6 && (
+            <Step6DocumentationGenerator onBack={() => goTo(5)} onNext={() => goTo(7)} />
+          )}
+          {state.step === 7 && (
+            <Step7AuthorizationOutput onBack={() => goTo(6)} onFinish={handleFinish} />
           )}
         </div>
       </main>

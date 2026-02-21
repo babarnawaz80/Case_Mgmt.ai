@@ -28,10 +28,10 @@ function generateWorkflowFromRulePacks(rulePacks: RulePack[]): WorkflowNode[] {
     {
       id: "wf-1",
       step: 1,
-      name: "Intake & Service Identification",
+      name: "Service Intake",
       type: "intake",
       description:
-        "Triggered when case manager selects a service. Loads the corresponding rule pack and pulls participant profile data.",
+        "Triggered when case manager selects a service. Identifies service type, loads corresponding rule pack, and pulls participant profile data.",
       triggers: [
         "Case manager selects service from service catalog",
         "New authorization request initiated",
@@ -40,7 +40,7 @@ function generateWorkflowFromRulePacks(rulePacks: RulePack[]): WorkflowNode[] {
         "Identify selected service from rule pack library",
         "Load corresponding rule pack configuration",
         "Pull participant profile data (demographics, waiver, assessments)",
-        "Initialize workflow tracking record",
+        "Initialize compliance tracking record",
       ],
       validations: [
         "Service exists in rule pack library",
@@ -50,19 +50,19 @@ function generateWorkflowFromRulePacks(rulePacks: RulePack[]): WorkflowNode[] {
       output: [
         "Service rule pack loaded",
         "Participant profile retrieved",
-        "Workflow instance created",
+        "Compliance workflow instance created",
       ],
       status: "complete",
     },
     {
       id: "wf-2",
       step: 2,
-      name: "Eligibility Validation",
+      name: "Eligibility Check",
       type: "eligibility",
       description:
         "Validates participant eligibility against rule pack criteria. Auto-creates tasks for any unmet requirements.",
       triggers: [
-        "Intake step completed successfully",
+        "Service Intake step completed successfully",
         "Re-validation requested by case manager",
       ],
       actions: [
@@ -86,23 +86,151 @@ function generateWorkflowFromRulePacks(rulePacks: RulePack[]): WorkflowNode[] {
       ],
       status: "active",
     },
+    {
+      id: "wf-3",
+      step: 3,
+      name: "PCP Validation",
+      type: "pcp_validation",
+      description:
+        "Validates Person-Centered Plan for required justifications, employment language, behavioral triggers, SMART goals, and team certification.",
+      triggers: [
+        "Eligibility Check passed",
+        "PCP document updated",
+      ],
+      actions: [
+        "Scan PCP for service justification narrative",
+        "Check employment interest language presence",
+        "Validate behavioral trigger documentation",
+        "Verify SMART goal formatting and completeness",
+        "Confirm team certification currency",
+      ],
+      validations: [
+        "Service justification present",
+        "Employment interest documented",
+        "Behavioral triggers identified",
+        "All goals are SMART-formatted",
+        "Team certifications current",
+      ],
+      output: [
+        "PCP Compliance: PASS or FAIL per category",
+        "Auto-generated PCP addendum for missing items",
+        "Tasks created in Workflow Manager",
+      ],
+      status: "pending",
+    },
+    {
+      id: "wf-4",
+      step: 4,
+      name: "Limit & Conflict Engine",
+      type: "limits",
+      description:
+        "Calculates service caps, checks for scheduling conflicts, and enforces billing rules across all authorized services.",
+      triggers: [
+        "PCP Validation completed",
+        "Service schedule modified",
+      ],
+      actions: [
+        "Calculate daily/weekly/plan-year caps",
+        "Cross-check against existing authorized services",
+        "Validate attendance against billing units",
+        "Check for concurrent billing conflicts",
+      ],
+      validations: [
+        "Within daily service cap",
+        "Within weekly service cap",
+        "No concurrent billing violations",
+        "No schedule overlaps detected",
+      ],
+      output: [
+        "Cap utilization report",
+        "Hard stops for violations",
+        "Warnings for approaching limits",
+        "Conflict resolution suggestions",
+      ],
+      status: "pending",
+    },
+    {
+      id: "wf-5",
+      step: 5,
+      name: "Documentation Generation",
+      type: "documentation",
+      description:
+        "Auto-generates all required documentation templates based on service type and state guidelines.",
+      triggers: [
+        "Limit & Conflict Engine passed",
+        "Case manager requests documentation",
+      ],
+      actions: [
+        "Generate billable activity note template",
+        "Create progress note structure",
+        "Build behavioral assessment form",
+        "Prepare employment plan template",
+        "Configure monitoring form",
+      ],
+      validations: [
+        "All required fields included",
+        "Templates match state guidelines",
+        "Goal tie-ins configured",
+      ],
+      output: [
+        "Complete documentation package",
+        "Templates pushed to respective modules",
+        "Missing document checklist",
+      ],
+      status: "pending",
+    },
+    {
+      id: "wf-6",
+      step: 6,
+      name: "Authorization Output",
+      type: "authorization",
+      description:
+        "Generates final authorization recommendation with compliance score, risk assessment, and actionable task list.",
+      triggers: [
+        "All prior steps completed",
+        "Case manager requests authorization summary",
+      ],
+      actions: [
+        "Calculate compliance score",
+        "Assess risk level",
+        "Compile missing documentation",
+        "Generate task assignments",
+        "Prepare authorization recommendation",
+      ],
+      validations: [
+        "All hard stops resolved",
+        "Required documentation complete",
+        "PCP validation passed",
+      ],
+      output: [
+        "Authorization recommendation summary",
+        "Compliance score with breakdown",
+        "Risk score with flagged items",
+        "Prioritized task list",
+      ],
+      status: "pending",
+    },
   ];
 }
 
 const nodeIcons: Record<string, typeof Zap> = {
   intake: ClipboardList,
   eligibility: ShieldCheck,
-  authorization: Zap,
+  pcp_validation: ClipboardList,
+  limits: AlertTriangle,
   documentation: ClipboardList,
+  authorization: Zap,
   monitoring: AlertTriangle,
 };
 
 const nodeColors: Record<string, string> = {
   intake: "from-[hsl(200,65%,52%)] to-[hsl(210,55%,62%)]",
   eligibility: "from-[hsl(160,45%,48%)] to-[hsl(160,40%,58%)]",
-  authorization: "from-[hsl(270,50%,58%)] to-[hsl(270,45%,68%)]",
-  documentation: "from-[hsl(30,70%,55%)] to-[hsl(30,60%,65%)]",
-  monitoring: "from-[hsl(350,55%,58%)] to-[hsl(350,50%,68%)]",
+  pcp_validation: "from-[hsl(270,50%,58%)] to-[hsl(270,45%,68%)]",
+  limits: "from-[hsl(30,70%,55%)] to-[hsl(30,60%,65%)]",
+  documentation: "from-[hsl(190,55%,48%)] to-[hsl(190,50%,58%)]",
+  authorization: "from-[hsl(350,55%,58%)] to-[hsl(350,50%,68%)]",
+  monitoring: "from-[hsl(40,60%,50%)] to-[hsl(40,50%,60%)]",
 };
 
 export function Step2WorkflowGenerator({

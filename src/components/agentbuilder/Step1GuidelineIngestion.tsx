@@ -26,120 +26,60 @@ interface Step1Props {
 
 // Simulated rule pack generation from uploaded files
 function generateMockRulePacks(files: UploadedFile[]): RulePack[] {
-  const services = [
+  const toRuleItems = (items: string[]) => items.map((t) => ({ rule_type: "rule", rule_text: t }));
+  const toLimitRules = (items: string[]) => items.map((t) => ({ type: "daily" as const, rule_text: t }));
+  const toConflictRules = (items: string[]) => items.map((t) => ({ type: "same_time" as const, conflicting_service: "N/A", rule_text: t }));
+
+  const base = {
+    guideline_version_date: "2026-01-15",
+    state: "Example State",
+    program_waiver_type: "HCBS",
+    source_service_name: "",
+    service_category: "Support" as const,
+    service_description: "",
+    authorization_requirements: [] as { rule_type: string; rule_text: string }[],
+    self_directed_differences: [] as { rule_type: string; rule_text: string }[],
+    hard_stops: [{ rule_type: "cap", rule_text: "Cannot exceed authorized cap" }],
+    warnings: [{ rule_type: "threshold", rule_text: "Warning at 80% utilization" }],
+    citations: [{ page: "p.10", section: "§3.1", text: "See guideline" }],
+    published: false,
+    created_by: "Admin",
+    created_at: new Date().toISOString(),
+  };
+
+  const services: RulePack[] = [
     {
-      id: "rp-1",
-      service_name: "Personal Care Services (PCS)",
-      billing_unit: "15-minute increments",
-      eligibility_rules: [
-        "Must be enrolled in applicable Medicaid waiver",
-        "Age 21+ unless EPSDT exception applies",
-        "Documented need for assistance with ADLs",
-      ],
-      pcp_requirements: [
-        "Person-Centered Plan must be completed annually",
-        "Goals must be measurable and time-bound",
-        "Individual must participate in plan development",
-      ],
-      prerequisite_requirements: [
-        "Level of Care assessment completed",
-        "Functional assessment within 90 days",
-        "Natural supports exploration documented",
-      ],
-      limits: [
-        "Maximum 40 hours per week",
-        "Cannot exceed authorized units per plan year",
-        "Daily cap of 8 hours unless exception granted",
-      ],
-      conflicts: [
-        "Cannot bill concurrently with Day Habilitation",
-        "Cannot overlap with Residential Habilitation hours",
-      ],
-      documentation_requirements: [
-        "Daily service notes required within 24 hours",
-        "Monthly progress summaries",
-        "Incident reports within 4 hours",
-      ],
-      monitoring_rules: [
-        "Quarterly review by case manager",
-        "Annual recertification required",
-        "Random documentation audits monthly",
-      ],
+      ...base, id: "rp-1", service_name: "Personal Care Services (PCS)", source_service_name: "Personal Care Services (PCS)",
+      billing_unit: "15 min",
+      eligibility_rules: toRuleItems(["Must be enrolled in applicable Medicaid waiver", "Age 21+ unless EPSDT exception applies", "Documented need for assistance with ADLs"]),
+      pcp_requirements: toRuleItems(["Person-Centered Plan must be completed annually", "Goals must be measurable and time-bound", "Individual must participate in plan development"]),
+      prerequisite_requirements: toRuleItems(["Level of Care assessment completed", "Functional assessment within 90 days", "Natural supports exploration documented"]),
+      limits: toLimitRules(["Maximum 40 hours per week", "Cannot exceed authorized units per plan year", "Daily cap of 8 hours unless exception granted"]),
+      conflicts: toConflictRules(["Cannot bill concurrently with Day Habilitation", "Cannot overlap with Residential Habilitation hours"]),
+      documentation_requirements: toRuleItems(["Daily service notes required within 24 hours", "Monthly progress summaries", "Incident reports within 4 hours"]),
+      monitoring_rules: toRuleItems(["Quarterly review by case manager", "Annual recertification required", "Random documentation audits monthly"]),
     },
     {
-      id: "rp-2",
-      service_name: "Day Habilitation Services",
-      billing_unit: "Hourly",
-      eligibility_rules: [
-        "Enrolled in HCBS waiver",
-        "Requires skill-building support",
-        "Not enrolled in school full-time if under 21",
-      ],
-      pcp_requirements: [
-        "Community integration goals required",
-        "Skill acquisition targets documented",
-        "Preferences and interests incorporated",
-      ],
-      prerequisite_requirements: [
-        "Vocational assessment completed",
-        "Transportation plan in place",
-      ],
-      limits: [
-        "Maximum 6 hours per day",
-        "5 days per week maximum",
-        "Plan year cap of 1,560 hours",
-      ],
-      conflicts: [
-        "Cannot bill with PCS during same hours",
-        "Cannot bill during school hours for minors",
-      ],
-      documentation_requirements: [
-        "Attendance logs daily",
-        "Skill acquisition data tracking",
-        "Monthly progress notes to case manager",
-      ],
-      monitoring_rules: [
-        "Semi-annual quality reviews",
-        "Staff ratio compliance checks",
-        "Community integration percentage tracking",
-      ],
+      ...base, id: "rp-2", service_name: "Day Habilitation Services", source_service_name: "Day Habilitation Services",
+      billing_unit: "hourly", service_category: "Meaningful Day",
+      eligibility_rules: toRuleItems(["Enrolled in HCBS waiver", "Requires skill-building support", "Not enrolled in school full-time if under 21"]),
+      pcp_requirements: toRuleItems(["Community integration goals required", "Skill acquisition targets documented", "Preferences and interests incorporated"]),
+      prerequisite_requirements: toRuleItems(["Vocational assessment completed", "Transportation plan in place"]),
+      limits: toLimitRules(["Maximum 6 hours per day", "5 days per week maximum", "Plan year cap of 1,560 hours"]),
+      conflicts: toConflictRules(["Cannot bill with PCS during same hours", "Cannot bill during school hours for minors"]),
+      documentation_requirements: toRuleItems(["Attendance logs daily", "Skill acquisition data tracking", "Monthly progress notes to case manager"]),
+      monitoring_rules: toRuleItems(["Semi-annual quality reviews", "Staff ratio compliance checks", "Community integration percentage tracking"]),
     },
     {
-      id: "rp-3",
-      service_name: "Respite Care Services",
-      billing_unit: "15-minute increments",
-      eligibility_rules: [
-        "Primary caregiver identified",
-        "Waiver enrolled participant",
-        "Documented caregiver stress or need for relief",
-      ],
-      pcp_requirements: [
-        "Respite schedule in PCP",
-        "Emergency protocols documented",
-        "Caregiver training plan included",
-      ],
-      prerequisite_requirements: [
-        "Caregiver assessment completed",
-        "Background check for respite provider",
-      ],
-      limits: [
-        "Maximum 720 hours per plan year",
-        "Daily cap of 24 hours for in-home",
-        "Facility respite limited to 30 consecutive days",
-      ],
-      conflicts: [
-        "Cannot bill with PCS simultaneously",
-        "Cannot bill during Day Hab hours",
-      ],
-      documentation_requirements: [
-        "Service delivery logs",
-        "Caregiver sign-off sheets",
-        "Incident reporting same as PCS",
-      ],
-      monitoring_rules: [
-        "Quarterly utilization reviews",
-        "Caregiver satisfaction surveys annually",
-      ],
+      ...base, id: "rp-3", service_name: "Respite Care Services", source_service_name: "Respite Care Services",
+      billing_unit: "15 min",
+      eligibility_rules: toRuleItems(["Primary caregiver identified", "Waiver enrolled participant", "Documented caregiver stress or need for relief"]),
+      pcp_requirements: toRuleItems(["Respite schedule in PCP", "Emergency protocols documented", "Caregiver training plan included"]),
+      prerequisite_requirements: toRuleItems(["Caregiver assessment completed", "Background check for respite provider"]),
+      limits: toLimitRules(["Maximum 720 hours per plan year", "Daily cap of 24 hours for in-home", "Facility respite limited to 30 consecutive days"]),
+      conflicts: toConflictRules(["Cannot bill with PCS simultaneously", "Cannot bill during Day Hab hours"]),
+      documentation_requirements: toRuleItems(["Service delivery logs", "Caregiver sign-off sheets", "Incident reporting same as PCS"]),
+      monitoring_rules: toRuleItems(["Quarterly utilization reviews", "Caregiver satisfaction surveys annually"]),
     },
   ];
 
@@ -429,16 +369,16 @@ export function Step1GuidelineIngestion({
                 <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <RuleSection
                     title="Eligibility"
-                    items={pack.eligibility_rules}
+                    items={pack.eligibility_rules.map((r) => r.rule_text)}
                   />
                   <RuleSection
                     title="PCP Requirements"
-                    items={pack.pcp_requirements}
+                    items={pack.pcp_requirements.map((r) => r.rule_text)}
                   />
-                  <RuleSection title="Limits" items={pack.limits} />
+                  <RuleSection title="Limits" items={pack.limits.map((r) => r.rule_text)} />
                   <RuleSection
                     title="Documentation"
-                    items={pack.documentation_requirements}
+                    items={pack.documentation_requirements.map((r) => r.rule_text)}
                   />
                 </div>
               </motion.div>

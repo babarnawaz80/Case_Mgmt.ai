@@ -155,7 +155,7 @@ export function Layer2Step7Push({ rulePack, onBack, onFinish }: Props) {
         </button>
         {allDone && (
           <button onClick={onFinish} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-            <CheckCircle2 className="h-4 w-4" /> Complete Compliance Check
+            <CheckCircle2 className="h-4 w-4" /> View Compliance Dashboard
           </button>
         )}
       </div>

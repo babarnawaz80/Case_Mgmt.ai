@@ -51,7 +51,7 @@ export function LifePlanAgentCard({ agent, colorIndex = 0, onClick, onDelete }: 
             "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
             isLayer1 ? "bg-white/20 text-white" : "bg-white/15 text-white/80"
           )}>
-            {isLayer1 ? "Admin" : "CM"}
+            {isLayer1 ? "Training" : "Runtime"}
           </span>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function LifePlanAgentCard({ agent, colorIndex = 0, onClick, onDelete }: 
           onClick={(e) => { e.stopPropagation(); onClick?.(agent); }}
         >
           <Play className="h-3 w-3 fill-current" />
-          {isLayer1 ? "Open Parser" : "Open Agent"}
+          {isLayer1 ? "Open Training" : "Run Agent"}
         </button>
       </div>
     </div>

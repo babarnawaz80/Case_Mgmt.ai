@@ -2,45 +2,48 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, Shield, Bot, LayoutDashboard, User, Sparkles,
+  ArrowLeft, Shield, User, Sparkles,
 } from "lucide-react";
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
 import { Layer1Step1Upload } from "@/components/layer1/Layer1Step1Upload";
-import { Layer1Step2Extract } from "@/components/layer1/Layer1Step2Extract";
-import { Layer1Step3Build } from "@/components/layer1/Layer1Step3Build";
-import { Layer1Step4Normalize } from "@/components/layer1/Layer1Step4Normalize";
-import { Layer1Step5Review } from "@/components/layer1/Layer1Step5Review";
-import { Layer1Step6Publish } from "@/components/layer1/Layer1Step6Publish";
-import { Layer1State, RulePack, UploadedFile } from "@/types/rulePack";
+import { Layer1Step2Templates } from "@/components/layer1/Layer1Step2Templates";
+import { Layer1Step3DataMapping } from "@/components/layer1/Layer1Step3DataMapping";
+import { Layer1Step4ReviewPublish } from "@/components/layer1/Layer1Step4ReviewPublish";
+import { UploadedFile, RulePack, ExtractionSummary } from "@/types/rulePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
-  { label: "Ingest Guidelines", description: "Upload PDF & optional docs" },
-  { label: "Extract Services", description: "Identify all services" },
-  { label: "Build Rule Packs", description: "Structure per service" },
-  { label: "Normalize & De-dup", description: "Clean service naming" },
-  { label: "Admin Review", description: "Review & flag issues" },
-  { label: "Publish", description: "Activate rule packs" },
+  { label: "Upload Guidelines", description: "Parse PDF → Build Rule Packs" },
+  { label: "Upload Templates", description: "Optional doc templates" },
+  { label: "Data Mapping", description: "Configure iCM module outputs" },
+  { label: "Review & Publish", description: "Admin approval & publish" },
 ];
+
+interface ModuleConfig {
+  id: string;
+  name: string;
+  icon: any;
+  description: string;
+  enabled: boolean;
+  fields: string[];
+}
 
 export default function Layer1AgentBuilder() {
   const navigate = useNavigate();
-  const [state, setState] = useState<Layer1State>({
-    step: 1,
-    uploadedFiles: [],
-    optionalTemplates: [],
-    serviceCodeMapping: "",
-    rulePacks: [],
-    extractionSummary: null,
-    isProcessing: false,
-  });
+  const [step, setStep] = useState(1);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [templates, setTemplates] = useState<UploadedFile[]>([]);
+  const [serviceCodeMapping, setServiceCodeMapping] = useState("");
+  const [moduleConfigs, setModuleConfigs] = useState<ModuleConfig[]>([]);
+  const [rulePacks] = useState<RulePack[]>([]);
+  const [extractionSummary, setExtractionSummary] = useState<ExtractionSummary | null>(null);
 
-  const goTo = (step: number) => setState((s) => ({ ...s, step }));
+  const goTo = (s: number) => setStep(s);
 
   const handlePublish = () => {
     toast({
-      title: "Rule Packs Published",
-      description: `${state.rulePacks.length} rule packs are now available for Case Manager Compliance Agents.`,
+      title: "Agent Trained & Ready",
+      description: "Rule Packs published. Case Manager Compliance Agents can now use these rules.",
     });
     navigate("/lifeplan");
   };
@@ -57,8 +60,8 @@ export default function Layer1AgentBuilder() {
               <Shield className="w-4 h-4 text-destructive-foreground" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">Layer 1 — Guideline Parsing Agent</h2>
-              <p className="text-[11px] text-muted-foreground">Admin Only · Converts PDFs → Structured Rule Packs</p>
+              <h2 className="font-display font-semibold text-foreground text-sm">Phase 1 — Agent Training</h2>
+              <p className="text-[11px] text-muted-foreground">Admin Only · Train agent on state guidelines & configure module mapping</p>
             </div>
           </div>
         </div>
@@ -74,60 +77,43 @@ export default function Layer1AgentBuilder() {
 
       <div className="px-6 py-4 border-b border-border/60 bg-card/50 overflow-x-auto">
         <div className="max-w-[1200px] mx-auto min-w-[700px]">
-          <StepIndicator currentStep={state.step} steps={STEPS} />
+          <StepIndicator currentStep={step} steps={STEPS} />
         </div>
       </div>
 
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-[1000px] mx-auto">
-          {state.step === 1 && (
+          {step === 1 && (
             <Layer1Step1Upload
-              uploadedFiles={state.uploadedFiles}
-              optionalTemplates={state.optionalTemplates}
-              serviceCodeMapping={state.serviceCodeMapping}
-              onFilesChange={(files) => setState((s) => ({ ...s, uploadedFiles: files }))}
-              onTemplatesChange={(files) => setState((s) => ({ ...s, optionalTemplates: files }))}
-              onMappingChange={(m) => setState((s) => ({ ...s, serviceCodeMapping: m }))}
+              uploadedFiles={uploadedFiles}
+              serviceCodeMapping={serviceCodeMapping}
+              onFilesChange={setUploadedFiles}
+              onMappingChange={setServiceCodeMapping}
               onNext={() => goTo(2)}
             />
           )}
-          {state.step === 2 && (
-            <Layer1Step2Extract
-              rulePacks={state.rulePacks}
-              onRulePacksGenerated={(packs) => setState((s) => ({ ...s, rulePacks: packs }))}
+          {step === 2 && (
+            <Layer1Step2Templates
+              templates={templates}
+              onTemplatesChange={setTemplates}
               onBack={() => goTo(1)}
               onNext={() => goTo(3)}
             />
           )}
-          {state.step === 3 && (
-            <Layer1Step3Build
-              rulePacks={state.rulePacks}
+          {step === 3 && (
+            <Layer1Step3DataMapping
+              moduleConfigs={moduleConfigs}
+              onConfigsChange={setModuleConfigs}
               onBack={() => goTo(2)}
               onNext={() => goTo(4)}
             />
           )}
-          {state.step === 4 && (
-            <Layer1Step4Normalize
-              rulePacks={state.rulePacks}
-              onRulePacksUpdated={(packs) => setState((s) => ({ ...s, rulePacks: packs }))}
+          {step === 4 && (
+            <Layer1Step4ReviewPublish
+              rulePacks={rulePacks}
+              extractionSummary={extractionSummary}
+              onSummaryGenerated={setExtractionSummary}
               onBack={() => goTo(3)}
-              onNext={() => goTo(5)}
-            />
-          )}
-          {state.step === 5 && (
-            <Layer1Step5Review
-              rulePacks={state.rulePacks}
-              onSummaryGenerated={(summary) => setState((s) => ({ ...s, extractionSummary: summary }))}
-              extractionSummary={state.extractionSummary}
-              onBack={() => goTo(4)}
-              onNext={() => goTo(6)}
-            />
-          )}
-          {state.step === 6 && (
-            <Layer1Step6Publish
-              rulePacks={state.rulePacks}
-              extractionSummary={state.extractionSummary}
-              onBack={() => goTo(5)}
               onPublish={handlePublish}
             />
           )}

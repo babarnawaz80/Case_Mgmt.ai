@@ -67,10 +67,10 @@ export default function LifePlanBoard() {
                   <Layers className="h-7 w-7 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-foreground">Compliance Agent Platform</h1>
+                <h1 className="text-2xl font-display font-bold text-foreground">Compliance Agent Platform</h1>
                   <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    Two-layer architecture: Admin parsing → Case Manager compliance
+                    Two-phase architecture: Phase 1 (Train Agent) → Phase 2 (Execute Compliance)
                   </p>
                 </div>
               </div>
@@ -80,14 +80,14 @@ export default function LifePlanBoard() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(30,70%,55%)] text-destructive-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
                 >
                   <Shield className="h-4 w-4" />
-                  Layer 1: Parse Guidelines
+                  Phase 1: Train Agent
                 </button>
                 <button
                   onClick={() => navigate("/lifeplan/agent/new/layer2")}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
                 >
                   <Bot className="h-4 w-4" />
-                  Layer 2: Compliance Agent
+                  Phase 2: Run Compliance
                 </button>
               </div>
             </div>
@@ -112,7 +112,7 @@ export default function LifePlanBoard() {
           {/* Layer filter + Search */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex items-center rounded-xl border border-border p-1 bg-card">
-              {([["all", "All Agents"], ["layer1", "Layer 1 (Admin)"], ["layer2", "Layer 2 (CM)"]] as const).map(([key, label]) => (
+              {([["all", "All Agents"], ["layer1", "Phase 1 (Training)"], ["layer2", "Phase 2 (Runtime)"]] as const).map(([key, label]) => (
                 <button
                   key={key}
                   className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors", layerFilter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}

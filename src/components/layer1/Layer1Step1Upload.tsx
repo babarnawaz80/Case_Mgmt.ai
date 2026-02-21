@@ -1,66 +1,76 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Upload, FileText, FileSpreadsheet, ClipboardList,
-  CheckCircle2, AlertCircle, X, ArrowRight, Shield,
+  Upload, FileText, CheckCircle2, ArrowRight, Shield,
+  Loader2, Sparkles,
 } from "lucide-react";
 import { UploadedFile } from "@/types/rulePack";
 import { cn } from "@/lib/utils";
 
 interface Props {
   uploadedFiles: UploadedFile[];
-  optionalTemplates: UploadedFile[];
   serviceCodeMapping: string;
   onFilesChange: (files: UploadedFile[]) => void;
-  onTemplatesChange: (files: UploadedFile[]) => void;
   onMappingChange: (m: string) => void;
   onNext: () => void;
 }
 
 export function Layer1Step1Upload({
-  uploadedFiles, optionalTemplates, serviceCodeMapping,
-  onFilesChange, onTemplatesChange, onMappingChange, onNext,
+  uploadedFiles, serviceCodeMapping,
+  onFilesChange, onMappingChange, onNext,
 }: Props) {
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseComplete, setParsComplete] = useState(false);
+
   const handleGuidelineDrop = () => {
     const file: UploadedFile = {
       id: `f-${Date.now()}`,
       name: "State_Waiver_Guidelines_2026.pdf",
       type: "application/pdf",
       size: 4200000,
-      status: "parsed",
-      extractedServices: 12,
+      status: "uploading",
     };
-    onFilesChange([...uploadedFiles, file]);
+    onFilesChange([file]);
+
+    // Simulate: upload → parse → extract services → build rule packs → normalize
+    setIsParsing(true);
+    setTimeout(() => {
+      onFilesChange([{ ...file, status: "processing" }]);
+    }, 800);
+    setTimeout(() => {
+      onFilesChange([{ ...file, status: "parsed", extractedServices: 12 }]);
+      setIsParsing(false);
+      setParsComplete(true);
+    }, 3000);
   };
 
-  const handleTemplateDrop = () => {
-    const templates: UploadedFile[] = [
-      { id: `t-1`, name: "PCP_Addendum_Template.docx", type: "docx", size: 120000, status: "parsed" },
-      { id: `t-2`, name: "Billable_Activity_Note.docx", type: "docx", size: 95000, status: "parsed" },
-      { id: `t-3`, name: "Progress_Note_Template.docx", type: "docx", size: 88000, status: "parsed" },
-      { id: `t-4`, name: "Monitoring_Form.docx", type: "docx", size: 76000, status: "parsed" },
-      { id: `t-5`, name: "Comprehensive_Assessment.docx", type: "docx", size: 145000, status: "parsed" },
-    ];
-    onTemplatesChange(templates);
-  };
+  const parsingSteps = [
+    "Reading PDF structure and sections…",
+    "Extracting all services from guideline…",
+    "Building structured Rule Packs per service…",
+    "Normalizing service names and de-duplicating…",
+    "Storing in StateGuidelineRulePacks database…",
+  ];
 
   return (
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Shield className="h-5 w-5 text-destructive" />
-          <h2 className="text-lg font-display font-bold text-foreground">Step 1 — Ingest Guidelines</h2>
+          <h2 className="text-lg font-display font-bold text-foreground">Step 1 — Upload Guidelines</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          Upload the state guideline PDF (required). Optionally add templates, service lists, and billing code mappings.
+          Upload the state guideline PDF. The agent will automatically parse the entire document, extract every service, build structured Rule Packs, normalize naming, and store them in the database.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">The AI reads the uploaded guideline PDF and understands its sections and structure. If it doesn't read the guideline carefully first, it can't reliably extract rules like billing units, limits, and documentation requirements.</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            This converts a PDF guideline into structured, reusable Rule Packs. Each service becomes one Rule Pack containing billing unit, eligibility rules, authorization requirements, PCP requirements, limits, conflicts, documentation requirements, monitoring rules, hard stops, and warnings. Once stored, case managers never need to read the PDF again.
+          </p>
         </div>
       </div>
 
-      {/* Required: State Guideline PDF */}
+      {/* State Guideline PDF Upload */}
       <div className="space-y-2">
         <p className="text-xs font-semibold text-foreground uppercase tracking-wide">State Guideline PDF <span className="text-destructive">*Required</span></p>
         {uploadedFiles.length === 0 ? (
@@ -73,44 +83,81 @@ export function Layer1Step1Upload({
             <p className="text-xs text-muted-foreground mt-1">State waiver guidelines, program manuals, service definitions</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {uploadedFiles.map((f) => (
-              <motion.div key={f.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
-                <FileText className="h-5 w-5 text-primary shrink-0" />
+              <motion.div key={f.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border",
+                f.status === "parsed" ? "bg-primary/5 border-primary/20" : "bg-muted/30 border-border"
+              )}>
+                <FileText className={cn("h-5 w-5 shrink-0", f.status === "parsed" ? "text-primary" : "text-muted-foreground")} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{f.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{(f.size / 1024 / 1024).toFixed(1)} MB · {f.extractedServices} services identified</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {(f.size / 1024 / 1024).toFixed(1)} MB
+                    {f.status === "parsed" && ` · ${f.extractedServices} services extracted`}
+                    {f.status === "uploading" && " · Uploading…"}
+                    {f.status === "processing" && " · Processing…"}
+                  </p>
                 </div>
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                {f.status === "parsed" ? (
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                ) : (
+                  <Loader2 className="h-4 w-4 text-muted-foreground animate-spin shrink-0" />
+                )}
               </motion.div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Optional: Templates */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Templates & Documents <span className="text-muted-foreground font-normal">(Optional)</span></p>
-        {optionalTemplates.length === 0 ? (
-          <div
-            onClick={handleTemplateDrop}
-            className="border border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/30 hover:bg-muted/30 transition-all"
-          >
-            <ClipboardList className="h-7 w-7 mx-auto text-muted-foreground mb-2" />
-            <p className="text-xs font-medium text-foreground">Upload PCP Addendum, BAN, Progress Note, Monitoring, Assessment templates</p>
+      {/* Auto-processing pipeline */}
+      {isParsing && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 rounded-xl border border-primary/20 bg-primary/5">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            <p className="text-xs font-semibold text-primary">AI Processing Pipeline</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {optionalTemplates.map((t) => (
-              <div key={t.id} className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/30 border border-border/40">
-                <FileSpreadsheet className="h-4 w-4 text-muted-foreground shrink-0" />
-                <p className="text-[11px] font-medium text-foreground truncate">{t.name}</p>
-                <CheckCircle2 className="h-3 w-3 text-primary ml-auto shrink-0" />
+          <div className="space-y-2">
+            {parsingSteps.map((step, i) => (
+              <div key={i} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                {step}
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </motion.div>
+      )}
+
+      {/* Extraction complete summary */}
+      {parseComplete && (
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-4 rounded-xl border border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-3 mb-3">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Extraction Complete</p>
+              <p className="text-[11px] text-muted-foreground">12 services extracted → 12 Rule Packs created → Stored in StateGuidelineRulePacks</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="p-2 rounded-lg bg-card border border-border/40">
+              <p className="text-lg font-bold text-foreground">12</p>
+              <p className="text-[9px] text-muted-foreground uppercase">Services</p>
+            </div>
+            <div className="p-2 rounded-lg bg-card border border-border/40">
+              <p className="text-lg font-bold text-foreground">12</p>
+              <p className="text-[9px] text-muted-foreground uppercase">Rule Packs</p>
+            </div>
+            <div className="p-2 rounded-lg bg-card border border-border/40">
+              <p className="text-lg font-bold text-destructive">24</p>
+              <p className="text-[9px] text-muted-foreground uppercase">Hard Stops</p>
+            </div>
+            <div className="p-2 rounded-lg bg-card border border-border/40">
+              <p className="text-lg font-bold text-warning">12</p>
+              <p className="text-[9px] text-muted-foreground uppercase">Warnings</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Optional: Service Code Mapping */}
       <div className="space-y-2">
@@ -124,10 +171,10 @@ export function Layer1Step1Upload({
       </div>
 
       {/* Continue */}
-      {uploadedFiles.length > 0 && (
+      {parseComplete && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end pt-2">
           <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-            Extract Services <ArrowRight className="h-4 w-4" />
+            Upload Templates <ArrowRight className="h-4 w-4" />
           </button>
         </motion.div>
       )}

@@ -12,17 +12,19 @@ import { Layer2Step4Limits } from "@/components/layer2/Layer2Step4Limits";
 import { Layer2Step5Conflicts } from "@/components/layer2/Layer2Step5Conflicts";
 import { Layer2Step6Documentation } from "@/components/layer2/Layer2Step6Documentation";
 import { Layer2Step7Push } from "@/components/layer2/Layer2Step7Push";
-import { Layer2State, RulePack } from "@/types/rulePack";
+import { Layer2Step8Dashboard } from "@/components/layer2/Layer2Step8Dashboard";
+import { Layer2State } from "@/types/rulePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
-  { label: "Service & Context", description: "Select service + load rule pack" },
-  { label: "Eligibility Check", description: "Prerequisites & rules" },
-  { label: "PCP Alignment", description: "Validate PCP requirements" },
-  { label: "Limits & Caps", description: "Evaluate caps & thresholds" },
-  { label: "Conflict Engine", description: "Cross-check schedule" },
-  { label: "Doc Builder", description: "Generate documentation" },
-  { label: "Push to Modules", description: "Map outputs to iCM" },
+  { label: "Individual & Service", description: "Select person + load rule pack" },
+  { label: "Eligibility Check", description: "Prerequisites & qualification" },
+  { label: "PCP Alignment", description: "Plan justifies service?" },
+  { label: "Limits & Caps", description: "Within allowed hours/units?" },
+  { label: "Conflict Engine", description: "No billing conflicts?" },
+  { label: "Doc Builder", description: "Generate required docs" },
+  { label: "Push to Modules", description: "Write outputs to iCM" },
+  { label: "Compliance Dashboard", description: "Final status & next steps" },
 ];
 
 export default function Layer2AgentBuilder() {
@@ -57,8 +59,8 @@ export default function Layer2AgentBuilder() {
               <Bot className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">Layer 2 — State Compliance Copilot</h2>
-              <p className="text-[11px] text-muted-foreground">Case Manager Agent · Uses Published Rule Packs</p>
+              <h2 className="font-display font-semibold text-foreground text-sm">Phase 2 — Agent Execution</h2>
+              <p className="text-[11px] text-muted-foreground">Case Manager Runtime · Compliance enforcement using published Rule Packs</p>
             </div>
           </div>
         </div>
@@ -126,6 +128,13 @@ export default function Layer2AgentBuilder() {
             <Layer2Step7Push
               rulePack={state.selectedRulePack}
               onBack={() => goTo(6)}
+              onFinish={() => goTo(8)}
+            />
+          )}
+          {state.step === 8 && (
+            <Layer2Step8Dashboard
+              rulePack={state.selectedRulePack}
+              onBack={() => goTo(7)}
               onFinish={handleFinish}
             />
           )}

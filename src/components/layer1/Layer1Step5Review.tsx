@@ -41,8 +41,12 @@ export function Layer1Step5Review({ rulePacks, extractionSummary, onSummaryGener
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 5 — Admin Review</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Review extraction summary, flag unclear sections, and verify rule packs before publishing.
+          Shows an admin summary: how many services were extracted, which rules are unclear, and whether it's "Publish Ready."
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">This prevents mistakes from going live. Admin gets final say before rules affect authorizations and billing.</p>
+        </div>
       </div>
 
       {!extractionSummary ? (

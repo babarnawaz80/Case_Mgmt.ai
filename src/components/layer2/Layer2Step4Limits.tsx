@@ -51,8 +51,12 @@ export function Layer2Step4Limits({ rulePack, onBack, onNext }: Props) {
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 4 — Limits & Caps Engine</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Evaluating service caps for <span className="font-medium text-foreground">{rulePack?.service_name}</span> against requested units, existing authorizations, and schedule.
+          Calculates whether requested hours/units for <span className="font-medium text-foreground">{rulePack?.service_name}</span> violate daily, weekly, or plan-year caps.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Even if the service is valid, you can still get denied if you exceed caps. This step prevents over-authorizing and over-billing. <span className="italic text-muted-foreground/80">"Are we asking for too much compared to what's allowed?"</span></p>
+        </div>
       </div>
 
       {caps.length === 0 && (

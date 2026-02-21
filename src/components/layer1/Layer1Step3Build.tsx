@@ -29,8 +29,12 @@ export function Layer1Step3Build({ rulePacks, onBack, onNext }: Props) {
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 3 — Build Rule Packs</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          For each service, structured rule pack data has been extracted: billing unit, auth requirements, documentation, conflicts, limits, and citations.
+          For each service, a structured Rule Pack is created with billing unit, authorization requirements, documentation, limits, conflicts, and PCP requirements.
         </p>
+        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">This is the conversion from "PDF text" into "system rules." Without this, you can't automate compliance — everything remains manual.</p>
+        </div>
       </div>
 
       <div className="space-y-2">

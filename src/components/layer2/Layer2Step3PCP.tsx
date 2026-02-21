@@ -33,8 +33,9 @@ export function Layer2Step3PCP({ rulePack, onBack, onNext }: Props) {
     let idx = 0;
     const interval = setInterval(() => {
       if (idx >= items.length) { clearInterval(interval); setIsChecking(false); return; }
-      setChecks((prev) => [...prev, items[idx]]);
+      const current = items[idx];
       idx++;
+      setChecks((prev) => [...prev, current]);
     }, 500);
   };
 

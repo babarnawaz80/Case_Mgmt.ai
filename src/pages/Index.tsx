@@ -1,13 +1,28 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { AppLayout } from "@/components/layout/AppLayout";
+import { StatsCards } from "@/components/dashboard/StatsCards";
+import { PCPChart } from "@/components/dashboard/PCPChart";
+import { IncidentsCard } from "@/components/dashboard/IncidentsCard";
+import { MyWorkCard } from "@/components/dashboard/MyWorkCard";
+import { QuickActions } from "@/components/dashboard/QuickActions";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <AppLayout>
+      <div className="space-y-6 max-w-[1600px] mx-auto">
+        {/* Stats Row */}
+        <StatsCards />
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <PCPChart />
+          <IncidentsCard />
+          <MyWorkCard />
+        </div>
+
+        {/* Quick Actions & Modules */}
+        <QuickActions />
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

@@ -11,36 +11,21 @@ import {
 import { mockRuleLibraries, mockRuntimeAgents, runtimeAgentTypeLabels, RuleLibrary, RuntimeAgent } from "@/types/agent";
 import { cn } from "@/lib/utils";
 
-type Tab = "libraries" | "agents";
-
 export default function LifePlanBoard() {
-  const [activeTab, setActiveTab] = useState<Tab>("agents");
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
-
-  const filteredLibraries = mockRuleLibraries.filter((lib) =>
-    lib.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    lib.state.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const filteredAgents = mockRuntimeAgents.filter((agent) =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.ruleLibraryName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const overviewStats = activeTab === "libraries"
-    ? [
-        { label: "Compliance Engines", value: mockRuleLibraries.length.toString(), icon: Library, trend: `${mockRuleLibraries.filter(l => l.status === 'published').length} published` },
-        { label: "Total Services", value: mockRuleLibraries.reduce((s, l) => s + l.serviceCount, 0).toString(), icon: FileCheck, trend: "Across all libraries" },
-        { label: "Hard Stops", value: mockRuleLibraries.reduce((s, l) => s + l.hardStopCount, 0).toString(), icon: AlertTriangle, trend: "Active enforcement" },
-        { label: "Warnings", value: mockRuleLibraries.reduce((s, l) => s + l.warningCount, 0).toString(), icon: AlertTriangle, trend: "Flagged items" },
-      ]
-    : [
-        { label: "Active Agents", value: mockRuntimeAgents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
-        { label: "Individuals Served", value: mockRuntimeAgents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
-        { label: "Avg Compliance", value: Math.round(mockRuntimeAgents.reduce((s, a) => s + a.complianceRate, 0) / mockRuntimeAgents.length) + "%", icon: TrendingUp, trend: "Denial prevention" },
-        { label: "Engines Used", value: new Set(mockRuntimeAgents.map(a => a.ruleLibraryId)).size.toString(), icon: Library, trend: "Linked & active" },
-      ];
+  const overviewStats = [
+    { label: "Active Agents", value: mockRuntimeAgents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
+    { label: "Individuals Served", value: mockRuntimeAgents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
+    { label: "Avg Compliance", value: Math.round(mockRuntimeAgents.reduce((s, a) => s + a.complianceRate, 0) / mockRuntimeAgents.length) + "%", icon: TrendingUp, trend: "Denial prevention" },
+    { label: "Engines Used", value: new Set(mockRuntimeAgents.map(a => a.ruleLibraryId)).size.toString(), icon: Library, trend: "Linked & active" },
+  ];
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
@@ -83,53 +68,24 @@ export default function LifePlanBoard() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {activeTab === "libraries" ? (
-                  <button
-                    onClick={() => navigate("/lifeplan/rule-library/new")}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(30,70%,55%)] text-destructive-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
-                  >
-                    <Shield className="h-4 w-4" />
-                    Create Compliance Engine
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => navigate("/lifeplan/agent/new")}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Create New Agent
-                  </button>
-                )}
+              <div className="flex flex-col items-end gap-1.5">
+                <button
+                  onClick={() => navigate("/lifeplan/agent/new")}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create New Agent
+                </button>
+                <button
+                  onClick={() => navigate("/lifeplan/rule-library/new")}
+                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Shield className="h-3 w-3" />
+                  Manage Compliance Engine
+                </button>
               </div>
             </div>
           </motion.div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1 mb-6 p-1 rounded-xl bg-muted/50 border border-border w-fit">
-            <button
-              onClick={() => { setActiveTab("libraries"); setSearchQuery(""); }}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
-                activeTab === "libraries" ? "bg-card shadow-sm text-foreground border border-border/60" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <BookOpen className="h-4 w-4" />
-              Compliance Engine
-              <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-muted">{mockRuleLibraries.length}</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab("agents"); setSearchQuery(""); }}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
-                activeTab === "agents" ? "bg-card shadow-sm text-foreground border border-border/60" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Bot className="h-4 w-4" />
-              Agents
-              <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-muted">{mockRuntimeAgents.length}</span>
-            </button>
-          </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -151,16 +107,12 @@ export default function LifePlanBoard() {
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input placeholder={activeTab === "libraries" ? "Search compliance engines..." : "Search agents..."} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+              <input placeholder="Search agents..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
           </div>
 
           {/* Content */}
-          {activeTab === "libraries" ? (
-            <RuleLibrariesTab libraries={filteredLibraries} navigate={navigate} />
-          ) : (
-            <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} />
-          )}
+          <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} />
         </div>
       </main>
     </div>

@@ -1,70 +1,58 @@
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Clock, Users } from "lucide-react";
+import { Users, AlertTriangle, Pill } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const stats = [
+const heroStats = [
   {
-    label: "People Supported",
     value: "48",
-    change: "+3 this month",
-    trend: "up" as const,
+    label: "Current Individuals",
+    sub: "Census Report >",
     icon: Users,
-    accent: "from-primary to-accent",
+    bg: "bg-primary",
+    iconBg: "bg-primary-foreground/20",
   },
   {
-    label: "On Track",
-    value: "16.67%",
-    change: "8 individuals",
-    trend: "up" as const,
-    icon: CheckCircle2,
-    accent: "from-[hsl(152,55%,42%)] to-[hsl(160,50%,50%)]",
+    value: "03",
+    label: "Incident Reporting",
+    sub: "Jan 20 – Feb 20",
+    icon: AlertTriangle,
+    bg: "bg-warning",
+    iconBg: "bg-warning-foreground/20",
   },
   {
-    label: "Out of Compliance",
-    value: "83.33%",
-    change: "Needs attention",
-    trend: "down" as const,
-    icon: AlertCircle,
-    accent: "from-destructive to-[hsl(20,70%,55%)]",
-  },
-  {
-    label: "Open Tasks",
-    value: "0",
-    change: "All caught up",
-    trend: "up" as const,
-    icon: Clock,
-    accent: "from-info to-primary",
+    value: "eMAR",
+    label: "Daily Med Compliance",
+    sub: "Details > Compute >",
+    icon: Pill,
+    bg: "bg-info",
+    iconBg: "bg-info-foreground/20",
   },
 ];
 
 export function StatsCards() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat, i) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {heroStats.map((stat, i) => (
         <motion.div
           key={stat.label}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.08 }}
-          className="relative overflow-hidden rounded-2xl bg-card border border-border/40 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"
+          className={cn(
+            "relative rounded-2xl p-6 text-white overflow-hidden cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300",
+            stat.bg
+          )}
         >
-          {/* Subtle gradient accent bar at top */}
-          <div className={cn("absolute top-0 left-0 right-0 h-1 bg-gradient-to-r", stat.accent)} />
-          
-          <div className="flex items-start justify-between mb-4">
-            <div className={cn("p-2.5 rounded-xl bg-gradient-to-br", stat.accent)}>
-              <stat.icon className="w-4 h-4 text-white" />
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-4xl font-display font-bold leading-none">{stat.value}</p>
+              <p className="text-sm font-semibold mt-1 opacity-95">{stat.label}</p>
+              <p className="text-xs mt-1 opacity-70">{stat.sub}</p>
             </div>
-            <div className={cn(
-              "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
-              stat.trend === "up" ? "bg-[hsl(152,55%,42%)]/10 text-[hsl(152,55%,42%)]" : "bg-destructive/10 text-destructive"
-            )}>
-              {stat.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              {stat.change}
+            <div className={cn("p-3 rounded-xl", stat.iconBg)}>
+              <stat.icon className="w-6 h-6 text-white" />
             </div>
           </div>
-          <p className="text-3xl font-display font-bold text-foreground tracking-tight">{stat.value}</p>
-          <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">{stat.label}</p>
         </motion.div>
       ))}
     </div>

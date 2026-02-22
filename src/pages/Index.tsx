@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -19,7 +19,7 @@ import {
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronDown,
+  
   User,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -70,8 +70,18 @@ const individuals = [
 const Index = () => {
   const [message, setMessage] = useState("");
   const [historyOpen, setHistoryOpen] = useState(true);
-  const [selectedIndividual, setSelectedIndividual] = useState(individuals[0]);
+  const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (plusRef.current && !plusRef.current.contains(e.target as Node)) setPlusMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -133,20 +143,6 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Individual Selector */}
-            <div className="relative">
-              <select
-                value={selectedIndividual}
-                onChange={(e) => setSelectedIndividual(e.target.value)}
-                className="appearance-none glass rounded-lg px-4 py-2 pr-8 text-sm text-foreground bg-secondary border border-border cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                {individuals.map((ind) => (
-                  <option key={ind} value={ind} className="bg-card text-foreground">{ind}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            </div>
-
             {/* Dashboard Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -222,10 +218,41 @@ const Index = () => {
                 rows={2}
               />
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                <div className="flex gap-1">
-                  <button className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-                    <Plus className="w-4 h-4" />
-                  </button>
+                <div className="flex gap-1 items-center">
+                  <div className="relative" ref={plusRef}>
+                    <button
+                      onClick={() => setPlusMenuOpen(!plusMenuOpen)}
+                      className={`p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${selectedIndividual ? 'text-primary' : ''}`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    {plusMenuOpen && (
+                      <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
+                        <div className="px-3 py-2 border-b border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Individual</p>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                          {individuals.map((ind) => (
+                            <button
+                              key={ind}
+                              onClick={() => { setSelectedIndividual(ind); setPlusMenuOpen(false); }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors ${selectedIndividual === ind ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
+                            >
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${selectedIndividual === ind ? 'bg-primary/20' : 'bg-muted/50'}`}>
+                                <User className={`w-3.5 h-3.5 ${selectedIndividual === ind ? 'text-primary' : 'text-muted-foreground'}`} />
+                              </div>
+                              {ind}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {selectedIndividual && (
+                    <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-lg">
+                      {selectedIndividual}
+                    </span>
+                  )}
                   <button className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
                     <Camera className="w-4 h-4" />
                   </button>

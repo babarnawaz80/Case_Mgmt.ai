@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, ArrowRight, Database, CheckCircle2, FileText, Users, User } from "lucide-react";
+import { Search, ArrowRight, Database, CheckCircle2, FileText, Users, User, ChevronDown } from "lucide-react";
 import { RulePack } from "@/types/rulePack";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,6 @@ interface Props {
   onNext: () => void;
 }
 
-// Mock individuals
 const INDIVIDUALS = [
   { id: "ind-1", name: "James Williams", dob: "1992-03-15", waiver: "HCBS Waiver", status: "Active" },
   { id: "ind-2", name: "Maria Garcia", dob: "1988-07-22", waiver: "HCBS Waiver", status: "Active" },
@@ -19,7 +18,6 @@ const INDIVIDUALS = [
   { id: "ind-5", name: "Robert Davis", dob: "1985-09-12", waiver: "HCBS Waiver", status: "Active" },
 ];
 
-// Published services from compliance engine
 const PUBLISHED_RULE_PACKS: RulePack[] = [
   "Personal Care Services (PCS)", "Day Habilitation", "Respite Care",
   "Supported Employment – Individual", "Supported Employment – Group",
@@ -71,20 +69,113 @@ const PUBLISHED_RULE_PACKS: RulePack[] = [
   created_at: "2026-02-20T10:00:00Z",
 }));
 
+function SearchableDropdown<T extends { id: string }>({
+  label,
+  icon: Icon,
+  placeholder,
+  items,
+  selectedId,
+  onSelect,
+  renderItem,
+  renderSelected,
+  searchFilter,
+}: {
+  label: string;
+  icon: React.ElementType;
+  placeholder: string;
+  items: T[];
+  selectedId: string | null;
+  onSelect: (item: T) => void;
+  renderItem: (item: T, isSelected: boolean) => React.ReactNode;
+  renderSelected: (item: T) => React.ReactNode;
+  searchFilter: (item: T, query: string) => boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = items.filter((item) => searchFilter(item, query));
+  const selectedItem = items.find((i) => i.id === selectedId);
+
+  return (
+    <div className="flex-1 min-w-0" ref={ref}>
+      <p className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" /> {label}
+      </p>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className={cn(
+            "w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border text-left transition-all text-sm",
+            selectedItem
+              ? "border-primary/40 bg-primary/5"
+              : "border-border bg-card hover:border-primary/20"
+          )}
+        >
+          {selectedItem ? renderSelected(selectedItem) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")} />
+        </button>
+
+        {open && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl bg-popover border border-border shadow-xl max-h-72 overflow-hidden flex flex-col">
+            <div className="p-2 border-b border-border">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full pl-9 pr-3 py-2 rounded-lg bg-muted/50 border-none text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {filtered.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-muted-foreground text-center">No results found</p>
+              ) : (
+                filtered.map((item) => {
+                  const isSelected = item.id === selectedId;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { onSelect(item); setOpen(false); setQuery(""); }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors",
+                        isSelected ? "bg-primary/10" : "hover:bg-muted/50"
+                      )}
+                    >
+                      {renderItem(item, isSelected)}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Layer2Step1Service({ selectedRulePack, onRulePackSelected, onNext }: Props) {
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
-  const [searchIndividual, setSearchIndividual] = useState("");
-  const [searchService, setSearchService] = useState("");
-
-  const filteredIndividuals = INDIVIDUALS.filter((ind) =>
-    ind.name.toLowerCase().includes(searchIndividual.toLowerCase())
-  );
-
-  const filteredServices = PUBLISHED_RULE_PACKS.filter((rp) =>
-    rp.service_name.toLowerCase().includes(searchService.toLowerCase())
-  );
 
   const canProceed = selectedIndividual && selectedRulePack;
+
+  const selectedPerson = INDIVIDUALS.find((i) => i.id === selectedIndividual);
 
   return (
     <div className="space-y-6">
@@ -93,108 +184,91 @@ export function Layer2Step1Service({ selectedRulePack, onRulePackSelected, onNex
         <p className="text-sm text-muted-foreground mt-1">
           Select the individual and the service you're working on. The agent loads the matching compliance engine and begins compliance checks.
         </p>
-        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
-          <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Compliance is always person-specific and service-specific. The agent must know who the individual is and which service is being authorized before it can apply the correct rules from the compliance engine.
-          </p>
-        </div>
       </div>
 
-      {/* 1. Select Individual */}
-      <div className="space-y-3">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-muted-foreground" /> 1. Select Individual
-        </p>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            value={searchIndividual}
-            onChange={(e) => setSearchIndividual(e.target.value)}
-            placeholder="Search individuals..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {filteredIndividuals.map((ind) => {
-            const isSelected = selectedIndividual === ind.id;
-            return (
-              <motion.button
-                key={ind.id}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => setSelectedIndividual(ind.id)}
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
-                  isSelected ? "border-primary/40 bg-primary/5 shadow-md" : "border-border/40 bg-card hover:border-primary/20 hover:bg-muted/20"
-                )}
-              >
-                <div className={cn("h-9 w-9 rounded-full flex items-center justify-center shrink-0", isSelected ? "bg-primary/20" : "bg-muted/50")}>
-                  <User className={cn("h-4 w-4", isSelected ? "text-primary" : "text-muted-foreground")} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">{ind.name}</p>
-                  <p className="text-[10px] text-muted-foreground">DOB: {ind.dob} · {ind.waiver}</p>
-                </div>
-                {isSelected && <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />}
-              </motion.button>
-            );
-          })}
-        </div>
+      {/* Two dropdowns side by side */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <SearchableDropdown
+          label="Individual"
+          icon={Users}
+          placeholder="Select an individual..."
+          items={INDIVIDUALS}
+          selectedId={selectedIndividual}
+          onSelect={(ind) => setSelectedIndividual(ind.id)}
+          searchFilter={(ind, q) => ind.name.toLowerCase().includes(q.toLowerCase())}
+          renderSelected={(ind) => (
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <User className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{ind.name}</p>
+                <p className="text-[10px] text-muted-foreground">DOB: {ind.dob}</p>
+              </div>
+            </div>
+          )}
+          renderItem={(ind, isSelected) => (
+            <>
+              <div className={cn("h-7 w-7 rounded-full flex items-center justify-center shrink-0", isSelected ? "bg-primary/20" : "bg-muted/50")}>
+                <User className={cn("h-3.5 w-3.5", isSelected ? "text-primary" : "text-muted-foreground")} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{ind.name}</p>
+                <p className="text-[10px] text-muted-foreground">DOB: {ind.dob} · {ind.waiver}</p>
+              </div>
+              {isSelected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+            </>
+          )}
+        />
+
+        <SearchableDropdown
+          label="Service"
+          icon={FileText}
+          placeholder="Select a service..."
+          items={PUBLISHED_RULE_PACKS}
+          selectedId={selectedRulePack?.id || null}
+          onSelect={onRulePackSelected}
+          searchFilter={(rp, q) => rp.service_name.toLowerCase().includes(q.toLowerCase())}
+          renderSelected={(rp) => (
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-7 w-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                <FileText className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{rp.service_name}</p>
+                <p className="text-[10px] text-muted-foreground">{rp.billing_unit} · {rp.service_category}</p>
+              </div>
+            </div>
+          )}
+          renderItem={(rp, isSelected) => (
+            <>
+              <div className={cn("h-7 w-7 rounded-lg flex items-center justify-center shrink-0", isSelected ? "bg-primary/20" : "bg-muted/50")}>
+                <FileText className={cn("h-3.5 w-3.5", isSelected ? "text-primary" : "text-muted-foreground")} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{rp.service_name}</p>
+                <p className="text-[10px] text-muted-foreground">{rp.billing_unit} · {rp.service_category}</p>
+              </div>
+              {isSelected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+            </>
+          )}
+        />
       </div>
 
-      {/* 2. Select Service */}
-      {selectedIndividual && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-          <p className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5 text-muted-foreground" /> 2. Select Service
-          </p>
-          <div className="flex items-center gap-2 p-1.5 rounded-xl bg-primary/5 border border-primary/20">
-            <Database className="h-4 w-4 text-primary ml-2 shrink-0" />
-            <p className="text-xs text-primary font-medium">Reading from: <span className="font-bold">Compliance Engine</span> (published by admin)</p>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              value={searchService}
-              onChange={(e) => setSearchService(e.target.value)}
-              placeholder="Search services..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div className="space-y-2">
-            {filteredServices.map((rp) => {
-              const isSelected = selectedRulePack?.id === rp.id;
-              return (
-                <motion.button
-                  key={rp.id}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={() => onRulePackSelected(rp)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
-                    isSelected ? "border-primary/40 bg-primary/5 shadow-md" : "border-border/40 bg-card hover:border-primary/20 hover:bg-muted/20"
-                  )}
-                >
-                  <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", isSelected ? "bg-primary/20" : "bg-muted/50")}>
-                    <FileText className={cn("h-4 w-4", isSelected ? "text-primary" : "text-muted-foreground")} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{rp.service_name}</p>
-                    <p className="text-[10px] text-muted-foreground">{rp.billing_unit} · {rp.service_category} · {rp.limits.length} limits · {rp.hard_stops.length} hard stops</p>
-                  </div>
-                  {isSelected && <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />}
-                </motion.button>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Proceed */}
+      {/* Selection summary */}
       {canProceed && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end">
-          <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-            Run Eligibility Check <ArrowRight className="h-4 w-4" />
-          </button>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-primary/5 border border-primary/20">
+            <Database className="h-4 w-4 text-primary ml-1 shrink-0" />
+            <p className="text-xs text-primary font-medium">
+              Loading compliance engine for <span className="font-bold">{selectedRulePack.service_name}</span> · Individual: <span className="font-bold">{selectedPerson?.name}</span>
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
+              Run Eligibility Check <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </motion.div>
       )}
     </div>

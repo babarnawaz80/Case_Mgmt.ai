@@ -5,19 +5,25 @@ import {
   Loader2, Sparkles,
 } from "lucide-react";
 import { UploadedFile } from "@/types/rulePack";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface Props {
   uploadedFiles: UploadedFile[];
   serviceCodeMapping: string;
+  agentName: string;
+  agentInstructions: string;
   onFilesChange: (files: UploadedFile[]) => void;
   onMappingChange: (m: string) => void;
+  onAgentNameChange: (name: string) => void;
+  onAgentInstructionsChange: (instructions: string) => void;
   onNext: () => void;
 }
 
 export function Layer1Step1Upload({
-  uploadedFiles, serviceCodeMapping,
-  onFilesChange, onMappingChange, onNext,
+  uploadedFiles, serviceCodeMapping, agentName, agentInstructions,
+  onFilesChange, onMappingChange, onAgentNameChange, onAgentInstructionsChange, onNext,
 }: Props) {
   const [isParsing, setIsParsing] = useState(false);
   const [parseComplete, setParsComplete] = useState(false);
@@ -67,6 +73,29 @@ export function Layer1Step1Upload({
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             This converts a PDF guideline into structured, reusable Rule Packs. Each service becomes one Rule Pack containing billing unit, eligibility rules, authorization requirements, PCP requirements, limits, conflicts, documentation requirements, monitoring rules, hard stops, and warnings. Once stored, case managers never need to read the PDF again.
           </p>
+        </div>
+      </div>
+
+      {/* Agent Name & Instructions */}
+      <div className="space-y-4 p-4 rounded-xl border border-border bg-card/50">
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-foreground uppercase tracking-wide">Agent Name <span className="text-destructive">*Required</span></label>
+          <Input
+            value={agentName}
+            onChange={(e) => onAgentNameChange(e.target.value)}
+            placeholder="e.g. Ohio DODD Compliance Agent"
+            className="bg-background"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-foreground uppercase tracking-wide">Agent Instructions / Prompt <span className="text-muted-foreground font-normal">(Optional)</span></label>
+          <Textarea
+            value={agentInstructions}
+            onChange={(e) => onAgentInstructionsChange(e.target.value)}
+            placeholder="Describe what this agent should do, how it should enforce compliance, any special rules or behaviors…"
+            className="bg-background min-h-[100px]"
+          />
+          <p className="text-[11px] text-muted-foreground">Tell the agent how to interpret guidelines, handle edge cases, or apply organization-specific rules.</p>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { Bell, Mail, Sparkles, User, BookOpen } from "lucide-react";
+import { Bell, Mail, Sparkles, User, BrainCircuit } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
@@ -20,15 +20,15 @@ export function AppHeader() {
           <Mail className="w-5 h-5" />
         </button>
 
-        {/* Compliance Engine Button */}
+        {/* Agents Button */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => navigate("/lifeplan")}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-success text-success-foreground font-medium text-sm transition-all shadow-sm hover:shadow-md"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[hsl(270,60%,58%)] to-[hsl(200,80%,50%)] text-white font-medium text-sm transition-all shadow-sm hover:shadow-lg"
         >
-          <BookOpen className="w-4 h-4" />
-          <span>Compliance Engine</span>
+          <BrainCircuit className="w-4 h-4" />
+          <span>Agents</span>
         </motion.button>
 
         {/* AI Companion Button */}

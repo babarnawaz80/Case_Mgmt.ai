@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 
 const STEPS = [
   { label: "Define Agent", description: "Name, type & instructions" },
-  { label: "Select Compliance Engine", description: "Choose published engine" },
+  { label: "Select Guidelines Engine", description: "Choose published engine" },
   { label: "Configure Overrides", description: "Override & push settings" },
   { label: "Data Mapping", description: "Module output overrides" },
   { label: "Review & Deploy", description: "Confirm & deploy" },
@@ -168,7 +168,7 @@ export default function RuntimeAgentBuilder() {
             </motion.div>
           )}
 
-          {/* Step 2: Select Compliance Engine */}
+          {/* Step 2: Select Guidelines Engine */}
           {step === 2 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>

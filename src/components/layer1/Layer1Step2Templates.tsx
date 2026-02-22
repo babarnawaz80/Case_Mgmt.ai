@@ -21,6 +21,19 @@ const TEMPLATE_TYPES = [
 ];
 
 export function Layer1Step2Templates({ templates, onTemplatesChange, onBack, onNext }: Props) {
+  const handleUploadSingle = (templateType: typeof TEMPLATE_TYPES[number]) => {
+    const alreadyUploaded = templates.find((f) => f.name === templateType.file);
+    if (alreadyUploaded) return;
+    const newFile: UploadedFile = {
+      id: `t-${Date.now()}`,
+      name: templateType.file,
+      type: "docx",
+      size: 80000 + Math.floor(Math.random() * 70000),
+      status: "parsed" as const,
+    };
+    onTemplatesChange([...templates, newFile]);
+  };
+
   const handleUploadAll = () => {
     const files: UploadedFile[] = TEMPLATE_TYPES.map((t, i) => ({
       id: `t-${i + 1}`,
@@ -31,6 +44,8 @@ export function Layer1Step2Templates({ templates, onTemplatesChange, onBack, onN
     }));
     onTemplatesChange(files);
   };
+
+  const uploadedCount = templates.length;
 
   return (
     <div className="space-y-6">
@@ -47,23 +62,36 @@ export function Layer1Step2Templates({ templates, onTemplatesChange, onBack, onN
         </div>
       </div>
 
-      {/* Template types */}
+      {/* Template types with individual upload buttons */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Supported Templates</p>
-        <div className="grid sm:grid-cols-2 gap-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Organization Templates</p>
+          {uploadedCount > 0 && (
+            <span className="text-xs text-primary font-medium">{uploadedCount} of {TEMPLATE_TYPES.length} uploaded</span>
+          )}
+        </div>
+        <div className="space-y-2">
           {TEMPLATE_TYPES.map((t, i) => {
             const uploaded = templates.find((f) => f.name === t.file);
             return (
-              <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${uploaded ? "border-primary/20 bg-primary/5" : "border-border/40 bg-card"}`}>
+              <div key={i} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${uploaded ? "border-primary/20 bg-primary/5" : "border-border/40 bg-card"}`}>
                 <FileSpreadsheet className={`h-4 w-4 shrink-0 ${uploaded ? "text-primary" : "text-muted-foreground"}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground">{t.name}</p>
-                  {uploaded && <p className="text-[10px] text-muted-foreground">{t.file}</p>}
+                  <p className="text-sm font-medium text-foreground">{t.name}</p>
+                  {uploaded && <p className="text-[10px] text-muted-foreground mt-0.5">{t.file}</p>}
                 </div>
                 {uploaded ? (
-                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-[10px] text-primary font-medium">Uploaded</span>
+                  </div>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">Not uploaded</span>
+                  <button
+                    onClick={() => handleUploadSingle(t)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-all hover:-translate-y-0.5 shrink-0"
+                  >
+                    <Upload className="h-3 w-3" /> Upload
+                  </button>
                 )}
               </div>
             );
@@ -71,20 +99,25 @@ export function Layer1Step2Templates({ templates, onTemplatesChange, onBack, onN
         </div>
       </div>
 
-      {templates.length === 0 ? (
-        <div
+      {/* Upload all shortcut */}
+      {uploadedCount < TEMPLATE_TYPES.length && (
+        <button
           onClick={handleUploadAll}
-          className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/30 hover:bg-muted/30 transition-all"
+          className="w-full border-2 border-dashed border-border rounded-xl p-4 text-center cursor-pointer hover:border-primary/30 hover:bg-muted/30 transition-all"
         >
-          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm font-medium text-foreground">Click to upload templates</p>
-          <p className="text-xs text-muted-foreground mt-1">PCP Addendum, BAN, Progress Note, Assessment, Monitoring</p>
-        </div>
-      ) : (
+          <div className="flex items-center justify-center gap-2">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Upload All Templates</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Bulk upload all remaining templates at once</p>
+        </button>
+      )}
+
+      {uploadedCount === TEMPLATE_TYPES.length && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-3 rounded-xl border border-primary/20 bg-primary/5">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-primary" />
-            <p className="text-sm font-medium text-foreground">{templates.length} templates uploaded</p>
+            <p className="text-sm font-medium text-foreground">All {TEMPLATE_TYPES.length} templates uploaded</p>
           </div>
         </motion.div>
       )}

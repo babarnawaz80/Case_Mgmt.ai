@@ -39,14 +39,6 @@ export default function LifePlanBoard() {
           <h2 className="font-display font-semibold text-foreground text-lg">Guidelines Engine Platform</h2>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-muted border border-border">
-            <button onClick={() => setRole("admin")} className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", role === "admin" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              <Shield className="h-3 w-3 inline mr-1" />Admin
-            </button>
-            <button onClick={() => setRole("case_manager")} className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", role === "case_manager" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              <User className="h-3 w-3 inline mr-1" />Case Manager
-            </button>
-          </div>
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-sm transition-all">
             <Sparkles className="w-4 h-4" /> AI Companion
           </motion.button>

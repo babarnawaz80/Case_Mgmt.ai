@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
-  { label: "Individual & Service", description: "Select person + load rule pack" },
+  { label: "Individual & Service", description: "Select person + load compliance engine" },
   { label: "Eligibility Check", description: "Prerequisites & qualification" },
   { label: "PCP Alignment", description: "Plan justifies service?" },
   { label: "Limits & Caps", description: "Within allowed hours/units?" },
@@ -74,7 +74,7 @@ export default function Layer2AgentBuilder() {
             </div>
             <div>
               <h2 className="font-display font-semibold text-foreground text-sm">Agent Execution</h2>
-              <p className="text-[11px] text-muted-foreground">Case Manager Runtime · Compliance enforcement using published Rule Packs</p>
+              <p className="text-[11px] text-muted-foreground">Case Manager Runtime · Compliance enforcement using published engines</p>
             </div>
           </div>
         </div>

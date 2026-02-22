@@ -9,7 +9,7 @@ const stats = [
     change: "+3 this month",
     trend: "up" as const,
     icon: Users,
-    bg: "bg-primary",
+    bg: "bg-primary/70",
   },
   {
     label: "On Track",
@@ -17,7 +17,7 @@ const stats = [
     change: "8 individuals",
     trend: "up" as const,
     icon: CheckCircle2,
-    bg: "bg-success",
+    bg: "bg-success/70",
   },
   {
     label: "Out of Compliance",
@@ -25,7 +25,7 @@ const stats = [
     change: "Needs attention",
     trend: "down" as const,
     icon: AlertCircle,
-    bg: "bg-destructive",
+    bg: "bg-destructive/70",
   },
   {
     label: "Open Tasks",
@@ -33,7 +33,7 @@ const stats = [
     change: "All caught up",
     trend: "up" as const,
     icon: Clock,
-    bg: "bg-warning",
+    bg: "bg-warning/70",
   },
 ];
 

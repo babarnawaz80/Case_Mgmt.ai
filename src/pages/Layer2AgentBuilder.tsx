@@ -85,7 +85,7 @@ export default function Layer2AgentBuilder() {
                 onClick={handleStartNew}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
               >
-                <Plus className="h-4 w-4" /> New Compliance Run
+                <Plus className="h-4 w-4" /> New Run
               </motion.button>
             </div>
 

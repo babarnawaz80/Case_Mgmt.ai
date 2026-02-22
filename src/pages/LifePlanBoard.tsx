@@ -79,7 +79,7 @@ export default function LifePlanBoard() {
                 {isAdmin && (
                   <>
                     <button onClick={() => navigate("/lifeplan/agent/new")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-                      <Plus className="h-4 w-4" /> Create New Agent
+                      <Plus className="h-4 w-4" /> New Agent
                     </button>
                     <button onClick={() => navigate("/lifeplan/guidelines-engines")} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors">
                       <Shield className="h-3 w-3" /> Manage Guidelines Engines

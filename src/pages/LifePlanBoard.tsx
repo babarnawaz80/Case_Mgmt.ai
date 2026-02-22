@@ -178,7 +178,7 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
         return (
           <motion.div key={agent.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}>
             <div className="group relative rounded-2xl bg-card border border-border/40 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer"
-              onClick={() => navigate("/lifeplan/agent/new/layer2")}
+              onClick={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })}
             >
               <div className={cn("relative bg-gradient-to-br px-5 pt-5 pb-6", gradient)}>
                 <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 blur-2xl -translate-y-8 translate-x-8" />
@@ -193,7 +193,7 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                   <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
                     {agent.status}
                   </span>
-                  <AgentMenu onEdit={() => navigate("/lifeplan/agent/new/layer2")} onClone={() => {}} onDelete={() => {}} />
+                  <AgentMenu onEdit={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })} onClone={() => {}} onDelete={() => {}} />
                 </div>
               </div>
 

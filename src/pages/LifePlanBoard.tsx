@@ -104,17 +104,6 @@ export default function LifePlanBoard() {
 
           {/* Layer filter + Search */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex items-center rounded-xl border border-border p-1 bg-card">
-              {([["all", "All Agents"], ["layer1", "Phase 1 (Training)"], ["layer2", "Phase 2 (Runtime)"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors", layerFilter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}
-                  onClick={() => setLayerFilter(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input placeholder="Search agents..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />

@@ -53,6 +53,10 @@ export function Layer2Step4Limits({ rulePack, onBack, onNext }: Props) {
         <p className="text-sm text-muted-foreground mt-1">
           Calculates whether requested hours/units for <span className="font-medium text-foreground">{rulePack?.service_name}</span> violate daily, weekly, or plan-year caps.
         </p>
+        <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/30">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase">Data Source:</span>
+          <span className="text-[11px] text-foreground font-medium">Authorization + Utilization Records</span>
+        </div>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">Even if the service is valid, you can still get denied if you exceed caps. This step prevents over-authorizing and over-billing. <span className="italic text-muted-foreground/80">"Are we asking for too much compared to what's allowed?"</span></p>

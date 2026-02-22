@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Bot, Sparkles, User, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Bot, Sparkles, User, Shield, Lock, AlertTriangle } from "lucide-react";
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
-import { RuntimeAgentType, mockRuleLibraries, runtimeAgentTypeLabels, RuleLibrary } from "@/types/agent";
+import { RuntimeAgentType, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, pushModeLabels, PushMode, FIXED_WORKFLOW_STEPS } from "@/types/agent";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -16,59 +16,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 const STEPS = [
-  { label: "Define Agent", description: "Name, type & description" },
-  { label: "Select Rule Source", description: "Choose published library" },
-  { label: "Configure Workflow", description: "Agent-type workflow" },
+  { label: "Define Agent", description: "Name, type & instructions" },
+  { label: "Select Compliance Engine", description: "Choose published engine" },
+  { label: "Configure Overrides", description: "Override & push settings" },
   { label: "Data Mapping", description: "Module output overrides" },
-  { label: "Review & Save", description: "Confirm & deploy" },
+  { label: "Review & Deploy", description: "Confirm & deploy" },
 ];
-
-const workflowTemplates: Record<RuntimeAgentType, string[]> = {
-  compliance_copilot: [
-    "Select Individual",
-    "Select Service",
-    "Eligibility / Prerequisites Check",
-    "PCP Alignment Check",
-    "Limits & Caps Check",
-    "Conflict Check",
-    "Documentation Packet Builder",
-    "Push Outputs to Modules",
-    "Final Compliance Summary",
-  ],
-  pcp_alignment: [
-    "Select Individual",
-    "Scan PCP vs Rule Pack Requirements",
-    "Identify Missing Items",
-    "Draft Addendum Language",
-    "Push to PCP Module + Tasks",
-  ],
-  billing_documentation: [
-    "Select Individual + Service + Date Range",
-    "Verify Billable Requirements",
-    "Generate Compliant Note Templates",
-    "Cross-check Conflicts / Units",
-    "Push to Billable Activity Note + Progress Note",
-  ],
-  monitoring_reauth: [
-    "Select Individual + Service",
-    "Track Caps + Deadlines + Required Monthly Elements",
-    "Create Monitoring Form Templates + Tasks",
-  ],
-  isp_generator: [
-    "Select Individual",
-    "Pull Assessments & Goals",
-    "Map to State ISP Template",
-    "Generate ISP Draft",
-    "Review & Finalize",
-  ],
-  ambient_meeting: [
-    "Start Meeting Recording",
-    "Transcribe & Summarize",
-    "Map to Progress Note Fields",
-    "Generate Billable Note Draft",
-    "Push to Activity Notes",
-  ],
-};
 
 const ICM_MODULES = [
   "PCP", "Services", "Service Plan", "Billable Activity Note",
@@ -87,24 +40,27 @@ export default function RuntimeAgentBuilder() {
   const [instructions, setInstructions] = useState("");
 
   // Step 2
-  const [selectedLibraryId, setSelectedLibraryId] = useState("");
-  const [serviceScope, setServiceScope] = useState("all");
+  const [selectedEngineId, setSelectedEngineId] = useState("");
+
+  // Step 3
+  const [allowOverrides, setAllowOverrides] = useState(true);
+  const [requireSupervisorApproval, setRequireSupervisorApproval] = useState(false);
+  const [pushMode, setPushMode] = useState<PushMode>("manual");
 
   // Step 4
   const [moduleToggles, setModuleToggles] = useState<Record<string, boolean>>(
     Object.fromEntries(ICM_MODULES.map(m => [m, true]))
   );
 
-  const selectedLibrary = mockRuleLibraries.find(l => l.id === selectedLibraryId);
-  const publishedLibraries = mockRuleLibraries.filter(l => l.status === "published");
-  const workflowSteps = agentType ? workflowTemplates[agentType] : [];
+  const selectedEngine = mockComplianceEngines.find(e => e.id === selectedEngineId);
+  const publishedEngines = mockComplianceEngines.filter(e => e.status === "published");
 
   const goTo = (s: number) => setStep(s);
 
   const handleSave = () => {
     toast({
       title: "Agent Created Successfully",
-      description: `${agentName} is now active and linked to ${selectedLibrary?.name} v${selectedLibrary?.version}.`,
+      description: `${agentName} is now active and linked to ${selectedEngine?.name} v${selectedEngine?.version}.`,
     });
     navigate("/lifeplan");
   };
@@ -178,8 +134,29 @@ export default function RuntimeAgentBuilder() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Instructions / Prompt</label>
-                  <textarea value={instructions} onChange={e => setInstructions(e.target.value)} placeholder="Custom instructions for how this agent should behave..." rows={4} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Agent Instructions</label>
+                  <p className="text-[11px] text-muted-foreground mb-2">Organization-level instructions. These override Compliance Engine state-level logic when conflicts occur.</p>
+                  <textarea value={instructions} onChange={e => setInstructions(e.target.value)} placeholder="Custom instructions for how this agent should behave at the organization level..." rows={4} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
+                </div>
+
+                {/* Instruction hierarchy info */}
+                <div className="p-3 rounded-xl bg-muted/30 border border-border/40">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instruction Precedence</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="w-4 h-4 rounded bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">1</span>
+                      <span className="text-muted-foreground">Compliance Engine Instructions <span className="text-muted-foreground/60">(State-level logic)</span></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="w-4 h-4 rounded bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary">2</span>
+                      <span className="text-foreground font-medium">Agent Instructions <span className="text-muted-foreground/60">(Organization-level — you are here)</span></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="w-4 h-4 rounded bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">3</span>
+                      <span className="text-muted-foreground">Runtime Overrides <span className="text-muted-foreground/60">(Case-specific, requires justification)</span></span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">Higher numbers override lower when conflicts occur.</p>
                 </div>
               </div>
 
@@ -191,83 +168,144 @@ export default function RuntimeAgentBuilder() {
             </motion.div>
           )}
 
-          {/* Step 2: Select Rule Source */}
+          {/* Step 2: Select Compliance Engine */}
           {step === 2 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-1">Select Rule Source</h3>
-                <p className="text-sm text-muted-foreground">Choose a published Compliance Engine for this agent to use.</p>
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">Select Compliance Engine</h3>
+                <p className="text-sm text-muted-foreground">Choose a published Compliance Engine. Only published engines can be linked to agents.</p>
               </div>
 
               <div className="space-y-4 glass rounded-xl p-6">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Compliance Engine</label>
-                  <Select value={selectedLibraryId} onValueChange={setSelectedLibraryId}>
+                  <Select value={selectedEngineId} onValueChange={setSelectedEngineId}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select a published compliance engine..." />
                     </SelectTrigger>
                     <SelectContent className="bg-popover z-50">
-                      {publishedLibraries.map(lib => (
-                        <SelectItem key={lib.id} value={lib.id}>
-                          {lib.name} – Effective {lib.effectiveDate} – v{lib.version}
+                      {publishedEngines.map(engine => (
+                        <SelectItem key={engine.id} value={engine.id}>
+                          {engine.name} – {engine.program} – Effective {engine.effectiveDate} (v{engine.version})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[10px] text-muted-foreground mt-1.5">Draft engines cannot be linked to agents. Only published engines appear here.</p>
                 </div>
 
-                {selectedLibrary && (
+                {selectedEngine && (
                   <div className="p-4 rounded-xl bg-muted/40 border border-border/60 space-y-2">
-                    <p className="text-sm font-medium text-foreground">{selectedLibrary.name} v{selectedLibrary.version}</p>
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span>{selectedLibrary.serviceCount} services</span>
-                      <span>{selectedLibrary.hardStopCount} hard stops</span>
-                      <span>{selectedLibrary.warningCount} warnings</span>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground">{selectedEngine.name} v{selectedEngine.version}</p>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-primary/10 text-primary">Published</span>
                     </div>
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span>{selectedEngine.serviceCount} services</span>
+                      <span>{selectedEngine.hardStopCount} hard stops</span>
+                      <span>{selectedEngine.warningCount} warnings</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> Agent will be pinned to v{selectedEngine.version}. Upgrading requires manual action.
+                    </p>
                   </div>
                 )}
+              </div>
 
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Service Scope</label>
-                  <Select value={serviceScope} onValueChange={setServiceScope}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover z-50">
-                      <SelectItem value="all">All Services</SelectItem>
-                      <SelectItem value="employment">Employment Only</SelectItem>
-                      <SelectItem value="behavioral">Behavioral Only</SelectItem>
-                      <SelectItem value="residential">Residential Only</SelectItem>
-                      <SelectItem value="day">Meaningful Day Only</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Fixed workflow preview */}
+              <div className="glass rounded-xl p-6 space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">System Workflow (Fixed)</p>
+                    <p className="text-[11px] text-muted-foreground">This workflow is system-defined and cannot be reordered or modified.</p>
+                  </div>
                 </div>
+                {FIXED_WORKFLOW_STEPS.map((ws) => (
+                  <div key={ws.step} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/20 border border-border/30">
+                    <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-bold text-muted-foreground">{ws.step}</span>
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-xs font-medium text-foreground">{ws.name}</span>
+                      <span className="text-[10px] text-muted-foreground ml-2">{ws.description}</span>
+                    </div>
+                    <Lock className="h-3 w-3 text-muted-foreground/40" />
+                  </div>
+                ))}
               </div>
 
               <div className="flex justify-between">
                 <button onClick={() => goTo(1)} className="px-6 py-2.5 rounded-xl bg-secondary text-foreground font-medium text-sm border border-border">Back</button>
-                <button onClick={() => goTo(3)} disabled={!selectedLibraryId} className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">Continue</button>
+                <button onClick={() => goTo(3)} disabled={!selectedEngineId} className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">Continue</button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 3: Configure Workflow */}
+          {/* Step 3: Configure Overrides */}
           {step === 3 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-1">Configure Workflow</h3>
-                <p className="text-sm text-muted-foreground">Auto-generated workflow for <span className="font-medium text-foreground">{agentType ? runtimeAgentTypeLabels[agentType] : ""}</span>.</p>
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">Configure Overrides</h3>
+                <p className="text-sm text-muted-foreground">Set override permissions and push-to-module behavior for this agent.</p>
               </div>
 
-              <div className="glass rounded-xl p-6 space-y-3">
-                {workflowSteps.map((ws, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/40">
-                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-primary-foreground">{i + 1}</span>
+              <div className="glass rounded-xl p-6 space-y-5">
+                {/* Override settings */}
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">Override Controls</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/40">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Allow Overrides</p>
+                        <p className="text-[11px] text-muted-foreground">Case managers can override compliance findings with written justification</p>
+                      </div>
+                      <Switch checked={allowOverrides} onCheckedChange={setAllowOverrides} />
                     </div>
-                    <span className="text-sm text-foreground">{ws}</span>
+                    <div className={cn("flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/40 transition-opacity", !allowOverrides && "opacity-50 pointer-events-none")}>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Require Supervisor Approval</p>
+                        <p className="text-[11px] text-muted-foreground">Overrides require supervisor sign-off before taking effect</p>
+                      </div>
+                      <Switch checked={requireSupervisorApproval} onCheckedChange={setRequireSupervisorApproval} />
+                    </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Push mode */}
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">Push to Modules — Safety Control</p>
+                  <p className="text-[11px] text-muted-foreground mb-3">Controls how outputs are written to iCM modules. Default: Manual Confirmation Required.</p>
+                  <Select value={pushMode} onValueChange={(v) => setPushMode(v as PushMode)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover z-50">
+                      {(Object.entries(pushModeLabels) as [PushMode, string][]).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {pushMode === "auto_always" && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20 flex items-start gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-warning">Auto-Push Always writes to iCM without confirmation, even on failures. Use with caution.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* What agents CANNOT do */}
+                <div className="p-3 rounded-xl bg-muted/20 border border-border/30">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <Shield className="h-3 w-3" /> Agents Cannot
+                  </p>
+                  <ul className="space-y-1 text-[11px] text-muted-foreground">
+                    <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Disable conflict engine</li>
+                    <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Skip eligibility checks</li>
+                    <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Reorder workflow steps</li>
+                    <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Edit compliance engine rules</li>
+                  </ul>
+                </div>
               </div>
 
               <div className="flex justify-between">
@@ -301,27 +339,30 @@ export default function RuntimeAgentBuilder() {
             </motion.div>
           )}
 
-          {/* Step 5: Review & Save */}
+          {/* Step 5: Review & Deploy */}
           {step === 5 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-1">Review & Save</h3>
-                <p className="text-sm text-muted-foreground">Confirm your agent configuration before saving.</p>
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">Review & Deploy</h3>
+                <p className="text-sm text-muted-foreground">Confirm your agent configuration before deploying.</p>
               </div>
 
               <div className="glass rounded-xl p-6 space-y-4">
                 <ReviewRow label="Agent Name" value={agentName} />
                 <ReviewRow label="Agent Type" value={agentType ? runtimeAgentTypeLabels[agentType] : ""} />
-                <ReviewRow label="Compliance Engine" value={selectedLibrary ? `${selectedLibrary.name} v${selectedLibrary.version}` : ""} />
-                <ReviewRow label="Service Scope" value={serviceScope === "all" ? "All Services" : serviceScope} />
-                <ReviewRow label="Workflow Steps" value={`${workflowSteps.length} steps`} />
+                <ReviewRow label="Compliance Engine" value={selectedEngine ? `${selectedEngine.name} v${selectedEngine.version}` : ""} />
+                <ReviewRow label="Engine Pinned Version" value={selectedEngine ? `v${selectedEngine.version}` : ""} />
+                <ReviewRow label="Allow Overrides" value={allowOverrides ? "Yes" : "No"} />
+                <ReviewRow label="Supervisor Approval" value={requireSupervisorApproval ? "Required" : "Not required"} />
+                <ReviewRow label="Push Mode" value={pushModeLabels[pushMode]} />
+                <ReviewRow label="Workflow Steps" value={`${FIXED_WORKFLOW_STEPS.length} steps (fixed)`} />
                 <ReviewRow label="Enabled Modules" value={`${Object.values(moduleToggles).filter(Boolean).length} of ${ICM_MODULES.length}`} />
               </div>
 
               <div className="flex justify-between">
                 <button onClick={() => goTo(4)} className="px-6 py-2.5 rounded-xl bg-secondary text-foreground font-medium text-sm border border-border">Back</button>
                 <button onClick={handleSave} className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg">
-                  Save & Deploy Agent
+                  Deploy Agent
                 </button>
               </div>
             </motion.div>

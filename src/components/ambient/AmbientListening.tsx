@@ -22,8 +22,14 @@ import {
   CheckCircle2,
   FileText,
   Clock,
+  Pencil,
+  Save,
+  Trash2,
+  Send,
+  Info,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import ReviewApplyModal from "./ReviewApplyModal";
 
 interface AmbientListeningProps {
   individualName: string;
@@ -154,36 +160,43 @@ const mockSuggestions = [
     action: "Create Service Authorization Draft",
     module: "Service Authorization",
     explanation: "Individual expressed interest in Supported Employment. A new authorization may be needed.",
+    added: false,
   },
   {
     action: "Draft PCP Addendum",
     module: "PCP / ISP",
     explanation: "Add Supported Employment interest language and update community integration goal.",
+    added: false,
   },
   {
     action: "Schedule ISP Review",
     module: "Workflow Manager",
     explanation: "Service changes discussed require ISP team review before implementation.",
+    added: false,
   },
   {
     action: "Create LOC Renewal Task",
     module: "Assessments",
     explanation: "LOC assessment expires next month. Renewal must be scheduled.",
+    added: false,
   },
   {
     action: "Flag Transportation Barrier",
     module: "Care Coordination",
     explanation: "Recurring transportation no-shows causing missed Day Hab sessions.",
+    added: false,
   },
   {
     action: "Log Safety Incident",
     module: "Incident Reporting",
     explanation: "Individual reported a fall at home. No ER visit but should be documented.",
+    added: false,
   },
   {
     action: "Trigger Cap Utilization Warning",
     module: "Utilization",
     explanation: "PCS utilization at 85%, approaching 90% cap threshold.",
+    added: false,
   },
 ];
 
@@ -197,66 +210,66 @@ const sessionTypes = [
 
 type SessionType = (typeof sessionTypes)[number];
 
-const draftTemplates: Record<SessionType, { title: string; module: string; fields: string[] }> = {
+const draftTemplates: Record<SessionType, { title: string; module: string; fields: { label: string; value: string }[] }> = {
   "Family Call": {
     title: "Case Management Contact Note (Draft)",
     module: "Contact Notes",
     fields: [
-      "Contact Type: Family Call",
-      "Participants: Kathy (CM), Individual",
-      "Reason for Contact: Routine check-in, service review",
-      "Summary: Discussed PCS attendance, Day Hab transportation barriers, interest in Supported Employment, fall incident, LOC renewal timeline.",
-      "Plan/Service Changes: Supported Employment exploration, transportation barrier resolution needed.",
-      "Compliance Implications: LOC expiring — renewal required. PCS cap approaching 90%.",
-      "Action Items: Schedule LOC renewal, draft PCP addendum for SE interest, flag transport barrier.",
-      "Next Steps: Follow up in 2 weeks on transportation resolution and LOC scheduling.",
+      { label: "Contact Type", value: "Family Call" },
+      { label: "Participants", value: "Kathy (CM), Individual" },
+      { label: "Reason for Contact", value: "Routine check-in, service review" },
+      { label: "Summary", value: "Discussed PCS attendance, Day Hab transportation barriers, interest in Supported Employment, fall incident, LOC renewal timeline." },
+      { label: "Plan/Service Changes", value: "Supported Employment exploration, transportation barrier resolution needed." },
+      { label: "Compliance Implications", value: "LOC expiring — renewal required. PCS cap approaching 90%." },
+      { label: "Action Items", value: "Schedule LOC renewal, draft PCP addendum for SE interest, flag transport barrier." },
+      { label: "Next Steps", value: "Follow up in 2 weeks on transportation resolution and LOC scheduling." },
     ],
   },
   "Provider Call": {
     title: "Care Coordination Note (Draft)",
     module: "Care Coordination",
     fields: [
-      "Service Delivery Summary: PCS aide attending regularly. Day Hab missed 2x due to transportation.",
-      "Attendance/Schedule Notes: Transportation no-shows impacting Day Hab attendance.",
-      "Incident Discussion: Individual reported fall at home — no ER visit, aide assisted.",
-      "Compliance & Utilization Review: PCS at 85% utilization. LOC expiring next month.",
-      "Required Actions: Resolve transportation, schedule LOC renewal, explore SE authorization.",
+      { label: "Service Delivery Summary", value: "PCS aide attending regularly. Day Hab missed 2x due to transportation." },
+      { label: "Attendance/Schedule Notes", value: "Transportation no-shows impacting Day Hab attendance." },
+      { label: "Incident Discussion", value: "Individual reported fall at home — no ER visit, aide assisted." },
+      { label: "Compliance & Utilization Review", value: "PCS at 85% utilization. LOC expiring next month." },
+      { label: "Required Actions", value: "Resolve transportation, schedule LOC renewal, explore SE authorization." },
     ],
   },
   "Individual Meeting": {
     title: "Progress Note (Draft)",
     module: "Progress Notes",
     fields: [
-      "Individual Report: Individual reports satisfaction with PCS but frustration with Day Hab transportation.",
-      "Goal Review: Community integration goal impacted by missed sessions. Interest in Supported Employment.",
-      "Health & Safety: Fall reported at home — no injury, no ER visit. Aide provided assistance.",
-      "Service Satisfaction: Positive about PCS aide. Wants to explore employment services.",
-      "Compliance Impact: LOC renewal needed. Authorization utilization nearing cap.",
-      "Follow-Up: Transportation barrier resolution, LOC scheduling, SE interest to ISP team.",
+      { label: "Individual Report", value: "Individual reports satisfaction with PCS but frustration with Day Hab transportation." },
+      { label: "Goal Review", value: "Community integration goal impacted by missed sessions. Interest in Supported Employment." },
+      { label: "Health & Safety", value: "Fall reported at home — no injury, no ER visit. Aide provided assistance." },
+      { label: "Service Satisfaction", value: "Positive about PCS aide. Wants to explore employment services." },
+      { label: "Compliance Impact", value: "LOC renewal needed. Authorization utilization nearing cap." },
+      { label: "Follow-Up", value: "Transportation barrier resolution, LOC scheduling, SE interest to ISP team." },
     ],
   },
   "Team Meeting": {
     title: "Team Meeting Note (Draft)",
     module: "Case Notes",
     fields: [
-      "Attendees: Kathy (CM), Individual",
-      "Topics Discussed: Service delivery, transportation barriers, new service interest, safety incident, compliance timelines.",
-      "Decisions Made: Pending — requires ISP team input.",
-      "Action Items: LOC renewal, PCP addendum, transportation follow-up, incident documentation.",
+      { label: "Attendees", value: "Kathy (CM), Individual" },
+      { label: "Topics Discussed", value: "Service delivery, transportation barriers, new service interest, safety incident, compliance timelines." },
+      { label: "Decisions Made", value: "Pending — requires ISP team input." },
+      { label: "Action Items", value: "LOC renewal, PCP addendum, transportation follow-up, incident documentation." },
     ],
   },
   Other: {
     title: "General Session Note (Draft)",
     module: "Case Notes",
     fields: [
-      "Session Summary: Discussion covered current services, barriers, safety, and compliance timelines.",
-      "Key Topics: PCS, Day Hab, transportation, Supported Employment interest, fall incident, LOC renewal.",
-      "Follow-Up Required: Multiple action items generated — see suggestions.",
+      { label: "Session Summary", value: "Discussion covered current services, barriers, safety, and compliance timelines." },
+      { label: "Key Topics", value: "PCS, Day Hab, transportation, Supported Employment interest, fall incident, LOC renewal." },
+      { label: "Follow-Up Required", value: "Multiple action items generated — see suggestions." },
     ],
   },
 };
 
-type Screen = "consent" | "recording";
+type Screen = "consent" | "recording" | "processed";
 
 const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => {
   const [screen, setScreen] = useState<Screen>("consent");
@@ -266,6 +279,12 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
   const [visibleEntries, setVisibleEntries] = useState(0);
   const [activeTab, setActiveTab] = useState<"entities" | "suggestions" | "draft">("entities");
   const [selectedSessionType, setSelectedSessionType] = useState<SessionType | null>(null);
+  const [draftFields, setDraftFields] = useState<{ label: string; value: string }[]>([]);
+  const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [suggestions, setSuggestions] = useState(mockSuggestions);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [appliedItems, setAppliedItems] = useState<string[] | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -316,6 +335,57 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
     }
   };
 
+  const handleStopAndProcess = () => {
+    setIsPaused(true);
+    setVisibleEntries(mockTranscript.length);
+    setScreen("processed");
+    setActiveTab("entities");
+  };
+
+  const handleSelectSessionType = (type: SessionType) => {
+    setSelectedSessionType(type);
+    setDraftFields([...draftTemplates[type].fields]);
+    setDraftSaved(false);
+  };
+
+  const handleDiscardDraft = () => {
+    setSelectedSessionType(null);
+    setDraftFields([]);
+    setEditingFieldIndex(null);
+    setDraftSaved(false);
+    // Keep transcript, clear extracted items
+    setActiveTab("entities");
+  };
+
+  const handleSaveDraft = () => {
+    setDraftSaved(true);
+    setEditingFieldIndex(null);
+  };
+
+  const handleApply = (items: string[]) => {
+    setAppliedItems(items);
+    setReviewOpen(false);
+  };
+
+  const toggleSuggestion = (index: number) => {
+    setSuggestions((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, added: !s.added } : s))
+    );
+  };
+
+  const appliedLabels: Record<string, string> = {
+    contact_note: "Contact Note",
+    progress_note: "Progress / Case Note",
+    barriers: "Barriers / SDoH",
+    risk_safety: "Risk & Safety",
+    pcp_updates: "PCP / ISP Updates",
+    workflow_tasks: "Workflow Tasks",
+    service_auth: "Service Authorization Draft",
+    utilization: "Utilization / Caps Update Draft",
+    assessments: "Assessments / LOC Renewal Item",
+  };
+
+  // Consent screen
   if (screen === "consent") {
     return (
       <div className="flex flex-col h-full bg-background">
@@ -403,7 +473,9 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
     );
   }
 
-  // Recording screen
+  const isProcessed = screen === "processed";
+
+  // Recording + Processed screen
   return (
     <div className="flex flex-col h-full bg-background">
       <header className="h-14 flex items-center gap-3 px-5 border-b border-border shrink-0">
@@ -422,10 +494,17 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
           <p className="text-sm font-semibold text-foreground">{individualName}</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-2 text-destructive text-sm font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
-            Ambient ON — Recording {formatTime(elapsedSeconds)}
-          </div>
+          {isProcessed ? (
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Lock className="w-3.5 h-3.5" />
+              Session Ended — {formatTime(elapsedSeconds)}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-destructive text-sm font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
+              Ambient ON — Recording {formatTime(elapsedSeconds)}
+            </div>
+          )}
           <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
             <Lock className="w-3.5 h-3.5" />
             Encrypted
@@ -433,22 +512,48 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
         </div>
       </header>
 
+      {/* Applied success banner */}
+      {appliedItems && (
+        <div className="px-5 py-3 bg-green-500/10 border-b border-green-500/20 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+          <div className="text-sm">
+            <span className="font-semibold text-green-700">Selected items applied to iCM successfully.</span>
+            <span className="text-green-600 ml-2">
+              Applied: {appliedItems.map((id) => appliedLabels[id] || id).join(", ")}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Draft banner */}
+      {isProcessed && !appliedItems && (
+        <div className="px-5 py-2.5 bg-warning/10 border-b border-warning/20 flex items-center gap-2">
+          <Info className="w-4 h-4 text-warning shrink-0" />
+          <span className="text-xs font-medium text-foreground">
+            Draft only — nothing has been written to iCM yet.
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 flex min-h-0">
         {/* Left: Transcript */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-border">
           <div className="px-5 py-3 border-b border-border flex items-center gap-3">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Activity className="w-4 h-4 text-primary" />
-              Live Transcript
+              {isProcessed ? "Transcript (Locked)" : "Live Transcript"}
             </div>
             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-              {visibleEntries} segments
+              {isProcessed ? mockTranscript.length : visibleEntries} segments
             </span>
+            {isProcessed && (
+              <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+            )}
           </div>
 
           <div ref={transcriptRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
             <AnimatePresence>
-              {mockTranscript.slice(0, visibleEntries).map((entry, i) => (
+              {mockTranscript.slice(0, isProcessed ? mockTranscript.length : visibleEntries).map((entry, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 10 }}
@@ -485,7 +590,7 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
               ))}
             </AnimatePresence>
 
-            {!isPaused && (
+            {!isProcessed && !isPaused && (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Activity className="w-4 h-4 animate-pulse" />
                 Listening...
@@ -493,26 +598,28 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
             )}
           </div>
 
-          <div className="px-5 py-4 border-t border-border flex items-center justify-center gap-3">
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors"
-            >
-              {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-              {isPaused ? "Resume" : "Pause"}
-            </button>
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
-            >
-              <Square className="w-4 h-4" />
-              Stop & Process
-            </button>
-          </div>
+          {!isProcessed && (
+            <div className="px-5 py-4 border-t border-border flex items-center justify-center gap-3">
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors"
+              >
+                {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                {isPaused ? "Resume" : "Pause"}
+              </button>
+              <button
+                onClick={handleStopAndProcess}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
+              >
+                <Square className="w-4 h-4" />
+                Stop & Process
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Structured Output */}
-        <div className="w-[380px] shrink-0 flex flex-col">
+        <div className="w-[400px] shrink-0 flex flex-col">
           <div className="px-4 py-3 border-b border-border flex gap-1">
             {(["entities", "suggestions", "draft"] as const).map((tab) => (
               <button
@@ -573,8 +680,8 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
 
             {activeTab === "suggestions" && (
               <div className="space-y-3">
-                {mockSuggestions.map((s, i) => (
-                  <div key={i} className="rounded-lg border border-border p-3 space-y-2">
+                {suggestions.map((s, i) => (
+                  <div key={i} className={`rounded-lg border p-3 space-y-2 ${s.added ? "border-primary/30 bg-primary/5" : "border-border"}`}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold text-foreground">{s.action}</p>
                       <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -584,9 +691,14 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
                       <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-md font-medium">
                         {s.module}
                       </span>
-                      <button className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+                      <button
+                        onClick={() => toggleSuggestion(i)}
+                        className={`text-xs font-medium flex items-center gap-1 ${
+                          s.added ? "text-green-600" : "text-primary hover:underline"
+                        }`}
+                      >
                         <CheckCircle2 className="w-3 h-3" />
-                        Create Draft
+                        {s.added ? "Added to Draft" : "Create Draft"}
                       </button>
                     </div>
                   </div>
@@ -606,7 +718,7 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
                       {sessionTypes.map((type) => (
                         <button
                           key={type}
-                          onClick={() => setSelectedSessionType(type)}
+                          onClick={() => handleSelectSessionType(type)}
                           className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors"
                         >
                           <span className="flex items-center gap-2">
@@ -622,7 +734,11 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <button
-                        onClick={() => setSelectedSessionType(null)}
+                        onClick={() => {
+                          setSelectedSessionType(null);
+                          setDraftFields([]);
+                          setEditingFieldIndex(null);
+                        }}
                         className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                       >
                         <ArrowLeft className="w-3 h-3" />
@@ -632,6 +748,14 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
                         {draftTemplates[selectedSessionType].module}
                       </span>
                     </div>
+
+                    {draftSaved && (
+                      <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-500/10 px-3 py-1.5 rounded-lg">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Draft saved locally for this session.
+                      </div>
+                    )}
+
                     <div className="rounded-lg border border-border p-4 space-y-3">
                       <p className="text-sm font-semibold text-foreground">
                         {draftTemplates[selectedSessionType].title}
@@ -642,18 +766,66 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
                       </div>
                       <div className="border-t border-border my-2" />
                       <div className="space-y-2">
-                        {draftTemplates[selectedSessionType].fields.map((field, i) => {
-                          const [label, ...rest] = field.split(": ");
-                          const value = rest.join(": ");
-                          return (
-                            <div key={i} className="text-sm">
-                              <span className="font-medium text-foreground">{label}</span>
-                              {value && <span className="text-foreground/80">: {value}</span>}
-                            </div>
-                          );
-                        })}
+                        {draftFields.map((field, i) => (
+                          <div key={i} className="text-sm group">
+                            {editingFieldIndex === i ? (
+                              <div className="space-y-1">
+                                <span className="font-medium text-foreground">{field.label}:</span>
+                                <textarea
+                                  value={field.value}
+                                  onChange={(e) => {
+                                    const updated = [...draftFields];
+                                    updated[i] = { ...updated[i], value: e.target.value };
+                                    setDraftFields(updated);
+                                  }}
+                                  onBlur={() => setEditingFieldIndex(null)}
+                                  autoFocus
+                                  className="w-full text-sm bg-secondary/50 border border-border rounded-md px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none min-h-[60px]"
+                                />
+                              </div>
+                            ) : (
+                              <div
+                                className="cursor-pointer hover:bg-secondary/30 rounded px-1 py-0.5 -mx-1 transition-colors"
+                                onClick={() => isProcessed && setEditingFieldIndex(i)}
+                              >
+                                <span className="font-medium text-foreground">{field.label}</span>
+                                <span className="text-foreground/80">: {field.value}</span>
+                                {isProcessed && (
+                                  <Pencil className="w-3 h-3 text-muted-foreground inline ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
+
+                    {/* Draft actions */}
+                    {isProcessed && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveDraft}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          Save Draft
+                        </button>
+                        <button
+                          onClick={() => setReviewOpen(true)}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          Review & Apply
+                        </button>
+                        <button
+                          onClick={handleDiscardDraft}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-destructive/30 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
                     <p className="text-[10px] text-muted-foreground text-center">
                       Draft only — will not write to iCM until reviewed and applied.
                     </p>
@@ -664,6 +836,17 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
           </div>
         </div>
       </div>
+
+      {/* Review & Apply Modal */}
+      <ReviewApplyModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        onApply={handleApply}
+        onEditDraft={() => {
+          setReviewOpen(false);
+          setActiveTab("draft");
+        }}
+      />
     </div>
   );
 };
@@ -700,7 +883,10 @@ function EntitySection({
             <span className="text-foreground text-xs leading-snug">{e.name}</span>
             <div className="flex items-center gap-2 shrink-0">
               {e.detail && <span className="text-muted-foreground text-xs">{e.detail}</span>}
-              <span className="text-green-500 text-xs font-medium">{e.confidence}%</span>
+              <span className={`text-xs font-medium ${e.confidence < 85 ? "text-warning" : "text-green-500"}`}>
+                {e.confidence < 85 && <AlertTriangle className="w-3 h-3 inline mr-0.5" />}
+                {e.confidence}%
+              </span>
             </div>
           </div>
         ))}

@@ -122,7 +122,7 @@ export default function RuntimeAgentBuilder() {
             </div>
             <div>
               <h2 className="font-display font-semibold text-foreground text-sm">Create New Agent</h2>
-              <p className="text-[11px] text-muted-foreground">Runtime Agent · Uses published Rule Libraries for compliance</p>
+              <p className="text-[11px] text-muted-foreground">Runtime Agent · Uses published Compliance Engines for compliance</p>
             </div>
           </div>
         </div>
@@ -196,15 +196,15 @@ export default function RuntimeAgentBuilder() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
                 <h3 className="text-lg font-display font-bold text-foreground mb-1">Select Rule Source</h3>
-                <p className="text-sm text-muted-foreground">Choose a published Rule Library for this agent to use.</p>
+                <p className="text-sm text-muted-foreground">Choose a published Compliance Engine for this agent to use.</p>
               </div>
 
               <div className="space-y-4 glass rounded-xl p-6">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Rule Library</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Compliance Engine</label>
                   <Select value={selectedLibraryId} onValueChange={setSelectedLibraryId}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a published rule library..." />
+                      <SelectValue placeholder="Select a published compliance engine..." />
                     </SelectTrigger>
                     <SelectContent className="bg-popover z-50">
                       {publishedLibraries.map(lib => (
@@ -282,7 +282,7 @@ export default function RuntimeAgentBuilder() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
                 <h3 className="text-lg font-display font-bold text-foreground mb-1">Data Mapping</h3>
-                <p className="text-sm text-muted-foreground">Per-agent module output overrides. These can differ from the Rule Library defaults.</p>
+                <p className="text-sm text-muted-foreground">Per-agent module output overrides. These can differ from the Compliance Engine defaults.</p>
               </div>
 
               <div className="glass rounded-xl p-6 space-y-3">
@@ -312,7 +312,7 @@ export default function RuntimeAgentBuilder() {
               <div className="glass rounded-xl p-6 space-y-4">
                 <ReviewRow label="Agent Name" value={agentName} />
                 <ReviewRow label="Agent Type" value={agentType ? runtimeAgentTypeLabels[agentType] : ""} />
-                <ReviewRow label="Rule Library" value={selectedLibrary ? `${selectedLibrary.name} v${selectedLibrary.version}` : ""} />
+                <ReviewRow label="Compliance Engine" value={selectedLibrary ? `${selectedLibrary.name} v${selectedLibrary.version}` : ""} />
                 <ReviewRow label="Service Scope" value={serviceScope === "all" ? "All Services" : serviceScope} />
                 <ReviewRow label="Workflow Steps" value={`${workflowSteps.length} steps`} />
                 <ReviewRow label="Enabled Modules" value={`${Object.values(moduleToggles).filter(Boolean).length} of ${ICM_MODULES.length}`} />

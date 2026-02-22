@@ -30,7 +30,7 @@ export default function LifePlanBoard() {
 
   const overviewStats = activeTab === "libraries"
     ? [
-        { label: "Rule Libraries", value: mockRuleLibraries.length.toString(), icon: Library, trend: `${mockRuleLibraries.filter(l => l.status === 'published').length} published` },
+        { label: "Compliance Engines", value: mockRuleLibraries.length.toString(), icon: Library, trend: `${mockRuleLibraries.filter(l => l.status === 'published').length} published` },
         { label: "Total Services", value: mockRuleLibraries.reduce((s, l) => s + l.serviceCount, 0).toString(), icon: FileCheck, trend: "Across all libraries" },
         { label: "Hard Stops", value: mockRuleLibraries.reduce((s, l) => s + l.hardStopCount, 0).toString(), icon: AlertTriangle, trend: "Active enforcement" },
         { label: "Warnings", value: mockRuleLibraries.reduce((s, l) => s + l.warningCount, 0).toString(), icon: AlertTriangle, trend: "Flagged items" },
@@ -39,7 +39,7 @@ export default function LifePlanBoard() {
         { label: "Active Agents", value: mockRuntimeAgents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
         { label: "Individuals Served", value: mockRuntimeAgents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
         { label: "Avg Compliance", value: Math.round(mockRuntimeAgents.reduce((s, a) => s + a.complianceRate, 0) / mockRuntimeAgents.length) + "%", icon: TrendingUp, trend: "Denial prevention" },
-        { label: "Rule Libraries Used", value: new Set(mockRuntimeAgents.map(a => a.ruleLibraryId)).size.toString(), icon: Library, trend: "Linked & active" },
+        { label: "Engines Used", value: new Set(mockRuntimeAgents.map(a => a.ruleLibraryId)).size.toString(), icon: Library, trend: "Linked & active" },
       ];
 
   return (
@@ -77,8 +77,8 @@ export default function LifePlanBoard() {
                 <div>
                   <h1 className="text-2xl font-display font-bold text-foreground">Compliance Agent Platform</h1>
                   <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-                    <p className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-primary" /> Step 1: Build Rule Library (Admin)</p>
-                    <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Step 2: Create Agents that use the Rule Library</p>
+                    <p className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-primary" /> Step 1: Build Compliance Engine (Admin)</p>
+                    <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Step 2: Create Agents that use the Compliance Engine</p>
                     <p className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-primary" /> Case Managers run Agents — no guideline uploads required</p>
                   </div>
                 </div>
@@ -90,7 +90,7 @@ export default function LifePlanBoard() {
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(30,70%,55%)] text-destructive-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
                   >
                     <Shield className="h-4 w-4" />
-                    Create Rule Library
+                    Create Compliance Engine
                   </button>
                 ) : (
                   <button
@@ -115,7 +115,7 @@ export default function LifePlanBoard() {
               )}
             >
               <BookOpen className="h-4 w-4" />
-              Rule Libraries
+              Compliance Engine
               <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-muted">{mockRuleLibraries.length}</span>
             </button>
             <button
@@ -151,7 +151,7 @@ export default function LifePlanBoard() {
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input placeholder={activeTab === "libraries" ? "Search rule libraries..." : "Search agents..."} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+              <input placeholder={activeTab === "libraries" ? "Search compliance engines..." : "Search agents..."} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
           </div>
 
@@ -213,7 +213,7 @@ function RuleLibrariesTab({ libraries, navigate }: { libraries: RuleLibrary[]; n
     return (
       <div className="text-center py-16">
         <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 mb-4"><Search className="h-8 w-8 text-muted-foreground" /></div>
-        <p className="text-lg font-medium mb-1">No rule libraries found</p>
+        <p className="text-lg font-medium mb-1">No compliance engines found</p>
         <p className="text-muted-foreground">Try adjusting your search</p>
       </div>
     );
@@ -341,7 +341,7 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                 <div className="flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg bg-muted/40 border border-border/40">
                   <BookOpen className="h-3 w-3 text-muted-foreground shrink-0" />
                   <span className="text-[11px] text-muted-foreground truncate">
-                    Uses: <span className="font-medium text-foreground">{agent.ruleLibraryName}</span> v{agent.ruleLibraryVersion}
+                    Engine: <span className="font-medium text-foreground">{agent.ruleLibraryName}</span> v{agent.ruleLibraryVersion}
                   </span>
                 </div>
 

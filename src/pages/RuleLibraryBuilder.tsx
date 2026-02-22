@@ -42,7 +42,7 @@ export default function RuleLibraryBuilder() {
 
   const handlePublish = () => {
     toast({
-      title: "Rule Library Published",
+      title: "Compliance Engine Published",
       description: "Rule Packs are now frozen and available for runtime agents to use.",
     });
     navigate("/lifeplan");
@@ -60,7 +60,7 @@ export default function RuleLibraryBuilder() {
               <Shield className="w-4 h-4 text-destructive-foreground" />
             </div>
             <div className="flex flex-col">
-              <h2 className="font-display font-semibold text-foreground text-sm">Create Rule Library</h2>
+              <h2 className="font-display font-semibold text-foreground text-sm">Create Compliance Engine</h2>
               <p className="text-[11px] text-muted-foreground">Admin Only · Parse guidelines, build rule packs, publish for agents</p>
             </div>
           </div>

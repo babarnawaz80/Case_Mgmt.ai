@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ArrowLeft, BookOpen, Shield, Library,
-  FileCheck, AlertTriangle, MoreVertical, Eye, Pencil, Copy,
+  Bot, MoreVertical, Eye, Pencil, Copy,
 } from "lucide-react";
-import { mockRuleLibraries, RuleLibrary } from "@/types/agent";
+import { mockRuleLibraries, mockRuntimeAgents, RuleLibrary } from "@/types/agent";
 import { cn } from "@/lib/utils";
 
 function RuleLibraryMenu({ onView, onEdit, onClone }: { onView: () => void; onEdit: () => void; onClone: () => void }) {
@@ -56,11 +56,19 @@ export default function ComplianceEngineDashboard() {
     lib.state.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Count how many agents use each engine
+  const agentUsageMap = mockRuntimeAgents.reduce((acc, agent) => {
+    acc[agent.ruleLibraryId] = (acc[agent.ruleLibraryId] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const linkedEngines = mockRuleLibraries.filter(l => agentUsageMap[l.id]);
+  const totalAgentsLinked = mockRuntimeAgents.filter(a => mockRuleLibraries.some(l => l.id === a.ruleLibraryId)).length;
+
   const stats = [
-    { label: "Compliance Engines", value: mockRuleLibraries.length.toString(), icon: Library, trend: `${mockRuleLibraries.filter(l => l.status === 'published').length} published` },
-    { label: "Total Services", value: mockRuleLibraries.reduce((s, l) => s + l.serviceCount, 0).toString(), icon: FileCheck, trend: "Across all engines" },
-    { label: "Hard Stops", value: mockRuleLibraries.reduce((s, l) => s + l.hardStopCount, 0).toString(), icon: AlertTriangle, trend: "Active enforcement" },
-    { label: "Warnings", value: mockRuleLibraries.reduce((s, l) => s + l.warningCount, 0).toString(), icon: AlertTriangle, trend: "Flagged items" },
+    { label: "Total Engines", value: mockRuleLibraries.length.toString(), icon: Library, trend: `${mockRuleLibraries.filter(l => l.status === 'published').length} published` },
+    { label: "Linked to Agents", value: linkedEngines.length.toString(), icon: Bot, trend: `${totalAgentsLinked} agents using engines` },
+    { label: "Unused Engines", value: (mockRuleLibraries.length - linkedEngines.length).toString(), icon: Shield, trend: "Not linked to any agent" },
   ];
 
   return (
@@ -84,7 +92,7 @@ export default function ComplianceEngineDashboard() {
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-[1600px] mx-auto">
           {/* Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             {stats.map((stat, i) => (
               <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass rounded-xl p-4">
                 <div className="flex items-start justify-between">

@@ -62,7 +62,7 @@ export default function Layer1AgentBuilder() {
               <Shield className="w-4 h-4 text-destructive-foreground" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">Phase 1 — Agent Training</h2>
+              <h2 className="font-display font-semibold text-foreground text-sm">Agent Training</h2>
               <p className="text-[11px] text-muted-foreground">Admin Only · Train agent on state guidelines & configure module mapping</p>
             </div>
           </div>

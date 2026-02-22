@@ -6,7 +6,7 @@ import {
   ArrowLeft, Layers, BookOpen, Bot, Shield,
   FileCheck, TrendingUp, Users, AlertTriangle,
   Play, CheckCircle2, Clock, Library,
-  MoreVertical, Eye, Pencil, Copy,
+  MoreVertical, Eye, Pencil, Copy, Trash2,
 } from "lucide-react";
 import { mockRuleLibraries, mockRuntimeAgents, runtimeAgentTypeLabels, RuleLibrary, RuntimeAgent } from "@/types/agent";
 import { cn } from "@/lib/utils";
@@ -160,6 +160,46 @@ function RuleLibraryMenu({ onView, onEdit, onClone }: { onView: () => void; onEd
   );
 }
 
+function AgentMenu({ onEdit, onClone, onDelete }: { onEdit: () => void; onClone: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-popover border border-border shadow-xl z-50 py-1 overflow-hidden"
+            >
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onClone(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
+                <Copy className="h-3.5 w-3.5" /> Clone
+              </button>
+              <div className="h-px bg-border mx-1 my-1" />
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors">
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function RuleLibrariesTab({ libraries, navigate }: { libraries: RuleLibrary[]; navigate: ReturnType<typeof useNavigate> }) {
   if (libraries.length === 0) {
     return (
@@ -282,6 +322,11 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                   )}>
                     {agent.status}
                   </span>
+                  <AgentMenu
+                    onEdit={() => navigate("/lifeplan/agent/new/layer2")}
+                    onClone={() => {}}
+                    onDelete={() => {}}
+                  />
                 </div>
               </div>
 

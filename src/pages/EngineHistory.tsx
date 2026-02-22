@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, FileText, User, GitBranch, Bot, Shield, Download } from "lucide-react";
-import { mockRuleLibraries, mockRuntimeAgents } from "@/types/agent";
+import { ArrowLeft, Clock, FileText, User, GitBranch, Bot, Shield, Download, AlertCircle, ArrowUp } from "lucide-react";
+import { mockComplianceEngines, mockRuntimeAgents } from "@/types/agent";
 import { cn } from "@/lib/utils";
 
 interface AuditEntry {
@@ -57,14 +57,17 @@ const mockAuditLog: AuditEntry[] = [
 export default function EngineHistory() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const engine = mockRuleLibraries.find((e) => e.id === id) || mockRuleLibraries[0];
-  const linkedAgents = mockRuntimeAgents.filter((a) => a.ruleLibraryId === engine.id);
+  const engine = mockComplianceEngines.find((e) => e.id === id) || mockComplianceEngines[0];
+  const linkedAgents = mockRuntimeAgents.filter((a) => a.engineId === engine.id);
+
+  // Mock: agents on older version
+  const agentsOnOlderVersion = linkedAgents.filter(a => a.engineVersion !== engine.version);
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
       <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/lifeplan")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => navigate("/lifeplan/compliance-engines")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
@@ -72,7 +75,7 @@ export default function EngineHistory() {
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">{engine.name} — History</h2>
+              <h2 className="font-display font-semibold text-foreground text-sm">{engine.name} — Version History</h2>
               <p className="text-[11px] text-muted-foreground">Version history & audit log</p>
             </div>
           </div>
@@ -90,7 +93,9 @@ export default function EngineHistory() {
               </div>
               <span className={cn(
                 "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider",
-                engine.status === "published" ? "bg-primary/10 text-primary" : "bg-warning/10 text-warning"
+                engine.status === "published" ? "bg-primary/10 text-primary" :
+                engine.status === "archived" ? "bg-muted text-muted-foreground" :
+                "bg-warning/10 text-warning"
               )}>
                 v{engine.version} · {engine.status}
               </span>
@@ -109,7 +114,47 @@ export default function EngineHistory() {
                 <p className="text-[9px] text-muted-foreground uppercase">Warnings</p>
               </div>
             </div>
+
+            {/* Immutability notice */}
+            {engine.status === "published" && (
+              <div className="mt-4 p-3 rounded-lg bg-muted/20 border border-border/30">
+                <p className="text-[11px] text-muted-foreground">
+                  <span className="font-semibold text-foreground">Published engines are immutable.</span> To make changes, create a new version by cloning this engine.
+                </p>
+              </div>
+            )}
           </motion.div>
+
+          {/* Upgrade notification */}
+          {agentsOnOlderVersion.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+              className="p-4 rounded-xl bg-warning/5 border border-warning/20"
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Engine Update Available</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    New version v{engine.version} is available. The following agents are still pinned to older versions and must be manually upgraded:
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {agentsOnOlderVersion.map(agent => (
+                      <div key={agent.id} className="flex items-center justify-between p-2 rounded-lg bg-card border border-border/30">
+                        <div className="flex items-center gap-2">
+                          <Bot className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-medium text-foreground">{agent.name}</span>
+                          <span className="text-[10px] text-muted-foreground">pinned to v{agent.engineVersion}</span>
+                        </div>
+                        <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-warning/10 hover:bg-warning/20 text-[10px] font-medium text-warning transition-colors">
+                          <ArrowUp className="h-3 w-3" /> Upgrade
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {/* Linked agents */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -117,7 +162,7 @@ export default function EngineHistory() {
               <Bot className="h-4 w-4 text-primary" /> Linked Agents ({linkedAgents.length})
             </h4>
             {linkedAgents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No agents linked to this engine version.</p>
+              <p className="text-sm text-muted-foreground">No agents linked to this engine.</p>
             ) : (
               <div className="space-y-2">
                 {linkedAgents.map((agent) => (
@@ -126,7 +171,7 @@ export default function EngineHistory() {
                       <Bot className="h-4 w-4 text-primary" />
                       <div>
                         <p className="text-sm font-medium text-foreground">{agent.name}</p>
-                        <p className="text-[10px] text-muted-foreground">Pinned to v{agent.ruleLibraryVersion}</p>
+                        <p className="text-[10px] text-muted-foreground">Pinned to v{agent.engineVersion}</p>
                       </div>
                     </div>
                     <span className={cn(

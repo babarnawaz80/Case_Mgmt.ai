@@ -5,34 +5,28 @@ import {
   Plus, Search, Sparkles, LayoutDashboard, User,
   ArrowLeft, Layers, BookOpen, Bot, Shield,
   TrendingUp, Users,
-  Play, CheckCircle2, Clock, Library,
+  Play, CheckCircle2, Clock,
   MoreVertical, Pencil, Copy, Trash2,
 } from "lucide-react";
-import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent } from "@/types/agent";
+import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 
-// Tabs removed — engines accessed via link under Create New Agent
-
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
-  
   const navigate = useNavigate();
   const { isAdmin, role, setRole } = useRole();
 
   const filteredAgents = mockRuntimeAgents.filter((agent) =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    agent.ruleLibraryName.toLowerCase().includes(searchQuery.toLowerCase())
+    agent.engineName.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-
-
 
   const overviewStats = [
     { label: "Active Agents", value: mockRuntimeAgents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
     { label: "Individuals Served", value: mockRuntimeAgents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
     { label: "Avg Compliance", value: Math.round(mockRuntimeAgents.reduce((s, a) => s + a.complianceRate, 0) / mockRuntimeAgents.length) + "%", icon: TrendingUp, trend: "Denial prevention" },
-    { label: "Engines Used", value: new Set(mockRuntimeAgents.map(a => a.ruleLibraryId)).size.toString(), icon: Library, trend: "Linked & active" },
+    { label: "Engines Used", value: new Set(mockRuntimeAgents.map(a => a.engineId)).size.toString(), icon: Shield, trend: "Linked & active" },
   ];
 
   return (
@@ -45,28 +39,14 @@ export default function LifePlanBoard() {
           <h2 className="font-display font-semibold text-foreground text-lg">Compliance Agent Platform</h2>
         </div>
         <div className="flex items-center gap-3">
-          {/* Role switcher */}
           <div className="flex items-center gap-1 p-0.5 rounded-lg bg-muted border border-border">
-            <button
-              onClick={() => setRole("admin")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
-                role === "admin" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
+            <button onClick={() => setRole("admin")} className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", role === "admin" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
               <Shield className="h-3 w-3 inline mr-1" />Admin
             </button>
-            <button
-              onClick={() => setRole("case_manager")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
-                role === "case_manager" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
+            <button onClick={() => setRole("case_manager")} className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", role === "case_manager" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
               <User className="h-3 w-3 inline mr-1" />Case Manager
             </button>
           </div>
-
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-sm transition-all">
             <Sparkles className="w-4 h-4" /> AI Companion
           </motion.button>
@@ -106,27 +86,17 @@ export default function LifePlanBoard() {
               <div className="flex flex-col items-end gap-1.5">
                 {isAdmin && (
                   <>
-                    <button
-                      onClick={() => navigate("/lifeplan/agent/new")}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Create New Agent
+                    <button onClick={() => navigate("/lifeplan/agent/new")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
+                      <Plus className="h-4 w-4" /> Create New Agent
                     </button>
-                    <button
-                      onClick={() => navigate("/lifeplan/compliance-engines")}
-                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      <Shield className="h-3 w-3" />
-                      Manage Compliance Engines
+                    <button onClick={() => navigate("/lifeplan/compliance-engines")} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors">
+                      <Shield className="h-3 w-3" /> Manage Compliance Engines
                     </button>
                   </>
                 )}
               </div>
             </div>
           </motion.div>
-
-
 
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -148,24 +118,16 @@ export default function LifePlanBoard() {
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                placeholder="Search agents..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
+              <input placeholder="Search agents..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
           </div>
 
-          {/* Content */}
           <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} />
         </div>
       </main>
     </div>
   );
 }
-
-// ============= MENUS =============
 
 function AgentMenu({ onEdit, onClone, onDelete }: { onEdit: () => void; onClone: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
@@ -196,9 +158,6 @@ function AgentMenu({ onEdit, onClone, onDelete }: { onEdit: () => void; onClone:
     </div>
   );
 }
-
-
-// ============= RUNTIME AGENTS TAB =============
 
 const agentTypeColors: Record<string, string> = {
   compliance_copilot: "from-[hsl(200,65%,52%)] to-[hsl(210,55%,62%)]",
@@ -239,29 +198,20 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                     <h3 className="font-semibold text-[15px] text-white truncate leading-tight">{agent.name}</h3>
                     <p className="text-[11px] text-white/60 mt-0.5">{runtimeAgentTypeLabels[agent.type]}</p>
                   </div>
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                    agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70"
-                  )}>
+                  <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
                     {agent.status}
                   </span>
-                  <AgentMenu
-                    onEdit={() => navigate("/lifeplan/agent/new/layer2")}
-                    onClone={() => {}}
-                    onDelete={() => {}}
-                  />
+                  <AgentMenu onEdit={() => navigate("/lifeplan/agent/new/layer2")} onClone={() => {}} onDelete={() => {}} />
                 </div>
               </div>
 
               <div className="px-5 pt-4 pb-5">
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem] leading-relaxed">
-                  {agent.description}
-                </p>
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem] leading-relaxed">{agent.description}</p>
 
                 <div className="flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg bg-muted/40 border border-border/40">
                   <BookOpen className="h-3 w-3 text-muted-foreground shrink-0" />
                   <span className="text-[11px] text-muted-foreground truncate">
-                    Powered by: <span className="font-medium text-foreground">{agent.ruleLibraryName}</span> v{agent.ruleLibraryVersion}
+                    Powered by: <span className="font-medium text-foreground">{agent.engineName}</span> v{agent.engineVersion}
                   </span>
                 </div>
 
@@ -283,12 +233,8 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                   </div>
                 </div>
 
-                <button className={cn(
-                  "w-full h-9 gap-2 rounded-xl text-xs font-medium flex items-center justify-center bg-gradient-to-r text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all",
-                  gradient
-                )}>
-                  <Play className="h-3 w-3 fill-current" />
-                  Run Agent
+                <button className={cn("w-full h-9 gap-2 rounded-xl text-xs font-medium flex items-center justify-center bg-gradient-to-r text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all", gradient)}>
+                  <Play className="h-3 w-3 fill-current" /> Run Agent
                 </button>
               </div>
             </div>

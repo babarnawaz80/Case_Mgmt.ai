@@ -49,6 +49,10 @@ export function Layer2Step6Documentation({ rulePack, onBack, onNext }: Props) {
         <p className="text-sm text-muted-foreground mt-1">
           Creates the exact documentation checklist and generates templates for <span className="font-medium text-foreground">{rulePack?.service_name}</span>.
         </p>
+        <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/30">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase">Data Source:</span>
+          <span className="text-[11px] text-foreground font-medium">Engine Templates</span>
+        </div>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">Case managers and providers often miss required documentation elements. This step makes documentation requirements explicit and auto-prepared. <span className="italic text-muted-foreground/80">"What paperwork and notes do we need to prove the service happened correctly?"</span></p>

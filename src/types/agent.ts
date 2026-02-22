@@ -8,7 +8,7 @@ export type PlanType =
   | 'Safety Plan'
   | 'Discharge Plan'
   | 'Guideline Parsing'
-  | 'Compliance Engine'
+  | 'Guidelines Engine'
   | 'Custom';
 
 export type RuntimeAgentType =
@@ -57,9 +57,9 @@ export interface AgentFormData {
   instructions: string;
 }
 
-// ============= COMPLIANCE ENGINE TYPES =============
+// ============= GUIDELINES ENGINE TYPES =============
 
-export interface ComplianceEngine {
+export interface GuidelinesEngine {
   id: string;
   name: string;
   state: string;
@@ -74,6 +74,9 @@ export interface ComplianceEngine {
   publishedAt: string | null;
   lastUpdated: string;
 }
+
+// Backward compat alias
+export type ComplianceEngine = GuidelinesEngine;
 
 // ============= COMPLIANCE RUN TYPES =============
 
@@ -124,7 +127,7 @@ export interface RuntimeAgent {
 }
 
 // ============= INSTRUCTION HIERARCHY =============
-// Level 1: Compliance Engine Instructions (State-level logic)
+// Level 1: Guidelines Engine Instructions (State-level logic)
 // Level 2: Agent Instructions (Organization-level overrides)
 // Level 3: Runtime Overrides (Case-specific, requires justification)
 // If conflicts occur, higher level number overrides lower.
@@ -132,7 +135,7 @@ export interface RuntimeAgent {
 // ============= FIXED WORKFLOW =============
 // The workflow is system-defined and locked. Agents configure behavior, not structure.
 export const FIXED_WORKFLOW_STEPS = [
-  { step: 1, name: "Individual & Service", description: "Select person + load compliance engine" },
+  { step: 1, name: "Individual & Service", description: "Select person + load guidelines engine" },
   { step: 2, name: "Eligibility Check", description: "Prerequisites & qualification" },
   { step: 3, name: "PCP Alignment", description: "Plan justifies service?" },
   { step: 4, name: "Limits & Caps", description: "Within allowed hours/units?" },
@@ -154,7 +157,7 @@ export const DATA_SOURCES: Record<string, string> = {
 
 // ============= MOCK DATA =============
 
-export const mockComplianceEngines: ComplianceEngine[] = [
+export const mockGuidelinesEngines: GuidelinesEngine[] = [
   {
     id: "ce-1",
     name: "Maryland DDA",
@@ -202,10 +205,13 @@ export const mockComplianceEngines: ComplianceEngine[] = [
   },
 ];
 
+// Backward compat alias
+export const mockComplianceEngines = mockGuidelinesEngines;
+
 export const mockRuntimeAgents: RuntimeAgent[] = [
   {
     id: "ra-1",
-    name: "State Compliance Engine Agent",
+    name: "State Guidelines Engine Agent",
     type: "compliance_copilot",
     description: "Full compliance enforcement across eligibility, PCP, limits, conflicts, and documentation.",
     engineId: "ce-1",
@@ -224,7 +230,7 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     id: "ra-2",
     name: "PCP Alignment Copilot",
     type: "pcp_alignment",
-    description: "Scans PCP vs rule pack requirements, identifies missing items, drafts addendum language.",
+    description: "Scans PCP vs guideline pack requirements, identifies missing items, drafts addendum language.",
     engineId: "ce-1",
     engineName: "Maryland DDA",
     engineVersion: "2.0",
@@ -291,12 +297,12 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
 ];
 
 export const mockComplianceRuns: ComplianceRun[] = [
-  { id: "cr-1", individual: "James Williams", service: "Personal Care Services (PCS)", status: "Complete", date: "2026-02-18", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "BAN", "Workflow Manager"] },
-  { id: "cr-2", individual: "Maria Garcia", service: "Day Habilitation", status: "Complete", date: "2026-02-15", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "Progress Note"] },
+  { id: "cr-1", individual: "James Williams", service: "Personal Care Services (PCS)", status: "Complete", date: "2026-02-18", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Guidelines Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "BAN", "Workflow Manager"] },
+  { id: "cr-2", individual: "Maria Garcia", service: "Day Habilitation", status: "Complete", date: "2026-02-15", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Guidelines Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "Progress Note"] },
   { id: "cr-3", individual: "David Johnson", service: "Respite Care", status: "In Progress", date: "2026-02-20", compliance: "Pending", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "Billing Documentation Copilot", agentVersion: "1.0", user: "John Smith", overrides: [], modulesWritten: [] },
   { id: "cr-4", individual: "Sarah Thompson", service: "Supported Employment – Individual", status: "Complete", date: "2026-02-10", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "PCP Alignment Copilot", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["PCP", "Services"] },
   { id: "cr-5", individual: "Robert Davis", service: "Community Living Supports", status: "Complete", date: "2026-02-05", compliance: "Flagged", engineName: "Virginia DBHDS", engineVersion: "1.0", agentName: "Monitoring & Reauth Copilot", agentVersion: "1.0", user: "John Smith", overrides: [{ id: "ov-1", user: "John Smith", timestamp: "2026-02-05T14:30:00Z", field: "Weekly Cap", originalResult: "hard_stop", newResult: "warning", justification: "Temporary exception approved by supervisor — additional hours authorized by MCO." }], modulesWritten: ["Services", "Monitoring"] },
-  { id: "cr-6", individual: "James Williams", service: "Behavioral Support Services", status: "In Progress", date: "2026-02-21", compliance: "Pending", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: [] },
+  { id: "cr-6", individual: "James Williams", service: "Behavioral Support Services", status: "In Progress", date: "2026-02-21", compliance: "Pending", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Guidelines Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: [] },
 ];
 
 // Legacy mock agents (kept for backward compat)
@@ -306,7 +312,7 @@ export const mockAgents: Agent[] = [
     name: "Guideline Parsing Agent",
     planType: "Guideline Parsing",
     layer: "layer1",
-    description: "Admin-only agent that converts uploaded state guideline PDFs into structured Rule Packs for downstream Compliance Engine agents.",
+    description: "Admin-only agent that converts uploaded state guideline PDFs into structured Guideline Packs for downstream Guidelines Engine agents.",
     instructions: "Upload state guideline PDF. Optionally provide service list, templates, and service code mappings.",
     status: "active",
     profileFields: [],
@@ -315,11 +321,11 @@ export const mockAgents: Agent[] = [
   },
   {
     id: "l2-1",
-    name: "State Compliance Engine Agent",
-    planType: "Compliance Engine",
+    name: "State Guidelines Engine Agent",
+    planType: "Guidelines Engine",
     layer: "layer2",
-    description: "Guides case managers through service authorization and billing documentation using published Compliance Engines.",
-    instructions: "Uses Compliance Engine rule packs to enforce compliance at every step.",
+    description: "Guides case managers through service authorization and billing documentation using published Guidelines Engines.",
+    instructions: "Uses Guidelines Engine guideline packs to enforce compliance at every step.",
     status: "active",
     profileFields: [],
     createdAt: new Date("2025-12-01"),
@@ -328,7 +334,7 @@ export const mockAgents: Agent[] = [
 ];
 
 export const runtimeAgentTypeLabels: Record<RuntimeAgentType, string> = {
-  compliance_copilot: "Compliance Engine Agent",
+  compliance_copilot: "Guidelines Engine Agent",
   pcp_alignment: "PCP Alignment",
   billing_documentation: "Billing Documentation",
   monitoring_reauth: "Monitoring / Reauthorization",

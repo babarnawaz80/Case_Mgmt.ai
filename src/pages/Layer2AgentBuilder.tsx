@@ -13,7 +13,7 @@ import { Layer2Step5Conflicts } from "@/components/layer2/Layer2Step5Conflicts";
 import { Layer2Step6Documentation } from "@/components/layer2/Layer2Step6Documentation";
 import { Layer2Step7Push } from "@/components/layer2/Layer2Step7Push";
 import { Layer2Step8Dashboard } from "@/components/layer2/Layer2Step8Dashboard";
-import { Layer2State } from "@/types/rulePack";
+import { Layer2State } from "@/types/guidelinePack";
 import { mockComplianceRuns, FIXED_WORKFLOW_STEPS } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
@@ -26,6 +26,7 @@ export default function Layer2AgentBuilder() {
   const [state, setState] = useState<Layer2State>({
     step: 1,
     selectedRulePack: null,
+    selectedGuidelinePack: null,
     moduleMapping: [],
     complianceResult: null,
     isProcessing: false,

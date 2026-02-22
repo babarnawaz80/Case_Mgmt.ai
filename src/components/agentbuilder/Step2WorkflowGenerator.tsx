@@ -12,7 +12,7 @@ import {
   Play,
   ArrowLeft,
 } from "lucide-react";
-import { RulePack, WorkflowNode } from "@/types/rulePack";
+import { GuidelinePack, RulePack, WorkflowNode } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step2Props {

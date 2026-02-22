@@ -73,13 +73,13 @@ export default function ComplianceEngineDashboard() {
           <button onClick={() => navigate("/lifeplan")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="font-display font-semibold text-foreground text-lg">Compliance Engines</h2>
+          <h2 className="font-display font-semibold text-foreground text-lg">Guidelines Engines</h2>
         </div>
         <button
-          onClick={() => navigate("/lifeplan/rule-library/new")}
+          onClick={() => navigate("/lifeplan/guidelines-library/new")}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(30,70%,55%)] text-destructive-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
         >
-          <Shield className="h-4 w-4" /> Create Compliance Engine
+          <Shield className="h-4 w-4" /> Create Guidelines Engine
         </button>
       </header>
 
@@ -105,7 +105,7 @@ export default function ComplianceEngineDashboard() {
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input placeholder="Search compliance engines..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+              <input placeholder="Search guidelines engines..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
           </div>
 
@@ -113,7 +113,7 @@ export default function ComplianceEngineDashboard() {
           {filteredEngines.length === 0 ? (
             <div className="text-center py-16">
               <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 mb-4"><Search className="h-8 w-8 text-muted-foreground" /></div>
-              <p className="text-lg font-medium mb-1">No compliance engines found</p>
+              <p className="text-lg font-medium mb-1">No guidelines engines found</p>
               <p className="text-muted-foreground">Try adjusting your search</p>
             </div>
           ) : (
@@ -137,7 +137,7 @@ export default function ComplianceEngineDashboard() {
                           </div>
                           <EngineMenu
                             onView={() => navigate(`/lifeplan/engine/${engine.id}/history`)}
-                            onEdit={() => navigate("/lifeplan/rule-library/new")}
+                            onEdit={() => navigate("/lifeplan/guidelines-library/new")}
                             onClone={() => {}}
                             onHistory={() => navigate(`/lifeplan/engine/${engine.id}/history`)}
                           />

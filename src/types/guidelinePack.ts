@@ -1,6 +1,6 @@
-// ============= RULE PACK TYPES =============
+// ============= GUIDELINE PACK TYPES =============
 
-export interface RulePack {
+export interface GuidelinePack {
   id: string;
   guideline_version_date: string;
   state: string;
@@ -10,40 +10,52 @@ export interface RulePack {
   service_category: 'Meaningful Day' | 'Support' | 'Residential' | 'Behavioral' | 'Other';
   billing_unit: '15 min' | 'hourly' | 'daily' | 'monthly' | 'milestone' | 'other';
   service_description: string;
-  eligibility_rules: RuleItem[];
-  authorization_requirements: RuleItem[];
-  pcp_requirements: RuleItem[];
-  prerequisite_requirements: RuleItem[];
-  limits: LimitRule[];
-  conflicts: ConflictRule[];
-  documentation_requirements: RuleItem[];
-  self_directed_differences: RuleItem[];
-  monitoring_rules: RuleItem[];
-  hard_stops: RuleItem[];
-  warnings: RuleItem[];
+  eligibility_rules: GuidelineItem[];
+  authorization_requirements: GuidelineItem[];
+  pcp_requirements: GuidelineItem[];
+  prerequisite_requirements: GuidelineItem[];
+  limits: LimitGuideline[];
+  conflicts: ConflictGuideline[];
+  documentation_requirements: GuidelineItem[];
+  self_directed_differences: GuidelineItem[];
+  monitoring_rules: GuidelineItem[];
+  hard_stops: GuidelineItem[];
+  warnings: GuidelineItem[];
   citations: Citation[];
   published: boolean;
   created_by: string;
   created_at: string;
 }
 
-export interface RuleItem {
+// Backward compat alias
+export type RulePack = GuidelinePack;
+
+export interface GuidelineItem {
   rule_type: string;
   rule_text: string;
 }
 
-export interface LimitRule {
+// Backward compat alias
+export type RuleItem = GuidelineItem;
+
+export interface LimitGuideline {
   type: 'daily' | 'weekly' | 'yearly' | 'frequency' | 'plan_year';
   rule_text: string;
   value?: number;
   unit?: string;
 }
 
-export interface ConflictRule {
+// Backward compat alias
+export type LimitRule = LimitGuideline;
+
+export interface ConflictGuideline {
   type: 'same_time' | 'same_day';
   conflicting_service: string;
   rule_text: string;
 }
+
+// Backward compat alias
+export type ConflictRule = ConflictGuideline;
 
 export interface Citation {
   page: string;
@@ -90,10 +102,16 @@ export interface Layer1State {
   uploadedFiles: UploadedFile[];
   optionalTemplates: UploadedFile[];
   serviceCodeMapping: string;
-  rulePacks: RulePack[];
+  guidelinePacks: GuidelinePack[];
+  /** @deprecated Use guidelinePacks */
+  rulePacks?: GuidelinePack[];
   extractionSummary: ExtractionSummary | null;
   isProcessing: boolean;
 }
+
+// Backward compat
+/** @deprecated Use Layer1State.guidelinePacks */
+export type { Layer1State as Layer1StateCompat };
 
 // ============= LAYER 2 CM AGENT STATE =============
 
@@ -115,7 +133,9 @@ export interface ComplianceCheckResult {
 
 export interface Layer2State {
   step: number;
-  selectedRulePack: RulePack | null;
+  selectedGuidelinePack: GuidelinePack | null;
+  /** @deprecated Use selectedGuidelinePack */
+  selectedRulePack?: GuidelinePack | null;
   moduleMapping: ModuleMapping[];
   complianceResult: ComplianceCheckResult | null;
   isProcessing: boolean;
@@ -172,7 +192,9 @@ export interface AgentBuilderState {
   agentName: string;
   agentDescription: string;
   uploadedFiles: UploadedFile[];
-  rulePacks: RulePack[];
+  guidelinePacks: GuidelinePack[];
+  /** @deprecated Use guidelinePacks */
+  rulePacks?: GuidelinePack[];
   workflowNodes: WorkflowNode[];
   isProcessing: boolean;
 }

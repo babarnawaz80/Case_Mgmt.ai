@@ -4,7 +4,7 @@ import {
   ArrowLeft, CheckCircle2, Rocket, Shield, ToggleLeft, ToggleRight,
   Database, FileText,
 } from "lucide-react";
-import { RulePack, ExtractionSummary } from "@/types/rulePack";
+import { GuidelinePack, RulePack, ExtractionSummary } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Props {

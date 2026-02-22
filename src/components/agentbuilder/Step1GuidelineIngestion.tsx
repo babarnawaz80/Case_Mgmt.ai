@@ -11,7 +11,7 @@ import {
   File,
   Sparkles,
 } from "lucide-react";
-import { RulePack, UploadedFile } from "@/types/rulePack";
+import { GuidelinePack, RulePack, UploadedFile } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step1Props {

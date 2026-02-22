@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Flag,
 } from "lucide-react";
-import { AuthorizationOutput } from "@/types/rulePack";
+import { AuthorizationOutput } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step7Props {

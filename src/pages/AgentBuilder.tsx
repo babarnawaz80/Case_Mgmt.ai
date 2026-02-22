@@ -19,7 +19,7 @@ import { Step5ConflictEngine } from "@/components/agentbuilder/Step5ConflictEngi
 import { Step6DocumentationGenerator } from "@/components/agentbuilder/Step6DocumentationGenerator";
 import { Step7AuthorizationOutput } from "@/components/agentbuilder/Step7AuthorizationOutput";
 import { StepVersionControl } from "@/components/agentbuilder/StepVersionControl";
-import { AgentBuilderState } from "@/types/rulePack";
+import { AgentBuilderState } from "@/types/guidelinePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
@@ -43,6 +43,7 @@ export default function AgentBuilder() {
     agentDescription: "",
     uploadedFiles: [],
     rulePacks: [],
+    guidelinePacks: [],
     workflowNodes: [],
     isProcessing: false,
   });

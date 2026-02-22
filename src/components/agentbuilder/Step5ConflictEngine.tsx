@@ -11,7 +11,7 @@ import {
   Ban,
   Lightbulb,
 } from "lucide-react";
-import { ConflictCheck } from "@/types/rulePack";
+import { ConflictCheck } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step5Props {

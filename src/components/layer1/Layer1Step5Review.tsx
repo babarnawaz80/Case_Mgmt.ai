@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowRight, Sparkles, Loader2, CheckCircle2,
   AlertTriangle, OctagonAlert, FileText, Eye,
 } from "lucide-react";
-import { RulePack, ExtractionSummary } from "@/types/rulePack";
+import { GuidelinePack, RulePack, ExtractionSummary } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Props {

@@ -3,7 +3,7 @@ import {
   ArrowLeft, CheckCircle2, AlertTriangle, OctagonAlert,
   ArrowRight, Gauge, Shield,
 } from "lucide-react";
-import { RulePack } from "@/types/rulePack";
+import { GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Props {

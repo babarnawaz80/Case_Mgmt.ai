@@ -10,7 +10,7 @@ import {
   Gauge,
   OctagonAlert,
 } from "lucide-react";
-import { CapLimit, RulePack } from "@/types/rulePack";
+import { CapLimit, GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step4Props {

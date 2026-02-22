@@ -25,7 +25,7 @@ import {
   Calendar,
   UserCheck,
 } from "lucide-react";
-import { RulePack } from "@/types/rulePack";
+import { GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step3Props {

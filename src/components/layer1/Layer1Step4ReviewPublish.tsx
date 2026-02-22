@@ -5,7 +5,7 @@ import {
   Database, FileText, OctagonAlert, AlertTriangle, Eye, Loader2,
   Sparkles,
 } from "lucide-react";
-import { RulePack, ExtractionSummary } from "@/types/rulePack";
+import { GuidelinePack, RulePack, ExtractionSummary } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Props {

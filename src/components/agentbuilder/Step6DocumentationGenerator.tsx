@@ -13,7 +13,7 @@ import {
   Download,
   Eye,
 } from "lucide-react";
-import { DocumentTemplate } from "@/types/rulePack";
+import { DocumentTemplate } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step6Props {

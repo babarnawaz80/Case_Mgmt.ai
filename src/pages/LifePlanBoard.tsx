@@ -36,7 +36,7 @@ export default function LifePlanBoard() {
           <button onClick={() => navigate("/dashboard")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="font-display font-semibold text-foreground text-lg">Compliance Engine Platform</h2>
+          <h2 className="font-display font-semibold text-foreground text-lg">Guidelines Engine Platform</h2>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 p-0.5 rounded-lg bg-muted border border-border">
@@ -70,11 +70,11 @@ export default function LifePlanBoard() {
                   <Layers className="h-7 w-7 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-foreground">Compliance Engine Platform</h1>
+                  <h1 className="text-2xl font-display font-bold text-foreground">Guidelines Engine Platform</h1>
                   <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
                     {isAdmin ? (
                       <>
-                        <p className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-primary" /> Build Compliance Engines from state guidelines</p>
+                        <p className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-primary" /> Build Guidelines Engines from state guidelines</p>
                         <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Create and manage Runtime Agents</p>
                       </>
                     ) : (
@@ -89,8 +89,8 @@ export default function LifePlanBoard() {
                     <button onClick={() => navigate("/lifeplan/agent/new")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
                       <Plus className="h-4 w-4" /> Create New Agent
                     </button>
-                    <button onClick={() => navigate("/lifeplan/compliance-engines")} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors">
-                      <Shield className="h-3 w-3" /> Manage Compliance Engines
+                    <button onClick={() => navigate("/lifeplan/guidelines-engines")} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors">
+                      <Shield className="h-3 w-3" /> Manage Guidelines Engines
                     </button>
                   </>
                 )}

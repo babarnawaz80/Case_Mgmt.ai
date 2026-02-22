@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Bot, Sparkles, User, Shield, Lock, AlertTriangle, Eye } from "lucide-react";
+import { ArrowLeft, Bot, Sparkles, User, Shield, Lock, AlertTriangle, Eye, GitBranch, Info } from "lucide-react";
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
-import { RuntimeAgentType, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, applyModeLabels, ApplyMode, FIXED_WORKFLOW_STEPS, monitoringCadenceLabels, MonitoringCadence } from "@/types/agent";
+import { RuntimeAgentType, RuntimeAgent, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, applyModeLabels, ApplyMode, FIXED_WORKFLOW_STEPS, monitoringCadenceLabels, MonitoringCadence } from "@/types/agent";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -31,26 +31,40 @@ const ICM_MODULES = [
 
 export default function RuntimeAgentBuilder() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(1);
 
+  // Edit / Clone mode
+  const editAgent: RuntimeAgent | undefined = location.state?.editAgent;
+  const cloneAgent: RuntimeAgent | undefined = location.state?.cloneAgent;
+  const sourceAgent = editAgent || cloneAgent;
+  const isEditMode = !!editAgent;
+  const isCloneMode = !!cloneAgent;
+
+  // Compute next version
+  const currentVersion = editAgent?.version || "1.0";
+  const nextVersion = isEditMode
+    ? `${parseFloat(currentVersion) + 0.1}`
+    : "1.0";
+
   // Step 1
-  const [agentName, setAgentName] = useState("");
-  const [agentType, setAgentType] = useState<RuntimeAgentType | "">("");
-  const [description, setDescription] = useState("");
-  const [instructions, setInstructions] = useState("");
+  const [agentName, setAgentName] = useState(sourceAgent?.name || "");
+  const [agentType, setAgentType] = useState<RuntimeAgentType | "">(sourceAgent?.type || "");
+  const [description, setDescription] = useState(sourceAgent?.description || "");
+  const [instructions, setInstructions] = useState(sourceAgent?.instructions || "");
 
   // Step 2
-  const [selectedEngineId, setSelectedEngineId] = useState("");
+  const [selectedEngineId, setSelectedEngineId] = useState(sourceAgent?.engineId || "");
 
   // Step 3
-  const [allowOverrides, setAllowOverrides] = useState(true);
-  const [requireSupervisorApproval, setRequireSupervisorApproval] = useState(false);
-  const [applyMode, setApplyMode] = useState<ApplyMode>("manual");
+  const [allowOverrides, setAllowOverrides] = useState(sourceAgent?.allowOverrides ?? true);
+  const [requireSupervisorApproval, setRequireSupervisorApproval] = useState(sourceAgent?.requireSupervisorApproval ?? false);
+  const [applyMode, setApplyMode] = useState<ApplyMode>(sourceAgent?.applyMode || "manual");
 
   // Auto-Monitor
-  const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(false);
-  const [monitorCadence, setMonitorCadence] = useState<MonitoringCadence>("realtime");
-  const [debounceHours, setDebounceHours] = useState(6);
+  const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(sourceAgent?.autoMonitorEnabled ?? false);
+  const [monitorCadence, setMonitorCadence] = useState<MonitoringCadence>(sourceAgent?.autoMonitorCadence || "realtime");
+  const [debounceHours, setDebounceHours] = useState(sourceAgent?.autoMonitorDebounceHours ?? 6);
 
   // Step 4
   const [moduleToggles, setModuleToggles] = useState<Record<string, boolean>>(
@@ -64,8 +78,10 @@ export default function RuntimeAgentBuilder() {
 
   const handleSave = () => {
     toast({
-      title: "Agent Created Successfully",
-      description: `${agentName} is now active and linked to ${selectedEngine?.name} v${selectedEngine?.version}.`,
+      title: isEditMode ? "New Agent Version Created" : "Agent Created Successfully",
+      description: isEditMode
+        ? `${agentName} v${nextVersion} created. Existing individuals remain on v${currentVersion} until upgraded.`
+        : `${agentName} is now active and linked to ${selectedEngine?.name} v${selectedEngine?.version}.`,
     });
     navigate("/lifeplan");
   };
@@ -82,8 +98,14 @@ export default function RuntimeAgentBuilder() {
               <Bot className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">New Agent</h2>
-              <p className="text-[11px] text-muted-foreground">Runtime Agent · Uses published Guidelines Engines for compliance</p>
+              <h2 className="font-display font-semibold text-foreground text-sm">
+                {isEditMode ? `Edit: ${editAgent.name}` : isCloneMode ? `Clone: ${cloneAgent.name}` : "New Agent"}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                {isEditMode
+                  ? `Creating v${nextVersion} · Current: v${currentVersion}`
+                  : "Runtime Agent · Uses published Guidelines Engines for compliance"}
+              </p>
             </div>
           </div>
         </div>
@@ -105,6 +127,21 @@ export default function RuntimeAgentBuilder() {
 
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-[800px] mx-auto">
+          {/* Edit Mode Safety Banner */}
+          {isEditMode && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 p-4 rounded-xl bg-warning/5 border border-warning/20 space-y-2">
+              <div className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4 text-warning shrink-0" />
+                <p className="text-sm font-semibold text-foreground">Editing creates a new version (v{nextVersion})</p>
+              </div>
+              <ul className="space-y-1 text-[11px] text-muted-foreground ml-6">
+                <li className="flex items-center gap-1.5"><Shield className="h-3 w-3 text-primary" /> Existing individuals remain on <span className="font-semibold text-foreground">v{currentVersion}</span> until manually upgraded</li>
+                <li className="flex items-center gap-1.5"><Shield className="h-3 w-3 text-primary" /> Active monitoring runs continue using the current version</li>
+                <li className="flex items-center gap-1.5"><Shield className="h-3 w-3 text-primary" /> Changes only apply to <span className="font-semibold text-foreground">new runs going forward</span></li>
+                <li className="flex items-center gap-1.5"><Info className="h-3 w-3 text-muted-foreground" /> Admins can upgrade individuals to the new version from the agent settings</li>
+              </ul>
+            </motion.div>
+          )}
           {/* Step 1: Define Agent */}
           {step === 1 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -390,12 +427,19 @@ export default function RuntimeAgentBuilder() {
           {step === 5 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-1">Review & Deploy</h3>
-                <p className="text-sm text-muted-foreground">Confirm your agent configuration before deploying.</p>
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  {isEditMode ? "Review & Create New Version" : "Review & Deploy"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {isEditMode
+                    ? `This will create v${nextVersion}. Existing plans on v${currentVersion} are not affected.`
+                    : "Confirm your agent configuration before deploying."}
+                </p>
               </div>
 
               <div className="glass rounded-xl p-6 space-y-4">
                 <ReviewRow label="Agent Name" value={agentName} />
+                {isEditMode && <ReviewRow label="Version" value={`v${currentVersion} → v${nextVersion}`} />}
                 <ReviewRow label="Agent Type" value={agentType ? runtimeAgentTypeLabels[agentType] : ""} />
                 <ReviewRow label="Guidelines Engine" value={selectedEngine ? `${selectedEngine.name} v${selectedEngine.version}` : ""} />
                 <ReviewRow label="Engine Pinned Version" value={selectedEngine ? `v${selectedEngine.version}` : ""} />
@@ -416,7 +460,7 @@ export default function RuntimeAgentBuilder() {
               <div className="flex justify-between">
                 <button onClick={() => goTo(4)} className="px-6 py-2.5 rounded-xl bg-secondary text-foreground font-medium text-sm border border-border">Back</button>
                 <button onClick={handleSave} className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg">
-                  Deploy Agent
+                  {isEditMode ? `Deploy v${nextVersion}` : "Deploy Agent"}
                 </button>
               </div>
             </motion.div>

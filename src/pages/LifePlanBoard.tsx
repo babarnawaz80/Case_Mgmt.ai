@@ -6,7 +6,7 @@ import {
   ArrowLeft, Layers, BookOpen, Bot, Shield,
   TrendingUp, Users,
   Play, CheckCircle2, Clock, Eye, FileText,
-  MoreVertical, Pencil, Copy, Trash2, AlertTriangle,
+  MoreVertical, Pencil, Copy, Trash2, AlertTriangle, Lock,
 } from "lucide-react";
 import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
 import { cn } from "@/lib/utils";
@@ -114,14 +114,14 @@ export default function LifePlanBoard() {
             </div>
           </div>
 
-          <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} />
+          <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} />
         </div>
       </main>
     </div>
   );
 }
 
-function AgentMenu({ onEdit, onClone, onDelete }: { onEdit: () => void; onClone: () => void; onDelete: () => void }) {
+function AgentMenu({ onEdit, onClone, onDelete, isAdmin }: { onEdit: () => void; onClone: () => void; onDelete: () => void; isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
@@ -132,17 +132,30 @@ function AgentMenu({ onEdit, onClone, onDelete }: { onEdit: () => void; onClone:
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }} className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-popover border border-border shadow-xl z-50 py-1 overflow-hidden">
-              <button onClick={(e) => { e.stopPropagation(); onEdit(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
-                <Pencil className="h-3.5 w-3.5" /> Edit
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); onClone(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
-                <Copy className="h-3.5 w-3.5" /> Clone
-              </button>
-              <div className="h-px bg-border mx-1 my-1" />
-              <button onClick={(e) => { e.stopPropagation(); onDelete(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors">
-                <Trash2 className="h-3.5 w-3.5" /> Delete
-              </button>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }} className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-popover border border-border shadow-xl z-50 py-1 overflow-hidden">
+              {isAdmin ? (
+                <>
+                  <button onClick={(e) => { e.stopPropagation(); onEdit(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
+                    <Pencil className="h-3.5 w-3.5" /> Edit (New Version)
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); onClone(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
+                    <Copy className="h-3.5 w-3.5" /> Clone
+                  </button>
+                  <div className="h-px bg-border mx-1 my-1" />
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors">
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={(e) => { e.stopPropagation(); onEdit(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
+                    <Eye className="h-3.5 w-3.5" /> View Details
+                  </button>
+                  <div className="px-3 py-2 text-[10px] text-muted-foreground flex items-center gap-1.5">
+                    <Lock className="h-3 w-3" /> Admin required to edit
+                  </div>
+                </>
+              )}
             </motion.div>
           </>
         )}
@@ -160,7 +173,7 @@ const agentTypeColors: Record<string, string> = {
   ambient_meeting: "from-[hsl(190,55%,48%)] to-[hsl(190,50%,58%)]",
 };
 
-function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate> }) {
+function RuntimeAgentsTab({ agents, navigate, isAdmin }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate>; isAdmin: boolean }) {
   if (agents.length === 0) {
     return (
       <div className="text-center py-16">
@@ -203,7 +216,12 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                       {agent.autoMonitorEnabled ? "● Auto-Monitor" : "Monitor: Off"}
                     </span>
                   </div>
-                  <AgentMenu onEdit={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })} onClone={() => {}} onDelete={() => {}} />
+                  <AgentMenu
+                    isAdmin={isAdmin}
+                    onEdit={() => navigate("/lifeplan/agent/new", { state: { editAgent: agent } })}
+                    onClone={() => navigate("/lifeplan/agent/new", { state: { cloneAgent: agent } })}
+                    onDelete={() => {}}
+                  />
                 </div>
               </div>
 

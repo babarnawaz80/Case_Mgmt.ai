@@ -160,9 +160,11 @@ export interface RuntimeAgent {
   name: string;
   type: RuntimeAgentType;
   description: string;
+  instructions: string;
   engineId: string;
   engineName: string;
   engineVersion: string;
+  version: string;
   status: AgentStatus;
   createdAt: string;
   lastUsed: string | null;
@@ -173,6 +175,8 @@ export interface RuntimeAgent {
   applyMode: ApplyMode;
   // Auto-Monitor fields
   autoMonitorEnabled: boolean;
+  autoMonitorCadence: MonitoringCadence;
+  autoMonitorDebounceHours: number;
   draftsPending: number;
   lastEvaluated: string | null;
 }
@@ -265,9 +269,11 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     name: "State Guidelines Engine Agent",
     type: "compliance_copilot",
     description: "Full compliance enforcement across eligibility, PCP, limits, conflicts, and documentation.",
+    instructions: "Enforce all Maryland DDA guidelines. Flag any service without valid PCP reference.",
     engineId: "ce-1",
     engineName: "Maryland DDA",
     engineVersion: "2.0",
+    version: "1.2",
     status: "active",
     createdAt: "2026-01-20",
     lastUsed: "2026-02-22",
@@ -277,6 +283,8 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     requireSupervisorApproval: false,
     applyMode: "manual",
     autoMonitorEnabled: true,
+    autoMonitorCadence: "realtime",
+    autoMonitorDebounceHours: 6,
     draftsPending: 5,
     lastEvaluated: "2026-02-22T14:30:00Z",
   },
@@ -285,9 +293,11 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     name: "PCP Alignment Copilot",
     type: "pcp_alignment",
     description: "Scans PCP vs guideline pack requirements, identifies missing items, drafts addendum language.",
+    instructions: "Compare PCP goals against service authorization requirements. Generate addendum suggestions.",
     engineId: "ce-1",
     engineName: "Maryland DDA",
     engineVersion: "2.0",
+    version: "1.0",
     status: "active",
     createdAt: "2026-02-01",
     lastUsed: "2026-02-21",
@@ -297,6 +307,8 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     requireSupervisorApproval: true,
     applyMode: "pre_selected",
     autoMonitorEnabled: true,
+    autoMonitorCadence: "daily",
+    autoMonitorDebounceHours: 6,
     draftsPending: 3,
     lastEvaluated: "2026-02-22T12:00:00Z",
   },
@@ -305,9 +317,11 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     name: "Billing Documentation Copilot",
     type: "billing_documentation",
     description: "Verifies billable requirements, generates compliant note templates, cross-checks conflicts/units.",
+    instructions: "Verify all billing documentation against state requirements before submission.",
     engineId: "ce-1",
     engineName: "Maryland DDA",
     engineVersion: "2.0",
+    version: "1.1",
     status: "active",
     createdAt: "2026-02-05",
     lastUsed: "2026-02-22",
@@ -317,6 +331,8 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     requireSupervisorApproval: false,
     applyMode: "manual",
     autoMonitorEnabled: false,
+    autoMonitorCadence: "daily",
+    autoMonitorDebounceHours: 6,
     draftsPending: 0,
     lastEvaluated: null,
   },
@@ -325,9 +341,11 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     name: "Monitoring & Reauth Copilot",
     type: "monitoring_reauth",
     description: "Tracks caps, deadlines, and required monthly elements. Creates monitoring forms and tasks.",
+    instructions: "Track all reauthorization deadlines and generate monitoring forms 30 days before expiry.",
     engineId: "ce-2",
     engineName: "Virginia DBHDS",
     engineVersion: "1.0",
+    version: "1.0",
     status: "active",
     createdAt: "2026-02-10",
     lastUsed: "2026-02-20",
@@ -337,6 +355,8 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     requireSupervisorApproval: true,
     applyMode: "pre_selected",
     autoMonitorEnabled: true,
+    autoMonitorCadence: "realtime",
+    autoMonitorDebounceHours: 4,
     draftsPending: 2,
     lastEvaluated: "2026-02-22T08:00:00Z",
   },
@@ -345,9 +365,11 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     name: "ISP Generator",
     type: "isp_generator",
     description: "Generates comprehensive Individual Service Plans based on assessments, goals, and state guidelines.",
+    instructions: "Generate ISP documents aligned with Maryland DDA requirements and individual goals.",
     engineId: "ce-1",
     engineName: "Maryland DDA",
     engineVersion: "2.0",
+    version: "1.0",
     status: "active",
     createdAt: "2026-01-25",
     lastUsed: "2026-02-19",
@@ -357,6 +379,8 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     requireSupervisorApproval: false,
     applyMode: "manual",
     autoMonitorEnabled: false,
+    autoMonitorCadence: "daily",
+    autoMonitorDebounceHours: 6,
     draftsPending: 0,
     lastEvaluated: null,
   },

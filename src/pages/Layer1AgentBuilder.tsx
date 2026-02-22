@@ -32,6 +32,8 @@ export default function Layer1AgentBuilder() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [agentName, setAgentName] = useState("");
+  const [agentInstructions, setAgentInstructions] = useState("");
   const [templates, setTemplates] = useState<UploadedFile[]>([]);
   const [serviceCodeMapping, setServiceCodeMapping] = useState("");
   const [moduleConfigs, setModuleConfigs] = useState<ModuleConfig[]>([]);
@@ -87,8 +89,12 @@ export default function Layer1AgentBuilder() {
             <Layer1Step1Upload
               uploadedFiles={uploadedFiles}
               serviceCodeMapping={serviceCodeMapping}
+              agentName={agentName}
+              agentInstructions={agentInstructions}
               onFilesChange={setUploadedFiles}
               onMappingChange={setServiceCodeMapping}
+              onAgentNameChange={setAgentName}
+              onAgentInstructionsChange={setAgentInstructions}
               onNext={() => goTo(2)}
             />
           )}

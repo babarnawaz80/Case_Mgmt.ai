@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Bot, User, Plus, Search, Shield, Database, Settings,
@@ -22,6 +22,9 @@ const STEPS = FIXED_WORKFLOW_STEPS.map(s => ({ label: s.name, description: s.des
 
 export default function Layer2AgentBuilder() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const agentName = (location.state as any)?.agentName || "Agent";
+  const runLabel = `${agentName} Runs`;
   const [showLanding, setShowLanding] = useState(true);
   const [state, setState] = useState<Layer2State>({
     step: 1,
@@ -36,7 +39,7 @@ export default function Layer2AgentBuilder() {
 
   const handleFinish = () => {
     toast({
-      title: "Compliance Run Complete",
+      title: "Run Complete",
       description: "All outputs have been pushed to iCM modules. Service authorization is ready.",
     });
     navigate("/lifeplan");
@@ -76,8 +79,8 @@ export default function Layer2AgentBuilder() {
           <div className="max-w-[1000px] mx-auto space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-display font-bold text-foreground">Compliance Runs</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">View existing compliance runs or start a new one.</p>
+                <h2 className="text-lg font-display font-bold text-foreground">{runLabel}</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">View existing runs or start a new one.</p>
               </div>
               <motion.button
                 whileHover={{ scale: 1.03 }}
@@ -91,7 +94,7 @@ export default function Layer2AgentBuilder() {
 
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input placeholder="Search compliance runs..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+              <input placeholder={`Search ${runLabel.toLowerCase()}...`} className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
 
             <div className="rounded-xl border border-border overflow-hidden">

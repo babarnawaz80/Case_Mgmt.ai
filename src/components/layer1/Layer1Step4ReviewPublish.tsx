@@ -49,7 +49,7 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 4 — Review & Publish</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Review the extraction results and publish approved Rule Packs so case managers can use them.
+          Review the extraction results and publish the compliance engine so case managers can use it.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
@@ -119,8 +119,8 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
                 <div className="flex items-center gap-3">
                   <Shield className="h-5 w-5 text-destructive" />
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Publish Rule Packs</p>
-                    <p className="text-xs text-muted-foreground">Enable toggle to confirm, then click Publish. This makes rule packs available to all case managers.</p>
+                    <p className="text-sm font-semibold text-foreground">Publish Compliance Engine</p>
+                    <p className="text-xs text-muted-foreground">Enable toggle to confirm, then click Publish. This makes the engine available to all case managers.</p>
                   </div>
                 </div>
                 <button onClick={() => setPublishToggle(!publishToggle)} className="text-primary">
@@ -135,8 +135,8 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
               <div className="flex items-center gap-3">
                 <Sparkles className="h-6 w-6 text-primary" />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Agent Trained & Ready</p>
-                  <p className="text-xs text-muted-foreground">{extractionSummary.totalServices} Rule Packs published. Case Manager Compliance Agents can now use these rules.</p>
+                  <p className="text-sm font-semibold text-foreground">Compliance Engine Ready</p>
+                  <p className="text-xs text-muted-foreground">{extractionSummary.totalServices} services published. Case Manager Compliance Agents can now use this engine.</p>
                 </div>
               </div>
             </motion.div>
@@ -150,7 +150,7 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
         </button>
         {publishToggle && !published && (
           <button onClick={handlePublish} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-            <Rocket className="h-4 w-4" /> Publish Rule Packs
+            <Rocket className="h-4 w-4" /> Publish Compliance Engine
           </button>
         )}
       </div>

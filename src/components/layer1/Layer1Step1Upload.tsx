@@ -38,7 +38,7 @@ export function Layer1Step1Upload({
     };
     onFilesChange([file]);
 
-    // Simulate: upload → parse → extract services → build rule packs → normalize
+    // Simulate: upload → parse → extract services → build compliance engine → normalize
     setIsParsing(true);
     setTimeout(() => {
       onFilesChange([{ ...file, status: "processing" }]);
@@ -53,9 +53,9 @@ export function Layer1Step1Upload({
   const parsingSteps = [
     "Reading PDF structure and sections…",
     "Extracting all services from guideline…",
-    "Building structured Rule Packs per service…",
+    "Building compliance engine rules per service…",
     "Normalizing service names and de-duplicating…",
-    "Storing in StateGuidelineRulePacks database…",
+    "Storing in compliance engine database…",
   ];
 
   return (
@@ -66,12 +66,12 @@ export function Layer1Step1Upload({
           <h2 className="text-lg font-display font-bold text-foreground">Step 1 — Upload Guidelines</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          Upload the state guideline PDF. The agent will automatically parse the entire document, extract every service, build structured Rule Packs, normalize naming, and store them in the database.
+          Upload the state guideline PDF. The agent will automatically parse the entire document, extract every service, build the compliance engine, normalize naming, and store them in the database.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            This converts a PDF guideline into structured, reusable Rule Packs. Each service becomes one Rule Pack containing billing unit, eligibility rules, authorization requirements, PCP requirements, limits, conflicts, documentation requirements, monitoring rules, hard stops, and warnings. Once stored, case managers never need to read the PDF again.
+            This converts a PDF guideline into a structured, reusable compliance engine. Each service contains billing unit, eligibility rules, authorization requirements, PCP requirements, limits, conflicts, documentation requirements, monitoring rules, hard stops, and warnings. Once stored, case managers never need to read the PDF again.
           </p>
         </div>
       </div>
@@ -164,7 +164,7 @@ export function Layer1Step1Upload({
             <CheckCircle2 className="h-5 w-5 text-primary" />
             <div>
               <p className="text-sm font-semibold text-foreground">Extraction Complete</p>
-              <p className="text-[11px] text-muted-foreground">12 services extracted → 12 Rule Packs created → Stored in StateGuidelineRulePacks</p>
+              <p className="text-[11px] text-muted-foreground">12 services extracted → Compliance engine built → Stored in database</p>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2 text-center">
@@ -174,7 +174,7 @@ export function Layer1Step1Upload({
             </div>
             <div className="p-2 rounded-lg bg-card border border-border/40">
               <p className="text-lg font-bold text-foreground">12</p>
-              <p className="text-[9px] text-muted-foreground uppercase">Rule Packs</p>
+              <p className="text-[9px] text-muted-foreground uppercase">Rules</p>
             </div>
             <div className="p-2 rounded-lg bg-card border border-border/40">
               <p className="text-lg font-bold text-destructive">24</p>

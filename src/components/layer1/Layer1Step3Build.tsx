@@ -27,9 +27,9 @@ export function Layer1Step3Build({ rulePacks, onBack, onNext }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-display font-bold text-foreground">Step 3 — Build Rule Packs</h2>
+        <h2 className="text-lg font-display font-bold text-foreground">Step 3 — Build Compliance Engine</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          For each service, a structured Rule Pack is created with billing unit, authorization requirements, documentation, limits, conflicts, and PCP requirements.
+          For each service, structured compliance rules are created with billing unit, authorization requirements, documentation, limits, conflicts, and PCP requirements.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>

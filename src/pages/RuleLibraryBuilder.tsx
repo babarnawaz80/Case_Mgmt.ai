@@ -11,7 +11,7 @@ import { UploadedFile, RulePack, ExtractionSummary } from "@/types/rulePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
-  { label: "Upload Guidelines", description: "Parse PDF → Build Rule Packs" },
+  { label: "Upload Guidelines", description: "Parse PDF → Build Compliance Engine" },
   { label: "Upload Templates", description: "Org-level doc templates" },
   { label: "Default Data Mapping", description: "Org-wide module defaults" },
   { label: "Review & Publish", description: "Admin approval & publish" },
@@ -43,7 +43,7 @@ export default function RuleLibraryBuilder() {
   const handlePublish = () => {
     toast({
       title: "Compliance Engine Published",
-      description: "Rule Packs are now frozen and available for runtime agents to use.",
+      description: "Compliance engine is now frozen and available for runtime agents to use.",
     });
     navigate("/lifeplan");
   };
@@ -61,7 +61,7 @@ export default function RuleLibraryBuilder() {
             </div>
             <div className="flex flex-col">
               <h2 className="font-display font-semibold text-foreground text-sm">Create Compliance Engine</h2>
-              <p className="text-[11px] text-muted-foreground">Admin Only · Parse guidelines, build rule packs, publish for agents</p>
+              <p className="text-[11px] text-muted-foreground">Admin Only · Parse guidelines, build compliance engine, publish for agents</p>
             </div>
           </div>
         </div>

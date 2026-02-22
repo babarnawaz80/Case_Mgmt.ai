@@ -269,17 +269,38 @@ const Index = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setAmbientOpen(true)}
-                    className="px-3 py-1.5 rounded-lg hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                    Ambient
-                  </button>
-                  <button className="px-3 py-1.5 rounded-lg hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5" />
-                    Scribe
-                  </button>
+                  {(() => {
+                    const isIndividualSelected = selectedIndividual && selectedIndividual !== "Select Individual";
+                    return (
+                      <>
+                        <button
+                          onClick={() => isIndividualSelected && setAmbientOpen(true)}
+                          disabled={!isIndividualSelected}
+                          className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
+                            isIndividualSelected
+                              ? "hover:bg-secondary text-foreground cursor-pointer"
+                              : "text-muted-foreground/40 cursor-not-allowed"
+                          }`}
+                          title={!isIndividualSelected ? "Select an individual first" : ""}
+                        >
+                          <Mic className="w-3.5 h-3.5" />
+                          Ambient
+                        </button>
+                        <button
+                          disabled={!isIndividualSelected}
+                          className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
+                            isIndividualSelected
+                              ? "hover:bg-secondary text-foreground cursor-pointer"
+                              : "text-muted-foreground/40 cursor-not-allowed"
+                          }`}
+                          title={!isIndividualSelected ? "Select an individual first" : ""}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          Scribe
+                        </button>
+                      </>
+                    );
+                  })()}
                   <button className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
                     <Mic className="w-4 h-4" />
                   </button>

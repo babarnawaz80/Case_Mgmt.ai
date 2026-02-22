@@ -80,14 +80,7 @@ export default function LifePlanBoard() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(30,70%,55%)] text-destructive-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
                 >
                   <Shield className="h-4 w-4" />
-                  Phase 1: Train Agent
-                </button>
-                <button
-                  onClick={() => navigate("/lifeplan/agent/new/layer2")}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
-                >
-                  <Bot className="h-4 w-4" />
-                  Phase 2: Run Compliance
+                  Train New Agent
                 </button>
               </div>
             </div>
@@ -150,7 +143,7 @@ export default function LifePlanBoard() {
                       if (agent.layer === "layer1") {
                         navigate("/lifeplan/agent/new/layer1");
                       } else {
-                        navigate(`/lifeplan/agent/${agent.id}`);
+                        navigate("/lifeplan/agent/new/layer2");
                       }
                     }}
                   />

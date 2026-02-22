@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Bot, Sparkles, User, Shield, Lock, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Bot, Sparkles, User, Shield, Lock, AlertTriangle, Eye } from "lucide-react";
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
-import { RuntimeAgentType, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, applyModeLabels, ApplyMode, FIXED_WORKFLOW_STEPS } from "@/types/agent";
+import { RuntimeAgentType, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, applyModeLabels, ApplyMode, FIXED_WORKFLOW_STEPS, monitoringCadenceLabels, MonitoringCadence } from "@/types/agent";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -46,6 +46,11 @@ export default function RuntimeAgentBuilder() {
   const [allowOverrides, setAllowOverrides] = useState(true);
   const [requireSupervisorApproval, setRequireSupervisorApproval] = useState(false);
   const [applyMode, setApplyMode] = useState<ApplyMode>("manual");
+
+  // Auto-Monitor
+  const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(false);
+  const [monitorCadence, setMonitorCadence] = useState<MonitoringCadence>("realtime");
+  const [debounceHours, setDebounceHours] = useState(6);
 
   // Step 4
   const [moduleToggles, setModuleToggles] = useState<Record<string, boolean>>(
@@ -304,6 +309,50 @@ export default function RuntimeAgentBuilder() {
                     <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Edit guidelines engine rules</li>
                   </ul>
                 </div>
+
+                {/* Auto-Monitor Settings */}
+                <div className="border-t border-border/40 pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <Eye className="h-4 w-4 text-primary" /> Auto-Monitor (Draft Mode)
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Automatically generate draft compliance runs in the background. No iCM writes.</p>
+                    </div>
+                    <Switch checked={autoMonitorEnabled} onCheckedChange={setAutoMonitorEnabled} />
+                  </div>
+
+                  <div className={cn("space-y-4 transition-opacity", !autoMonitorEnabled && "opacity-50 pointer-events-none")}>
+                    <div>
+                      <label className="text-xs font-medium text-foreground mb-1.5 block">Monitoring Cadence</label>
+                      <Select value={monitorCadence} onValueChange={(v) => setMonitorCadence(v as MonitoringCadence)}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          {(Object.entries(monitoringCadenceLabels) as [MonitoringCadence, string][]).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-foreground mb-1.5 block">Debounce Window (hours)</label>
+                      <input
+                        type="number" min={1} max={24} value={debounceHours}
+                        onChange={e => setDebounceHours(Number(e.target.value))}
+                        className="w-24 px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">Max 1 draft per individual per agent within this window (unless Hard Stop detected)</p>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/10 flex items-start gap-2">
+                      <Shield className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-muted-foreground">Per-individual monitoring toggles and quiet hours can be configured after deployment from the Agent Monitoring Settings page.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-between">
@@ -355,6 +404,13 @@ export default function RuntimeAgentBuilder() {
                 <ReviewRow label="Apply Mode" value={applyModeLabels[applyMode]} />
                 <ReviewRow label="Workflow Steps" value={`${FIXED_WORKFLOW_STEPS.length} steps (fixed)`} />
                 <ReviewRow label="Enabled Modules" value={`${Object.values(moduleToggles).filter(Boolean).length} of ${ICM_MODULES.length}`} />
+                <ReviewRow label="Auto-Monitor" value={autoMonitorEnabled ? "ON" : "OFF"} />
+                {autoMonitorEnabled && (
+                  <>
+                    <ReviewRow label="Monitor Cadence" value={monitoringCadenceLabels[monitorCadence]} />
+                    <ReviewRow label="Debounce Window" value={`${debounceHours} hours`} />
+                  </>
+                )}
               </div>
 
               <div className="flex justify-between">

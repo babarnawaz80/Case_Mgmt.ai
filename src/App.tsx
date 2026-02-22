@@ -14,6 +14,8 @@ import ComplianceEngineDashboard from "./pages/ComplianceEngineDashboard";
 import RuntimeAgentBuilder from "./pages/RuntimeAgentBuilder";
 import Layer2AgentBuilder from "./pages/Layer2AgentBuilder";
 import EngineHistory from "./pages/EngineHistory";
+import AgentDraftRuns from "./pages/AgentDraftRuns";
+import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ const App = () => (
             <Route path="/lifeplan/agent/new" element={<RuntimeAgentBuilder />} />
             <Route path="/lifeplan/agent/new/layer2" element={<Layer2AgentBuilder />} />
             <Route path="/lifeplan/engine/:id/history" element={<EngineHistory />} />
+            <Route path="/lifeplan/agent/:agentId/drafts" element={<AgentDraftRuns />} />
+            <Route path="/lifeplan/agent/:agentId/monitoring" element={<AgentMonitoringSettings />} />
             <Route path="/lifeplan/agent/:id" element={<LifePlanAgentDetail />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

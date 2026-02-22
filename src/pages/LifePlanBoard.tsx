@@ -36,7 +36,7 @@ export default function LifePlanBoard() {
           <button onClick={() => navigate("/dashboard")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="font-display font-semibold text-foreground text-lg">Compliance Agent Platform</h2>
+          <h2 className="font-display font-semibold text-foreground text-lg">Compliance Engine Platform</h2>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 p-0.5 rounded-lg bg-muted border border-border">
@@ -70,7 +70,7 @@ export default function LifePlanBoard() {
                   <Layers className="h-7 w-7 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-foreground">Compliance Agent Platform</h1>
+                  <h1 className="text-2xl font-display font-bold text-foreground">Compliance Engine Platform</h1>
                   <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
                     {isAdmin ? (
                       <>

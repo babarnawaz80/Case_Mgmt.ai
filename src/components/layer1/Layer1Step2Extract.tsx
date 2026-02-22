@@ -113,7 +113,7 @@ export function Layer1Step2Extract({ rulePacks, onRulePacksGenerated, onBack, on
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-            Build Rule Packs <ArrowRight className="h-4 w-4" />
+            Build Compliance Engine <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       )}

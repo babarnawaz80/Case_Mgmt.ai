@@ -26,9 +26,9 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-display font-bold text-foreground">Step 6 — Publish Rule Packs</h2>
+        <h2 className="text-lg font-display font-bold text-foreground">Step 6 — Publish Compliance Engine</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Marks the rule packs as "approved" so case managers can use them.
+          Marks the compliance engine as "approved" so case managers can use it.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
@@ -41,14 +41,14 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
         <div className="flex items-center gap-3 mb-3">
           <Database className="h-6 w-6 text-primary" />
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Rule Pack Extraction Summary</h3>
-            <p className="text-[11px] text-muted-foreground">StateGuidelineRulePacks collection</p>
+            <h3 className="text-sm font-semibold text-foreground">Compliance Engine Summary</h3>
+            <p className="text-[11px] text-muted-foreground">Compliance engine collection</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="text-center p-3 rounded-lg bg-card border border-border/40">
             <p className="text-xl font-display font-bold text-foreground">{rulePacks.length}</p>
-            <p className="text-[10px] text-muted-foreground">Rule Packs</p>
+            <p className="text-[10px] text-muted-foreground">Services</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-card border border-border/40">
             <p className="text-xl font-display font-bold text-primary">
@@ -86,7 +86,7 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
             <div className="flex items-center gap-3">
               <Shield className="h-5 w-5 text-destructive" />
               <div>
-                <p className="text-sm font-semibold text-foreground">Publish Rule Packs</p>
+                <p className="text-sm font-semibold text-foreground">Publish Compliance Engine</p>
                 <p className="text-xs text-muted-foreground">Enable toggle to confirm, then click Publish.</p>
               </div>
             </div>
@@ -102,7 +102,7 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-6 w-6 text-primary" />
             <div>
-              <p className="text-sm font-semibold text-foreground">{rulePacks.length} Rule Packs Published</p>
+              <p className="text-sm font-semibold text-foreground">{rulePacks.length} Services Published</p>
               <p className="text-xs text-muted-foreground">Available to all Case Manager Compliance Agents.</p>
             </div>
           </div>
@@ -115,7 +115,7 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
         </button>
         {publishToggle && !published && (
           <button onClick={handlePublish} className="flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-            <Rocket className="h-4 w-4" /> Publish {rulePacks.length} Rule Packs
+            <Rocket className="h-4 w-4" /> Publish Compliance Engine
           </button>
         )}
       </div>

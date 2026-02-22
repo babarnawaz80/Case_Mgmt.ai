@@ -11,7 +11,6 @@ import {
 import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
-import { Switch } from "@/components/ui/switch";
 
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -195,8 +194,13 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                     <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
                       {agent.status}
                     </span>
-                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.autoMonitorEnabled ? "bg-success/25 text-white" : "bg-white/10 text-white/50")}>
-                      {agent.autoMonitorEnabled ? "Auto-Monitor: On" : "Monitor: Off"}
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border",
+                      agent.autoMonitorEnabled
+                        ? "bg-white text-success border-white/80"
+                        : "bg-white/10 text-white/50 border-white/10"
+                    )}>
+                      {agent.autoMonitorEnabled ? "● Auto-Monitor" : "Monitor: Off"}
                     </span>
                   </div>
                   <AgentMenu onEdit={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })} onClone={() => {}} onDelete={() => {}} />
@@ -204,22 +208,7 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
               </div>
 
               <div className="px-5 pt-4 pb-5">
-                {/* Auto-Monitor Toggle Row */}
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center justify-between mb-3 px-3 py-2 rounded-lg bg-muted/40 border border-border/40"
-                >
-                  <div className="flex items-center gap-2">
-                    <Eye className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-[11px] font-medium text-foreground">Auto-Monitor</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={cn("text-[10px] font-semibold", agent.autoMonitorEnabled ? "text-success" : "text-muted-foreground")}>
-                      {agent.autoMonitorEnabled ? "ON" : "OFF"}
-                    </span>
-                    <Switch checked={agent.autoMonitorEnabled} onCheckedChange={() => {}} className="scale-75" />
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem] leading-relaxed">{agent.description}</p>
 
                 <div className="flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg bg-muted/40 border border-border/40">
                   <BookOpen className="h-3 w-3 text-muted-foreground shrink-0" />

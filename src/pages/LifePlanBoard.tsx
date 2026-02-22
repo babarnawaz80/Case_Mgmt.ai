@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 type Tab = "libraries" | "agents";
 
 export default function LifePlanBoard() {
-  const [activeTab, setActiveTab] = useState<Tab>("libraries");
+  const [activeTab, setActiveTab] = useState<Tab>("agents");
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 

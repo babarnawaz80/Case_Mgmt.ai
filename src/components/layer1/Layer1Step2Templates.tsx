@@ -52,12 +52,12 @@ export function Layer1Step2Templates({ templates, onTemplatesChange, onBack, onN
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Step 2 — Upload Templates (Optional)</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Upload document templates the agent will use when generating documentation for case managers.
+          Upload document templates that become <span className="font-medium text-foreground">defaults</span> for any runtime agent using this engine. Agents can override templates later.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Templates ensure documentation is consistent across your organization. When the agent generates a PCP addendum, billable note, or progress note, it uses your approved templates — not generic ones.
+            Templates ensure documentation is consistent across your organization. These become engine-level defaults — runtime agents inherit them automatically but can override per-agent if needed.
           </p>
         </div>
       </div>

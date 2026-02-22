@@ -54,7 +54,13 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Compliance rules should never change without oversight. Admin reviews what was extracted, flags unclear sections, and has final say before rules affect authorizations and billing. This protects you legally and operationally.
+            Compliance rules should never change without oversight. Admin reviews what was extracted, flags unclear sections, and has final say before rules affect authorizations and billing.
+          </p>
+        </div>
+        <div className="mt-2 p-3 rounded-xl bg-warning/5 border border-warning/15">
+          <p className="text-xs text-warning font-medium mb-0.5">⚠️ Governance Notice</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Publishing locks this engine version. Published engines are <span className="font-semibold text-foreground">read-only and immutable</span>. To make changes, create a new version by cloning this engine.
           </p>
         </div>
       </div>
@@ -120,7 +126,7 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
                   <Shield className="h-5 w-5 text-destructive" />
                   <div>
                     <p className="text-sm font-semibold text-foreground">Publish Compliance Engine</p>
-                    <p className="text-xs text-muted-foreground">Enable toggle to confirm, then click Publish. This makes the engine available to all case managers.</p>
+                    <p className="text-xs text-muted-foreground">Publishing creates an immutable engine version. Once published, you cannot edit — only create a new version.</p>
                   </div>
                 </div>
                 <button onClick={() => setPublishToggle(!publishToggle)} className="text-primary">

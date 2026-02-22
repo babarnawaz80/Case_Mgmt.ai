@@ -49,14 +49,14 @@ export function Layer1Step3DataMapping({ moduleConfigs, onConfigsChange, onBack,
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-display font-bold text-foreground">Step 3 — Data Mapping Configuration</h2>
+        <h2 className="text-lg font-display font-bold text-foreground">Step 3 — Default Data Mapping</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Define how the agent's outputs push into iCareManager modules. Enable or disable each module and review what data flows where.
+          Set <span className="font-medium text-foreground">engine-level defaults</span> for how outputs push into iCareManager modules. Runtime agents may override these per-agent.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-destructive/5 border border-destructive/15">
-          <p className="text-xs text-destructive font-medium mb-0.5">⚠️ Critical Step</p>
+          <p className="text-xs text-destructive font-medium mb-0.5">⚠️ Critical Step — Org-Wide Defaults</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            This is what turns the agent into real automation. Without data mapping, the agent can only give advice. With it, compliance outputs are written directly into iCM modules — PCP, Services, Workflow Manager, Billable Notes, and more.
+            These mappings define the default behavior for all agents using this engine. Individual agents can override mappings later. Without data mapping, agents can only give advice. With it, compliance outputs flow directly into iCM modules.
           </p>
         </div>
       </div>

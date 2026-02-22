@@ -20,7 +20,7 @@ export function AppHeader() {
           <Mail className="w-5 h-5" />
         </button>
 
-        {/* Life Plan Button */}
+        {/* Compliance Agent Button */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -28,7 +28,7 @@ export function AppHeader() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-success text-success-foreground font-medium text-sm transition-all shadow-sm hover:shadow-md"
         >
           <BookOpen className="w-4 h-4" />
-          <span>Life Plan</span>
+          <span>Compliance Agent</span>
         </motion.button>
 
         {/* AI Companion Button */}

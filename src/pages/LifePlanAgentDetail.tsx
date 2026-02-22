@@ -48,7 +48,7 @@ export default function LifePlanAgentDetail() {
       <div className="flex flex-col min-h-screen w-full bg-background">
         <header className="h-16 flex items-center px-6 border-b border-border glass shrink-0">
           <button onClick={() => navigate("/lifeplan")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-4 h-4" /> Back to Life Plan
+            <ArrowLeft className="w-4 h-4" /> Back to Compliance Agent
           </button>
         </header>
         <div className="flex-1 flex items-center justify-center">

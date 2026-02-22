@@ -11,6 +11,7 @@ import {
 import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
+import { Switch } from "@/components/ui/switch";
 
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -203,7 +204,22 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
               </div>
 
               <div className="px-5 pt-4 pb-5">
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem] leading-relaxed">{agent.description}</p>
+                {/* Auto-Monitor Toggle Row */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center justify-between mb-3 px-3 py-2 rounded-lg bg-muted/40 border border-border/40"
+                >
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px] font-medium text-foreground">Auto-Monitor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("text-[10px] font-semibold", agent.autoMonitorEnabled ? "text-success" : "text-muted-foreground")}>
+                      {agent.autoMonitorEnabled ? "ON" : "OFF"}
+                    </span>
+                    <Switch checked={agent.autoMonitorEnabled} onCheckedChange={() => {}} className="scale-75" />
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg bg-muted/40 border border-border/40">
                   <BookOpen className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -248,6 +264,12 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                       <AlertTriangle className="h-3 w-3" /> {agent.draftsPending} Drafts
                     </button>
                   )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/monitoring`); }}
+                    className="h-9 px-3 gap-1.5 rounded-xl text-xs font-medium flex items-center justify-center bg-muted/50 text-muted-foreground border border-border/40 hover:bg-muted hover:text-foreground transition-all"
+                  >
+                    <Shield className="h-3 w-3" /> Settings
+                  </button>
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import AmbientListening from "@/components/ambient/AmbientListening";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -72,6 +73,7 @@ const Index = () => {
   const [historyOpen, setHistoryOpen] = useState(true);
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [ambientOpen, setAmbientOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -82,6 +84,15 @@ const Index = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  if (ambientOpen) {
+    return (
+      <AmbientListening
+        individualName={selectedIndividual && selectedIndividual !== "Select Individual" ? selectedIndividual : "Unknown Individual"}
+        onBack={() => setAmbientOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -258,7 +269,10 @@ const Index = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button className="px-3 py-1.5 rounded-lg hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                  <button
+                    onClick={() => setAmbientOpen(true)}
+                    className="px-3 py-1.5 rounded-lg hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                  >
                     <Mic className="w-3.5 h-3.5" />
                     Ambient
                   </button>

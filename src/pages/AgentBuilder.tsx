@@ -76,7 +76,7 @@ export default function AgentBuilder() {
         </div>
         <div className="flex items-center gap-3">
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/lifeplan")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
-            <Sparkles className="w-4 h-4" /> Life Plan
+            <Sparkles className="w-4 h-4" /> Compliance Agent
           </motion.button>
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/dashboard")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
             <LayoutDashboard className="w-4 h-4" /> Dashboard

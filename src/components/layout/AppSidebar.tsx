@@ -81,7 +81,7 @@ export function AppSidebar() {
                 exit={{ opacity: 0, width: 0 }}
                 className="overflow-hidden whitespace-nowrap"
               >
-                <span className="font-display font-bold text-foreground text-lg">CaseAI</span>
+                <span className="font-display font-bold text-foreground text-lg">Case Management AI</span>
               </motion.div>
             )}
           </AnimatePresence>

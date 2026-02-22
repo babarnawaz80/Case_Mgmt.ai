@@ -5,8 +5,8 @@ import {
   Plus, Search, Sparkles, LayoutDashboard, User,
   ArrowLeft, Layers, BookOpen, Bot, Shield,
   TrendingUp, Users,
-  Play, CheckCircle2, Clock,
-  MoreVertical, Pencil, Copy, Trash2,
+  Play, CheckCircle2, Clock, Eye, FileText,
+  MoreVertical, Pencil, Copy, Trash2, AlertTriangle,
 } from "lucide-react";
 import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
 import { cn } from "@/lib/utils";
@@ -22,11 +22,13 @@ export default function LifePlanBoard() {
     agent.engineName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const totalDraftsPending = mockRuntimeAgents.reduce((s, a) => s + a.draftsPending, 0);
+
   const overviewStats = [
     { label: "Active Agents", value: mockRuntimeAgents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
     { label: "Individuals Served", value: mockRuntimeAgents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
     { label: "Avg Compliance", value: Math.round(mockRuntimeAgents.reduce((s, a) => s + a.complianceRate, 0) / mockRuntimeAgents.length) + "%", icon: TrendingUp, trend: "Denial prevention" },
-    { label: "Engines Used", value: new Set(mockRuntimeAgents.map(a => a.engineId)).size.toString(), icon: Shield, trend: "Linked & active" },
+    { label: "Drafts Pending", value: totalDraftsPending.toString(), icon: FileText, trend: "Auto-monitor drafts" },
   ];
 
   return (
@@ -188,9 +190,14 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                     <h3 className="font-semibold text-[15px] text-white truncate leading-tight">{agent.name}</h3>
                     <p className="text-[11px] text-white/60 mt-0.5">{runtimeAgentTypeLabels[agent.type]}</p>
                   </div>
-                  <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
-                    {agent.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
+                      {agent.status}
+                    </span>
+                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.autoMonitorEnabled ? "bg-success/25 text-white" : "bg-white/10 text-white/50")}>
+                      {agent.autoMonitorEnabled ? "Auto-Monitor: On" : "Monitor: Off"}
+                    </span>
+                  </div>
                   <AgentMenu onEdit={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })} onClone={() => {}} onDelete={() => {}} />
                 </div>
               </div>
@@ -217,15 +224,31 @@ function RuntimeAgentsTab({ agents, navigate }: { agents: RuntimeAgent[]; naviga
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Individuals</p>
                   </div>
                   <div className="text-center p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                    <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <div className="text-xs font-bold text-foreground leading-none mt-1">{agent.lastUsed || "Never"}</div>
-                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Last Used</p>
+                    <FileText className="h-4 w-4 mx-auto mb-1 text-warning" />
+                    <div className="text-xl font-bold text-warning leading-none">{agent.draftsPending}</div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Drafts</p>
                   </div>
                 </div>
 
-                <button className={cn("w-full h-9 gap-2 rounded-xl text-xs font-medium flex items-center justify-center bg-gradient-to-r text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all", gradient)}>
-                  <Play className="h-3 w-3 fill-current" /> Run Agent
-                </button>
+                {agent.lastEvaluated && (
+                  <p className="text-[10px] text-muted-foreground mb-3 flex items-center gap-1">
+                    <Eye className="h-3 w-3" /> Last evaluated: {new Date(agent.lastEvaluated).toLocaleString()}
+                  </p>
+                )}
+
+                <div className="flex gap-2">
+                  <button className={cn("flex-1 h-9 gap-2 rounded-xl text-xs font-medium flex items-center justify-center bg-gradient-to-r text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all", gradient)}>
+                    <Play className="h-3 w-3 fill-current" /> Run Agent
+                  </button>
+                  {agent.draftsPending > 0 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/drafts`); }}
+                      className="h-9 px-3 gap-1.5 rounded-xl text-xs font-medium flex items-center justify-center bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 transition-all"
+                    >
+                      <AlertTriangle className="h-3 w-3" /> {agent.draftsPending} Drafts
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>

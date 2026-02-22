@@ -23,6 +23,11 @@ export type EngineStatus = 'draft' | 'published' | 'archived';
 
 export type ApplyMode = 'manual' | 'pre_selected' | 'supervisor_bulk';
 
+export type MonitoringCadence = 'realtime' | 'hourly' | 'daily';
+export type DraftRunStatus = 'draft_pending_review' | 'draft_updated' | 'reviewed' | 'applied' | 'expired' | 'discarded';
+export type DraftTriggerType = 'ambient_session' | 'apply_plan' | 'scheduled_sweep';
+export type PauseMonitoringDuration = '7_days' | '30_days' | 'until_manual';
+
 export interface ProfileField {
   id: string;
   name: string;
@@ -106,6 +111,48 @@ export interface OverrideRecord {
   justification: string;
 }
 
+// ============= AUTO-MONITOR TYPES =============
+
+export interface AgentMonitoringSettings {
+  agentId: string;
+  enabled: boolean;
+  cadence: MonitoringCadence;
+  debounceHours: number;
+  quietHoursStart: string | null; // "22:00"
+  quietHoursEnd: string | null;   // "06:00"
+  createdBy: string;
+  updatedAt: string;
+}
+
+export interface AgentIndividualMonitoring {
+  agentId: string;
+  individualId: string;
+  individualName: string;
+  enabled: boolean;
+  pausedUntil: string | null;
+  updatedAt: string;
+}
+
+export interface DraftComplianceRun {
+  id: string;
+  agentId: string;
+  agentName: string;
+  individualId: string;
+  individualName: string;
+  guidelinesEngineVersionId: string;
+  engineName: string;
+  engineVersion: string;
+  status: DraftRunStatus;
+  triggerType: DraftTriggerType;
+  triggerRefId: string;
+  detectedChangesSummary: string;
+  findingsCount: number;
+  hardStopCount: number;
+  hasHardStop: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ============= RUNTIME AGENT TYPES =============
 
 export interface RuntimeAgent {
@@ -124,6 +171,10 @@ export interface RuntimeAgent {
   allowOverrides: boolean;
   requireSupervisorApproval: boolean;
   applyMode: ApplyMode;
+  // Auto-Monitor fields
+  autoMonitorEnabled: boolean;
+  draftsPending: number;
+  lastEvaluated: string | null;
 }
 
 // ============= INSTRUCTION HIERARCHY =============
@@ -225,6 +276,9 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     allowOverrides: true,
     requireSupervisorApproval: false,
     applyMode: "manual",
+    autoMonitorEnabled: true,
+    draftsPending: 5,
+    lastEvaluated: "2026-02-22T14:30:00Z",
   },
   {
     id: "ra-2",
@@ -242,6 +296,9 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     allowOverrides: true,
     requireSupervisorApproval: true,
     applyMode: "pre_selected",
+    autoMonitorEnabled: true,
+    draftsPending: 3,
+    lastEvaluated: "2026-02-22T12:00:00Z",
   },
   {
     id: "ra-3",
@@ -259,6 +316,9 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     allowOverrides: false,
     requireSupervisorApproval: false,
     applyMode: "manual",
+    autoMonitorEnabled: false,
+    draftsPending: 0,
+    lastEvaluated: null,
   },
   {
     id: "ra-4",
@@ -276,6 +336,9 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     allowOverrides: true,
     requireSupervisorApproval: true,
     applyMode: "pre_selected",
+    autoMonitorEnabled: true,
+    draftsPending: 2,
+    lastEvaluated: "2026-02-22T08:00:00Z",
   },
   {
     id: "ra-5",
@@ -293,6 +356,9 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     allowOverrides: true,
     requireSupervisorApproval: false,
     applyMode: "manual",
+    autoMonitorEnabled: false,
+    draftsPending: 0,
+    lastEvaluated: null,
   },
 ];
 
@@ -347,3 +413,54 @@ export const applyModeLabels: Record<ApplyMode, string> = {
   pre_selected: "Pre-Selected Apply (Still Requires Confirm)",
   supervisor_bulk: "Supervisor Bulk Apply (Gated)",
 };
+
+export const monitoringCadenceLabels: Record<MonitoringCadence, string> = {
+  realtime: "Realtime (Event-Driven)",
+  hourly: "Hourly",
+  daily: "Daily (Catch-Up)",
+};
+
+export const draftRunStatusLabels: Record<DraftRunStatus, string> = {
+  draft_pending_review: "Pending Review",
+  draft_updated: "Updated",
+  reviewed: "Reviewed",
+  applied: "Applied",
+  expired: "Expired",
+  discarded: "Discarded",
+};
+
+export const draftTriggerTypeLabels: Record<DraftTriggerType, string> = {
+  ambient_session: "Ambient Session",
+  apply_plan: "Apply Plan",
+  scheduled_sweep: "Scheduled Sweep",
+};
+
+// ============= MOCK AUTO-MONITOR DATA =============
+
+export const mockAgentMonitoringSettings: AgentMonitoringSettings[] = [
+  { agentId: "ra-1", enabled: true, cadence: "realtime", debounceHours: 6, quietHoursStart: "22:00", quietHoursEnd: "06:00", createdBy: "Admin", updatedAt: "2026-02-20" },
+  { agentId: "ra-2", enabled: true, cadence: "daily", debounceHours: 6, quietHoursStart: null, quietHoursEnd: null, createdBy: "Admin", updatedAt: "2026-02-18" },
+  { agentId: "ra-4", enabled: true, cadence: "realtime", debounceHours: 4, quietHoursStart: "23:00", quietHoursEnd: "07:00", createdBy: "Admin", updatedAt: "2026-02-19" },
+];
+
+export const mockIndividualMonitoring: AgentIndividualMonitoring[] = [
+  { agentId: "ra-1", individualId: "ind-1", individualName: "James Williams", enabled: true, pausedUntil: null, updatedAt: "2026-02-20" },
+  { agentId: "ra-1", individualId: "ind-2", individualName: "Maria Garcia", enabled: true, pausedUntil: null, updatedAt: "2026-02-20" },
+  { agentId: "ra-1", individualId: "ind-3", individualName: "David Johnson", enabled: false, pausedUntil: null, updatedAt: "2026-02-21" },
+  { agentId: "ra-1", individualId: "ind-4", individualName: "Sarah Thompson", enabled: true, pausedUntil: "2026-03-01", updatedAt: "2026-02-22" },
+  { agentId: "ra-1", individualId: "ind-5", individualName: "Robert Davis", enabled: true, pausedUntil: null, updatedAt: "2026-02-20" },
+  { agentId: "ra-2", individualId: "ind-1", individualName: "James Williams", enabled: true, pausedUntil: null, updatedAt: "2026-02-18" },
+  { agentId: "ra-2", individualId: "ind-2", individualName: "Maria Garcia", enabled: true, pausedUntil: null, updatedAt: "2026-02-18" },
+  { agentId: "ra-2", individualId: "ind-6", individualName: "Lisa Chen", enabled: true, pausedUntil: null, updatedAt: "2026-02-18" },
+];
+
+export const mockDraftRuns: DraftComplianceRun[] = [
+  { id: "dr-1", agentId: "ra-1", agentName: "State Guidelines Engine Agent", individualId: "ind-1", individualName: "James Williams", guidelinesEngineVersionId: "ce-1-v2", engineName: "Maryland DDA", engineVersion: "2.0", status: "draft_pending_review", triggerType: "ambient_session", triggerRefId: "amb-session-042", detectedChangesSummary: "New goals identified in ambient session; PCP may need addendum.", findingsCount: 3, hardStopCount: 1, hasHardStop: true, createdAt: "2026-02-22T14:30:00Z", updatedAt: "2026-02-22T14:30:00Z" },
+  { id: "dr-2", agentId: "ra-1", agentName: "State Guidelines Engine Agent", individualId: "ind-2", individualName: "Maria Garcia", guidelinesEngineVersionId: "ce-1-v2", engineName: "Maryland DDA", engineVersion: "2.0", status: "draft_pending_review", triggerType: "scheduled_sweep", triggerRefId: "sweep-2026-02-22", detectedChangesSummary: "Authorization expiring in 14 days; utilization at 87%.", findingsCount: 2, hardStopCount: 0, hasHardStop: false, createdAt: "2026-02-22T08:00:00Z", updatedAt: "2026-02-22T08:00:00Z" },
+  { id: "dr-3", agentId: "ra-1", agentName: "State Guidelines Engine Agent", individualId: "ind-5", individualName: "Robert Davis", guidelinesEngineVersionId: "ce-1-v2", engineName: "Maryland DDA", engineVersion: "2.0", status: "draft_updated", triggerType: "apply_plan", triggerRefId: "ap-015", detectedChangesSummary: "New service authorization applied; limits recalculated.", findingsCount: 4, hardStopCount: 0, hasHardStop: false, createdAt: "2026-02-21T16:00:00Z", updatedAt: "2026-02-22T10:00:00Z" },
+  { id: "dr-4", agentId: "ra-2", agentName: "PCP Alignment Copilot", individualId: "ind-1", individualName: "James Williams", guidelinesEngineVersionId: "ce-1-v2", engineName: "Maryland DDA", engineVersion: "2.0", status: "draft_pending_review", triggerType: "ambient_session", triggerRefId: "amb-session-042", detectedChangesSummary: "PCP missing required behavioral support plan reference.", findingsCount: 2, hardStopCount: 1, hasHardStop: true, createdAt: "2026-02-22T14:35:00Z", updatedAt: "2026-02-22T14:35:00Z" },
+  { id: "dr-5", agentId: "ra-2", agentName: "PCP Alignment Copilot", individualId: "ind-2", individualName: "Maria Garcia", guidelinesEngineVersionId: "ce-1-v2", engineName: "Maryland DDA", engineVersion: "2.0", status: "reviewed", triggerType: "scheduled_sweep", triggerRefId: "sweep-2026-02-21", detectedChangesSummary: "PCP goal alignment verified; minor documentation gap.", findingsCount: 1, hardStopCount: 0, hasHardStop: false, createdAt: "2026-02-21T08:00:00Z", updatedAt: "2026-02-22T09:00:00Z" },
+  { id: "dr-6", agentId: "ra-1", agentName: "State Guidelines Engine Agent", individualId: "ind-1", individualName: "James Williams", guidelinesEngineVersionId: "ce-1-v2", engineName: "Maryland DDA", engineVersion: "2.0", status: "applied", triggerType: "scheduled_sweep", triggerRefId: "sweep-2026-02-20", detectedChangesSummary: "Daily sweep — all checks passed after apply.", findingsCount: 0, hardStopCount: 0, hasHardStop: false, createdAt: "2026-02-20T08:00:00Z", updatedAt: "2026-02-20T15:00:00Z" },
+  { id: "dr-7", agentId: "ra-4", agentName: "Monitoring & Reauth Copilot", individualId: "ind-5", individualName: "Robert Davis", guidelinesEngineVersionId: "ce-2-v1", engineName: "Virginia DBHDS", engineVersion: "1.0", status: "draft_pending_review", triggerType: "scheduled_sweep", triggerRefId: "sweep-2026-02-22", detectedChangesSummary: "Monthly monitoring form overdue; reauth deadline in 21 days.", findingsCount: 3, hardStopCount: 1, hasHardStop: true, createdAt: "2026-02-22T08:00:00Z", updatedAt: "2026-02-22T08:00:00Z" },
+  { id: "dr-8", agentId: "ra-4", agentName: "Monitoring & Reauth Copilot", individualId: "ind-3", individualName: "David Johnson", guidelinesEngineVersionId: "ce-2-v1", engineName: "Virginia DBHDS", engineVersion: "1.0", status: "draft_pending_review", triggerType: "ambient_session", triggerRefId: "amb-session-039", detectedChangesSummary: "New incident reported; barrier documentation required.", findingsCount: 2, hardStopCount: 0, hasHardStop: false, createdAt: "2026-02-22T11:00:00Z", updatedAt: "2026-02-22T11:00:00Z" },
+];

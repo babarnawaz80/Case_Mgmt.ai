@@ -9,7 +9,9 @@ const stats = [
     change: "+3 this month",
     trend: "up" as const,
     icon: Users,
-    bg: "bg-primary/70",
+    bg: "bg-primary/10",
+    textColor: "text-primary",
+    iconColor: "text-primary",
   },
   {
     label: "On Track",
@@ -17,7 +19,9 @@ const stats = [
     change: "8 individuals",
     trend: "up" as const,
     icon: CheckCircle2,
-    bg: "bg-success/70",
+    bg: "bg-success/10",
+    textColor: "text-success",
+    iconColor: "text-success",
   },
   {
     label: "Out of Compliance",
@@ -25,7 +29,9 @@ const stats = [
     change: "Needs attention",
     trend: "down" as const,
     icon: AlertCircle,
-    bg: "bg-destructive/70",
+    bg: "bg-destructive/10",
+    textColor: "text-destructive",
+    iconColor: "text-destructive",
   },
   {
     label: "Open Tasks",
@@ -33,7 +39,9 @@ const stats = [
     change: "All caught up",
     trend: "up" as const,
     icon: Clock,
-    bg: "bg-warning/70",
+    bg: "bg-warning/10",
+    textColor: "text-warning",
+    iconColor: "text-warning",
   },
 ];
 
@@ -47,24 +55,24 @@ export function StatsCards() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.08 }}
           className={cn(
-            "relative overflow-hidden rounded-2xl p-5 text-white hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer",
+            "relative overflow-hidden rounded-2xl p-5 border border-border/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer",
             stat.bg
           )}
         >
           <div className="flex items-start justify-between mb-4">
-            <div className="p-2.5 rounded-xl bg-white/15">
-              <stat.icon className="w-4 h-4 text-white" />
+            <div className={cn("p-2.5 rounded-xl", stat.bg)}>
+              <stat.icon className={cn("w-4 h-4", stat.iconColor)} />
             </div>
             <div className={cn(
               "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
-              stat.trend === "up" ? "bg-white/20 text-white" : "bg-white/20 text-white"
+              stat.bg, stat.textColor
             )}>
               {stat.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {stat.change}
             </div>
           </div>
-          <p className="text-3xl font-display font-bold tracking-tight">{stat.value}</p>
-          <p className="text-xs mt-1 font-medium uppercase tracking-wide opacity-85">{stat.label}</p>
+          <p className={cn("text-3xl font-display font-bold tracking-tight text-foreground")}>{stat.value}</p>
+          <p className={cn("text-xs mt-1 font-medium uppercase tracking-wide text-muted-foreground")}>{stat.label}</p>
         </motion.div>
       ))}
     </div>

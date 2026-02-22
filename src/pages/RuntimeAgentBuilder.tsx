@@ -77,7 +77,7 @@ export default function RuntimeAgentBuilder() {
               <Bot className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">Create New Agent</h2>
+              <h2 className="font-display font-semibold text-foreground text-sm">New Agent</h2>
               <p className="text-[11px] text-muted-foreground">Runtime Agent · Uses published Guidelines Engines for compliance</p>
             </div>
           </div>

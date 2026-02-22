@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Bot, Sparkles, User, Shield, Lock, AlertTriangle } from "lucide-react";
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
-import { RuntimeAgentType, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, pushModeLabels, PushMode, FIXED_WORKFLOW_STEPS } from "@/types/agent";
+import { RuntimeAgentType, mockComplianceEngines, runtimeAgentTypeLabels, ComplianceEngine, applyModeLabels, ApplyMode, FIXED_WORKFLOW_STEPS } from "@/types/agent";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -45,7 +45,7 @@ export default function RuntimeAgentBuilder() {
   // Step 3
   const [allowOverrides, setAllowOverrides] = useState(true);
   const [requireSupervisorApproval, setRequireSupervisorApproval] = useState(false);
-  const [pushMode, setPushMode] = useState<PushMode>("manual");
+  const [applyMode, setApplyMode] = useState<ApplyMode>("manual");
 
   // Step 4
   const [moduleToggles, setModuleToggles] = useState<Record<string, boolean>>(
@@ -247,7 +247,7 @@ export default function RuntimeAgentBuilder() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
                 <h3 className="text-lg font-display font-bold text-foreground mb-1">Configure Overrides</h3>
-                <p className="text-sm text-muted-foreground">Set override permissions and push-to-module behavior for this agent.</p>
+                <p className="text-sm text-muted-foreground">Set override permissions and apply-to-module behavior for this agent.</p>
               </div>
 
               <div className="glass rounded-xl p-6 space-y-5">
@@ -272,26 +272,24 @@ export default function RuntimeAgentBuilder() {
                   </div>
                 </div>
 
-                {/* Push mode */}
+                {/* Apply mode */}
                 <div>
-                  <p className="text-sm font-semibold text-foreground mb-3">Push to Modules — Safety Control</p>
-                  <p className="text-[11px] text-muted-foreground mb-3">Controls how outputs are written to iCM modules. Default: Manual Confirmation Required.</p>
-                  <Select value={pushMode} onValueChange={(v) => setPushMode(v as PushMode)}>
+                  <p className="text-sm font-semibold text-foreground mb-3">Apply to Modules — Safety Control</p>
+                  <p className="text-[11px] text-muted-foreground mb-3">Controls how outputs are written to iCM modules. All modes require human confirmation. Default: Manual Apply.</p>
+                  <Select value={applyMode} onValueChange={(v) => setApplyMode(v as ApplyMode)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover z-50">
-                      {(Object.entries(pushModeLabels) as [PushMode, string][]).map(([key, label]) => (
+                      {(Object.entries(applyModeLabels) as [ApplyMode, string][]).map(([key, label]) => (
                         <SelectItem key={key} value={key}>{label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {pushMode === "auto_always" && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20 flex items-start gap-2">
-                      <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
-                      <p className="text-[11px] text-warning">Auto-Push Always writes to iCM without confirmation, even on failures. Use with caution.</p>
-                    </div>
-                  )}
+                  <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 flex items-start gap-2">
+                    <Shield className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-muted-foreground">All apply modes require explicit user confirmation. No silent automation.</p>
+                  </div>
                 </div>
 
                 {/* What agents CANNOT do */}
@@ -354,7 +352,7 @@ export default function RuntimeAgentBuilder() {
                 <ReviewRow label="Engine Pinned Version" value={selectedEngine ? `v${selectedEngine.version}` : ""} />
                 <ReviewRow label="Allow Overrides" value={allowOverrides ? "Yes" : "No"} />
                 <ReviewRow label="Supervisor Approval" value={requireSupervisorApproval ? "Required" : "Not required"} />
-                <ReviewRow label="Push Mode" value={pushModeLabels[pushMode]} />
+                <ReviewRow label="Apply Mode" value={applyModeLabels[applyMode]} />
                 <ReviewRow label="Workflow Steps" value={`${FIXED_WORKFLOW_STEPS.length} steps (fixed)`} />
                 <ReviewRow label="Enabled Modules" value={`${Object.values(moduleToggles).filter(Boolean).length} of ${ICM_MODULES.length}`} />
               </div>

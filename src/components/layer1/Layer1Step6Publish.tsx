@@ -103,7 +103,7 @@ export function Layer1Step6Publish({ rulePacks, extractionSummary, onBack, onPub
             <CheckCircle2 className="h-6 w-6 text-primary" />
             <div>
               <p className="text-sm font-semibold text-foreground">{rulePacks.length} Services Published</p>
-              <p className="text-xs text-muted-foreground">Available to all Case Manager Compliance Agents.</p>
+              <p className="text-xs text-muted-foreground">Available to all Compliance Engine agents.</p>
             </div>
           </div>
         </motion.div>

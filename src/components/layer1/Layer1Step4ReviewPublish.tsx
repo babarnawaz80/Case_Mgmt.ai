@@ -142,7 +142,7 @@ export function Layer1Step4ReviewPublish({ rulePacks, extractionSummary, onSumma
                 <Sparkles className="h-6 w-6 text-primary" />
                 <div>
                   <p className="text-sm font-semibold text-foreground">Compliance Engine Ready</p>
-                  <p className="text-xs text-muted-foreground">{extractionSummary.totalServices} services published. Case Manager Compliance Agents can now use this engine.</p>
+                  <p className="text-xs text-muted-foreground">{extractionSummary.totalServices} services published. Compliance Engine agents can now use this engine.</p>
                 </div>
               </div>
             </motion.div>

@@ -45,7 +45,7 @@ export default function Layer1AgentBuilder() {
   const handlePublish = () => {
     toast({
       title: "Agent Trained & Ready",
-      description: "Rule Packs published. Case Manager Compliance Agents can now use these rules.",
+      description: "Rule Packs published. Compliance Engine agents can now use these rules.",
     });
     navigate("/lifeplan");
   };
@@ -69,7 +69,7 @@ export default function Layer1AgentBuilder() {
         </div>
         <div className="flex items-center gap-3">
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/lifeplan")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
-            <Sparkles className="w-4 h-4" /> Compliance Agent
+            <Sparkles className="w-4 h-4" /> Compliance Engine
           </motion.button>
           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
             <User className="w-5 h-5 text-muted-foreground" />

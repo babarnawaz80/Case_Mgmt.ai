@@ -8,7 +8,7 @@ export type PlanType =
   | 'Safety Plan'
   | 'Discharge Plan'
   | 'Guideline Parsing'
-  | 'Compliance Copilot'
+  | 'Compliance Engine'
   | 'Custom';
 
 export type RuntimeAgentType =
@@ -21,7 +21,7 @@ export type RuntimeAgentType =
 
 export type EngineStatus = 'draft' | 'published' | 'archived';
 
-export type PushMode = 'manual' | 'auto_pass' | 'auto_always';
+export type ApplyMode = 'manual' | 'pre_selected' | 'supervisor_bulk';
 
 export interface ProfileField {
   id: string;
@@ -120,7 +120,7 @@ export interface RuntimeAgent {
   complianceRate: number;
   allowOverrides: boolean;
   requireSupervisorApproval: boolean;
-  pushMode: PushMode;
+  applyMode: ApplyMode;
 }
 
 // ============= INSTRUCTION HIERARCHY =============
@@ -205,7 +205,7 @@ export const mockComplianceEngines: ComplianceEngine[] = [
 export const mockRuntimeAgents: RuntimeAgent[] = [
   {
     id: "ra-1",
-    name: "State Compliance Copilot",
+    name: "State Compliance Engine Agent",
     type: "compliance_copilot",
     description: "Full compliance enforcement across eligibility, PCP, limits, conflicts, and documentation.",
     engineId: "ce-1",
@@ -218,7 +218,7 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     complianceRate: 94,
     allowOverrides: true,
     requireSupervisorApproval: false,
-    pushMode: "manual",
+    applyMode: "manual",
   },
   {
     id: "ra-2",
@@ -235,7 +235,7 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     complianceRate: 97,
     allowOverrides: true,
     requireSupervisorApproval: true,
-    pushMode: "auto_pass",
+    applyMode: "pre_selected",
   },
   {
     id: "ra-3",
@@ -252,7 +252,7 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     complianceRate: 91,
     allowOverrides: false,
     requireSupervisorApproval: false,
-    pushMode: "manual",
+    applyMode: "manual",
   },
   {
     id: "ra-4",
@@ -269,7 +269,7 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     complianceRate: 96,
     allowOverrides: true,
     requireSupervisorApproval: true,
-    pushMode: "auto_pass",
+    applyMode: "pre_selected",
   },
   {
     id: "ra-5",
@@ -286,17 +286,17 @@ export const mockRuntimeAgents: RuntimeAgent[] = [
     complianceRate: 93,
     allowOverrides: true,
     requireSupervisorApproval: false,
-    pushMode: "manual",
+    applyMode: "manual",
   },
 ];
 
 export const mockComplianceRuns: ComplianceRun[] = [
-  { id: "cr-1", individual: "James Williams", service: "Personal Care Services (PCS)", status: "Complete", date: "2026-02-18", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Copilot", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "BAN", "Workflow Manager"] },
-  { id: "cr-2", individual: "Maria Garcia", service: "Day Habilitation", status: "Complete", date: "2026-02-15", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Copilot", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "Progress Note"] },
+  { id: "cr-1", individual: "James Williams", service: "Personal Care Services (PCS)", status: "Complete", date: "2026-02-18", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "BAN", "Workflow Manager"] },
+  { id: "cr-2", individual: "Maria Garcia", service: "Day Habilitation", status: "Complete", date: "2026-02-15", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["Services", "PCP", "Progress Note"] },
   { id: "cr-3", individual: "David Johnson", service: "Respite Care", status: "In Progress", date: "2026-02-20", compliance: "Pending", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "Billing Documentation Copilot", agentVersion: "1.0", user: "John Smith", overrides: [], modulesWritten: [] },
   { id: "cr-4", individual: "Sarah Thompson", service: "Supported Employment – Individual", status: "Complete", date: "2026-02-10", compliance: "Pass", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "PCP Alignment Copilot", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: ["PCP", "Services"] },
   { id: "cr-5", individual: "Robert Davis", service: "Community Living Supports", status: "Complete", date: "2026-02-05", compliance: "Flagged", engineName: "Virginia DBHDS", engineVersion: "1.0", agentName: "Monitoring & Reauth Copilot", agentVersion: "1.0", user: "John Smith", overrides: [{ id: "ov-1", user: "John Smith", timestamp: "2026-02-05T14:30:00Z", field: "Weekly Cap", originalResult: "hard_stop", newResult: "warning", justification: "Temporary exception approved by supervisor — additional hours authorized by MCO." }], modulesWritten: ["Services", "Monitoring"] },
-  { id: "cr-6", individual: "James Williams", service: "Behavioral Support Services", status: "In Progress", date: "2026-02-21", compliance: "Pending", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Copilot", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: [] },
+  { id: "cr-6", individual: "James Williams", service: "Behavioral Support Services", status: "In Progress", date: "2026-02-21", compliance: "Pending", engineName: "Maryland DDA", engineVersion: "2.0", agentName: "State Compliance Engine Agent", agentVersion: "1.0", user: "Jane Doe", overrides: [], modulesWritten: [] },
 ];
 
 // Legacy mock agents (kept for backward compat)
@@ -306,7 +306,7 @@ export const mockAgents: Agent[] = [
     name: "Guideline Parsing Agent",
     planType: "Guideline Parsing",
     layer: "layer1",
-    description: "Admin-only agent that converts uploaded state guideline PDFs into structured Rule Packs for downstream compliance agents.",
+    description: "Admin-only agent that converts uploaded state guideline PDFs into structured Rule Packs for downstream Compliance Engine agents.",
     instructions: "Upload state guideline PDF. Optionally provide service list, templates, and service code mappings.",
     status: "active",
     profileFields: [],
@@ -315,8 +315,8 @@ export const mockAgents: Agent[] = [
   },
   {
     id: "l2-1",
-    name: "State Compliance Copilot",
-    planType: "Compliance Copilot",
+    name: "State Compliance Engine Agent",
+    planType: "Compliance Engine",
     layer: "layer2",
     description: "Guides case managers through service authorization and billing documentation using published Compliance Engines.",
     instructions: "Uses Compliance Engine rule packs to enforce compliance at every step.",
@@ -328,7 +328,7 @@ export const mockAgents: Agent[] = [
 ];
 
 export const runtimeAgentTypeLabels: Record<RuntimeAgentType, string> = {
-  compliance_copilot: "Compliance Copilot",
+  compliance_copilot: "Compliance Engine Agent",
   pcp_alignment: "PCP Alignment",
   billing_documentation: "Billing Documentation",
   monitoring_reauth: "Monitoring / Reauthorization",
@@ -336,8 +336,8 @@ export const runtimeAgentTypeLabels: Record<RuntimeAgentType, string> = {
   ambient_meeting: "Ambient Meeting Copilot",
 };
 
-export const pushModeLabels: Record<PushMode, string> = {
-  manual: "Manual Confirmation Required",
-  auto_pass: "Auto-Push on Pass Only",
-  auto_always: "Auto-Push Always",
+export const applyModeLabels: Record<ApplyMode, string> = {
+  manual: "Manual Apply (Confirmation Required)",
+  pre_selected: "Pre-Selected Apply (Still Requires Confirm)",
+  supervisor_bulk: "Supervisor Bulk Apply (Gated)",
 };

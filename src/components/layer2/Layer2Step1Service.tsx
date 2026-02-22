@@ -19,7 +19,7 @@ const INDIVIDUALS = [
   { id: "ind-5", name: "Robert Davis", dob: "1985-09-12", waiver: "HCBS Waiver", status: "Active" },
 ];
 
-// Published rule packs from Phase 1
+// Published services from compliance engine
 const PUBLISHED_RULE_PACKS: RulePack[] = [
   "Personal Care Services (PCS)", "Day Habilitation", "Respite Care",
   "Supported Employment – Individual", "Supported Employment – Group",
@@ -91,12 +91,12 @@ export function Layer2Step1Service({ selectedRulePack, onRulePackSelected, onNex
       <div>
         <h2 className="text-lg font-display font-bold text-foreground">Select Individual & Service</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Select the individual and the service you're working on. The agent loads the matching Rule Pack and begins compliance checks.
+          Select the individual and the service you're working on. The agent loads the matching compliance engine and begins compliance checks.
         </p>
         <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
           <p className="text-xs text-foreground font-medium mb-0.5">Why this step?</p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Compliance is always person-specific and service-specific. The agent must know who the individual is and which service is being authorized before it can apply the correct rules from the Rule Pack.
+            Compliance is always person-specific and service-specific. The agent must know who the individual is and which service is being authorized before it can apply the correct rules from the compliance engine.
           </p>
         </div>
       </div>
@@ -150,7 +150,7 @@ export function Layer2Step1Service({ selectedRulePack, onRulePackSelected, onNex
           </p>
           <div className="flex items-center gap-2 p-1.5 rounded-xl bg-primary/5 border border-primary/20">
             <Database className="h-4 w-4 text-primary ml-2 shrink-0" />
-            <p className="text-xs text-primary font-medium">Reading from: <span className="font-bold">StateGuidelineRulePacks</span> (published by admin)</p>
+            <p className="text-xs text-primary font-medium">Reading from: <span className="font-bold">Compliance Engine</span> (published by admin)</p>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

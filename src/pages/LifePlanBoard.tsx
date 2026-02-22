@@ -77,7 +77,7 @@ export default function LifePlanBoard() {
                   Create New Agent
                 </button>
                 <button
-                  onClick={() => navigate("/lifeplan/rule-library/new")}
+                  onClick={() => navigate("/lifeplan/compliance-engines")}
                   className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
                 >
                   <Shield className="h-3 w-3" />

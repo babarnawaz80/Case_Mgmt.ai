@@ -9,6 +9,7 @@ import PeopleSupported from "./pages/PeopleSupported";
 import LifePlanBoard from "./pages/LifePlanBoard";
 import LifePlanAgentDetail from "./pages/LifePlanAgentDetail";
 import RuleLibraryBuilder from "./pages/RuleLibraryBuilder";
+import ComplianceEngineDashboard from "./pages/ComplianceEngineDashboard";
 import RuntimeAgentBuilder from "./pages/RuntimeAgentBuilder";
 import Layer2AgentBuilder from "./pages/Layer2AgentBuilder";
 import NotFound from "./pages/NotFound";
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/people" element={<PeopleSupported />} />
           <Route path="/lifeplan" element={<LifePlanBoard />} />
+          <Route path="/lifeplan/compliance-engines" element={<ComplianceEngineDashboard />} />
           <Route path="/lifeplan/rule-library/new" element={<RuleLibraryBuilder />} />
           <Route path="/lifeplan/agent/new" element={<RuntimeAgentBuilder />} />
           <Route path="/lifeplan/agent/new/layer2" element={<Layer2AgentBuilder />} />

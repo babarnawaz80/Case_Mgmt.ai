@@ -127,7 +127,7 @@ const Index = () => {
               <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-display font-semibold text-foreground">CaseAI Assistant</span>
+              <span className="font-display font-semibold text-foreground">Case Management AI</span>
               <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </div>
           </div>

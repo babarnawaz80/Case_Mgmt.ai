@@ -8,7 +8,7 @@ export function AppHeader() {
   return (
     <header className="h-16 border-b border-border glass flex items-center justify-between px-6 shrink-0">
       <div>
-        <h2 className="font-display font-semibold text-foreground text-lg">iCM Dashboard</h2>
+        <h2 className="font-display font-semibold text-foreground text-lg">Case Management Dashboard</h2>
       </div>
 
       <div className="flex items-center gap-3">

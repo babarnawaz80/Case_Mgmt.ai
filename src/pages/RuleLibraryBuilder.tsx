@@ -7,11 +7,11 @@ import { Layer1Step1Upload } from "@/components/layer1/Layer1Step1Upload";
 import { Layer1Step2Templates } from "@/components/layer1/Layer1Step2Templates";
 import { Layer1Step3DataMapping } from "@/components/layer1/Layer1Step3DataMapping";
 import { Layer1Step4ReviewPublish } from "@/components/layer1/Layer1Step4ReviewPublish";
-import { UploadedFile, RulePack, ExtractionSummary } from "@/types/rulePack";
+import { UploadedFile, GuidelinePack, RulePack, ExtractionSummary } from "@/types/guidelinePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
-  { label: "Upload Guidelines", description: "Parse PDF → Build Compliance Engine" },
+  { label: "Upload Guidelines", description: "Parse PDF → Build Guidelines Engine" },
   { label: "Upload Templates", description: "Org-level doc templates" },
   { label: "Default Data Mapping", description: "Org-wide module defaults" },
   { label: "Review & Publish", description: "Admin approval & publish" },
@@ -42,8 +42,8 @@ export default function RuleLibraryBuilder() {
 
   const handlePublish = () => {
     toast({
-      title: "Compliance Engine Published",
-      description: "Compliance engine is now frozen and available for runtime agents to use.",
+      title: "Guidelines Engine Published",
+      description: "Guidelines engine is now frozen and available for runtime agents to use.",
     });
     navigate("/lifeplan");
   };
@@ -60,8 +60,8 @@ export default function RuleLibraryBuilder() {
               <Shield className="w-4 h-4 text-destructive-foreground" />
             </div>
             <div className="flex flex-col">
-              <h2 className="font-display font-semibold text-foreground text-sm">Create Compliance Engine</h2>
-              <p className="text-[11px] text-muted-foreground">Admin Only · Parse guidelines, build compliance engine, publish for agents</p>
+              <h2 className="font-display font-semibold text-foreground text-sm">Create Guidelines Engine</h2>
+              <p className="text-[11px] text-muted-foreground">Admin Only · Parse guidelines, build guidelines engine, publish for agents</p>
             </div>
           </div>
         </div>

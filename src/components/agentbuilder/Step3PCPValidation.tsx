@@ -14,7 +14,7 @@ import {
   Briefcase,
   Shield,
 } from "lucide-react";
-import { PCPValidationItem, RulePack } from "@/types/rulePack";
+import { PCPValidationItem, GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step3Props {

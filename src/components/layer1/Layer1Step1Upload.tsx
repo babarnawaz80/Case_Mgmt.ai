@@ -4,7 +4,7 @@ import {
   Upload, FileText, CheckCircle2, ArrowRight, Shield,
   Loader2, Sparkles,
 } from "lucide-react";
-import { UploadedFile } from "@/types/rulePack";
+import { UploadedFile } from "@/types/guidelinePack";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";

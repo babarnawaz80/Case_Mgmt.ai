@@ -78,7 +78,7 @@ export default function RuntimeAgentBuilder() {
             </div>
             <div>
               <h2 className="font-display font-semibold text-foreground text-sm">Create New Agent</h2>
-              <p className="text-[11px] text-muted-foreground">Runtime Agent · Uses published Compliance Engines for compliance</p>
+              <p className="text-[11px] text-muted-foreground">Runtime Agent · Uses published Guidelines Engines for compliance</p>
             </div>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function RuntimeAgentBuilder() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className="w-4 h-4 rounded bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">1</span>
-                      <span className="text-muted-foreground">Compliance Engine Instructions <span className="text-muted-foreground/60">(State-level logic)</span></span>
+                      <span className="text-muted-foreground">Guidelines Engine Instructions <span className="text-muted-foreground/60">(State-level logic)</span></span>
                     </div>
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className="w-4 h-4 rounded bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary">2</span>
@@ -172,16 +172,16 @@ export default function RuntimeAgentBuilder() {
           {step === 2 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
-                <h3 className="text-lg font-display font-bold text-foreground mb-1">Select Compliance Engine</h3>
-                <p className="text-sm text-muted-foreground">Choose a published Compliance Engine. Only published engines can be linked to agents.</p>
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">Select Guidelines Engine</h3>
+                <p className="text-sm text-muted-foreground">Choose a published Guidelines Engine. Only published engines can be linked to agents.</p>
               </div>
 
               <div className="space-y-4 glass rounded-xl p-6">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Compliance Engine</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Guidelines Engine</label>
                   <Select value={selectedEngineId} onValueChange={setSelectedEngineId}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a published compliance engine..." />
+                      <SelectValue placeholder="Select a published guidelines engine..." />
                     </SelectTrigger>
                     <SelectContent className="bg-popover z-50">
                       {publishedEngines.map(engine => (
@@ -301,7 +301,7 @@ export default function RuntimeAgentBuilder() {
                     <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Disable conflict engine</li>
                     <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Skip eligibility checks</li>
                     <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Reorder workflow steps</li>
-                    <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Edit compliance engine rules</li>
+                    <li className="flex items-center gap-1.5"><Lock className="h-3 w-3 text-muted-foreground/50" /> Edit guidelines engine rules</li>
                   </ul>
                 </div>
               </div>
@@ -318,7 +318,7 @@ export default function RuntimeAgentBuilder() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
                 <h3 className="text-lg font-display font-bold text-foreground mb-1">Data Mapping</h3>
-                <p className="text-sm text-muted-foreground">Per-agent module output overrides. These can differ from the Compliance Engine defaults.</p>
+                <p className="text-sm text-muted-foreground">Per-agent module output overrides. These can differ from the Guidelines Engine defaults.</p>
               </div>
 
               <div className="glass rounded-xl p-6 space-y-3">
@@ -348,7 +348,7 @@ export default function RuntimeAgentBuilder() {
               <div className="glass rounded-xl p-6 space-y-4">
                 <ReviewRow label="Agent Name" value={agentName} />
                 <ReviewRow label="Agent Type" value={agentType ? runtimeAgentTypeLabels[agentType] : ""} />
-                <ReviewRow label="Compliance Engine" value={selectedEngine ? `${selectedEngine.name} v${selectedEngine.version}` : ""} />
+                <ReviewRow label="Guidelines Engine" value={selectedEngine ? `${selectedEngine.name} v${selectedEngine.version}` : ""} />
                 <ReviewRow label="Engine Pinned Version" value={selectedEngine ? `v${selectedEngine.version}` : ""} />
                 <ReviewRow label="Allow Overrides" value={allowOverrides ? "Yes" : "No"} />
                 <ReviewRow label="Supervisor Approval" value={requireSupervisorApproval ? "Required" : "Not required"} />

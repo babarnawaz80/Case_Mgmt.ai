@@ -30,8 +30,8 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/people" element={<PeopleSupported />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />
-            <Route path="/lifeplan/compliance-engines" element={<ComplianceEngineDashboard />} />
-            <Route path="/lifeplan/rule-library/new" element={<RuleLibraryBuilder />} />
+            <Route path="/lifeplan/guidelines-engines" element={<ComplianceEngineDashboard />} />
+            <Route path="/lifeplan/guidelines-library/new" element={<RuleLibraryBuilder />} />
             <Route path="/lifeplan/agent/new" element={<RuntimeAgentBuilder />} />
             <Route path="/lifeplan/agent/new/layer2" element={<Layer2AgentBuilder />} />
             <Route path="/lifeplan/engine/:id/history" element={<EngineHistory />} />

@@ -9,7 +9,7 @@ import { Layer1Step1Upload } from "@/components/layer1/Layer1Step1Upload";
 import { Layer1Step2Templates } from "@/components/layer1/Layer1Step2Templates";
 import { Layer1Step3DataMapping } from "@/components/layer1/Layer1Step3DataMapping";
 import { Layer1Step4ReviewPublish } from "@/components/layer1/Layer1Step4ReviewPublish";
-import { UploadedFile, RulePack, ExtractionSummary } from "@/types/rulePack";
+import { UploadedFile, GuidelinePack, RulePack, ExtractionSummary } from "@/types/guidelinePack";
 import { toast } from "@/hooks/use-toast";
 
 const STEPS = [

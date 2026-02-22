@@ -5,7 +5,7 @@ import {
   ClipboardList, FileText, Calendar, Users, Shield,
   AlertTriangle, Eye, BarChart3,
 } from "lucide-react";
-import { RulePack } from "@/types/rulePack";
+import { GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Props {

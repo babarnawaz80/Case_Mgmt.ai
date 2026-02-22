@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Loader2, Sparkles, Gauge, OctagonAlert, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { RulePack } from "@/types/rulePack";
+import { GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Props {

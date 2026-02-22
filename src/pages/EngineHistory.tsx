@@ -67,7 +67,7 @@ export default function EngineHistory() {
     <div className="flex flex-col min-h-screen w-full bg-background">
       <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/lifeplan/compliance-engines")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => navigate("/lifeplan/guidelines-engines")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">

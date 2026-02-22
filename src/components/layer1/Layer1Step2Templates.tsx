@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowRight, ClipboardList, FileSpreadsheet,
   CheckCircle2, Upload,
 } from "lucide-react";
-import { UploadedFile } from "@/types/rulePack";
+import { UploadedFile } from "@/types/guidelinePack";
 
 interface Props {
   templates: UploadedFile[];

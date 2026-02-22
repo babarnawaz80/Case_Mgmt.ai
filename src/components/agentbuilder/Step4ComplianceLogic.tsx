@@ -13,7 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { RulePack } from "@/types/rulePack";
+import { GuidelinePack, RulePack } from "@/types/guidelinePack";
 import { cn } from "@/lib/utils";
 
 interface Step4Props {

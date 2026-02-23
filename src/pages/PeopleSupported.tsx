@@ -16,6 +16,7 @@ import {
   Sparkles,
   LayoutDashboard,
 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface Person {
   id: string;
@@ -96,16 +97,28 @@ const PeopleSupported = () => {
         <div className="max-w-[1600px] mx-auto space-y-5">
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium">
+            <button
+              onClick={() => toast({ title: "Add Person", description: "New person supported form would open here. This connects to the iCM People module." })}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium"
+            >
               <Plus className="w-4 h-4" /> Add Person Supported
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning text-warning-foreground text-sm font-medium">
+            <button
+              onClick={() => { setStatusFilter("Pending"); toast({ title: "Filtered", description: "Showing pending individuals." }); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning text-warning-foreground text-sm font-medium"
+            >
               <Clock className="w-4 h-4" /> Pending
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium border border-border">
+            <button
+              onClick={() => { setStatusFilter("Discharged"); toast({ title: "Filtered", description: "Showing discharged individuals." }); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium border border-border"
+            >
               Discharged
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium border border-border">
+            <button
+              onClick={() => toast({ title: "Export Started", description: "Exporting all records to Excel. File will download shortly." })}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium border border-border"
+            >
               <Download className="w-4 h-4" /> Export to Excel
             </button>
           </div>
@@ -137,7 +150,10 @@ const PeopleSupported = () => {
               placeholder="Last Name"
               className="rounded-lg px-4 py-2.5 text-sm bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-40"
             />
-            <button className="flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-medium">
+            <button
+              onClick={() => toast({ title: "Search Applied", description: `Showing results matching your filters.` })}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-medium"
+            >
               <Search className="w-4 h-4" /> Search
             </button>
             <button onClick={clearFilters} className="px-4 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -201,13 +217,22 @@ const PeopleSupported = () => {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-2 shrink-0">
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/90 text-destructive-foreground text-xs font-medium hover:bg-destructive transition-colors">
+                  <button
+                    onClick={() => toast({ title: "e-Chart", description: `Opening e-Chart for ${person.firstName} ${person.lastName}. This connects to the iCM eChart module.` })}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/90 text-destructive-foreground text-xs font-medium hover:bg-destructive transition-colors"
+                  >
                     <FileText className="w-3.5 h-3.5" /> e-Chart
                   </button>
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+                  <button
+                    onClick={() => toast({ title: "Face Sheet", description: `Opening Face Sheet for ${person.firstName} ${person.lastName}. This connects to the iCM Face Sheet module.` })}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                  >
                     <ClipboardList className="w-3.5 h-3.5" /> FaceSheet
                   </button>
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success text-success-foreground text-xs font-medium hover:bg-success/90 transition-colors">
+                  <button
+                    onClick={() => toast({ title: "View Profile", description: `Opening full profile for ${person.firstName} ${person.lastName}. This connects to the iCM Individual Detail module.` })}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success text-success-foreground text-xs font-medium hover:bg-success/90 transition-colors"
+                  >
                     <Eye className="w-3.5 h-3.5" /> View Profile
                   </button>
                 </div>

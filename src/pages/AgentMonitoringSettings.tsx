@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Shield, Bot, User, Search,
-  Clock, Pause, Play, Eye,
+  Clock, Pause, Play, Eye, ChevronDown,
 } from "lucide-react";
 import {
   mockRuntimeAgents, mockAgentMonitoringSettings, mockIndividualMonitoring,
@@ -15,6 +15,14 @@ import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
+
+type PauseDuration = "7_days" | "30_days" | "until_manual";
+const pauseLabels: Record<PauseDuration, string> = {
+  "7_days": "Pause 7 Days",
+  "30_days": "Pause 30 Days",
+  "until_manual": "Pause Until Manual Resume",
+};
 
 export default function AgentMonitoringSettings() {
   const { agentId } = useParams();
@@ -31,16 +39,62 @@ export default function AgentMonitoringSettings() {
   const [quietEnd, setQuietEnd] = useState(settings?.quietHoursEnd ?? "");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const individuals = mockIndividualMonitoring.filter(m => m.agentId === agentId);
-  const filteredIndividuals = individuals.filter(ind =>
+  // Local mutable state for per-individual toggles
+  const [individualStates, setIndividualStates] = useState<AgentIndividualMonitoring[]>(
+    () => mockIndividualMonitoring.filter(m => m.agentId === agentId)
+  );
+
+  const [pauseMenuOpen, setPauseMenuOpen] = useState<string | null>(null);
+
+  const filteredIndividuals = individualStates.filter(ind =>
     ind.individualName.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const toggleIndividual = (individualId: string) => {
+    setIndividualStates(prev => prev.map(ind =>
+      ind.individualId === individualId
+        ? { ...ind, enabled: !ind.enabled, pausedUntil: null, updatedAt: new Date().toISOString().split("T")[0] }
+        : ind
+    ));
+  };
+
+  const pauseIndividual = (individualId: string, duration: PauseDuration) => {
+    const now = new Date();
+    let pauseUntil: string;
+    if (duration === "7_days") {
+      now.setDate(now.getDate() + 7);
+      pauseUntil = now.toISOString().split("T")[0];
+    } else if (duration === "30_days") {
+      now.setDate(now.getDate() + 30);
+      pauseUntil = now.toISOString().split("T")[0];
+    } else {
+      pauseUntil = "Until Manual Resume";
+    }
+    setIndividualStates(prev => prev.map(ind =>
+      ind.individualId === individualId
+        ? { ...ind, enabled: false, pausedUntil: pauseUntil, updatedAt: new Date().toISOString().split("T")[0] }
+        : ind
+    ));
+    setPauseMenuOpen(null);
+    toast({
+      title: "Monitoring Paused",
+      description: `Paused monitoring for ${individualStates.find(i => i.individualId === individualId)?.individualName} — ${pauseLabels[duration]}.`,
+    });
+  };
+
+  const handleSave = () => {
+    toast({
+      title: "Settings Saved",
+      description: `Auto-Monitor settings for "${agentName}" have been updated successfully.`,
+    });
+    navigate("/lifeplan");
+  };
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
       <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/lifeplan/agent/${agentId}/drafts`)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => navigate("/lifeplan")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2.5">
@@ -53,8 +107,13 @@ export default function AgentMonitoringSettings() {
             </div>
           </div>
         </div>
-        <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
-          <User className="w-5 h-5 text-muted-foreground" />
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(`/lifeplan/agent/${agentId}/drafts`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs border border-border transition-all">
+            <Eye className="h-3.5 w-3.5" /> View Drafts
+          </button>
+          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
+            <User className="w-5 h-5 text-muted-foreground" />
+          </div>
         </div>
       </header>
 
@@ -174,7 +233,7 @@ export default function AgentMonitoringSettings() {
                 <h4 className="text-sm font-semibold text-foreground">Per-Individual Monitoring</h4>
                 <p className="text-[11px] text-muted-foreground">Toggle monitoring ON/OFF for each individual. Pause temporarily to suppress draft generation.</p>
               </div>
-              <span className="text-xs text-muted-foreground">{individuals.filter(i => i.enabled).length}/{individuals.length} active</span>
+              <span className="text-xs text-muted-foreground">{individualStates.filter(i => i.enabled).length}/{individualStates.length} active</span>
             </div>
 
             <div className="relative max-w-xs mb-4">
@@ -203,7 +262,37 @@ export default function AgentMonitoringSettings() {
                       )}
                     </div>
                   </div>
-                  <Switch checked={ind.enabled} onCheckedChange={() => {}} />
+                  <div className="flex items-center gap-2">
+                    {/* Pause dropdown */}
+                    {ind.enabled && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setPauseMenuOpen(pauseMenuOpen === ind.individualId ? null : ind.individualId)}
+                          className="px-2 py-1 rounded-md text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1"
+                        >
+                          <Pause className="h-3 w-3" /> Pause
+                          <ChevronDown className="h-2.5 w-2.5" />
+                        </button>
+                        {pauseMenuOpen === ind.individualId && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setPauseMenuOpen(null)} />
+                            <div className="absolute right-0 top-full mt-1 w-48 rounded-xl bg-popover border border-border shadow-xl z-50 py-1">
+                              {(Object.entries(pauseLabels) as [PauseDuration, string][]).map(([key, label]) => (
+                                <button
+                                  key={key}
+                                  onClick={() => pauseIndividual(ind.individualId, key)}
+                                  className="w-full text-left px-3 py-2 text-xs text-popover-foreground hover:bg-muted transition-colors"
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <Switch checked={ind.enabled} onCheckedChange={() => toggleIndividual(ind.individualId)} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -211,10 +300,10 @@ export default function AgentMonitoringSettings() {
 
           {/* Save */}
           <div className="flex justify-end gap-3">
-            <button onClick={() => navigate(`/lifeplan/agent/${agentId}/drafts`)} className="px-6 py-2.5 rounded-xl bg-secondary text-foreground font-medium text-sm border border-border">
+            <button onClick={() => navigate("/lifeplan")} className="px-6 py-2.5 rounded-xl bg-secondary text-foreground font-medium text-sm border border-border">
               Cancel
             </button>
-            <button onClick={() => navigate(`/lifeplan/agent/${agentId}/drafts`)} className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg">
+            <button onClick={handleSave} className="px-6 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg">
               Save Settings
             </button>
           </div>

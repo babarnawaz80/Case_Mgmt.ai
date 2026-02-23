@@ -19,47 +19,57 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "@/hooks/use-toast";
 
 const navGroups = [
   {
     label: "Overview",
     items: [
       { title: "Dashboard", url: "/dashboard", icon: Home },
-      { title: "My Work", url: "/my-work", icon: Target },
-      { title: "Announcements", url: "/announcements", icon: Bell },
+      { title: "My Work", url: "", icon: Target },
+      { title: "Announcements", url: "", icon: Bell },
     ],
   },
   {
     label: "Care Management",
     items: [
       { title: "People Supported", url: "/people", icon: Users },
-      { title: "Care Tracker", url: "/care-tracker", icon: Heart },
-      { title: "Activity Notes", url: "/activity-notes", icon: FileText },
-      { title: "Assessments", url: "/assessments", icon: ClipboardList },
-      { title: "Progress Notes", url: "/progress-notes", icon: FileText },
+      { title: "Care Tracker", url: "", icon: Heart },
+      { title: "Activity Notes", url: "", icon: FileText },
+      { title: "Assessments", url: "", icon: ClipboardList },
+      { title: "Progress Notes", url: "", icon: FileText },
     ],
   },
   {
     label: "Operations",
     items: [
-      { title: "Attendance", url: "/attendance", icon: Calendar },
-      { title: "Incidents", url: "/incidents", icon: AlertTriangle },
-      { title: "My Sites", url: "/sites", icon: Building2 },
-      { title: "Training", url: "/training", icon: GraduationCap },
+      { title: "Attendance", url: "", icon: Calendar },
+      { title: "Incidents", url: "", icon: AlertTriangle },
+      { title: "My Sites", url: "", icon: Building2 },
+      { title: "Training", url: "", icon: GraduationCap },
     ],
   },
   {
     label: "Administration",
     items: [
-      { title: "Documents", url: "/documents", icon: FolderOpen },
-      { title: "Reports", url: "/reports", icon: BarChart3 },
-      { title: "Settings", url: "/settings", icon: Settings },
+      { title: "Documents", url: "", icon: FolderOpen },
+      { title: "Reports", url: "", icon: BarChart3 },
+      { title: "Settings", url: "", icon: Settings },
     ],
   },
 ];
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleNavClick = (item: typeof navGroups[0]["items"][0]) => {
+    if (!item.url) {
+      toast({
+        title: item.title,
+        description: `Opening ${item.title} module. This connects to the iCM ${item.title} feature.`,
+      });
+    }
+  };
 
   return (
     <motion.aside
@@ -107,26 +117,47 @@ export function AppSidebar() {
             <ul className="space-y-1">
               {group.items.map((item) => (
                 <li key={item.title}>
-                  <NavLink
-                    to={item.url}
-                    end={item.url === "/"}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 group"
-                    activeClassName="bg-sidebar-accent text-primary glow-border"
-                  >
-                    <item.icon className="w-5 h-5 shrink-0 group-hover:text-primary transition-colors" />
-                    <AnimatePresence>
-                      {!collapsed && (
-                        <motion.span
-                          initial={{ opacity: 0, width: 0 }}
-                          animate={{ opacity: 1, width: "auto" }}
-                          exit={{ opacity: 0, width: 0 }}
-                          className="overflow-hidden whitespace-nowrap"
-                        >
-                          {item.title}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </NavLink>
+                  {item.url ? (
+                    <NavLink
+                      to={item.url}
+                      end={item.url === "/"}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 group"
+                      activeClassName="bg-sidebar-accent text-primary glow-border"
+                    >
+                      <item.icon className="w-5 h-5 shrink-0 group-hover:text-primary transition-colors" />
+                      <AnimatePresence>
+                        {!collapsed && (
+                          <motion.span
+                            initial={{ opacity: 0, width: 0 }}
+                            animate={{ opacity: 1, width: "auto" }}
+                            exit={{ opacity: 0, width: 0 }}
+                            className="overflow-hidden whitespace-nowrap"
+                          >
+                            {item.title}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </NavLink>
+                  ) : (
+                    <button
+                      onClick={() => handleNavClick(item)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 group"
+                    >
+                      <item.icon className="w-5 h-5 shrink-0 group-hover:text-primary transition-colors" />
+                      <AnimatePresence>
+                        {!collapsed && (
+                          <motion.span
+                            initial={{ opacity: 0, width: 0 }}
+                            animate={{ opacity: 1, width: "auto" }}
+                            exit={{ opacity: 0, width: 0 }}
+                            className="overflow-hidden whitespace-nowrap"
+                          >
+                            {item.title}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

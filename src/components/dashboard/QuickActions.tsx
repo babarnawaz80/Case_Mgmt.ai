@@ -6,6 +6,7 @@ import {
   Building2, GraduationCap, Send, Tag, Shield, ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 const quickActions = [
   { title: "Activity Note", icon: FileText, bg: "bg-primary" },
@@ -35,6 +36,24 @@ const modules = [
 export function QuickActions() {
   const navigate = useNavigate();
 
+  const handleQuickAction = (title: string) => {
+    toast({
+      title: `${title}`,
+      description: `Opening ${title} form. This connects to the iCM ${title} module.`,
+    });
+  };
+
+  const handleModuleClick = (mod: typeof modules[0]) => {
+    if (mod.url) {
+      navigate(mod.url);
+    } else {
+      toast({
+        title: mod.title,
+        description: `Opening ${mod.title} module. This connects to iCM.`,
+      });
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Quick Actions */}
@@ -51,6 +70,7 @@ export function QuickActions() {
               transition={{ delay: 0.4 + i * 0.04 }}
               whileHover={{ y: -3, scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
+              onClick={() => handleQuickAction(action.title)}
               className={cn(
                 "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 text-white shadow-sm hover:shadow-lg transition-all duration-300",
                 action.bg
@@ -69,7 +89,10 @@ export function QuickActions() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display font-semibold text-foreground text-sm uppercase tracking-wide">All Modules</h3>
-          <button className="text-[11px] text-primary font-medium hover:underline flex items-center gap-1">
+          <button
+            onClick={() => toast({ title: "All Modules", description: "Showing complete module list. Each module connects to the corresponding iCM feature." })}
+            className="text-[11px] text-primary font-medium hover:underline flex items-center gap-1"
+          >
             View All <ArrowRight className="w-3 h-3" />
           </button>
         </div>
@@ -82,7 +105,7 @@ export function QuickActions() {
               transition={{ delay: 0.5 + i * 0.03 }}
               whileHover={{ y: -3, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => mod.url && navigate(mod.url)}
+              onClick={() => handleModuleClick(mod)}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-4 py-3.5 text-white font-semibold text-xs shadow-sm hover:shadow-lg transition-all duration-300",
                 mod.bg

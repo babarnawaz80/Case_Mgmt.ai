@@ -7,27 +7,62 @@ import {
   TrendingUp, Users,
   Play, CheckCircle2, Clock, Eye, FileText,
   MoreVertical, Pencil, Copy, Trash2, AlertTriangle, Lock,
+  UserCog,
 } from "lucide-react";
 import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
+import { toast } from "@/hooks/use-toast";
 
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [agents, setAgents] = useState<RuntimeAgent[]>([...mockRuntimeAgents]);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAdmin, role, setRole } = useRole();
 
-  const filteredAgents = mockRuntimeAgents.filter((agent) =>
+  const filteredAgents = agents.filter((agent) =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.engineName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalDraftsPending = mockRuntimeAgents.reduce((s, a) => s + a.draftsPending, 0);
+  const totalDraftsPending = agents.reduce((s, a) => s + a.draftsPending, 0);
+
+  const handleDelete = (agentId: string) => {
+    const agent = agents.find(a => a.id === agentId);
+    setAgents(prev => prev.filter(a => a.id !== agentId));
+    setDeleteConfirm(null);
+    toast({
+      title: "Agent Deleted",
+      description: `"${agent?.name}" has been removed. This action cannot be undone.`,
+    });
+  };
+
+  const handleClone = (agent: RuntimeAgent) => {
+    const cloned: RuntimeAgent = {
+      ...agent,
+      id: `ra-clone-${Date.now()}`,
+      name: `${agent.name} (Copy)`,
+      version: "1.0",
+      status: "draft",
+      createdAt: new Date().toISOString().split("T")[0],
+      lastUsed: null,
+      individualsServed: 0,
+      complianceRate: 0,
+      draftsPending: 0,
+      lastEvaluated: null,
+    };
+    setAgents(prev => [...prev, cloned]);
+    toast({
+      title: "Agent Cloned",
+      description: `"${cloned.name}" created as a draft. Open it to configure and deploy.`,
+    });
+  };
 
   const overviewStats = [
-    { label: "Active Agents", value: mockRuntimeAgents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
-    { label: "Individuals Served", value: mockRuntimeAgents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
-    { label: "Avg Compliance", value: Math.round(mockRuntimeAgents.reduce((s, a) => s + a.complianceRate, 0) / mockRuntimeAgents.length) + "%", icon: TrendingUp, trend: "Denial prevention" },
+    { label: "Active Agents", value: agents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
+    { label: "Individuals Served", value: agents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
+    { label: "Avg Compliance", value: Math.round(agents.reduce((s, a) => s + a.complianceRate, 0) / (agents.length || 1)) + "%", icon: TrendingUp, trend: "Denial prevention" },
     { label: "Drafts Pending", value: totalDraftsPending.toString(), icon: FileText, trend: "Auto-monitor drafts" },
   ];
 
@@ -41,6 +76,18 @@ export default function LifePlanBoard() {
           <h2 className="font-display font-semibold text-foreground text-lg">Agents Dashboard</h2>
         </div>
         <div className="flex items-center gap-3">
+          {/* Role Switcher */}
+          <button
+            onClick={() => {
+              const newRole = role === "admin" ? "case_manager" : "admin";
+              setRole(newRole);
+              toast({ title: "Role Switched", description: `Now viewing as: ${newRole === "admin" ? "Admin" : "Case Manager"}` });
+            }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/60 hover:bg-muted text-foreground font-medium text-xs transition-all border border-border"
+          >
+            <UserCog className="w-3.5 h-3.5" />
+            {role === "admin" ? "Admin" : "Case Manager"}
+          </button>
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-sm transition-all">
             <Sparkles className="w-4 h-4" /> AI Companion
           </motion.button>
@@ -114,9 +161,36 @@ export default function LifePlanBoard() {
             </div>
           </div>
 
-          <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} />
+          <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} onDelete={(id) => setDeleteConfirm(id)} onClone={handleClone} />
         </div>
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50" onClick={() => setDeleteConfirm(null)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[400px] rounded-2xl bg-card border border-border shadow-2xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <Trash2 className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-display font-bold text-foreground">Delete Agent</h3>
+                  <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                Are you sure you want to delete <span className="font-semibold text-foreground">"{agents.find(a => a.id === deleteConfirm)?.name}"</span>? All associated data, monitoring settings, and draft runs will be permanently removed.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-xl bg-secondary text-foreground text-sm font-medium border border-border">Cancel</button>
+                <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium">Delete Agent</button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -173,7 +247,7 @@ const agentTypeColors: Record<string, string> = {
   ambient_meeting: "from-[hsl(190,55%,48%)] to-[hsl(190,50%,58%)]",
 };
 
-function RuntimeAgentsTab({ agents, navigate, isAdmin }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate>; isAdmin: boolean }) {
+function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate>; isAdmin: boolean; onDelete: (id: string) => void; onClone: (agent: RuntimeAgent) => void }) {
   if (agents.length === 0) {
     return (
       <div className="text-center py-16">
@@ -201,7 +275,7 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin }: { agents: RuntimeAgent[
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-[15px] text-white truncate leading-tight">{agent.name}</h3>
-                    <p className="text-[11px] text-white/60 mt-0.5">{runtimeAgentTypeLabels[agent.type]}</p>
+                    <p className="text-[11px] text-white/60 mt-0.5">{runtimeAgentTypeLabels[agent.type]} · v{agent.version}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
@@ -219,8 +293,8 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin }: { agents: RuntimeAgent[
                   <AgentMenu
                     isAdmin={isAdmin}
                     onEdit={() => navigate("/lifeplan/agent/new", { state: { editAgent: agent } })}
-                    onClone={() => navigate("/lifeplan/agent/new", { state: { cloneAgent: agent } })}
-                    onDelete={() => {}}
+                    onClone={() => onClone(agent)}
+                    onDelete={() => onDelete(agent.id)}
                   />
                 </div>
               </div>

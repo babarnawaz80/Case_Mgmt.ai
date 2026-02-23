@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ArrowLeft, BookOpen, Shield, Bot, Plus,
-  MoreVertical, Eye, Pencil, Copy, History,
+  MoreVertical, Eye, Pencil, Copy, History, Trash2,
   FileText, Calendar, GitBranch, ChevronRight, Layers,
 } from "lucide-react";
 import { mockGuidelinesEngines, mockRuntimeAgents, GuidelinesEngine } from "@/types/agent";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 // State-themed accent colors for each engine (soft, calming palette)
 const stateAccents: Record<string, { bg: string; border: string; text: string; icon: string }> = {
@@ -17,7 +18,7 @@ const stateAccents: Record<string, { bg: string; border: string; text: string; i
 };
 const defaultAccent = { bg: "bg-[hsl(270,50%,96%)]", border: "border-l-[hsl(270,50%,58%)]", text: "text-[hsl(270,50%,50%)]", icon: "bg-[hsl(270,50%,58%)]" };
 
-function EngineMenu({ onView, onEdit, onClone, onHistory }: { onView: () => void; onEdit: () => void; onClone: () => void; onHistory: () => void }) {
+function EngineMenu({ onView, onEdit, onClone, onHistory, onDelete, isDraft }: { onView: () => void; onEdit: () => void; onClone: () => void; onHistory: () => void; onDelete: () => void; isDraft?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
@@ -41,6 +42,14 @@ function EngineMenu({ onView, onEdit, onClone, onHistory }: { onView: () => void
               <button onClick={(e) => { e.stopPropagation(); onHistory(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors">
                 <History className="h-3.5 w-3.5" /> Version History
               </button>
+              {isDraft && (
+                <>
+                  <div className="h-px bg-border mx-1 my-1" />
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors">
+                    <Trash2 className="h-3.5 w-3.5" /> Delete Draft
+                  </button>
+                </>
+              )}
             </motion.div>
           </>
         )}
@@ -51,9 +60,10 @@ function EngineMenu({ onView, onEdit, onClone, onHistory }: { onView: () => void
 
 export default function ComplianceEngineDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [engines, setEngines] = useState<GuidelinesEngine[]>([...mockGuidelinesEngines]);
   const navigate = useNavigate();
 
-  const filteredEngines = mockGuidelinesEngines.filter((e) =>
+  const filteredEngines = engines.filter((e) =>
     e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.state.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -62,6 +72,33 @@ export default function ComplianceEngineDashboard() {
     acc[agent.engineId] = (acc[agent.engineId] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+
+  const handleClone = (engine: GuidelinesEngine) => {
+    const cloned: GuidelinesEngine = {
+      ...engine,
+      id: `ce-clone-${Date.now()}`,
+      name: `${engine.name} (Copy)`,
+      version: "1.0",
+      status: "draft",
+      publishedAt: null,
+      lastUpdated: new Date().toISOString().split("T")[0],
+    };
+    setEngines(prev => [...prev, cloned]);
+    toast({
+      title: "Engine Cloned",
+      description: `"${cloned.name}" created as a draft. Open it to configure and publish.`,
+    });
+  };
+
+  const handleDelete = (engineId: string) => {
+    const engine = engines.find(e => e.id === engineId);
+    if (engine?.status !== "draft") {
+      toast({ title: "Cannot Delete", description: "Only draft engines can be deleted. Published engines are immutable." });
+      return;
+    }
+    setEngines(prev => prev.filter(e => e.id !== engineId));
+    toast({ title: "Engine Deleted", description: `"${engine.name}" has been removed.` });
+  };
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
@@ -101,20 +138,20 @@ export default function ComplianceEngineDashboard() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-lg font-bold text-foreground leading-none">{mockGuidelinesEngines.length}</p>
+                <p className="text-lg font-bold text-foreground leading-none">{engines.length}</p>
               </div>
             </div>
             <div className="h-8 w-px bg-border" />
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-success" />
               <span className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{mockGuidelinesEngines.filter(e => e.status === 'published').length}</span> published
+                <span className="font-semibold text-foreground">{engines.filter(e => e.status === 'published').length}</span> published
               </span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-warning" />
               <span className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{mockGuidelinesEngines.filter(e => e.status === 'draft').length}</span> draft
+                <span className="font-semibold text-foreground">{engines.filter(e => e.status === 'draft').length}</span> draft
               </span>
             </div>
             <div className="ml-auto flex items-center gap-2">
@@ -223,9 +260,14 @@ export default function ComplianceEngineDashboard() {
                       </div>
                       <EngineMenu
                         onView={() => navigate(`/lifeplan/engine/${engine.id}/history`)}
-                        onEdit={() => navigate("/lifeplan/guidelines-library/new")}
-                        onClone={() => {}}
+                        onEdit={() => {
+                          toast({ title: "New Version", description: `Creating a new draft version of "${engine.name}". Make changes and publish when ready.` });
+                          navigate("/lifeplan/guidelines-library/new");
+                        }}
+                        onClone={() => handleClone(engine)}
                         onHistory={() => navigate(`/lifeplan/engine/${engine.id}/history`)}
+                        onDelete={() => handleDelete(engine.id)}
+                        isDraft={engine.status === "draft"}
                       />
                       <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
                     </div>

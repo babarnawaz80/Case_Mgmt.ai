@@ -5,7 +5,7 @@ import {
   Plus, Search, Sparkles, LayoutDashboard, User,
   ArrowLeft, Layers, BookOpen, Bot, Shield,
   TrendingUp, Users,
-  Play, CheckCircle2, Clock, Eye, FileText,
+  Play, Clock, Eye, FileText,
   MoreVertical, Pencil, Copy, Trash2, AlertTriangle, Lock,
   UserCog,
 } from "lucide-react";
@@ -199,7 +199,7 @@ function AgentMenu({ onEdit, onClone, onDelete, isAdmin }: { onEdit: () => void;
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors">
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
         <MoreVertical className="h-4 w-4" />
       </button>
       <AnimatePresence>
@@ -238,13 +238,13 @@ function AgentMenu({ onEdit, onClone, onDelete, isAdmin }: { onEdit: () => void;
   );
 }
 
-const agentTypeColors: Record<string, string> = {
-  compliance_copilot: "from-[hsl(200,65%,52%)] to-[hsl(210,55%,62%)]",
-  pcp_alignment: "from-[hsl(160,45%,48%)] to-[hsl(160,40%,58%)]",
-  billing_documentation: "from-[hsl(30,70%,55%)] to-[hsl(30,60%,65%)]",
-  monitoring_reauth: "from-[hsl(270,50%,58%)] to-[hsl(270,45%,68%)]",
-  isp_generator: "from-[hsl(350,55%,58%)] to-[hsl(350,50%,68%)]",
-  ambient_meeting: "from-[hsl(190,55%,48%)] to-[hsl(190,50%,58%)]",
+const agentTypeAccents: Record<string, { border: string; bg: string; text: string; icon: string }> = {
+  compliance_copilot: { border: "border-l-[hsl(200,65%,52%)]", bg: "bg-[hsl(200,65%,52%)]/10", text: "text-[hsl(200,65%,52%)]", icon: "bg-[hsl(200,65%,52%)]" },
+  pcp_alignment: { border: "border-l-[hsl(160,45%,48%)]", bg: "bg-[hsl(160,45%,48%)]/10", text: "text-[hsl(160,45%,48%)]", icon: "bg-[hsl(160,45%,48%)]" },
+  billing_documentation: { border: "border-l-[hsl(30,70%,55%)]", bg: "bg-[hsl(30,70%,55%)]/10", text: "text-[hsl(30,70%,55%)]", icon: "bg-[hsl(30,70%,55%)]" },
+  monitoring_reauth: { border: "border-l-[hsl(270,50%,58%)]", bg: "bg-[hsl(270,50%,58%)]/10", text: "text-[hsl(270,50%,58%)]", icon: "bg-[hsl(270,50%,58%)]" },
+  isp_generator: { border: "border-l-[hsl(350,55%,58%)]", bg: "bg-[hsl(350,55%,58%)]/10", text: "text-[hsl(350,55%,58%)]", icon: "bg-[hsl(350,55%,58%)]" },
+  ambient_meeting: { border: "border-l-[hsl(190,55%,48%)]", bg: "bg-[hsl(190,55%,48%)]/10", text: "text-[hsl(190,55%,48%)]", icon: "bg-[hsl(190,55%,48%)]" },
 };
 
 function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate>; isAdmin: boolean; onDelete: (id: string) => void; onClone: (agent: RuntimeAgent) => void }) {
@@ -261,68 +261,64 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { ag
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
       {agents.map((agent, i) => {
-        const gradient = agentTypeColors[agent.type] || agentTypeColors.compliance_copilot;
+        const accent = agentTypeAccents[agent.type] || agentTypeAccents.compliance_copilot;
         return (
           <motion.div key={agent.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}>
-            <div className="group relative rounded-2xl bg-card border border-border/40 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ease-out hover:-translate-y-1 cursor-pointer"
+            <div className={cn("group relative rounded-xl bg-card border border-border/50 border-l-4 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer", accent.border)}
               onClick={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })}
             >
-              <div className={cn("relative bg-gradient-to-br px-5 pt-5 pb-6", gradient)}>
-                <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 blur-2xl -translate-y-8 translate-x-8" />
-                <div className="relative flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-white/20 border border-white/15 shadow-lg shrink-0">
-                    <Bot className="h-5 w-5 text-white" />
+              <div className="p-5">
+                {/* Header row */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", accent.icon)}>
+                      <Bot className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-sm text-foreground truncate">{agent.name}</h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{runtimeAgentTypeLabels[agent.type]} · v{agent.version}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-[15px] text-white truncate leading-tight">{agent.name}</h3>
-                    <p className="text-[11px] text-white/60 mt-0.5">{runtimeAgentTypeLabels[agent.type]} · v{agent.version}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider", agent.status === "active" ? "bg-white/25 text-white" : "bg-white/15 text-white/70")}>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
+                      agent.status === "active" ? "bg-[hsl(152,55%,42%)]/10 text-[hsl(152,55%,42%)]" : "bg-muted text-muted-foreground"
+                    )}>
                       {agent.status}
                     </span>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border",
-                      agent.autoMonitorEnabled
-                        ? "bg-white text-success border-white/80"
-                        : "bg-white/10 text-white/50 border-white/10"
+                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
+                      agent.autoMonitorEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                     )}>
                       {agent.autoMonitorEnabled ? "● Auto-Monitor" : "Monitor: Off"}
                     </span>
+                    <AgentMenu
+                      isAdmin={isAdmin}
+                      onEdit={() => navigate("/lifeplan/agent/new", { state: { editAgent: agent } })}
+                      onClone={() => onClone(agent)}
+                      onDelete={() => onDelete(agent.id)}
+                    />
                   </div>
-                  <AgentMenu
-                    isAdmin={isAdmin}
-                    onEdit={() => navigate("/lifeplan/agent/new", { state: { editAgent: agent } })}
-                    onClone={() => onClone(agent)}
-                    onDelete={() => onDelete(agent.id)}
-                  />
-                </div>
-              </div>
-
-              <div className="px-5 pt-4 pb-5">
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem] leading-relaxed">{agent.description}</p>
-
-                <div className="flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg bg-muted/40 border border-border/40">
-                  <BookOpen className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <span className="text-[11px] text-muted-foreground truncate">
-                    Powered by: <span className="font-medium text-foreground">{agent.engineName}</span> v{agent.engineVersion}
-                  </span>
                 </div>
 
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">{agent.description}</p>
+
+                {/* Powered by */}
+                <div className="flex items-center gap-1.5 mb-4 text-[11px] text-muted-foreground">
+                  <BookOpen className="h-3 w-3 shrink-0" />
+                  Powered by: <span className="font-medium text-foreground">{agent.engineName}</span> v{agent.engineVersion}
+                </div>
+
+                {/* Stats row */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="text-center p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                    <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-primary" />
-                    <div className="text-xl font-bold text-primary leading-none">{agent.complianceRate}%</div>
+                  <div className="text-center p-2.5 rounded-lg bg-muted/30">
+                    <div className={cn("text-lg font-bold leading-none", accent.text)}>{agent.complianceRate}%</div>
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Compliance</p>
                   </div>
-                  <div className="text-center p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                    <Users className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <div className="text-xl font-bold text-foreground leading-none">{agent.individualsServed}</div>
+                  <div className="text-center p-2.5 rounded-lg bg-muted/30">
+                    <div className="text-lg font-bold text-foreground leading-none">{agent.individualsServed}</div>
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Individuals</p>
                   </div>
-                  <div className="text-center p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                    <FileText className="h-4 w-4 mx-auto mb-1 text-warning" />
-                    <div className="text-xl font-bold text-warning leading-none">{agent.draftsPending}</div>
+                  <div className="text-center p-2.5 rounded-lg bg-muted/30">
+                    <div className={cn("text-lg font-bold leading-none", agent.draftsPending > 0 ? "text-warning" : "text-foreground")}>{agent.draftsPending}</div>
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Drafts</p>
                   </div>
                 </div>
@@ -333,21 +329,22 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { ag
                   </p>
                 )}
 
+                {/* Actions */}
                 <div className="flex gap-2">
-                  <button className={cn("flex-1 h-9 gap-2 rounded-xl text-xs font-medium flex items-center justify-center bg-gradient-to-r text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all", gradient)}>
+                  <button className={cn("flex-1 h-9 gap-2 rounded-lg text-xs font-medium flex items-center justify-center text-white shadow-sm hover:shadow-md transition-all", accent.icon)}>
                     <Play className="h-3 w-3 fill-current" /> Run Agent
                   </button>
                   {agent.draftsPending > 0 && (
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/drafts`); }}
-                      className="h-9 px-3 gap-1.5 rounded-xl text-xs font-medium flex items-center justify-center bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 transition-all"
+                      className="h-9 px-3 gap-1.5 rounded-lg text-xs font-medium flex items-center justify-center bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 transition-all"
                     >
-                      <AlertTriangle className="h-3 w-3" /> {agent.draftsPending} Drafts
+                      <AlertTriangle className="h-3 w-3" /> {agent.draftsPending}
                     </button>
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/monitoring`); }}
-                    className="h-9 px-3 gap-1.5 rounded-xl text-xs font-medium flex items-center justify-center bg-muted/50 text-muted-foreground border border-border/40 hover:bg-muted hover:text-foreground transition-all"
+                    className="h-9 px-3 gap-1.5 rounded-lg text-xs font-medium flex items-center justify-center bg-muted/50 text-muted-foreground border border-border/40 hover:bg-muted hover:text-foreground transition-all"
                   >
                     <Shield className="h-3 w-3" /> Settings
                   </button>

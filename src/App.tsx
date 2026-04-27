@@ -22,6 +22,8 @@ import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";
 import PersonCarePlan from "./pages/PersonCarePlan";
 import PersonCarePlanDetail from "./pages/PersonCarePlanDetail";
+import PersonMonitoringForm from "./pages/PersonMonitoringForm";
+import PersonMonitoringFormDetail from "./pages/PersonMonitoringFormDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

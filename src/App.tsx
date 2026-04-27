@@ -40,6 +40,11 @@ import IncidentsGlobal from "./pages/IncidentsGlobal";
 import MyWork from "./pages/MyWork";
 import PersonProfile from "./pages/PersonProfile";
 import PersonFaceSheet from "./pages/PersonFaceSheet";
+import PlatformHub from "./pages/platform/PlatformHub";
+import GuidelinesEnginesList from "./pages/platform/GuidelinesEnginesList";
+import NewEngineWizard from "./pages/platform/NewEngineWizard";
+import EngineDetail from "./pages/platform/EngineDetail";
+import RuleLibrary from "./pages/platform/RuleLibrary";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

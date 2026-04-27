@@ -9,7 +9,6 @@ import {
   CalendarCheck,
   ShieldCheck,
   Pencil,
-  GitBranch,
   Users,
   StickyNote,
   Activity,

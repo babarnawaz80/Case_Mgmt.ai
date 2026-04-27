@@ -1,5 +1,5 @@
 import { Search, Sparkles, Bell, HelpCircle, ChevronDown } from "lucide-react";
-import icmLogo from "@/assets/icm-logo.png";
+import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 
 interface TopbarProps {
   title?: string;
@@ -16,12 +16,11 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
     <header className="h-14 border-b border-icm-border bg-icm-panel flex items-center justify-between px-6 shrink-0">
       {/* Left: brand + title */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <img src={icmLogo} alt="iCareManager" className="w-7 h-7 object-contain" />
-          <span className="font-manrope font-extrabold text-[15px] tracking-tight icm-brand-gradient">
-            iCareManager
-          </span>
-        </div>
+        <img
+          src={brandLogo}
+          alt="CaseManagement AI by iCareManager"
+          className="h-7 w-auto object-contain"
+        />
         <span className="w-px h-5 bg-icm-border" />
         <div className="flex items-center gap-2 text-[13px] font-geist">
           <span className="font-tight font-semibold text-icm-text">{title}</span>

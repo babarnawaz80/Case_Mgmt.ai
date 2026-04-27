@@ -9,6 +9,7 @@ import {
   User,
   ListChecks,
   Layers,
+  CreditCard,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ const items = [
   { title: "Documentation", url: "/dashboard/documentation", icon: FileText },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/dashboard/reports", icon: BarChart3 },
+  { title: "Billing", url: "/billing", icon: CreditCard, adminOnly: true },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
@@ -38,6 +40,7 @@ export function ICMSidebar() {
       </NavLink>
       <nav className="flex-1 flex flex-col gap-1">
         {items.map((item) => {
+          if (item.adminOnly && !isAdmin) return null;
           const active =
             loc.pathname === item.url ||
             (item.url !== "/" && loc.pathname.startsWith(item.url + "/"));

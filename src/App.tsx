@@ -47,11 +47,32 @@ import EngineDetail from "./pages/platform/EngineDetail";
 import RuleLibrary from "./pages/platform/RuleLibrary";
 import NotFound from "./pages/NotFound";
 
+// Billing module (copied verbatim from IDDBilling.ai)
+import { BillingProvider } from "@/contexts/BillingContext";
+import BillingLayout from "@/components/billing/BillingLayout";
+import BAgentsDashboard from "@/pages/billing/AgentsDashboard";
+import BEngines from "@/pages/billing/Engines";
+import BEngineBuilder from "@/pages/billing/EngineBuilder";
+import BEngineDetail from "@/pages/billing/EngineDetail";
+import BAgentCreate from "@/pages/billing/AgentCreate";
+import BAgentDetail from "@/pages/billing/AgentDetail";
+import BAgentRun from "@/pages/billing/AgentRun";
+import BAgentEdit from "@/pages/billing/AgentEdit";
+import BAgentSettings from "@/pages/billing/AgentSettings";
+import BIndividualsBillingHealth from "@/pages/billing/IndividualsBillingHealth";
+import BIndividualDetail from "@/pages/billing/IndividualDetail";
+import BRunsHistory from "@/pages/billing/RunsHistory";
+import BClaimsManagement from "@/pages/billing/ClaimsManagement";
+import BAuditLog from "@/pages/billing/AuditLog";
+import BRevenueCycle from "@/pages/billing/RevenueCycle";
+import { Navigate } from "react-router-dom";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <RoleProvider>
+      <BillingProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />

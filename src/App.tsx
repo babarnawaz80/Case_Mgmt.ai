@@ -24,6 +24,8 @@ import PersonCarePlan from "./pages/PersonCarePlan";
 import PersonCarePlanDetail from "./pages/PersonCarePlanDetail";
 import PersonMonitoringForm from "./pages/PersonMonitoringForm";
 import PersonMonitoringFormDetail from "./pages/PersonMonitoringFormDetail";
+import PersonVisitSummary from "./pages/PersonVisitSummary";
+import PersonVisitSummaryDetail from "./pages/PersonVisitSummaryDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +48,8 @@ const App = () => (
             <Route path="/people/:id/care-plan/:planId" element={<PersonCarePlanDetail />} />
             <Route path="/people/:id/monitoring-form" element={<PersonMonitoringForm />} />
             <Route path="/people/:id/monitoring-form/:formId" element={<PersonMonitoringFormDetail />} />
+            <Route path="/people/:id/visit-summary" element={<PersonVisitSummary />} />
+            <Route path="/people/:id/visit-summary/:visitId" element={<PersonVisitSummaryDetail />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

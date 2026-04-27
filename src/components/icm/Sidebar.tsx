@@ -8,11 +8,13 @@ import {
   Sparkles,
   User,
   CheckSquare,
+  MessageSquare,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useMessages } from "@/hooks/useMessages";
 
 interface NavItem {
   title: string;
@@ -25,6 +27,7 @@ const items: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "People Supported", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Documentation", url: "/documentation", icon: FileText },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin"] },
@@ -45,6 +48,7 @@ export function ICMSidebar() {
   const loc = useLocation();
   const { role } = useRole();
   const { unreadAlerts, unreadMentions } = useNotifications();
+  const { unreadTotal: unreadMessages } = useMessages();
 
   function badgeFor(item: NavItem): {
     count: number;
@@ -58,6 +62,9 @@ export function ICMSidebar() {
       }
       if (unread > 0) return { count: unread, tone: "accent" };
       return null;
+    }
+    if (item.url === "/messages" && unreadMessages > 0) {
+      return { count: unreadMessages, tone: "red" };
     }
     if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) {
       return { count: OPEN_INCIDENT_COUNT, tone: "red" };

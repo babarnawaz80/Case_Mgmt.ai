@@ -35,13 +35,7 @@ const BillingLayout = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="bg-card shrink-0 shadow-elevated">
-        <div className="flex items-center justify-between px-6 h-16">
-          <div className="flex items-center gap-8">
-            <h1 className="text-lg font-extrabold font-display tracking-tight">
-              <span className="bg-gradient-to-r from-primary to-ai-violet bg-clip-text text-transparent">IDDBilling.ai</span>
-            </h1>
+    <div className="billing-scope flex flex-col h-screen bg-background">
             <nav className="flex items-center gap-1">
               {navItems.map(item => (
                 <Link

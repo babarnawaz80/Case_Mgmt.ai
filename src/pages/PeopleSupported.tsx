@@ -270,15 +270,15 @@ function PersonRow({ person, onOpen }: { person: Person; onOpen: () => void }) {
           <FileText className="w-3 h-3" /> eChart
         </button>
         <button
-          onClick={() => alert(`Face Sheet for ${person.firstName} (mock)`)}
+          onClick={() => navigate(`/people/${person.id}/facesheet`)}
           className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
         >
           <ClipboardList className="w-3 h-3" /> Face Sheet
         </button>
         <button
-          onClick={() => alert(`Profile menu for ${person.firstName} (mock)`)}
+          onClick={() => navigate(`/people/${person.id}/profile`)}
           className="h-8 w-8 rounded-lg border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center justify-center transition-colors"
-          title="Profile"
+          title="Open Profile"
         >
           <ChevronDown className="w-3.5 h-3.5" />
         </button>

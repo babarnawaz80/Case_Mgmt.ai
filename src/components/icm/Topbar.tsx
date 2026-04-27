@@ -1,11 +1,15 @@
-import { Search, Sparkles, Bell, HelpCircle, ChevronDown } from "lucide-react";
+import { Search, Sparkles, Bell, HelpCircle, ChevronDown, Layers } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
+import { useRole } from "@/contexts/RoleContext";
 
 interface TopbarProps {
   title?: string;
 }
 
 export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
+  const navigate = useNavigate();
+  const { isAdmin } = useRole();
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",

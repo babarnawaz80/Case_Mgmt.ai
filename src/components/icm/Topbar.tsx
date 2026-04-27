@@ -1,7 +1,8 @@
-import { Search, Sparkles, Bell, HelpCircle, ChevronDown, Layers } from "lucide-react";
+import { Search, Sparkles, HelpCircle, ChevronDown, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 import { useRole } from "@/contexts/RoleContext";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 interface TopbarProps {
   title?: string;
@@ -66,13 +67,8 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
         <div className="w-px h-5 bg-icm-border mx-1" />
 
-        {/* Notification cluster */}
-        <button className="relative h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors">
-          <Bell className="w-[18px] h-[18px]" />
-          <span className="absolute top-1 right-1 h-[16px] min-w-[16px] px-1 flex items-center justify-center rounded-full bg-icm-red text-white text-[9px] font-mono font-bold">
-            5
-          </span>
-        </button>
+        {/* Notifications dropdown (alerts + mentions) */}
+        <NotificationsBell />
         <button className="h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors">
           <HelpCircle className="w-[18px] h-[18px]" />
         </button>

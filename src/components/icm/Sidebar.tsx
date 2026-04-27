@@ -12,24 +12,22 @@ import {
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface NavItem {
   title: string;
   url: string;
   icon: typeof Home;
   roles?: ("admin" | "case_manager")[];
-  badge?: { count: number; tone: "red" | "amber" | "accent" };
 }
 
 const items: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "People Supported", url: "/people", icon: Users },
-  { title: "My Work", url: "/my-work", icon: CheckSquare, badge: { count: 3, tone: "red" } },
+  { title: "My Work", url: "/my-work", icon: CheckSquare },
   { title: "Documentation", url: "/documentation", icon: FileText },
-  { title: "Incidents", url: "/incidents", icon: AlertTriangle, badge: { count: 1, tone: "red" } },
-  // Reports — supervisor/admin/billing (we treat admin as visible)
+  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin"] },
-  // Settings — admin only
   { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
 ];
 
@@ -39,9 +37,33 @@ const badgeTone: Record<"red" | "amber" | "accent", string> = {
   accent: "bg-icm-accent text-white",
 };
 
+// Hard-coded count of overdue tasks for the demo (matches myWork seed data).
+const OVERDUE_TASK_COUNT = 3;
+const OPEN_INCIDENT_COUNT = 1;
+
 export function ICMSidebar() {
   const loc = useLocation();
-  const { isAdmin, role } = useRole();
+  const { role } = useRole();
+  const { unreadAlerts, unreadMentions } = useNotifications();
+
+  function badgeFor(item: NavItem): {
+    count: number;
+    tone: "red" | "amber" | "accent";
+    secondaryDot?: boolean;
+  } | null {
+    if (item.url === "/my-work") {
+      const unread = unreadAlerts + unreadMentions;
+      if (OVERDUE_TASK_COUNT > 0) {
+        return { count: OVERDUE_TASK_COUNT, tone: "red", secondaryDot: unread > 0 };
+      }
+      if (unread > 0) return { count: unread, tone: "accent" };
+      return null;
+    }
+    if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) {
+      return { count: OPEN_INCIDENT_COUNT, tone: "red" };
+    }
+    return null;
+  }
 
   return (
     <aside className="w-14 shrink-0 bg-icm-panel border-r border-icm-border flex flex-col items-center py-3">
@@ -58,6 +80,7 @@ export function ICMSidebar() {
           const active =
             loc.pathname === item.url ||
             (item.url !== "/" && loc.pathname.startsWith(item.url + "/"));
+          const badge = badgeFor(item);
           return (
             <NavLink
               key={item.title}
@@ -71,15 +94,20 @@ export function ICMSidebar() {
               )}
             >
               <item.icon className="w-[18px] h-[18px]" />
-              {item.badge && (
-                <span
-                  className={cn(
-                    "absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center ring-2 ring-icm-panel",
-                    badgeTone[item.badge.tone]
+              {badge && (
+                <>
+                  <span
+                    className={cn(
+                      "absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center ring-2 ring-icm-panel",
+                      badgeTone[badge.tone]
+                    )}
+                  >
+                    {badge.count}
+                  </span>
+                  {badge.secondaryDot && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-icm-accent ring-2 ring-icm-panel" />
                   )}
-                >
-                  {item.badge.count}
-                </span>
+                </>
               )}
             </NavLink>
           );

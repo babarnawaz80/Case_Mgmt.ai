@@ -93,6 +93,8 @@ const Index = () => {
   ) : null;
 
   return (
+    <>
+    {ambientOverlay}
     <div className="flex h-screen w-full bg-background">
       {/* Collapsible Chat History Sidebar */}
       <AnimatePresence initial={false}>

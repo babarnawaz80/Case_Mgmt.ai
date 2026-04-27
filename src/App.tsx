@@ -19,6 +19,7 @@ import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import EChart from "./pages/EChart";
 import ContactNote from "./pages/ContactNote";
 import PersonModule from "./pages/PersonModule";
+import PersonCaseManagement from "./pages/PersonCaseManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

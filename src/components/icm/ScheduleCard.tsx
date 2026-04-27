@@ -1,4 +1,5 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Video } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 type Status = "done" | "now" | "next" | "upcoming";
@@ -40,6 +41,16 @@ function StatusPill({ status }: { status: Status }) {
 }
 
 export function ScheduleCard() {
+  const navigate = useNavigate();
+  const startVisit = (title: string) => {
+    const sid = `vs-${Date.now().toString(36)}`;
+    const params = new URLSearchParams({
+      person: "1",
+      name: title,
+      purpose: "Quarterly check-in",
+    });
+    navigate(`/visit/${sid}?${params.toString()}`);
+  };
   return (
     <div className="rounded-[12px] border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong transition-colors">
       <div className="flex items-center justify-between mb-3">
@@ -73,6 +84,17 @@ export function ScheduleCard() {
               </p>
             </div>
             <StatusPill status={it.status} />
+            {(it.status === "now" || it.status === "next" || it.status === "upcoming") &&
+              it.location !== "Virtual" &&
+              it.location !== "—" && (
+                <button
+                  onClick={() => startVisit(it.title)}
+                  title="Start virtual visit"
+                  className="w-7 h-7 rounded-lg hover:bg-icm-green-soft text-icm-text-dim hover:text-icm-green flex items-center justify-center transition-colors"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                </button>
+              )}
           </li>
         ))}
       </ul>

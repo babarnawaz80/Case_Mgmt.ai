@@ -99,6 +99,7 @@ const EChart = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const person = getPerson(id ?? "");
+  const [showPreVisit, setShowPreVisit] = useState(false);
 
   if (!person) {
     return (

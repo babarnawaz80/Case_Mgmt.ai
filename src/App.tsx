@@ -70,6 +70,7 @@ import ReportRunner from "./pages/ReportRunner";
 import PersonDocuments from "./pages/PersonDocuments";
 import Documents from "./pages/Documents";
 import Messages from "./pages/Messages";
+import VirtualVisit from "./pages/VirtualVisit";
 import NotFound from "./pages/NotFound";
 
 // Billing module (copied verbatim from IDDBilling.ai)
@@ -184,6 +185,7 @@ const App = () => (
             <Route path="/platform/rule-library" element={<RuleLibrary />} />
             <Route path="/platform/agents" element={<LifePlanBoard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/visit/:sessionId" element={<VirtualVisit />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

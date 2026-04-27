@@ -2,7 +2,7 @@ import { Donut, Sparkline } from "./charts";
 
 function KpiCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[12px] border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong transition-colors">
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-5 hover:border-icm-border-strong hover:shadow-elevated transition-all">
       {children}
     </div>
   );

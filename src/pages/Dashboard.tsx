@@ -13,10 +13,10 @@ const Dashboard = () => {
       <div className="space-y-5">
         {/* Greeting */}
         <div>
-          <h1 className="font-tight text-[26px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">
+          <h1 className="font-manrope text-[28px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
             {greeting}, Kathy
           </h1>
-          <p className="text-[13px] text-icm-text-dim mt-1">
+          <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
             You have 3 items needing attention and 4 visits remaining today.
           </p>
         </div>

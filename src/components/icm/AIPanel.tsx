@@ -48,14 +48,14 @@ export function AIPanel() {
     <aside className="w-[320px] shrink-0 border-l border-icm-border bg-icm-panel flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-icm-border">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-icm-accent flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl ai-gradient flex items-center justify-center shadow-elevated">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-tight font-semibold text-[13px] text-icm-text">Case Management AI</p>
+            <p className="font-manrope font-bold text-[13px] text-icm-text tracking-tight">Case Management AI</p>
             <p className="text-[11px] flex items-center gap-1 text-icm-green font-geist">
-              <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-green animate-pulse" />
               Active · 4 suggestions
             </p>
           </div>

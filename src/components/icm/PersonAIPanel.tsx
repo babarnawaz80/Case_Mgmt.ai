@@ -10,10 +10,14 @@ const toneStyles = {
 
 interface Props {
   person: Person;
+  /** Override the person-level AI suggestions (e.g. module-specific). */
+  suggestions?: AISuggestion[];
+  /** Optional intro line shown above suggestions. */
+  intro?: string;
 }
 
-export function PersonAIPanel({ person }: Props) {
-  const suggestions: AISuggestion[] = person.aiSuggestions ?? [];
+export function PersonAIPanel({ person, suggestions: override, intro }: Props) {
+  const suggestions: AISuggestion[] = override ?? person.aiSuggestions ?? [];
   const count = suggestions.length;
 
   return (
@@ -35,9 +39,10 @@ export function PersonAIPanel({ person }: Props) {
           </div>
         </div>
         <p className="text-[12px] text-icm-text-dim font-geist mt-3 leading-relaxed">
-          {count > 0
-            ? `I reviewed ${person.firstName}'s record and have a few items for you.`
-            : `${person.firstName}'s record looks clean. Ask me anything about their care.`}
+          {intro
+            ?? (count > 0
+              ? `I reviewed ${person.firstName}'s record and have a few items for you.`
+              : `${person.firstName}'s record looks clean. Ask me anything about their care.`)}
         </p>
       </div>
 

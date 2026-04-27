@@ -16,6 +16,9 @@ export default {
       fontFamily: {
         sans: ["Inter", "sans-serif"],
         display: ["Space Grotesk", "sans-serif"],
+        tight: ['"Inter Tight"', "Inter", "sans-serif"],
+        geist: ["Geist", "Inter", "sans-serif"],
+        mono: ['"Geist Mono"', "ui-monospace", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -72,6 +75,23 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        icm: {
+          bg: "hsl(var(--icm-bg))",
+          panel: "hsl(var(--icm-panel))",
+          border: "hsl(var(--icm-border))",
+          "border-strong": "hsl(var(--icm-border-strong))",
+          text: "hsl(var(--icm-text))",
+          "text-dim": "hsl(var(--icm-text-dim))",
+          "text-faint": "hsl(var(--icm-text-faint))",
+          accent: "hsl(var(--icm-accent))",
+          "accent-soft": "hsl(var(--icm-accent-soft))",
+          green: "hsl(var(--icm-green))",
+          "green-soft": "hsl(var(--icm-green-soft))",
+          red: "hsl(var(--icm-red))",
+          "red-soft": "hsl(var(--icm-red-soft))",
+          amber: "hsl(var(--icm-amber))",
+          "amber-soft": "hsl(var(--icm-amber-soft))",
         },
       },
       borderRadius: {

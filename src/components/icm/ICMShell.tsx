@@ -6,9 +6,12 @@ interface ICMShellProps {
   children: React.ReactNode;
   title?: string;
   showAIPanel?: boolean;
+  rightPanel?: React.ReactNode;
 }
 
-export function ICMShell({ children, title, showAIPanel = true }: ICMShellProps) {
+export function ICMShell({ children, title, showAIPanel = true, rightPanel }: ICMShellProps) {
+  // rightPanel takes precedence over the default AIPanel.
+  const panel = rightPanel ?? (showAIPanel ? <AIPanel /> : null);
   return (
     <div className="flex h-screen w-full bg-icm-bg font-geist text-icm-text">
       <ICMSidebar />
@@ -18,7 +21,7 @@ export function ICMShell({ children, title, showAIPanel = true }: ICMShellProps)
           <main className="flex-1 overflow-y-auto p-6">
             <div className="max-w-[1200px] mx-auto">{children}</div>
           </main>
-          {showAIPanel && <AIPanel />}
+          {panel}
         </div>
       </div>
     </div>

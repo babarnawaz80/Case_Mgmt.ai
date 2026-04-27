@@ -273,6 +273,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/case-management`);
               } else if (t.slug === "care-plan") {
                 navigate(`/people/${personId}/care-plan`);
+              } else if (t.slug === "monitoring-form") {
+                navigate(`/people/${personId}/monitoring-form`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

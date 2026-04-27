@@ -44,6 +44,8 @@ const App = () => (
             <Route path="/people/:id/case-management" element={<PersonCaseManagement />} />
             <Route path="/people/:id/care-plan" element={<PersonCarePlan />} />
             <Route path="/people/:id/care-plan/:planId" element={<PersonCarePlanDetail />} />
+            <Route path="/people/:id/monitoring-form" element={<PersonMonitoringForm />} />
+            <Route path="/people/:id/monitoring-form/:formId" element={<PersonMonitoringFormDetail />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

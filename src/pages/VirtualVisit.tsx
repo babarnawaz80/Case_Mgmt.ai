@@ -539,6 +539,29 @@ const VirtualVisit = () => {
   );
 };
 
+const entityToneClass: Record<string, string> = {
+  service: "bg-icm-green/15 text-icm-green ring-icm-green/30",
+  risk: "bg-icm-red/15 text-icm-red ring-icm-red/30",
+  date: "bg-icm-amber/15 text-icm-amber ring-icm-amber/30",
+  goal: "bg-icm-accent/15 text-icm-accent ring-icm-accent/30",
+};
+
+function EntityChip({
+  label,
+  type,
+}: {
+  label: string;
+  type: "service" | "risk" | "date" | "goal";
+}) {
+  return (
+    <span
+      className={`text-[10px] font-geist font-medium px-1.5 py-0.5 rounded ring-1 ${entityToneClass[type]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function ParticipantTile({
   name,
   initials,

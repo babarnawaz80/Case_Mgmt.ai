@@ -1,7 +1,7 @@
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useRole } from "@/contexts/RoleContext";
 import { AdminOnly } from "@/components/platform/AdminOnly";
-import { mockProviders } from "@/data/referrals";
+import { providers as mockProviders } from "@/data/referrals";
 import { MapPin, Phone, Globe } from "lucide-react";
 
 const ProviderDirectory = () => {

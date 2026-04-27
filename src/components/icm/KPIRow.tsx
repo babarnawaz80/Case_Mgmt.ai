@@ -1,4 +1,5 @@
 import { Donut, Sparkline } from "./charts";
+import { NavLink } from "react-router-dom";
 
 function KpiCard({ children }: { children: React.ReactNode }) {
   return (

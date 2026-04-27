@@ -69,6 +69,7 @@ import Reports from "./pages/Reports";
 import ReportRunner from "./pages/ReportRunner";
 import PersonDocuments from "./pages/PersonDocuments";
 import Documents from "./pages/Documents";
+import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 
 // Billing module (copied verbatim from IDDBilling.ai)

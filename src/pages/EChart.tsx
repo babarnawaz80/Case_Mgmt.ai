@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Settings2,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -55,6 +56,7 @@ const caseManagementModules: ModuleTile[] = [
   { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, count: 5, meta: "Last 02/15" },
   { slug: "eligibility", label: "Eligibility Verification", icon: ShieldCheck, meta: "MA Active", metaTone: "green" },
   { slug: "progress-note", label: "Progress Note", icon: Pencil, count: 4, meta: "2 unsigned", metaTone: "amber" },
+  { slug: "assessments", label: "Assessments", icon: ClipboardCheck, count: 1, meta: "Annual due", metaTone: "amber", aiBadge: "AI pre-fill" },
 ];
 
 const individualRecordModules: ModuleTile[] = [
@@ -286,6 +288,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/workflow-manager`);
               } else if (t.slug === "incident-reporting") {
                 navigate(`/people/${personId}/incident-reporting`);
+              } else if (t.slug === "assessments") {
+                navigate(`/people/${personId}/assessments`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

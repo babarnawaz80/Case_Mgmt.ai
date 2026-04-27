@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { BookOpen, Bot, ArrowRight, Layers, Library } from "lucide-react";
+import { BookOpen, Bot, ArrowRight, Layers, Library, ClipboardCheck } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { engineSummary } from "@/data/guidelinesEngines";
 import { AdminOnly } from "@/components/platform/AdminOnly";
@@ -73,6 +73,27 @@ const PlatformHub = () => {
             className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
           >
             Open library
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-icm-accent-soft text-icm-accent flex items-center justify-center">
+            <ClipboardCheck className="w-4 h-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-geist font-semibold text-icm-text">
+              Assessment Builder
+            </p>
+            <p className="text-[11.5px] text-icm-text-dim font-geist">
+              Configure assessment templates with sections, scoring, and LOC thresholds.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/admin/assessment-builder")}
+            className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
+          >
+            Open builder
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

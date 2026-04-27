@@ -275,6 +275,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/care-plan`);
               } else if (t.slug === "monitoring-form") {
                 navigate(`/people/${personId}/monitoring-form`);
+              } else if (t.slug === "visit-summary") {
+                navigate(`/people/${personId}/visit-summary`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

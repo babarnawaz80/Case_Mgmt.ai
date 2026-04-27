@@ -129,6 +129,7 @@ const App = () => (
             <Route path="/people/:id/incident-reporting/:incidentId" element={<PersonIncidentReportingDetail />} />
             <Route path="/incidents" element={<IncidentsGlobal />} />
             <Route path="/my-work" element={<MyWork />} />
+            <Route path="/messages" element={<Messages />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

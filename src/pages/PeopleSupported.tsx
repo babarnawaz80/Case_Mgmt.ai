@@ -1,248 +1,307 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { ICMShell } from "@/components/icm/ICMShell";
 import {
   Search,
-  X,
-  User,
-  MapPin,
-  FileText,
-  ClipboardList,
-  Eye,
-  ChevronDown,
   Plus,
   Download,
-  Clock,
   Sparkles,
-  LayoutDashboard,
+  ChevronDown,
+  FileText,
+  ClipboardList,
+  MapPin,
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import {
+  people,
+  flagStyles,
+  riskAvatarClass,
+  riskScoreClass,
+  initials,
+  type Person,
+} from "@/data/people";
 
-interface Person {
-  id: string;
-  firstName: string;
-  lastName: string;
-  nickname?: string;
-  gender: string;
-  dob: string;
-  age: number;
-  admittedOn: string;
-  county: string;
-  status: "Active" | "Pending" | "Discharged";
-  updatedOn: string;
-  updatedBy: string;
-  serviceContact?: string;
-}
-
-const people: Person[] = [
-  { id: "1", firstName: "Joseph", lastName: "Brown", nickname: "Joe", gender: "M", dob: "01/01/1990", age: 36, admittedOn: "09/01/2022", county: "Carroll County", status: "Active", updatedOn: "08/01/2023", updatedBy: "Babar Nawaz CM", serviceContact: "Jennie Thollander" },
-  { id: "2", firstName: "Dwight", lastName: "Doe", gender: "M", dob: "05/05/2024", age: 1, admittedOn: "09/15/1993", county: "Franklin County", status: "Active", updatedOn: "11/01/2024", updatedBy: "Samara Johnson" },
-  { id: "3", firstName: "Travis", lastName: "Langston", gender: "M", dob: "01/05/2000", age: 26, admittedOn: "01/01/2021", county: "Dallas County", status: "Active", updatedOn: "08/01/2023", updatedBy: "Babar Nawaz CM", serviceContact: "Brenda Smith" },
-  { id: "4", firstName: "Muhammad", lastName: "Raaza", gender: "M", dob: "01/29/2013", age: 13, admittedOn: "01/01/2024", county: "Carroll County", status: "Active", updatedOn: "06/12/2024", updatedBy: "Babar Nawaz CM" },
-  { id: "5", firstName: "Mohsin", lastName: "Raza", gender: "M", dob: "05/06/2020", age: 5, admittedOn: "09/15/2023", county: "Bremer County", status: "Active", updatedOn: "09/19/2023", updatedBy: "Babar Nawaz CM" },
-  { id: "6", firstName: "Sarah", lastName: "Williams", gender: "F", dob: "03/15/1985", age: 40, admittedOn: "06/01/2020", county: "Polk County", status: "Active", updatedOn: "01/15/2025", updatedBy: "Kathy Adams", serviceContact: "Tom Rivera" },
-  { id: "7", firstName: "James", lastName: "Thompson", gender: "M", dob: "11/22/1995", age: 30, admittedOn: "03/10/2023", county: "Linn County", status: "Active", updatedOn: "02/01/2025", updatedBy: "Babar Nawaz CM" },
-];
+type StatusFilter = "All" | "Active" | "Pending" | "Discharged";
+type RiskFilter = "All" | "High" | "Review" | "Standard";
 
 const PeopleSupported = () => {
   const navigate = useNavigate();
-  const [searchFirst, setSearchFirst] = useState("");
-  const [searchLast, setSearchLast] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("All");
+  const [risk, setRisk] = useState<RiskFilter>("All");
+  const [county, setCounty] = useState("All");
 
-  const filtered = people.filter((p) => {
-    const matchFirst = p.firstName.toLowerCase().includes(searchFirst.toLowerCase());
-    const matchLast = p.lastName.toLowerCase().includes(searchLast.toLowerCase());
-    const matchStatus = statusFilter === "All" || p.status === statusFilter;
-    return matchFirst && matchLast && matchStatus;
-  });
+  const counties = useMemo(
+    () => ["All", ...Array.from(new Set(people.map((p) => p.county)))],
+    [],
+  );
 
-  const clearFilters = () => {
-    setSearchFirst("");
-    setSearchLast("");
-    setStatusFilter("All");
-  };
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return people.filter((p) => {
+      const matchQ =
+        !q ||
+        `${p.firstName} ${p.lastName} ${p.nickname ?? ""}`.toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q) ||
+        p.county.toLowerCase().includes(q);
+      const matchStatus = status === "All" || p.status === status;
+      const matchCounty = county === "All" || p.county === county;
+      const matchRisk =
+        risk === "All" ||
+        (risk === "High" && (p.riskScore ?? 0) >= 60) ||
+        (risk === "Review" && (p.riskScore ?? 0) >= 35 && (p.riskScore ?? 0) < 60) ||
+        (risk === "Standard" && (p.riskScore ?? 0) < 35);
+      return matchQ && matchStatus && matchCounty && matchRisk;
+    });
+  }, [query, status, risk, county]);
+
+  const flagged = filtered.filter((p) => p.aiFlag).length;
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-background">
-      {/* Header */}
-      <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
-        <h2 className="font-display font-semibold text-foreground text-lg">People Supported</h2>
-        <div className="flex items-center gap-3">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => navigate("/")}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-sm transition-all"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>AI Companion</span>
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-sm transition-all border border-border"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            <span>Dashboard</span>
-          </motion.button>
-          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
-            <User className="w-5 h-5 text-muted-foreground" />
+    <ICMShell title="People Supported" showAIPanel={false}>
+      <div className="space-y-5">
+        {/* Title row */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
+              People Supported
+            </h1>
+            <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
+              {people.length} individuals · {flagged} flagged by AI today
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => alert("Export CSV (mock)")}
+              className="h-9 px-3.5 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Export
+            </button>
+            <button
+              onClick={() => alert("Add Person (mock)")}
+              className="h-9 px-3.5 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium flex items-center gap-1.5 hover:opacity-90"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Person
+            </button>
           </div>
         </div>
-      </header>
 
-      <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-[1600px] mx-auto space-y-5">
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => toast({ title: "Add Person", description: "New person supported form would open here. This connects to the iCM People module." })}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" /> Add Person Supported
-            </button>
-            <button
-              onClick={() => { setStatusFilter("Pending"); toast({ title: "Filtered", description: "Showing pending individuals." }); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning text-warning-foreground text-sm font-medium"
-            >
-              <Clock className="w-4 h-4" /> Pending
-            </button>
-            <button
-              onClick={() => { setStatusFilter("Discharged"); toast({ title: "Filtered", description: "Showing discharged individuals." }); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium border border-border"
-            >
-              Discharged
-            </button>
-            <button
-              onClick={() => toast({ title: "Export Started", description: "Exporting all records to Excel. File will download shortly." })}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-medium border border-border"
-            >
-              <Download className="w-4 h-4" /> Export to Excel
-            </button>
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[260px] max-w-[420px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, ID, or county…"
+              className="w-full h-9 pl-9 pr-3 rounded-xl bg-icm-panel border border-icm-border text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/40 transition-colors"
+            />
           </div>
+          <FilterSelect
+            value={status}
+            onChange={(v) => setStatus(v as StatusFilter)}
+            options={["All", "Active", "Pending", "Discharged"]}
+            label="Status"
+          />
+          <FilterSelect
+            value={risk}
+            onChange={(v) => setRisk(v as RiskFilter)}
+            options={["All", "High", "Review", "Standard"]}
+            label="Risk"
+          />
+          <FilterSelect value={county} onChange={setCounty} options={counties} label="County" />
+        </div>
 
-          {/* Search Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="appearance-none rounded-lg px-4 py-2.5 pr-9 text-sm bg-card border border-border text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="All">All</option>
-                <option value="Active">Active</option>
-                <option value="Pending">Pending</option>
-                <option value="Discharged">Discharged</option>
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        {/* AI summary bar */}
+        <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <input
-              value={searchFirst}
-              onChange={(e) => setSearchFirst(e.target.value)}
-              placeholder="First Name"
-              className="rounded-lg px-4 py-2.5 text-sm bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-40"
-            />
-            <input
-              value={searchLast}
-              onChange={(e) => setSearchLast(e.target.value)}
-              placeholder="Last Name"
-              className="rounded-lg px-4 py-2.5 text-sm bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-40"
-            />
-            <button
-              onClick={() => toast({ title: "Search Applied", description: `Showing results matching your filters.` })}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-medium"
-            >
-              <Search className="w-4 h-4" /> Search
-            </button>
-            <button onClick={clearFilters} className="px-4 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <X className="w-4 h-4 inline mr-1" /> Clear
-            </button>
+            <p className="text-[12.5px] font-geist text-icm-text leading-snug">
+              <span className="font-semibold">AI reviewed your caseload.</span>{" "}
+              <span className="text-icm-text-dim">
+                {flagged} {flagged === 1 ? "individual needs" : "individuals need"} attention today.
+              </span>
+            </p>
           </div>
-
-          {/* Results Count */}
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {people.length} Records
-          </p>
-
-          {/* People List */}
-          <div className="space-y-3">
-            {filtered.map((person, i) => (
-              <motion.div
-                key={person.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="glass rounded-xl p-5 flex items-center gap-5 hover:glow-border transition-all duration-200"
-              >
-                {/* Avatar */}
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center shrink-0">
-                  <User className="w-8 h-8 text-muted-foreground" />
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-semibold text-foreground text-base">
-                    {person.lastName}, {person.firstName}
-                    {person.nickname && <span className="text-muted-foreground font-normal"> ({person.nickname})</span>}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {person.gender} / {person.age} - {person.dob}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Admitted On {person.admittedOn}</p>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" /> {person.county}
-                  </p>
-                </div>
-
-                {/* Status & Meta */}
-                <div className="text-right space-y-1 shrink-0">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-sm text-muted-foreground">Status:</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      person.status === "Active" ? "bg-success text-success-foreground" :
-                      person.status === "Pending" ? "bg-warning text-warning-foreground" :
-                      "bg-muted text-muted-foreground"
-                    }`}>
-                      {person.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Updated On: {person.updatedOn}</p>
-                  <p className="text-xs text-muted-foreground">Updated By: {person.updatedBy}</p>
-                  {person.serviceContact && (
-                    <p className="text-xs text-muted-foreground">Service Contact: {person.serviceContact}</p>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col gap-2 shrink-0">
-                  <button
-                    onClick={() => navigate(`/people/${person.id}/echart`)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/90 text-destructive-foreground text-xs font-medium hover:bg-destructive transition-colors"
-                  >
-                    <FileText className="w-3.5 h-3.5" /> e-Chart
-                  </button>
-                  <button
-                    onClick={() => toast({ title: "Face Sheet", description: `Opening Face Sheet for ${person.firstName} ${person.lastName}. This connects to the iCM Face Sheet module.` })}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    <ClipboardList className="w-3.5 h-3.5" /> FaceSheet
-                  </button>
-                  <button
-                    onClick={() => toast({ title: "View Profile", description: `Opening full profile for ${person.firstName} ${person.lastName}. This connects to the iCM Individual Detail module.` })}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success text-success-foreground text-xs font-medium hover:bg-success/90 transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> View Profile
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <button className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0">
+            View all flags →
+          </button>
         </div>
-      </main>
-    </div>
+
+        {/* People rows */}
+        <div className="space-y-2.5">
+          {filtered.map((p) => (
+            <PersonRow
+              key={p.id}
+              person={p}
+              onOpen={() => navigate(`/people/${p.id}/echart`)}
+            />
+          ))}
+          {filtered.length === 0 && (
+            <div className="rounded-xl border border-dashed border-icm-border bg-icm-panel py-12 text-center">
+              <p className="text-[13px] text-icm-text-dim font-geist">No individuals match your filters.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </ICMShell>
   );
 };
+
+function FilterSelect({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  label: string;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none h-9 pl-3 pr-8 rounded-xl bg-icm-panel border border-icm-border text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent/40"
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {label}: {o}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint pointer-events-none" />
+    </div>
+  );
+}
+
+function PersonRow({ person, onOpen }: { person: Person; onOpen: () => void }) {
+  const flag = person.aiFlag;
+  const flagStyle = flag ? flagStyles[flag.tone] : null;
+
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
+      {/* Avatar */}
+      <div
+        className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 font-mono text-[13px] font-bold ${riskAvatarClass(
+          person.riskScore,
+        )}`}
+      >
+        {initials(person)}
+      </div>
+
+      {/* Identity */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="font-tight font-semibold text-[14px] text-icm-text truncate">
+            {person.lastName}, {person.firstName}
+            {person.nickname && (
+              <span className="font-normal text-icm-text-dim"> ({person.nickname})</span>
+            )}
+          </h3>
+          {flag && flagStyle && (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${flagStyle.bg} ${flagStyle.text} ${flagStyle.ring}`}
+              title={flag.detail}
+            >
+              <Sparkles className="w-2.5 h-2.5" />
+              {flag.label}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-[11.5px] text-icm-text-dim font-geist mt-1 flex-wrap">
+          <span className="font-mono">
+            {person.gender} · {person.age}y · {person.dob}
+          </span>
+          <span className="text-icm-text-faint">·</span>
+          <span>Adm {person.admittedOn}</span>
+          <span className="text-icm-text-faint">·</span>
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="w-3 h-3" />
+            {person.county}
+          </span>
+        </div>
+      </div>
+
+      {/* Service contact */}
+      <div className="hidden lg:block min-w-[150px] text-right">
+        <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">
+          Service Contact
+        </p>
+        <p className="text-[12px] text-icm-text font-geist mt-0.5 truncate">
+          {person.serviceContact ?? "—"}
+        </p>
+      </div>
+
+      {/* Risk */}
+      {person.riskScore !== undefined && (
+        <div className="hidden md:block text-right shrink-0">
+          <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">
+            Risk
+          </p>
+          <p className={`font-mono font-bold text-[16px] leading-tight ${riskScoreClass(person.riskScore)}`}>
+            {person.riskScore}
+          </p>
+        </div>
+      )}
+
+      {/* Status */}
+      <div className="hidden md:block shrink-0">
+        <StatusPill status={person.status} />
+      </div>
+
+      {/* Updated */}
+      <div className="hidden xl:block text-right shrink-0">
+        <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">
+          Updated
+        </p>
+        <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">{person.updatedOn}</p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={onOpen}
+          className="h-8 px-3 rounded-lg bg-icm-accent text-white text-[11.5px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90"
+        >
+          <FileText className="w-3 h-3" /> eChart
+        </button>
+        <button
+          onClick={() => alert(`Face Sheet for ${person.firstName} (mock)`)}
+          className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
+        >
+          <ClipboardList className="w-3 h-3" /> Face Sheet
+        </button>
+        <button
+          onClick={() => alert(`Profile menu for ${person.firstName} (mock)`)}
+          className="h-8 w-8 rounded-lg border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center justify-center transition-colors"
+          title="Profile"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: Person["status"] }) {
+  const cls =
+    status === "Active"
+      ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+      : status === "Pending"
+      ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+      : "bg-icm-bg text-icm-text-dim ring-icm-border";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${cls}`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+      {status}
+    </span>
+  );
+}
 
 export default PeopleSupported;

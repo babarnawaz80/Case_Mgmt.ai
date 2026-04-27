@@ -37,6 +37,7 @@ import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
 import PersonIncidentReporting from "./pages/PersonIncidentReporting";
 import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
 import IncidentsGlobal from "./pages/IncidentsGlobal";
+import MyWork from "./pages/MyWork";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

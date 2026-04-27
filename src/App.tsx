@@ -34,6 +34,9 @@ import PersonWorkflowManager from "./pages/PersonWorkflowManager";
 import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
 import WorkflowsGlobal from "./pages/WorkflowsGlobal";
 import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
+import PersonIncidentReporting from "./pages/PersonIncidentReporting";
+import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
+import IncidentsGlobal from "./pages/IncidentsGlobal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

@@ -309,6 +309,93 @@ const PersonCaseManagement = () => {
           <SummaryChip label="Completed" value={summary.completed} tone="green" />
         </div>
 
+        {/* Active Workflows sub-section */}
+        <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+          <button
+            onClick={() => setWorkflowsOpen((o) => !o)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-icm-bg/60 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-icm-text-dim transition-transform ${
+                  workflowsOpen ? "" : "-rotate-90"
+                }`}
+              />
+              <GitBranch className="w-3.5 h-3.5 text-icm-accent" />
+              <span className="font-tight font-semibold text-[14px] text-icm-text">
+                Active Workflows
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full bg-icm-bg border border-icm-border text-[10px] font-mono font-semibold text-icm-text-dim">
+                {personWorkflows.length}
+              </span>
+            </div>
+            <span className="text-[11px] font-geist text-icm-text-faint">
+              AI-managed · auto-triggered
+            </span>
+          </button>
+          {workflowsOpen && (
+            <div className="border-t border-icm-border">
+              {personWorkflows.length === 0 ? (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-[12px] font-geist text-icm-text-dim">
+                    No active workflows. AI will start one automatically when a
+                    triggering event is detected.
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-icm-border">
+                  {personWorkflows.map((w) => {
+                    const frac = progressFraction(w);
+                    const tone = workflowProgressTone(w);
+                    const toneCls =
+                      tone === "red"
+                        ? "bg-icm-red"
+                        : tone === "amber"
+                        ? "bg-icm-amber"
+                        : "bg-icm-green";
+                    return (
+                      <li key={w.id}>
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/people/${person.id}/workflow-manager/${w.id}`,
+                            )
+                          }
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/60 transition-colors text-left"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[12.5px] font-geist font-semibold text-icm-text truncate">
+                              {w.title}
+                            </p>
+                            <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">
+                              Triggered {w.triggerDate}
+                              {w.dueDate ? ` · Due ${w.dueDate}` : ""}
+                            </p>
+                          </div>
+                          <div className="hidden md:flex items-center gap-2 shrink-0">
+                            <div className="w-24 h-1.5 rounded-full bg-icm-bg border border-icm-border overflow-hidden">
+                              <div
+                                className={`h-full ${toneCls}`}
+                                style={{
+                                  width: `${(frac.done / frac.total) * 100}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-[11px] font-mono text-icm-text-dim">
+                              {frac.done}/{frac.total}
+                            </span>
+                          </div>
+                          <ArrowRight className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Task groups */}
         <div className="space-y-3">
           {groups.map((g) => {

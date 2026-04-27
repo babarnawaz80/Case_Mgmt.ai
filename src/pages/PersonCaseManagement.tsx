@@ -156,8 +156,13 @@ const PersonCaseManagement = () => {
 
   const [groups] = useState<Group[]>(seedGroups);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [workflowsOpen, setWorkflowsOpen] = useState(true);
   const [pullOpen, setPullOpen] = useState(false);
   const [completeTask, setCompleteTask] = useState<Task | null>(null);
+
+  const personWorkflows = getWorkflowsForPerson(id ?? "").filter(
+    (w) => w.status === "Active",
+  );
 
   const summary = useMemo(() => {
     const all = groups.flatMap((g) => g.tasks);

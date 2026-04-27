@@ -281,6 +281,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/eligibility-verification`);
               } else if (t.slug === "progress-note") {
                 navigate(`/people/${personId}/progress-note`);
+              } else if (t.slug === "workflow-manager") {
+                navigate(`/people/${personId}/workflow-manager`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

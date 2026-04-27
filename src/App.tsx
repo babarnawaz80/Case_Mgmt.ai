@@ -30,6 +30,10 @@ import PersonEligibilityVerification from "./pages/PersonEligibilityVerification
 import PersonEligibilityVerificationDetail from "./pages/PersonEligibilityVerificationDetail";
 import PersonProgressNote from "./pages/PersonProgressNote";
 import PersonProgressNoteDetail from "./pages/PersonProgressNoteDetail";
+import PersonWorkflowManager from "./pages/PersonWorkflowManager";
+import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
+import WorkflowsGlobal from "./pages/WorkflowsGlobal";
+import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +62,10 @@ const App = () => (
             <Route path="/people/:id/eligibility-verification/:verificationId" element={<PersonEligibilityVerificationDetail />} />
             <Route path="/people/:id/progress-note" element={<PersonProgressNote />} />
             <Route path="/people/:id/progress-note/:noteId" element={<PersonProgressNoteDetail />} />
+            <Route path="/people/:id/workflow-manager" element={<PersonWorkflowManager />} />
+            <Route path="/people/:id/workflow-manager/:workflowId" element={<PersonWorkflowDetail />} />
+            <Route path="/workflows" element={<WorkflowsGlobal />} />
+            <Route path="/admin/workflow-templates" element={<WorkflowTemplatesAdmin />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

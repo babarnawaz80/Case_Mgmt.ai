@@ -54,6 +54,16 @@ import PersonReferralForm from "./pages/PersonReferralForm";
 import PersonReferralDetail from "./pages/PersonReferralDetail";
 import Documentation from "./pages/Documentation";
 import Settings from "./pages/Settings";
+import SettingsUsers from "./pages/settings/SettingsUsers";
+import SettingsUserDetail from "./pages/settings/SettingsUserDetail";
+import SettingsOrganization from "./pages/settings/SettingsOrganization";
+import SettingsPrograms from "./pages/settings/SettingsPrograms";
+import SettingsAI from "./pages/settings/SettingsAI";
+import SettingsIntegrations from "./pages/settings/SettingsIntegrations";
+import SettingsSecurity from "./pages/settings/SettingsSecurity";
+import SettingsNotifications from "./pages/settings/SettingsNotifications";
+import SettingsBillingConfig from "./pages/settings/SettingsBillingConfig";
+import AIRoadmap from "./pages/AIRoadmap";
 import ProviderDirectory from "./pages/admin/ProviderDirectory";
 import Reports from "./pages/Reports";
 import ReportRunner from "./pages/ReportRunner";
@@ -151,6 +161,17 @@ const App = () => (
             <Route path="/documentation/meeting-notes" element={<Documentation />} />
             <Route path="/documentation/communications" element={<Documentation />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/users" element={<SettingsUsers />} />
+            <Route path="/settings/users/:userId" element={<SettingsUserDetail />} />
+            <Route path="/settings/roles" element={<SettingsUsers />} />
+            <Route path="/settings/organization" element={<SettingsOrganization />} />
+            <Route path="/settings/programs" element={<SettingsPrograms />} />
+            <Route path="/settings/ai" element={<SettingsAI />} />
+            <Route path="/settings/integrations" element={<SettingsIntegrations />} />
+            <Route path="/settings/security" element={<SettingsSecurity />} />
+            <Route path="/settings/notifications" element={<SettingsNotifications />} />
+            <Route path="/settings/billing-config" element={<SettingsBillingConfig />} />
+            <Route path="/ai-roadmap" element={<AIRoadmap />} />
             <Route path="/admin/provider-directory" element={<ProviderDirectory />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/:reportId" element={<ReportRunner />} />

@@ -279,6 +279,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/visit-summary`);
               } else if (t.slug === "eligibility") {
                 navigate(`/people/${personId}/eligibility-verification`);
+              } else if (t.slug === "progress-note") {
+                navigate(`/people/${personId}/progress-note`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

@@ -31,15 +31,20 @@ import {
   type MyWorkTask,
   type TaskStatus,
 } from "@/data/myWork";
+import { AlertsTab } from "@/components/notifications/AlertsTab";
+import { MentionsTab } from "@/components/notifications/MentionsTab";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useSearchParams } from "react-router-dom";
 
+type TopView = "my_work" | "alerts" | "mentions" | "completed";
 type TabKey = "today" | "week" | "all" | "completed";
 type GroupMode = "individual" | "due";
 
-const tabs: { key: TabKey; label: string }[] = [
+// Inner tabs only show within the "My Work" top-level view.
+const innerTabs: { key: Exclude<TabKey, "completed">; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "week", label: "This Week" },
   { key: "all", label: "All Tasks" },
-  { key: "completed", label: "Completed" },
 ];
 
 function statusTone(status: TaskStatus) {

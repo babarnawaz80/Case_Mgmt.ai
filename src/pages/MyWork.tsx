@@ -102,8 +102,21 @@ function SourceLabel({ task }: { task: MyWorkTask }) {
 // ---------- Page ----------
 const MyWork = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialView = (searchParams.get("tab") as TopView | null) ?? "my_work";
+  const [view, setViewRaw] = useState<TopView>(
+    initialView === "alerts" || initialView === "mentions" || initialView === "completed"
+      ? initialView
+      : "my_work"
+  );
+  function setView(v: TopView) {
+    setViewRaw(v);
+    if (v === "my_work") setSearchParams({}, { replace: true });
+    else setSearchParams({ tab: v }, { replace: true });
+  }
+
   const [tasks, setTasks] = useState<MyWorkTask[]>(seedTasks);
-  const [tab, setTab] = useState<TabKey>("today");
+  const [tab, setTab] = useState<Exclude<TabKey, "completed">>("today");
   const [groupMode, setGroupMode] = useState<GroupMode>("individual");
   const [sort, setSort] = useState<"priority" | "due" | "name" | "type" | "created">("priority");
   const [showFilters, setShowFilters] = useState(false);
@@ -117,6 +130,8 @@ const MyWork = () => {
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [focused, setFocused] = useState(false);
   const [showSessionDone, setShowSessionDone] = useState(false);
+
+  const notif = useNotifications();
 
   // ---- counts ----
   const counts = useMemo(() => {

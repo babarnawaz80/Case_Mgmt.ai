@@ -11,11 +11,17 @@ import {
   Clock,
   X,
   ArrowRight,
+  GitBranch,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import { getPerson, riskAvatarClass, initials } from "@/data/people";
 import type { AISuggestion } from "@/data/people";
+import {
+  getWorkflowsForPerson,
+  progressFraction,
+  workflowProgressTone,
+} from "@/data/workflows";
 
 type TaskStatus = "Pending Start" | "Open" | "In Progress" | "Completed" | "Overdue";
 

@@ -180,7 +180,7 @@ function FilterSelect({
   );
 }
 
-function PersonRow({ person, onOpen }: { person: Person; onOpen: () => void }) {
+function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person: Person; onOpen: () => void; onOpenFaceSheet: () => void; onOpenProfile: () => void }) {
   const flag = person.aiFlag;
   const flagStyle = flag ? flagStyles[flag.tone] : null;
 

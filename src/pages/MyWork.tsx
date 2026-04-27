@@ -200,7 +200,7 @@ const MyWork = () => {
     });
 
     return list;
-  }, [tasks, tab, filterIndividual, filterSource, filterStatus, sort, focused]);
+  }, [tasks, view, tab, filterIndividual, filterSource, filterStatus, sort, focused]);
 
   // ---- grouping ----
   const grouped = useMemo(() => {

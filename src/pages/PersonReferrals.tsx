@@ -353,12 +353,12 @@ function Chip({
   );
 }
 
-function IconBtn({ icon: Icon, onClick }: { icon: any; onClick: (e: React.MouseEvent) => void }) {
+function IconBtn({ icon: Icon, onClick }: { icon: any; onClick: () => void }) {
   return (
     <button
       onClick={(e) => {
         e.stopPropagation();
-        onClick(e);
+        onClick();
       }}
       className="w-7 h-7 rounded-lg text-icm-text-faint hover:text-icm-text hover:bg-icm-bg flex items-center justify-center"
     >

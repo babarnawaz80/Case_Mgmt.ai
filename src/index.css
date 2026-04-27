@@ -154,4 +154,82 @@
   .shadow-elevated {
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.06);
   }
+
+  .card-elevated {
+    box-shadow: 0px 12px 32px -4px rgba(11, 15, 16, 0.06);
+    border: none;
+  }
+
+  .billing-gradient {
+    background: linear-gradient(135deg, hsl(222, 100%, 47%), hsl(178, 55%, 42%));
+  }
+
+  .btn-primary-gradient {
+    background: linear-gradient(135deg, hsl(222, 100%, 47%), hsl(222, 100%, 41%));
+  }
+
+  .font-display {
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* ============================================================
+ * IDD Billing.AI palette — scoped to .billing-scope only.
+ * Keeps the billing module's native blue/teal look intact while
+ * leaving the host app's tokens (teal primary, icm-* etc.) alone.
+ * ============================================================ */
+.billing-scope {
+  --background: 214 25% 97%;
+  --foreground: 200 14% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 200 14% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 200 14% 18%;
+  --primary: 222 100% 47%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 18% 95%;
+  --secondary-foreground: 200 14% 20%;
+  --muted: 210 18% 96%;
+  --muted-foreground: 195 6% 36%;
+  --accent: 178 55% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 51% 44%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 18% 93%;
+  --input: 210 18% 91%;
+  --ring: 222 100% 47%;
+  --radius: 0.75rem;
+  --billing-healthy: 152 60% 42%;
+  --billing-warning: 38 92% 50%;
+  --billing-at-risk: 0 51% 44%;
+  --ai-violet: 262 78% 55%;
+  --ai-violet-foreground: 0 0% 100%;
+  --surface-low: 210 20% 95%;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 222 100% 47%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 18% 95%;
+  --sidebar-accent-foreground: 200 14% 18%;
+  --sidebar-border: 210 18% 93%;
+  --sidebar-ring: 222 100% 47%;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Host-side fallback values for billing-* and ai-violet so the
+   tile/widget on the eChart, sidebar chip, and dashboard KPI
+   render correctly outside of .billing-scope. */
+:root {
+  --billing-healthy: 152 60% 42%;
+  --billing-warning: 38 92% 50%;
+  --billing-at-risk: 0 51% 44%;
+  --ai-violet: 262 78% 55%;
+  --ai-violet-foreground: 0 0% 100%;
+  --surface-low: 210 20% 95%;
 }

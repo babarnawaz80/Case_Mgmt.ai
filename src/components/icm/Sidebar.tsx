@@ -48,6 +48,7 @@ export function ICMSidebar() {
   const loc = useLocation();
   const { role } = useRole();
   const { unreadAlerts, unreadMentions } = useNotifications();
+  const { unreadTotal: unreadMessages } = useMessages();
 
   function badgeFor(item: NavItem): {
     count: number;
@@ -61,6 +62,9 @@ export function ICMSidebar() {
       }
       if (unread > 0) return { count: unread, tone: "accent" };
       return null;
+    }
+    if (item.url === "/messages" && unreadMessages > 0) {
+      return { count: unreadMessages, tone: "red" };
     }
     if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) {
       return { count: OPEN_INCIDENT_COUNT, tone: "red" };

@@ -15,9 +15,10 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Inter", "sans-serif"],
-        display: ["Space Grotesk", "sans-serif"],
+        display: ["Manrope", "Space Grotesk", "sans-serif"],
         tight: ['"Inter Tight"', "Inter", "sans-serif"],
         geist: ["Geist", "Inter", "sans-serif"],
+        manrope: ["Manrope", "Inter", "sans-serif"],
         mono: ['"Geist Mono"', "ui-monospace", "monospace"],
       },
       colors: {

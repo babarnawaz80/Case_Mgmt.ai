@@ -1,10 +1,11 @@
-import { Home, Users, Calendar, FileText, AlertTriangle, Building2, BarChart3, Settings, Sparkles, User, GitBranch } from "lucide-react";
+import { Home, Users, Calendar, FileText, AlertTriangle, Building2, BarChart3, Settings, Sparkles, User, GitBranch, ListChecks } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "People", url: "/people", icon: Users },
+  { title: "My Work", url: "/my-work", icon: ListChecks },
   { title: "Workflows", url: "/workflows", icon: GitBranch },
   { title: "Schedule", url: "/dashboard/schedule", icon: Calendar },
   { title: "Documentation", url: "/dashboard/documentation", icon: FileText },

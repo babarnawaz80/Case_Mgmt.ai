@@ -37,6 +37,7 @@ import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
 import PersonIncidentReporting from "./pages/PersonIncidentReporting";
 import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
 import IncidentsGlobal from "./pages/IncidentsGlobal";
+import MyWork from "./pages/MyWork";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/people/:id/incident-reporting" element={<PersonIncidentReporting />} />
             <Route path="/people/:id/incident-reporting/:incidentId" element={<PersonIncidentReportingDetail />} />
             <Route path="/incidents" element={<IncidentsGlobal />} />
+            <Route path="/my-work" element={<MyWork />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

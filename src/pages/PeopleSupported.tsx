@@ -272,13 +272,13 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
           <FileText className="w-3 h-3" /> eChart
         </button>
         <button
-          onClick={() => navigate(`/people/${person.id}/facesheet`)}
+          onClick={onOpenFaceSheet}
           className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
         >
           <ClipboardList className="w-3 h-3" /> Face Sheet
         </button>
         <button
-          onClick={() => navigate(`/people/${person.id}/profile`)}
+          onClick={onOpenProfile}
           className="h-8 w-8 rounded-lg border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center justify-center transition-colors"
           title="Open Profile"
         >

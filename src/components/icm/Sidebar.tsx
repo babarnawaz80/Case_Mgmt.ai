@@ -27,6 +27,7 @@ const items: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "People Supported", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Documentation", url: "/documentation", icon: FileText },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin"] },

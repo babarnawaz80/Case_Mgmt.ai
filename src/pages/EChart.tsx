@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import {
   MessageSquare,
@@ -30,6 +32,7 @@ import {
   ClipboardCheck,
   ArrowRightCircle,
   Phone,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -96,6 +99,7 @@ const EChart = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const person = getPerson(id ?? "");
+  const [showPreVisit, setShowPreVisit] = useState(false);
 
   if (!person) {
     return (
@@ -167,6 +171,13 @@ const EChart = () => {
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setShowPreVisit(true)}
+                  className="h-9 px-3 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-green-soft text-icm-green ring-1 ring-icm-green/30 hover:brightness-95 transition"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Start Visit
+                </button>
                 <HeaderButton label={person.status} icon={ChevronDown} variant="status" />
                 <HeaderButton label="eChart" icon={ChevronDown} />
                 <HeaderButton label="Manage Programs" icon={Settings2} />
@@ -215,6 +226,12 @@ const EChart = () => {
 
         <BillingSummaryWidget individualId={person.id} />
       </div>
+      <PreVisitModal
+        open={showPreVisit}
+        onClose={() => setShowPreVisit(false)}
+        personId={person.id}
+        personName={`${person.firstName} ${person.lastName}`}
+      />
     </ICMShell>
   );
 };

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { aiFeatures } from "@/data/settings";
 import { cn } from "@/lib/utils";
-import { Sparkles, ShieldCheck, ArrowRight, Lock } from "lucide-react";
+import { Sparkles, ShieldCheck, ArrowRight, Lock, Video } from "lucide-react";
 
 const SettingsAI = () => {
   const navigate = useNavigate();
@@ -58,6 +58,76 @@ const SettingsAI = () => {
             <FeatureRow key={f.key} name={f.name} description={f.description} defaultOn={f.enabled} />
           ))}
         </div>
+      </div>
+
+      {/* Virtual Visits */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Video className="w-4 h-4 text-icm-green" />
+          <p className="font-manrope font-bold text-[13.5px] text-icm-text">Virtual Visits</p>
+        </div>
+        <div className="space-y-2">
+          <FeatureRow
+            name="Enable virtual visits"
+            description="Conduct video visits with individuals and guardians directly inside CaseManagement.AI."
+            defaultOn={true}
+          />
+          <FeatureRow
+            name="Ambient listening automatically enabled"
+            description="Virtual visits start ambient transcription automatically. If off, must be triggered manually inside the call."
+            defaultOn={true}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Video quality
+            </label>
+            <select className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text">
+              <option>Auto (recommended)</option>
+              <option>HD</option>
+              <option>Standard</option>
+              <option>Low bandwidth mode</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Recording storage
+            </label>
+            <select className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text">
+              <option>Do not store video (transcript only)</option>
+              <option>Store for 24 hours</option>
+              <option>Store for 7 days</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Maximum visit duration (minutes)
+            </label>
+            <input
+              type="number"
+              defaultValue={120}
+              className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text"
+            />
+          </div>
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Background options
+            </label>
+            <div className="mt-1 space-y-1">
+              <label className="flex items-center gap-2 text-[12px] font-geist text-icm-text">
+                <input type="checkbox" defaultChecked /> Blur background
+              </label>
+              <label className="flex items-center gap-2 text-[12px] font-geist text-icm-text">
+                <input type="checkbox" /> Virtual background (org logo)
+              </label>
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] font-geist text-icm-text-dim italic">
+          Audio transcript is always retained per your data retention policy
+          regardless of video storage setting.
+        </p>
       </div>
 
       {/* Audit settings */}

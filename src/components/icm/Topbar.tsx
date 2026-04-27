@@ -1,7 +1,8 @@
-import { Search, Sparkles, Bell, HelpCircle, ChevronDown, Layers } from "lucide-react";
+import { Search, Sparkles, HelpCircle, ChevronDown, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 import { useRole } from "@/contexts/RoleContext";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 interface TopbarProps {
   title?: string;

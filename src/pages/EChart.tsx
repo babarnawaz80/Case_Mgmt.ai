@@ -230,7 +230,7 @@ const EChart = () => {
         open={showPreVisit}
         onClose={() => setShowPreVisit(false)}
         personId={person.id}
-        personName={person.name}
+        personName={`${person.firstName} ${person.lastName}`}
       />
     </ICMShell>
   );

@@ -365,50 +365,103 @@ const MyWork = () => {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Top-level tabs: My Work / Alerts / Mentions / Completed */}
         <div className="flex items-center gap-1 border-b border-icm-border">
-          {tabs.map((t) => {
-            const active = tab === t.key;
-            const badge =
-              t.key === "today"
-                ? counts.today
-                : t.key === "week"
-                  ? counts.week
-                  : t.key === "all"
-                    ? counts.total
-                    : counts.completed;
-            const badgeTone =
-              t.key === "today" && counts.overdue > 0
-                ? "bg-icm-red-soft text-icm-red"
+          {(
+            [
+              { key: "my_work", label: "My Work", count: counts.overdue, tone: counts.overdue > 0 ? "red" : "neutral" },
+              { key: "alerts", label: "Alerts", count: notif.unreadAlerts, tone: notif.unreadAlerts > 0 ? "red" : "neutral" },
+              { key: "mentions", label: "Mentions", count: notif.unreadMentions, tone: notif.unreadMentions > 0 ? "red" : "neutral" },
+              { key: "completed", label: "Completed", count: counts.completed, tone: "neutral" },
+            ] as const
+          ).map((t) => {
+            const active = view === t.key;
+            const badgeCls =
+              t.tone === "red"
+                ? "bg-icm-red text-white"
                 : "bg-icm-bg text-icm-text-dim";
             return (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => setView(t.key)}
                 className={cn(
                   "px-3 py-2 text-[12.5px] font-geist border-b-2 -mb-px flex items-center gap-1.5",
                   active
                     ? "border-icm-text text-icm-text font-semibold"
-                    : "border-transparent text-icm-text-dim hover:text-icm-text",
+                    : "border-transparent text-icm-text-dim hover:text-icm-text"
                 )}
               >
                 {t.label}
-                <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold", badgeTone)}>
-                  {badge}
-                </span>
+                {t.count > 0 && (
+                  <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-mono font-semibold", badgeCls)}>
+                    {t.count}
+                  </span>
+                )}
               </button>
             );
           })}
-          <button
-            onClick={() => {
-              setTab("all");
-              setAddOpen(true);
-            }}
-            className="ml-auto text-[11.5px] font-geist text-icm-accent hover:underline flex items-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add task
-          </button>
+          {view === "my_work" && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="ml-auto text-[11.5px] font-geist text-icm-accent hover:underline flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add task
+            </button>
+          )}
         </div>
+
+        {/* Alerts / Mentions take over the page when active */}
+        {view === "alerts" && (
+          <AlertsTab
+            alerts={notif.alerts}
+            onMarkRead={notif.markAlertRead}
+            onMarkUnread={notif.markAlertUnread}
+            onDismiss={notif.dismissAlert}
+            onMarkAllRead={notif.markAllAlertsRead}
+            onClearDismissed={notif.clearDismissedAlerts}
+          />
+        )}
+        {view === "mentions" && (
+          <MentionsTab
+            mentions={notif.mentions}
+            onMarkRead={notif.markMentionRead}
+            onMarkUnread={notif.markMentionUnread}
+            onDismiss={notif.dismissMention}
+            onMarkAllRead={notif.markAllMentionsRead}
+          />
+        )}
+
+        {/* Inner tabs only show under the My Work top-level view */}
+        {view === "my_work" && (
+          <div className="flex items-center gap-1 border-b border-icm-border">
+            {innerTabs.map((t) => {
+              const active = tab === t.key;
+              const badge =
+                t.key === "today" ? counts.today : t.key === "week" ? counts.week : counts.total;
+              const badgeTone =
+                t.key === "today" && counts.overdue > 0
+                  ? "bg-icm-red-soft text-icm-red"
+                  : "bg-icm-bg text-icm-text-dim";
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "px-3 py-1.5 text-[11.5px] font-geist border-b-2 -mb-px flex items-center gap-1.5",
+                    active
+                      ? "border-icm-accent text-icm-accent font-semibold"
+                      : "border-transparent text-icm-text-dim hover:text-icm-text"
+                  )}
+                >
+                  {t.label}
+                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold", badgeTone)}>
+                    {badge}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Summary chips + view controls */}
         <div className="flex items-center justify-between gap-3 flex-wrap">

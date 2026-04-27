@@ -49,6 +49,14 @@ import AssessmentBuilderList from "./pages/admin/AssessmentBuilderList";
 import AssessmentBuilderEdit from "./pages/admin/AssessmentBuilderEdit";
 import PersonAssessments from "./pages/PersonAssessments";
 import PersonAssessmentForm from "./pages/PersonAssessmentForm";
+import PersonReferrals from "./pages/PersonReferrals";
+import PersonReferralForm from "./pages/PersonReferralForm";
+import PersonReferralDetail from "./pages/PersonReferralDetail";
+import Documentation from "./pages/Documentation";
+import Settings from "./pages/Settings";
+import ProviderDirectory from "./pages/admin/ProviderDirectory";
+import Reports from "./pages/Reports";
+import ReportRunner from "./pages/ReportRunner";
 import NotFound from "./pages/NotFound";
 
 // Billing module (copied verbatim from IDDBilling.ai)
@@ -125,6 +133,29 @@ const App = () => (
             <Route path="/people/:id/assessments" element={<PersonAssessments />} />
             <Route path="/people/:id/assessments/new" element={<PersonAssessmentForm />} />
             <Route path="/people/:id/assessments/:assessmentId" element={<PersonAssessmentForm />} />
+            <Route path="/people/:id/referrals" element={<PersonReferrals />} />
+            <Route path="/people/:id/referrals/new" element={<PersonReferralForm />} />
+            <Route path="/people/:id/referrals/:referralId" element={<PersonReferralDetail />} />
+            <Route path="/documentation" element={<Documentation />} />
+            <Route path="/documentation/contact-notes" element={<Documentation />} />
+            <Route path="/documentation/progress-notes" element={<Documentation />} />
+            <Route path="/documentation/visit-summaries" element={<Documentation />} />
+            <Route path="/documentation/monitoring-forms" element={<Documentation />} />
+            <Route path="/documentation/assessments" element={<Documentation />} />
+            <Route path="/documentation/care-plans" element={<Documentation />} />
+            <Route path="/documentation/referrals" element={<Documentation />} />
+            <Route path="/documentation/meeting-notes" element={<Documentation />} />
+            <Route path="/documentation/communications" element={<Documentation />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/admin/provider-directory" element={<ProviderDirectory />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/reports/:reportId" element={<ReportRunner />} />
+            <Route path="/platform" element={<PlatformHub />} />
+            <Route path="/platform/guidelines-engines" element={<GuidelinesEnginesList />} />
+            <Route path="/platform/guidelines-engines/new" element={<NewEngineWizard />} />
+            <Route path="/platform/guidelines-engines/:engineId" element={<EngineDetail />} />
+            <Route path="/platform/rule-library" element={<RuleLibrary />} />
+            <Route path="/platform/agents" element={<LifePlanBoard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

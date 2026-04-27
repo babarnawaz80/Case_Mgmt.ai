@@ -55,7 +55,6 @@ const caseManagementModules: ModuleTile[] = [
   { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, count: 5, meta: "Last 02/15" },
   { slug: "eligibility", label: "Eligibility Verification", icon: ShieldCheck, meta: "MA Active", metaTone: "green" },
   { slug: "progress-note", label: "Progress Note", icon: Pencil, count: 4, meta: "2 unsigned", metaTone: "amber" },
-  { slug: "workflow-manager", label: "Workflow Manager", icon: GitBranch, meta: "2 active", metaTone: "accent" },
 ];
 
 const individualRecordModules: ModuleTile[] = [

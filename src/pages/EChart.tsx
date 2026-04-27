@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import {
   MessageSquare,
@@ -30,6 +32,7 @@ import {
   ClipboardCheck,
   ArrowRightCircle,
   Phone,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 import {

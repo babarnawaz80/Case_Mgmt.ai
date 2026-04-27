@@ -67,9 +67,14 @@ const SettingsAI = () => {
           <p className="font-manrope font-bold text-[13.5px] text-icm-text">Virtual Visits</p>
         </div>
         <div className="space-y-2">
-          <SettingRow label="Enable virtual visits" defaultOn={true} />
-          <SettingRow
-            label="Ambient listening automatically enabled in virtual visits"
+          <FeatureRow
+            name="Enable virtual visits"
+            description="Conduct video visits with individuals and guardians directly inside CaseManagement.AI."
+            defaultOn={true}
+          />
+          <FeatureRow
+            name="Ambient listening automatically enabled"
+            description="Virtual visits start ambient transcription automatically. If off, must be triggered manually inside the call."
             defaultOn={true}
           />
         </div>

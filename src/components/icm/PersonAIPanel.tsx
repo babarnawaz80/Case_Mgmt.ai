@@ -39,9 +39,10 @@ export function PersonAIPanel({ person, suggestions: override, intro }: Props) {
           </div>
         </div>
         <p className="text-[12px] text-icm-text-dim font-geist mt-3 leading-relaxed">
-          {count > 0
-            ? `I reviewed ${person.firstName}'s record and have a few items for you.`
-            : `${person.firstName}'s record looks clean. Ask me anything about their care.`}
+          {intro
+            ?? (count > 0
+              ? `I reviewed ${person.firstName}'s record and have a few items for you.`
+              : `${person.firstName}'s record looks clean. Ask me anything about their care.`)}
         </p>
       </div>
 

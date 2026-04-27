@@ -37,6 +37,7 @@ const App = () => (
             <Route path="/people" element={<PeopleSupported />} />
             <Route path="/people/:id/echart" element={<EChart />} />
             <Route path="/people/:id/contact-note" element={<ContactNote />} />
+            <Route path="/people/:id/case-management" element={<PersonCaseManagement />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

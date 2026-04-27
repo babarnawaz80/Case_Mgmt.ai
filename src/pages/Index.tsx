@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import AmbientListening from "@/components/ambient/AmbientListening";
+import AmbientFlowV2 from "@/components/ambient/AmbientFlowV2";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -85,14 +85,12 @@ const Index = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  if (ambientOpen) {
-    return (
-      <AmbientListening
-        individualName={selectedIndividual && selectedIndividual !== "Select Individual" ? selectedIndividual : "Unknown Individual"}
-        onBack={() => setAmbientOpen(false)}
-      />
-    );
-  }
+  const ambientOverlay = ambientOpen ? (
+    <AmbientFlowV2
+      defaultIndividualName={selectedIndividual && selectedIndividual !== "Select Individual" ? selectedIndividual : undefined}
+      onClose={() => setAmbientOpen(false)}
+    />
+  ) : null;
 
   return (
     <div className="flex h-screen w-full bg-background">

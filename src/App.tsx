@@ -20,6 +20,8 @@ import EChart from "./pages/EChart";
 import ContactNote from "./pages/ContactNote";
 import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";
+import PersonCarePlan from "./pages/PersonCarePlan";
+import PersonCarePlanDetail from "./pages/PersonCarePlanDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,8 @@ const App = () => (
             <Route path="/people/:id/echart" element={<EChart />} />
             <Route path="/people/:id/contact-note" element={<ContactNote />} />
             <Route path="/people/:id/case-management" element={<PersonCaseManagement />} />
+            <Route path="/people/:id/care-plan" element={<PersonCarePlan />} />
+            <Route path="/people/:id/care-plan/:planId" element={<PersonCarePlanDetail />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

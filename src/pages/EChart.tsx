@@ -271,6 +271,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/contact-note`);
               } else if (t.slug === "case-management") {
                 navigate(`/people/${personId}/case-management`);
+              } else if (t.slug === "care-plan") {
+                navigate(`/people/${personId}/care-plan`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

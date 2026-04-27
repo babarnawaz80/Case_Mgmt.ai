@@ -167,6 +167,13 @@ const EChart = () => {
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setShowPreVisit(true)}
+                  className="h-9 px-3 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-green-soft text-icm-green ring-1 ring-icm-green/30 hover:brightness-95 transition"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Start Visit
+                </button>
                 <HeaderButton label={person.status} icon={ChevronDown} variant="status" />
                 <HeaderButton label="eChart" icon={ChevronDown} />
                 <HeaderButton label="Manage Programs" icon={Settings2} />

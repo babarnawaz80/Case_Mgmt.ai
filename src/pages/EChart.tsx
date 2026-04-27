@@ -269,6 +269,8 @@ function ModuleSection({
             onOpen={() => {
               if (t.slug === "contact-note") {
                 navigate(`/people/${personId}/contact-note`);
+              } else if (t.slug === "case-management") {
+                navigate(`/people/${personId}/case-management`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

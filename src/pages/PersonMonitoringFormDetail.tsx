@@ -50,6 +50,21 @@ const PersonMonitoringFormDetail = () => {
   const [confirmReviewed, setConfirmReviewed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Completion status per section (computed before any early return to keep hook order stable)
+  const completion = useMemo(() => {
+    if (!form) return { s1: 0, s2: 0, s3: 0, s4: 0, s5: 0, s6: 0, s7: 0, s8: 0, s9: 0, s10: 0 };
+    const s2 = form.s2_circumstances.filter(q => q.answer).length / form.s2_circumstances.length;
+    const s3 = form.s3_satisfaction.filter(q => q.answer).length / form.s3_satisfaction.length;
+    const s4 = form.s4_progress.length > 0 ? form.s4_progress.filter(g => g.notes).length / form.s4_progress.length : 0;
+    const s5 = form.s5_choice.filter(q => q.answer).length / form.s5_choice.length;
+    const s6 = form.s6_health.filter(q => q.answer).length / form.s6_health.length;
+    const s7 = form.s7_emergency.filter(q => q.answer).length / form.s7_emergency.length;
+    const s8 = form.s8_incidents.filter(q => q.answer).length / form.s8_incidents.length;
+    const s9 = form.s9_recommendedActions.length > 0 ? 1 : 0;
+    const s10 = form.s10_contacts.length > 0 ? 1 : 0;
+    return { s1: 1, s2, s3, s4, s5, s6, s7, s8, s9, s10 };
+  }, [form]);
+
   if (!person || !form) {
     return (
       <ICMShell title="Monitoring Form" showAIPanel={false}>
@@ -71,20 +86,6 @@ const PersonMonitoringFormDetail = () => {
   const toggleAction = (actionId: string) => {
     setForm(prev => prev ? { ...prev, s9_recommendedActions: prev.s9_recommendedActions.map(a => a.id === actionId ? { ...a, createTask: !a.createTask } : a) } : prev);
   };
-
-  // Completion status per section
-  const completion = useMemo(() => {
-    const s2 = form.s2_circumstances.filter(q => q.answer).length / form.s2_circumstances.length;
-    const s3 = form.s3_satisfaction.filter(q => q.answer).length / form.s3_satisfaction.length;
-    const s4 = form.s4_progress.length > 0 ? form.s4_progress.filter(g => g.notes).length / form.s4_progress.length : 0;
-    const s5 = form.s5_choice.filter(q => q.answer).length / form.s5_choice.length;
-    const s6 = form.s6_health.filter(q => q.answer).length / form.s6_health.length;
-    const s7 = form.s7_emergency.filter(q => q.answer).length / form.s7_emergency.length;
-    const s8 = form.s8_incidents.filter(q => q.answer).length / form.s8_incidents.length;
-    const s9 = form.s9_recommendedActions.length > 0 ? 1 : 0;
-    const s10 = form.s10_contacts.length > 0 ? 1 : 0;
-    return { s1: 1, s2, s3, s4, s5, s6, s7, s8, s9, s10 };
-  }, [form]);
 
   const dotClass = (pct: number) => pct === 0 ? "bg-icm-text-faint/40" : pct >= 1 ? "bg-icm-green" : "bg-icm-amber";
 

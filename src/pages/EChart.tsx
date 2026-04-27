@@ -28,6 +28,8 @@ import {
   ChevronLeft,
   Settings2,
   ClipboardCheck,
+  ArrowRightCircle,
+  Phone,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -74,6 +76,12 @@ const individualRecordModules: ModuleTile[] = [
   { slug: "services", label: "Services", icon: HandHeart, count: 5 },
   { slug: "service-plan", label: "Service Plan", icon: ScrollText },
   { slug: "general-ledger", label: "General Ledger", icon: Receipt },
+];
+
+const coordinationModules: ModuleTile[] = [
+  { slug: "referrals", label: "Referrals", icon: ArrowRightCircle, count: 1, meta: "1 pending", metaTone: "amber" },
+  { slug: "meeting-notes", label: "Team Meeting Notes", icon: Users, count: 2, meta: "2 this month" },
+  { slug: "communications", label: "Communications Log", icon: Phone, count: 6, meta: "6 this month" },
 ];
 
 const metaToneClasses: Record<NonNullable<ModuleTile["metaTone"]>, string> = {
@@ -191,14 +199,21 @@ const EChart = () => {
           personId={person.id}
         />
 
-        <BillingSummaryWidget individualId={person.id} />
-
         <ModuleSection
           title="Individual Record"
           subtitle="Supporting information"
           tiles={individualRecordModules}
           personId={person.id}
         />
+
+        <ModuleSection
+          title="Coordination"
+          subtitle="Referrals and communications"
+          tiles={coordinationModules}
+          personId={person.id}
+        />
+
+        <BillingSummaryWidget individualId={person.id} />
       </div>
     </ICMShell>
   );
@@ -290,6 +305,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/incident-reporting`);
               } else if (t.slug === "assessments") {
                 navigate(`/people/${personId}/assessments`);
+              } else if (t.slug === "referrals") {
+                navigate(`/people/${personId}/referrals`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

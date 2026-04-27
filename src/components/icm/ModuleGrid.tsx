@@ -24,18 +24,18 @@ interface Tile {
 }
 
 const tiles: Tile[] = [
-  { label: "Contact Note", icon: FileText, count: 14, to: "/modules/contact-note" },
-  { label: "Progress Note", icon: StickyNote, count: 4 },
-  { label: "ISP Review", icon: ClipboardCheck, count: 5 },
-  { label: "Visit Summary", icon: ClipboardList, count: 2 },
-  { label: "Incidents", icon: AlertTriangle, count: 3, alert: true },
+  { label: "Contact Note", icon: FileText, count: 14, to: "/documentation/contact-notes" },
+  { label: "Progress Note", icon: StickyNote, count: 4, to: "/documentation/progress-notes" },
+  { label: "ISP Review", icon: ClipboardCheck, count: 5, to: "/documentation/care-plans" },
+  { label: "Visit Summary", icon: ClipboardList, count: 2, to: "/documentation/visit-summaries" },
+  { label: "Incidents", icon: AlertTriangle, count: 3, alert: true, to: "/incidents" },
   { label: "People", icon: Users, count: 48, to: "/people" },
-  { label: "Care Tracker", icon: Heart },
-  { label: "Sites", icon: Building2, count: 4 },
-  { label: "Plan of Correction", icon: Shield, count: 1 },
+  { label: "Care Tracker", icon: Heart, to: "/documentation" },
+  { label: "Sites", icon: Building2, count: 4, to: "/settings" },
+  { label: "Plan of Correction", icon: Shield, count: 1, to: "/documentation" },
   { label: "Outreach", icon: Phone },
-  { label: "Training", icon: GraduationCap },
-  { label: "All Modules", icon: LayoutGrid },
+  { label: "Training", icon: GraduationCap, to: "/settings" },
+  { label: "All Modules", icon: LayoutGrid, to: "/documentation" },
 ];
 
 export function ModuleGrid() {

@@ -38,6 +38,8 @@ import PersonIncidentReporting from "./pages/PersonIncidentReporting";
 import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
 import IncidentsGlobal from "./pages/IncidentsGlobal";
 import MyWork from "./pages/MyWork";
+import PersonProfile from "./pages/PersonProfile";
+import PersonFaceSheet from "./pages/PersonFaceSheet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

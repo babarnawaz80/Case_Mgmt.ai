@@ -10,10 +10,14 @@ const toneStyles = {
 
 interface Props {
   person: Person;
+  /** Override the person-level AI suggestions (e.g. module-specific). */
+  suggestions?: AISuggestion[];
+  /** Optional intro line shown above suggestions. */
+  intro?: string;
 }
 
-export function PersonAIPanel({ person }: Props) {
-  const suggestions: AISuggestion[] = person.aiSuggestions ?? [];
+export function PersonAIPanel({ person, suggestions: override, intro }: Props) {
+  const suggestions: AISuggestion[] = override ?? person.aiSuggestions ?? [];
   const count = suggestions.length;
 
   return (

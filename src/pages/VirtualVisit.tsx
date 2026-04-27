@@ -17,7 +17,7 @@ import {
   Send,
   Activity,
 } from "lucide-react";
-import { ReviewApplyModal } from "@/components/ambient/ReviewApplyModal";
+import ReviewApplyModal from "@/components/ambient/ReviewApplyModal";
 import { toast } from "@/hooks/use-toast";
 
 type Phase = "in-call" | "ending" | "processing" | "review";

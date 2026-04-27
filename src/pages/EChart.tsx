@@ -283,6 +283,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/progress-note`);
               } else if (t.slug === "workflow-manager") {
                 navigate(`/people/${personId}/workflow-manager`);
+              } else if (t.slug === "incident-reporting") {
+                navigate(`/people/${personId}/incident-reporting`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

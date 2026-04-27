@@ -154,7 +154,9 @@ const MyWork = () => {
       list = list.filter((t) => focusedSessionTaskIds.includes(t.id));
     }
 
-    if (tab === "today") {
+    if (view === "completed") {
+      list = list.filter((t) => t.status === "Completed");
+    } else if (tab === "today") {
       list = list.filter((t) => {
         if (t.status === "Completed") return false;
         const b = bucketForTask(t);
@@ -168,8 +170,6 @@ const MyWork = () => {
       });
     } else if (tab === "all") {
       list = list.filter((t) => t.status !== "Completed");
-    } else if (tab === "completed") {
-      list = list.filter((t) => t.status === "Completed");
     }
 
     if (filterIndividual)

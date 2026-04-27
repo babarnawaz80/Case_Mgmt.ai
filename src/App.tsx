@@ -16,6 +16,8 @@ import Layer2AgentBuilder from "./pages/Layer2AgentBuilder";
 import EngineHistory from "./pages/EngineHistory";
 import AgentDraftRuns from "./pages/AgentDraftRuns";
 import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
+import EChart from "./pages/EChart";
+import ContactNote from "./pages/ContactNote";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +33,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/people" element={<PeopleSupported />} />
+            <Route path="/people/:id/echart" element={<EChart />} />
+            <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />
             <Route path="/lifeplan/guidelines-engines" element={<ComplianceEngineDashboard />} />
             <Route path="/lifeplan/guidelines-library/new" element={<RuleLibraryBuilder />} />

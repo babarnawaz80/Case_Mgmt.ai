@@ -218,7 +218,7 @@ const PeopleSupported = () => {
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-2 shrink-0">
                   <button
-                    onClick={() => toast({ title: "e-Chart", description: `Opening e-Chart for ${person.firstName} ${person.lastName}. This connects to the iCM eChart module.` })}
+                    onClick={() => navigate(`/people/${person.id}/echart`)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/90 text-destructive-foreground text-xs font-medium hover:bg-destructive transition-colors"
                   >
                     <FileText className="w-3.5 h-3.5" /> e-Chart

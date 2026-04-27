@@ -1,35 +1,40 @@
-import { AppLayout } from "@/components/layout/AppLayout";
-import { StatsCards } from "@/components/dashboard/StatsCards";
-import { PCPChart } from "@/components/dashboard/PCPChart";
-import { IncidentsCard } from "@/components/dashboard/IncidentsCard";
-import { MyWorkCard } from "@/components/dashboard/MyWorkCard";
-import { QuickActions } from "@/components/dashboard/QuickActions";
+import { ICMShell } from "@/components/icm/ICMShell";
+import { KPIRow } from "@/components/icm/KPIRow";
+import { ScheduleCard } from "@/components/icm/ScheduleCard";
+import { WatchlistCard } from "@/components/icm/WatchlistCard";
+import { ModuleGrid } from "@/components/icm/ModuleGrid";
 
-const Index = () => {
+const Dashboard = () => {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
   return (
-    <AppLayout>
-      <div className="space-y-5 max-w-[1600px] mx-auto">
-        {/* Stats Row */}
-        <StatsCards />
-
-        {/* Middle Row: PCP wide + Incidents compact + My Work compact */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-5">
-            <PCPChart />
-          </div>
-          <div className="lg:col-span-3">
-            <IncidentsCard />
-          </div>
-          <div className="lg:col-span-4">
-            <MyWorkCard />
-          </div>
+    <ICMShell title="iCM Dashboard">
+      <div className="space-y-5">
+        {/* Greeting */}
+        <div>
+          <h1 className="font-tight text-[26px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">
+            {greeting}, Kathy
+          </h1>
+          <p className="text-[13px] text-icm-text-dim mt-1">
+            You have 3 items needing attention and 4 visits remaining today.
+          </p>
         </div>
 
-        {/* Quick Actions & Modules */}
-        <QuickActions />
+        {/* KPIs */}
+        <KPIRow />
+
+        {/* Two column */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ScheduleCard />
+          <WatchlistCard />
+        </div>
+
+        {/* Module grid */}
+        <ModuleGrid />
       </div>
-    </AppLayout>
+    </ICMShell>
   );
 };
 
-export default Index;
+export default Dashboard;

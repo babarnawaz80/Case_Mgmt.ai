@@ -226,6 +226,12 @@ const EChart = () => {
 
         <BillingSummaryWidget individualId={person.id} />
       </div>
+      <PreVisitModal
+        open={showPreVisit}
+        onClose={() => setShowPreVisit(false)}
+        personId={person.id}
+        personName={person.name}
+      />
     </ICMShell>
   );
 };

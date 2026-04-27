@@ -8,7 +8,7 @@ const items = [
   { title: "Workflows", url: "/workflows", icon: GitBranch },
   { title: "Schedule", url: "/dashboard/schedule", icon: Calendar },
   { title: "Documentation", url: "/dashboard/documentation", icon: FileText },
-  { title: "Incidents", url: "/dashboard/incidents", icon: AlertTriangle },
+  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Sites", url: "/dashboard/sites", icon: Building2 },
   { title: "Reports", url: "/dashboard/reports", icon: BarChart3 },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },

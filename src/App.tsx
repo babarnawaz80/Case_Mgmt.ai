@@ -34,6 +34,9 @@ import PersonWorkflowManager from "./pages/PersonWorkflowManager";
 import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
 import WorkflowsGlobal from "./pages/WorkflowsGlobal";
 import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
+import PersonIncidentReporting from "./pages/PersonIncidentReporting";
+import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
+import IncidentsGlobal from "./pages/IncidentsGlobal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -66,6 +69,9 @@ const App = () => (
             <Route path="/people/:id/workflow-manager/:workflowId" element={<PersonWorkflowDetail />} />
             <Route path="/workflows" element={<WorkflowsGlobal />} />
             <Route path="/admin/workflow-templates" element={<WorkflowTemplatesAdmin />} />
+            <Route path="/people/:id/incident-reporting" element={<PersonIncidentReporting />} />
+            <Route path="/people/:id/incident-reporting/:incidentId" element={<PersonIncidentReportingDetail />} />
+            <Route path="/incidents" element={<IncidentsGlobal />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

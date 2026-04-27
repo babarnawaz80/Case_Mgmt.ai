@@ -35,6 +35,7 @@ import {
   riskAvatarClass,
   riskScoreClass,
 } from "@/data/people";
+import { BillingSummaryWidget } from "@/components/billing/BillingSummaryWidget";
 
 interface ModuleTile {
   slug: string;
@@ -187,6 +188,8 @@ const EChart = () => {
           tiles={caseManagementModules}
           personId={person.id}
         />
+
+        <BillingSummaryWidget individualId={person.id} />
 
         <ModuleSection
           title="Individual Record"

@@ -94,11 +94,25 @@ export default {
           amber: "hsl(var(--icm-amber))",
           "amber-soft": "hsl(var(--icm-amber-soft))",
         },
+        billing: {
+          healthy: "hsl(var(--billing-healthy))",
+          warning: "hsl(var(--billing-warning))",
+          "at-risk": "hsl(var(--billing-at-risk))",
+        },
+        "ai-violet": {
+          DEFAULT: "hsl(var(--ai-violet))",
+          foreground: "hsl(var(--ai-violet-foreground))",
+        },
+        "surface-low": "hsl(var(--surface-low))",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        elevated: "0px 12px 32px -4px rgba(11, 15, 16, 0.06)",
+        "elevated-lg": "0px 16px 40px -8px rgba(11, 15, 16, 0.08)",
       },
       keyframes: {
         "accordion-down": {

@@ -42,16 +42,16 @@ export function KPIRow() {
       </KpiCard>
 
       {/* My Work */}
-      <KpiCard>
+      <NavLink to="/my-work" className="rounded-xl border border-icm-border bg-icm-panel p-5 hover:border-icm-border-strong hover:shadow-elevated transition-all block">
         <p className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">My Work</p>
         <p className="font-tight text-[26px] font-semibold text-icm-text leading-tight mt-1 tracking-tight">14</p>
-        <p className="text-[11px] text-icm-text-dim mt-1">3 past due</p>
+        <p className="text-[11px] text-icm-text-dim mt-1">3 past due · open list →</p>
         <div className="flex items-center gap-3 mt-3 text-[11px] font-geist">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-icm-red" />Past due</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-icm-amber" />Due soon</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-icm-text-faint" />Open</span>
         </div>
-      </KpiCard>
+      </NavLink>
 
       {/* Today's Visits */}
       <KpiCard>

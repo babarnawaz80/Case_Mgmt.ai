@@ -53,6 +53,17 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
           <ChevronDown className="w-3 h-3 opacity-70" />
         </button>
 
+        {isAdmin && (
+          <button
+            onClick={() => navigate("/platform")}
+            title="Agents Platform"
+            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text-dim text-[12px] font-geist font-medium flex items-center gap-1.5 hover:text-icm-text hover:border-icm-border-strong transition-colors"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Platform
+          </button>
+        )}
+
         <div className="w-px h-5 bg-icm-border mx-1" />
 
         {/* Notification cluster */}

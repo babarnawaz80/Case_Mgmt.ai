@@ -8,11 +8,13 @@ import {
   Sparkles,
   User,
   CheckSquare,
+  MessageSquare,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useMessages } from "@/hooks/useMessages";
 
 interface NavItem {
   title: string;

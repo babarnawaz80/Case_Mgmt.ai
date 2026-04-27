@@ -1,0 +1,627 @@
+import { useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  ChevronLeft,
+  Sparkles,
+  Save,
+  Send,
+  CheckCircle2,
+  ClipboardList,
+} from "lucide-react";
+import { getPerson } from "@/data/people";
+import {
+  AssessmentAnswer,
+  AssessmentTemplate,
+  INDEPENDENCE_LEVELS,
+  Question,
+  aiPrefillFor,
+  assessments,
+  getAssessment,
+  getTemplate,
+} from "@/data/assessments";
+
+export default function PersonAssessmentForm() {
+  const { id, assessmentId } = useParams<{ id: string; assessmentId: string }>();
+  const navigate = useNavigate();
+  const [search] = useSearchParams();
+  const person = getPerson(id ?? "");
+
+  // Existing read-only assessment vs new draft.
+  const existing = assessmentId && assessmentId !== "new" ? getAssessment(assessmentId) : null;
+  const templateId = existing?.templateId ?? search.get("template") ?? "";
+  const template = getTemplate(templateId);
+  const usePrefill = search.get("prefill") === "1";
+
+  const initialAnswers: AssessmentAnswer[] = useMemo(() => {
+    if (existing) return existing.answers;
+    if (template && usePrefill) return aiPrefillFor(template.id, id ?? "");
+    return [];
+  }, [existing, template, usePrefill, id]);
+
+  const [answers, setAnswers] = useState<AssessmentAnswer[]>(initialAnswers);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(
+    template?.sections[0]?.id ?? null,
+  );
+  const [submitted, setSubmitted] = useState(false);
+
+  if (!person || !template) {
+    return (
+      <div className="p-10 text-center text-[13px] text-icm-text-dim">
+        Assessment template not found.{" "}
+        <button
+          onClick={() => navigate(`/people/${id}/assessments`)}
+          className="text-icm-accent hover:underline"
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  const readonly = !!existing;
+  const aiCount = answers.filter((a) => a.aiSuggested).length;
+
+  function getAnswer(qid: string) {
+    return answers.find((a) => a.questionId === qid);
+  }
+  function setAnswer(qid: string, value: AssessmentAnswer["value"]) {
+    setAnswers((prev) => {
+      const idx = prev.findIndex((a) => a.questionId === qid);
+      if (idx === -1) return [...prev, { questionId: qid, value }];
+      const next = [...prev];
+      // Manually editing clears the AI flag.
+      next[idx] = { questionId: qid, value };
+      return next;
+    });
+  }
+
+  function calcScore() {
+    let total = 0;
+    for (const sec of template!.sections) {
+      for (const q of sec.questions) {
+        const a = getAnswer(q.id);
+        if (!a || a.value == null) continue;
+        if (q.type === "scored_choice") {
+          const opt = q.options?.find((o) => o.label === a.value);
+          if (opt?.score) total += opt.score;
+        } else if (q.type === "independence_level") {
+          const lvl = INDEPENDENCE_LEVELS.find((l) => l.label === a.value);
+          if (lvl && lvl.score != null) total += lvl.score;
+        }
+      }
+    }
+    return total;
+  }
+
+  const score = calcScore();
+  const loc =
+    score <= template.loc.low
+      ? "Low"
+      : score <= template.loc.moderate
+        ? "Moderate"
+        : score <= template.loc.high
+          ? "High"
+          : "Critical";
+  const locTone =
+    loc === "Low"
+      ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+      : loc === "Moderate"
+        ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+        : "bg-icm-red-soft text-icm-red ring-icm-red/20";
+
+  const totalQuestions = template.sections.reduce(
+    (acc, s) => acc + s.questions.filter((q) => q.type !== "section_header" && q.type !== "divider" && q.type !== "instructions").length,
+    0,
+  );
+  const answered = answers.filter((a) => a.value != null && a.value !== "").length;
+
+  function submit() {
+    const newId = search.get("aid") ?? `A-${Date.now().toString().slice(-4)}`;
+    assessments.push({
+      id: newId,
+      individualId: id!,
+      templateId: template!.id,
+      templateVersion: template!.version,
+      date: new Date().toLocaleDateString("en-US"),
+      status: "Completed",
+      completedBy: "Kathy Adams, CM",
+      totalScore: score,
+      loc: loc as any,
+      answers,
+    });
+    setSubmitted(true);
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-icm-bg flex items-center justify-center p-6">
+        <div className="max-w-[480px] w-full rounded-xl border border-icm-border bg-icm-panel p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-icm-green-soft text-icm-green mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-7 h-7" />
+          </div>
+          <h1 className="font-manrope font-extrabold text-[20px] text-icm-text mt-4">
+            Assessment Completed
+          </h1>
+          <p className="text-[12.5px] text-icm-text-dim mt-2">
+            {template.name} · Score {score} · LOC {loc}
+          </p>
+          <div className="mt-5 space-y-2">
+            <button
+              onClick={() => navigate(`/people/${id}/care-plan`)}
+              className="w-full h-10 rounded-xl bg-icm-text text-icm-panel text-[12.5px] font-semibold hover:opacity-90"
+            >
+              Connect to Care Plan →
+            </button>
+            <button
+              onClick={() => navigate(`/people/${id}/assessments`)}
+              className="w-full h-10 rounded-xl border border-icm-border text-[12.5px] font-semibold text-icm-text-dim hover:text-icm-text"
+            >
+              Back to assessments
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-icm-bg font-geist text-icm-text">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 bg-icm-bg/95 backdrop-blur-sm border-b border-icm-border px-6 py-3 flex items-center gap-3">
+        <button
+          onClick={() => navigate(`/people/${id}/assessments`)}
+          className="inline-flex items-center gap-1 text-[11.5px] text-icm-text-dim hover:text-icm-text"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          Assessments
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="font-manrope font-extrabold text-[16px] text-icm-text leading-tight">
+            {template.name}{" "}
+            <span className="text-icm-text-dim font-medium text-[12px]">
+              {template.version} · {person.firstName} {person.lastName}
+            </span>
+          </p>
+          <p className="text-[11px] text-icm-text-dim">
+            {answered} of {totalQuestions} answered ·{" "}
+            {Math.round((answered / Math.max(totalQuestions, 1)) * 100)}% complete
+          </p>
+        </div>
+        <span
+          className={`px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 uppercase ${readonly ? "bg-icm-green-soft text-icm-green ring-icm-green/20" : "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"}`}
+        >
+          {readonly ? "Completed" : "In Progress"}
+        </span>
+        {!readonly && (
+          <>
+            <button className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-medium text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5">
+              <Save className="w-3.5 h-3.5" />
+              Save draft
+            </button>
+            <button
+              onClick={submit}
+              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Submit
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="max-w-[1200px] mx-auto p-6 grid grid-cols-1 lg:grid-cols-[220px_1fr_240px] gap-5">
+        {/* Section nav */}
+        <aside className="lg:sticky lg:top-[72px] lg:self-start space-y-1">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">
+            Sections
+          </p>
+          {template.sections.map((s, i) => {
+            const sQs = s.questions.filter(
+              (q) => q.type !== "section_header" && q.type !== "instructions" && q.type !== "divider",
+            );
+            const sAnswered = sQs.filter((q) => {
+              const a = getAnswer(q.id);
+              return a && a.value != null && a.value !== "";
+            }).length;
+            const dot =
+              sAnswered === 0
+                ? "bg-icm-text-faint"
+                : sAnswered === sQs.length
+                  ? "bg-icm-green"
+                  : "bg-icm-amber";
+            return (
+              <button
+                key={s.id}
+                onClick={() => {
+                  setActiveSectionId(s.id);
+                  document.getElementById(`sec-${s.id}`)?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] ${activeSectionId === s.id ? "bg-icm-accent-soft text-icm-accent" : "hover:bg-icm-bg text-icm-text-dim"}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                <span className="truncate">{i + 1}. {s.name}</span>
+              </button>
+            );
+          })}
+        </aside>
+
+        {/* Form */}
+        <div className="space-y-4 min-w-0">
+          {!readonly && aiCount > 0 && (
+            <div className="rounded-xl bg-icm-accent-soft border border-icm-accent/20 p-3 flex items-start gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-icm-accent mt-0.5" />
+              <p className="text-[12px] font-geist text-icm-text">
+                <span className="font-semibold">I pre-filled {aiCount} questions</span>{" "}
+                <span className="text-icm-text-dim">
+                  from {person.firstName}'s profile, prior assessment, and recent notes.
+                  All pre-filled answers are labeled — review each one.
+                </span>
+              </p>
+            </div>
+          )}
+
+          {template.sections.map((s, i) => (
+            <SectionCard
+              key={s.id}
+              id={`sec-${s.id}`}
+              section={s}
+              index={i + 1}
+              answers={answers}
+              setAnswer={setAnswer}
+              readonly={readonly}
+            />
+          ))}
+        </div>
+
+        {/* Score */}
+        <aside className="lg:sticky lg:top-[72px] lg:self-start">
+          <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+            <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-semibold">
+              Current score
+            </p>
+            <p className="font-manrope font-extrabold text-[28px] text-icm-text leading-none mt-1">
+              {score}
+              <span className="text-[14px] font-medium text-icm-text-faint"> / {template.loc.high + 30}</span>
+            </p>
+            <span
+              className={`mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 uppercase ${locTone}`}
+            >
+              LOC: {loc}
+            </span>
+            <p className="text-[10.5px] text-icm-text-faint mt-3 leading-relaxed">
+              Low ≤{template.loc.low} · Moderate ≤{template.loc.moderate} · High ≤{template.loc.high} · Critical &gt;
+              {template.loc.high}
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({
+  id,
+  section,
+  index,
+  answers,
+  setAnswer,
+  readonly,
+}: {
+  id: string;
+  section: AssessmentTemplate["sections"][number];
+  index: number;
+  answers: AssessmentAnswer[];
+  setAnswer: (qid: string, value: AssessmentAnswer["value"]) => void;
+  readonly: boolean;
+}) {
+  const aiInSec = section.questions.some((q) =>
+    answers.find((a) => a.questionId === q.id && a.aiSuggested),
+  );
+  return (
+    <section id={id} className="rounded-xl border border-icm-border bg-icm-panel p-5 scroll-mt-20">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-6 h-6 rounded-full bg-icm-accent text-icm-panel text-[11px] font-mono font-bold flex items-center justify-center">
+          {index}
+        </span>
+        <h2 className="font-manrope font-bold text-[16px] text-icm-text">{section.name}</h2>
+        {aiInSec && (
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-geist font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
+            <Sparkles className="w-2.5 h-2.5" />
+            AI assist
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {section.questions.map((q) => (
+          <QuestionField
+            key={q.id}
+            question={q}
+            answer={answers.find((a) => a.questionId === q.id)}
+            onChange={(v) => setAnswer(q.id, v)}
+            readonly={readonly}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuestionField({
+  question,
+  answer,
+  onChange,
+  readonly,
+}: {
+  question: Question;
+  answer?: AssessmentAnswer;
+  onChange: (v: AssessmentAnswer["value"]) => void;
+  readonly: boolean;
+}) {
+  const aiTint = answer?.aiSuggested ? "bg-icm-accent-soft/40" : "";
+
+  if (question.type === "section_header") {
+    return <h3 className="font-manrope font-bold text-[14px] text-icm-text">{question.label}</h3>;
+  }
+  if (question.type === "divider") {
+    return <hr className="border-icm-border" />;
+  }
+  if (question.type === "instructions") {
+    return (
+      <div className="rounded-lg bg-icm-bg border border-icm-border p-2.5 text-[11.5px] text-icm-text-dim">
+        {question.body || question.label}
+      </div>
+    );
+  }
+
+  const Label = (
+    <div className="flex items-center gap-1.5 mb-1.5">
+      <span className="text-[12.5px] font-geist font-semibold text-icm-text">
+        {question.label}
+        {question.required && <span className="text-icm-red ml-0.5">*</span>}
+      </span>
+      {answer?.aiSuggested && (
+        <span
+          title={answer.aiSource}
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-geist font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20"
+        >
+          <Sparkles className="w-2.5 h-2.5" />
+          AI suggested
+        </span>
+      )}
+    </div>
+  );
+
+  if (question.type === "short_text" || question.type === "date" || question.type === "date_initials") {
+    return (
+      <div>
+        {Label}
+        <input
+          disabled={readonly}
+          type={question.type === "date" ? "date" : "text"}
+          value={(answer?.value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={`h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] focus:outline-none focus:border-icm-accent ${aiTint}`}
+        />
+      </div>
+    );
+  }
+  if (question.type === "long_text") {
+    return (
+      <div>
+        {Label}
+        <textarea
+          disabled={readonly}
+          rows={3}
+          value={(answer?.value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full p-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] focus:outline-none focus:border-icm-accent ${aiTint}`}
+        />
+      </div>
+    );
+  }
+  if (question.type === "number") {
+    return (
+      <div>
+        {Label}
+        <div className="flex items-center gap-2">
+          <input
+            disabled={readonly}
+            type="number"
+            value={(answer?.value as number) ?? ""}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className={`h-9 w-32 px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] font-mono focus:outline-none focus:border-icm-accent ${aiTint}`}
+          />
+          {question.unit && <span className="text-[11.5px] text-icm-text-dim">{question.unit}</span>}
+        </div>
+      </div>
+    );
+  }
+  if (question.type === "yes_no" || question.type === "yes_no_na") {
+    const opts = question.type === "yes_no" ? ["Yes", "No"] : ["Yes", "No", "N/A"];
+    return (
+      <div>
+        {Label}
+        <div className="flex gap-2 flex-wrap">
+          {opts.map((o) => {
+            const sel = answer?.value === o;
+            return (
+              <button
+                key={o}
+                disabled={readonly}
+                onClick={() => onChange(o)}
+                className={`h-8 px-3 rounded-full text-[11.5px] font-semibold border ${sel ? "bg-icm-accent text-white border-icm-accent" : "bg-icm-panel text-icm-text-dim border-icm-border hover:border-icm-border-strong"}`}
+              >
+                {o}
+              </button>
+            );
+          })}
+        </div>
+        {answer?.value === "Yes" && question.followUpIfYes && (
+          <textarea
+            placeholder={question.followUpIfYes.placeholder}
+            rows={2}
+            disabled={readonly}
+            className="mt-2 w-full p-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] focus:outline-none focus:border-icm-accent"
+          />
+        )}
+      </div>
+    );
+  }
+  if (question.type === "single_radio" || question.type === "single_select") {
+    return (
+      <div>
+        {Label}
+        <div className="flex flex-wrap gap-2">
+          {(question.options ?? []).map((o) => {
+            const sel = answer?.value === o.label;
+            return (
+              <button
+                key={o.label}
+                disabled={readonly}
+                onClick={() => onChange(o.label)}
+                className={`h-8 px-3 rounded-full text-[11.5px] border ${sel ? "bg-icm-accent text-white border-icm-accent" : "bg-icm-panel text-icm-text-dim border-icm-border hover:border-icm-border-strong"}`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  if (question.type === "multi_select") {
+    const arr = (answer?.value as string[]) ?? [];
+    return (
+      <div>
+        {Label}
+        <div className="flex flex-wrap gap-2">
+          {(question.options ?? []).map((o) => {
+            const sel = arr.includes(o.label);
+            return (
+              <button
+                key={o.label}
+                disabled={readonly}
+                onClick={() =>
+                  onChange(sel ? arr.filter((x) => x !== o.label) : [...arr, o.label])
+                }
+                className={`h-8 px-3 rounded-full text-[11.5px] border ${sel ? "bg-icm-accent text-white border-icm-accent" : "bg-icm-panel text-icm-text-dim border-icm-border hover:border-icm-border-strong"}`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  if (question.type === "scored_choice") {
+    return (
+      <div>
+        {Label}
+        <div className="flex flex-wrap gap-2">
+          {(question.options ?? []).map((o) => {
+            const sel = answer?.value === o.label;
+            return (
+              <button
+                key={o.label}
+                disabled={readonly}
+                onClick={() => onChange(o.label)}
+                className={`h-8 px-3 rounded-full text-[11.5px] border inline-flex items-center gap-1.5 ${sel ? "bg-icm-accent text-white border-icm-accent" : "bg-icm-panel text-icm-text-dim border-icm-border hover:border-icm-border-strong"}`}
+              >
+                {o.label}
+                <span className={`text-[10px] font-mono px-1 rounded ${sel ? "bg-white/20" : "bg-icm-bg text-icm-text-faint"}`}>
+                  {o.score}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  if (question.type === "independence_level") {
+    return (
+      <div>
+        {Label}
+        <div className="flex flex-wrap gap-1.5">
+          {INDEPENDENCE_LEVELS.map((l) => {
+            const sel = answer?.value === l.label;
+            const tone =
+              l.tone === "green"
+                ? "bg-icm-green text-white border-icm-green"
+                : l.tone === "blue"
+                  ? "bg-icm-accent text-white border-icm-accent"
+                  : l.tone === "amber"
+                    ? "bg-icm-amber text-white border-icm-amber"
+                    : l.tone === "red"
+                      ? "bg-icm-red text-white border-icm-red"
+                      : "bg-icm-bg text-icm-text-dim border-icm-border";
+            return (
+              <button
+                key={l.label}
+                disabled={readonly}
+                onClick={() => onChange(l.label)}
+                className={`h-8 px-2.5 rounded-full text-[10.5px] font-semibold border ${sel ? tone : "bg-icm-panel text-icm-text-dim border-icm-border hover:border-icm-border-strong"}`}
+              >
+                {l.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  if (question.type === "likert") {
+    const pts = question.likertPoints ?? 5;
+    return (
+      <div>
+        {Label}
+        <div className="flex gap-1.5">
+          {Array.from({ length: pts }).map((_, i) => {
+            const v = String(i + 1);
+            const sel = answer?.value === v;
+            return (
+              <button
+                key={i}
+                disabled={readonly}
+                onClick={() => onChange(v)}
+                className={`h-8 w-10 rounded-full text-[12px] font-semibold border ${sel ? "bg-icm-accent text-white border-icm-accent" : "bg-icm-panel text-icm-text-dim border-icm-border hover:border-icm-border-strong"}`}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  if (question.type === "rating") {
+    return (
+      <div>
+        {Label}
+        <input
+          type="range"
+          min={question.min ?? 1}
+          max={question.max ?? 10}
+          disabled={readonly}
+          value={(answer?.value as number) ?? question.min ?? 1}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-icm-accent"
+        />
+        <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">
+          Value: {(answer?.value as number) ?? "—"}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {Label}
+      <p className="text-[11px] text-icm-text-faint italic">
+        Field type "{question.type}" preview not yet rendered.
+      </p>
+    </div>
+  );
+}

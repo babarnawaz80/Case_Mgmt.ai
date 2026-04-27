@@ -45,6 +45,10 @@ import GuidelinesEnginesList from "./pages/platform/GuidelinesEnginesList";
 import NewEngineWizard from "./pages/platform/NewEngineWizard";
 import EngineDetail from "./pages/platform/EngineDetail";
 import RuleLibrary from "./pages/platform/RuleLibrary";
+import AssessmentBuilderList from "./pages/admin/AssessmentBuilderList";
+import AssessmentBuilderEdit from "./pages/admin/AssessmentBuilderEdit";
+import PersonAssessments from "./pages/PersonAssessments";
+import PersonAssessmentForm from "./pages/PersonAssessmentForm";
 import NotFound from "./pages/NotFound";
 
 // Billing module (copied verbatim from IDDBilling.ai)
@@ -115,6 +119,12 @@ const App = () => (
             <Route path="/lifeplan/agent/:agentId/drafts" element={<AgentDraftRuns />} />
             <Route path="/lifeplan/agent/:agentId/monitoring" element={<AgentMonitoringSettings />} />
             <Route path="/lifeplan/agent/:id" element={<LifePlanAgentDetail />} />
+            <Route path="/admin/assessment-builder" element={<AssessmentBuilderList />} />
+            <Route path="/admin/assessment-builder/new" element={<AssessmentBuilderEdit />} />
+            <Route path="/admin/assessment-builder/:templateId/edit" element={<AssessmentBuilderEdit />} />
+            <Route path="/people/:id/assessments" element={<PersonAssessments />} />
+            <Route path="/people/:id/assessments/new" element={<PersonAssessmentForm />} />
+            <Route path="/people/:id/assessments/:assessmentId" element={<PersonAssessmentForm />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

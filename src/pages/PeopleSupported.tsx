@@ -136,6 +136,8 @@ const PeopleSupported = () => {
               key={p.id}
               person={p}
               onOpen={() => navigate(`/people/${p.id}/echart`)}
+              onOpenFaceSheet={() => navigate(`/people/${p.id}/facesheet`)}
+              onOpenProfile={() => navigate(`/people/${p.id}/profile`)}
             />
           ))}
           {filtered.length === 0 && (

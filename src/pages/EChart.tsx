@@ -305,6 +305,8 @@ function ModuleSection({
                 navigate(`/people/${personId}/incident-reporting`);
               } else if (t.slug === "assessments") {
                 navigate(`/people/${personId}/assessments`);
+              } else if (t.slug === "referrals") {
+                navigate(`/people/${personId}/referrals`);
               } else {
                 navigate(`/people/${personId}/module/${t.slug}`);
               }

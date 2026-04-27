@@ -316,7 +316,7 @@ function PersonHeader({ person, navigate }: { person: ReturnType<typeof getPerso
         <div
           className={`w-10 h-10 rounded-full ring-2 flex items-center justify-center font-semibold text-[13px] ${riskAvatarClass(person.riskScore)}`}
         >
-          {initials(person.firstName, person.lastName)}
+          {initials(person)}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-manrope font-bold text-[15px] text-icm-text leading-tight">

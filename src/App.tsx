@@ -26,6 +26,8 @@ import PersonMonitoringForm from "./pages/PersonMonitoringForm";
 import PersonMonitoringFormDetail from "./pages/PersonMonitoringFormDetail";
 import PersonVisitSummary from "./pages/PersonVisitSummary";
 import PersonVisitSummaryDetail from "./pages/PersonVisitSummaryDetail";
+import PersonEligibilityVerification from "./pages/PersonEligibilityVerification";
+import PersonEligibilityVerificationDetail from "./pages/PersonEligibilityVerificationDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +52,8 @@ const App = () => (
             <Route path="/people/:id/monitoring-form/:formId" element={<PersonMonitoringFormDetail />} />
             <Route path="/people/:id/visit-summary" element={<PersonVisitSummary />} />
             <Route path="/people/:id/visit-summary/:visitId" element={<PersonVisitSummaryDetail />} />
+            <Route path="/people/:id/eligibility-verification" element={<PersonEligibilityVerification />} />
+            <Route path="/people/:id/eligibility-verification/:verificationId" element={<PersonEligibilityVerificationDetail />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
             <Route path="/lifeplan" element={<LifePlanBoard />} />

@@ -16,6 +16,7 @@ import {
 } from "@/data/settings";
 import { cn } from "@/lib/utils";
 import { Pencil, MoreHorizontal, Shield, Activity } from "lucide-react";
+import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 const SettingsUserDetail = () => {
   const { userId = "" } = useParams();
@@ -80,11 +81,17 @@ const SettingsUserDetail = () => {
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <button className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5">
+          <button
+            onClick={() => demoToast(`Edit ${user.firstName} ${user.lastName}`)}
+            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+          >
             <Pencil className="w-3.5 h-3.5" />
             Edit
           </button>
-          <button className="h-9 w-9 rounded-xl border border-icm-border bg-icm-panel text-icm-text-dim flex items-center justify-center">
+          <button
+            onClick={() => demoToast("More user actions")}
+            className="h-9 w-9 rounded-xl border border-icm-border bg-icm-panel text-icm-text-dim flex items-center justify-center hover:border-icm-border-strong"
+          >
             <MoreHorizontal className="w-4 h-4" />
           </button>
         </div>
@@ -152,7 +159,10 @@ const SettingsUserDetail = () => {
             Account active
           </label>
           <div className="flex justify-end pt-2">
-            <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold">
+            <button
+              onClick={() => demoSuccess("User profile saved")}
+              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+            >
               Save changes
             </button>
           </div>
@@ -315,7 +325,10 @@ const SettingsUserDetail = () => {
               </tbody>
             </table>
           </div>
-          <button className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5">
+          <button
+            onClick={() => demoSuccess("Permission overrides reset to role defaults")}
+            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+          >
             <Activity className="w-3.5 h-3.5" />
             Reset all to role defaults
           </button>

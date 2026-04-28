@@ -1,6 +1,7 @@
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { integrations, type IntegrationDef } from "@/data/settings";
 import { cn } from "@/lib/utils";
+import { demoToast, demoSuccess } from "@/lib/demoToast";
 import {
   CreditCard,
   Activity,
@@ -50,7 +51,10 @@ const SettingsIntegrations = () => {
           <SsoRow label="SAML 2.0" />
           <SsoRow label="OIDC" />
         </div>
-        <button className="mt-3 h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold">
+        <button
+          onClick={() => demoSuccess("SSO connection test passed", "SAML 2.0 endpoint reachable in 142ms.")}
+          className="mt-3 h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold hover:border-icm-border-strong"
+        >
           Test SSO connection
         </button>
       </div>
@@ -64,7 +68,10 @@ const SettingsIntegrations = () => {
               Manage API keys and webhook endpoints
             </p>
           </div>
-          <button className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5">
+          <button
+            onClick={() => demoToast("API key generation")}
+            className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
+          >
             <Plus className="w-3.5 h-3.5" />
             Generate API key
           </button>
@@ -130,6 +137,11 @@ function IntegrationCard({ integration }: { integration: IntegrationDef }) {
       </p>
       <button
         disabled={integration.status === "coming_soon"}
+        onClick={() => {
+          if (integration.status === "connected") demoToast(`${integration.name} configuration`);
+          else if (integration.status === "not_connected") demoSuccess(`${integration.name} connected`, "Demo connection established.");
+          else demoToast(`${integration.name} — coming soon`);
+        }}
         className="mt-3 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold hover:border-icm-border-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {integration.status === "connected"
@@ -146,7 +158,10 @@ function SsoRow({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[12px] font-geist text-icm-text">{label}</span>
-      <button className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11px] font-geist font-semibold">
+      <button
+        onClick={() => demoToast(`${label} configuration`)}
+        className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11px] font-geist font-semibold hover:border-icm-border-strong"
+      >
         Configure
       </button>
     </div>

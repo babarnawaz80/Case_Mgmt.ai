@@ -1,4 +1,5 @@
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
+import { demoSuccess } from "@/lib/demoToast";
 
 const SettingsOrganization = () => {
   return (
@@ -6,7 +7,10 @@ const SettingsOrganization = () => {
       title="Organization Profile"
       subtitle="Configure your organization's profile, branding, and operating states"
       actions={
-        <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold">
+        <button
+          onClick={() => demoSuccess("Organization profile saved", "Changes propagated to all users.")}
+          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+        >
           Save profile
         </button>
       }

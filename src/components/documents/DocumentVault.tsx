@@ -35,6 +35,7 @@ import {
   folderTone,
 } from "@/data/documents";
 import { cn } from "@/lib/utils";
+import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 interface DocumentVaultProps {
   folders: Folder[];
@@ -487,7 +488,10 @@ function UploadModal({ folders, onClose }: { folders: Folder[]; onClose: () => v
         <p className="text-[11.5px] text-icm-text-dim font-geist mt-1">
           PDF, PNG, JPG, JPEG, TIFF, DOC, DOCX, XLS, XLSX, TXT — max 50MB per file
         </p>
-        <button className="mt-4 h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5">
+        <button
+          onClick={() => demoToast("File browser")}
+          className="mt-4 h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
+        >
           <Upload className="w-3.5 h-3.5" />
           Browse files
         </button>
@@ -516,7 +520,7 @@ function UploadModal({ folders, onClose }: { folders: Folder[]; onClose: () => v
           Cancel
         </button>
         <button
-          onClick={onClose}
+          onClick={() => { demoSuccess("Document uploaded", "AI is indexing now."); onClose(); }}
           className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
         >
           Upload
@@ -530,7 +534,10 @@ function ScanModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalShell title="Scan Document" onClose={onClose} width={560}>
       <div className="grid grid-cols-2 gap-3">
-        <button className="rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-border-strong transition-colors">
+        <button
+          onClick={() => { demoToast("Camera capture coming soon"); }}
+          className="rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-border-strong transition-colors"
+        >
           <div className="w-10 h-10 rounded-lg bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20 flex items-center justify-center">
             <Camera className="w-5 h-5" />
           </div>
@@ -540,7 +547,10 @@ function ScanModal({ onClose }: { onClose: () => void }) {
             automatically.
           </p>
         </button>
-        <button className="rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-border-strong transition-colors">
+        <button
+          onClick={() => { demoToast("Scan upload coming soon"); }}
+          className="rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-border-strong transition-colors"
+        >
           <div className="w-10 h-10 rounded-lg bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 flex items-center justify-center">
             <ScanLine className="w-5 h-5" />
           </div>
@@ -625,7 +635,7 @@ function NewFolderModal({ onClose }: { onClose: () => void }) {
           Cancel
         </button>
         <button
-          onClick={onClose}
+          onClick={() => { demoSuccess("Folder created"); onClose(); }}
           className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
         >
           Create
@@ -689,6 +699,7 @@ function PreviewPanel({
             <button
               key={label}
               title={label}
+              onClick={() => demoToast(`${label} ${doc.name}`)}
               className="h-8 w-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
             >
               <I className="w-4 h-4" />
@@ -734,7 +745,10 @@ function PreviewPanel({
                 <p className="text-[12.5px] font-geist text-icm-text leading-relaxed">
                   {doc.aiSummary}
                 </p>
-                <button className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent inline-flex items-center gap-1">
+                <button
+                  onClick={() => demoToast(`Ask AI about "${doc.name}"`)}
+                  className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent inline-flex items-center gap-1 hover:underline"
+                >
                   <Sparkles className="w-3 h-3" />
                   Ask me about this document →
                 </button>

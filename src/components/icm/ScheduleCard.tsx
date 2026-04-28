@@ -55,7 +55,10 @@ export function ScheduleCard() {
     <div className="rounded-[12px] border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong transition-colors">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-tight font-semibold text-[15px] text-icm-text">Today's schedule</h3>
-        <button className="text-[12px] font-geist text-icm-accent hover:underline flex items-center gap-0.5">
+        <button
+          onClick={() => navigate("/my-work")}
+          className="text-[12px] font-geist text-icm-accent hover:underline flex items-center gap-0.5"
+        >
           View week <ChevronRight className="w-3 h-3" />
         </button>
       </div>

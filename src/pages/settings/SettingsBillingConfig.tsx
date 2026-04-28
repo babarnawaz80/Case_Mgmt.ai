@@ -1,6 +1,7 @@
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { demoToast } from "@/lib/demoToast";
 
 const SettingsBillingConfig = () => {
   return (
@@ -50,7 +51,10 @@ const SettingsBillingConfig = () => {
       <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="font-manrope font-bold text-[14px] text-icm-text">Service codes</p>
-          <button className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5">
+          <button
+            onClick={() => demoToast("Add service code")}
+            className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
+          >
             <Plus className="w-3.5 h-3.5" />
             Add code
           </button>

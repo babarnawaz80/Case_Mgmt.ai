@@ -2,6 +2,7 @@ import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { programs, operatingStates } from "@/data/settings";
 import { cn } from "@/lib/utils";
 import { Plus, Pencil } from "lucide-react";
+import { demoToast } from "@/lib/demoToast";
 
 const SettingsPrograms = () => {
   return (
@@ -9,7 +10,10 @@ const SettingsPrograms = () => {
       title="Programs & States"
       subtitle="Configure programs, service categories, and state-specific requirements"
       actions={
-        <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5">
+        <button
+          onClick={() => demoToast("New program wizard")}
+          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
+        >
           <Plus className="w-3.5 h-3.5" />
           Add program
         </button>
@@ -44,7 +48,10 @@ const SettingsPrograms = () => {
                   {p.fundingSource} · {p.billingUnit} · {p.individuals} individuals
                 </p>
               </div>
-              <button className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5">
+              <button
+                onClick={() => demoToast(`Edit ${p.name}`)}
+                className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+              >
                 <Pencil className="w-3.5 h-3.5" />
                 Edit
               </button>
@@ -67,7 +74,10 @@ const SettingsPrograms = () => {
                   Configured · State terminology customized
                 </p>
               </div>
-              <button className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold">
+              <button
+                onClick={() => demoToast(`Configure ${s.name}`)}
+                className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold hover:border-icm-border-strong"
+              >
                 Configure
               </button>
             </div>

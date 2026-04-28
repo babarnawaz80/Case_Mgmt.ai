@@ -1,6 +1,7 @@
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { Lock, Shield, FileLock2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { demoToast } from "@/lib/demoToast";
 
 const SettingsSecurity = () => {
   return (
@@ -124,7 +125,10 @@ const SettingsSecurity = () => {
         <Panel title="HIPAA compliance" icon={FileLock2}>
           <ToggleRow label="BAA signed" defaultOn />
           <Field label="BAA date" defaultValue="01/15/2025" />
-          <button className="mt-2 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-semibold">
+          <button
+            onClick={() => demoToast("BAA template download")}
+            className="mt-2 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-semibold hover:border-icm-border-strong"
+          >
             Download BAA template
           </button>
         </Panel>

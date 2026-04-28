@@ -137,9 +137,9 @@ const Messages = () => {
 
   return (
     <ICMShell title="Messages" showAIPanel={false}>
-      <div className="flex h-[calc(100vh-160px)] -m-6 bg-icm-bg">
+      <div className="flex h-[calc(100vh-160px)] -m-3 sm:-m-6 bg-icm-bg">
         {/* LEFT — conversation list */}
-        <aside className="w-[280px] shrink-0 bg-icm-panel border-r border-icm-border flex flex-col">
+        <aside className="w-[220px] sm:w-[280px] shrink-0 bg-icm-panel border-r border-icm-border flex flex-col">
           <div className="p-3 border-b border-icm-border space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-manrope font-bold text-[15px] text-icm-text">

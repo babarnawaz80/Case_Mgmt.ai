@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { BookOpen, Bot, ArrowRight, Layers, ClipboardCheck, MapPin, BarChart3 } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { engineSummary } from "@/data/guidelinesEngines";
@@ -15,10 +16,14 @@ const PlatformHub = () => {
   return (
     <ICMShell title="Platform" showAIPanel={false}>
       <div className="space-y-5 max-w-[1100px]">
-        <div className="text-[11.5px] font-geist text-icm-text-dim flex items-center gap-1.5">
-          <Layers className="w-3.5 h-3.5" />
-          Platform
-        </div>
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Platform" },
+          ]}
+        />
 
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>

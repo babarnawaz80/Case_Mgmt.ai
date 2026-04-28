@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { CreditCard, ArrowRight } from "lucide-react";
 import { demoToast } from "@/lib/demoToast";
 
@@ -8,13 +9,14 @@ const BillingHub = () => {
   return (
     <ICMShell title="Billing" showAIPanel={false}>
       <div className="space-y-6">
-        <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
-          <button onClick={() => navigate("/dashboard")} className="hover:text-icm-text">
-            Dashboard
-          </button>
-          <span className="text-icm-text-faint">›</span>
-          <span className="text-icm-text font-medium">Billing</span>
-        </nav>
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Billing" },
+          ]}
+        />
 
         <div>
           <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">

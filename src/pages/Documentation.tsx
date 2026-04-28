@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   MessageSquare,
   Pencil,
@@ -48,6 +49,14 @@ const Documentation = () => {
   return (
     <ICMShell title="Documentation" showAIPanel={false}>
       <div className="space-y-5 max-w-[1100px]">
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Documentation" },
+          ]}
+        />
         <div>
           <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
             Documentation

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   Search,
   Plus,
@@ -59,6 +60,14 @@ const PeopleSupported = () => {
   return (
     <ICMShell title="People Supported" showAIPanel={false}>
       <div className="space-y-5">
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "People Supported" },
+          ]}
+        />
         {/* Title row */}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowRight, Siren, Filter } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   getAllIncidents, globalIncidentSummary, typeBreakdown, stageBreakdown,
   type IncidentRecord, type IncidentStatus, type IncidentStageId, STAGE_LABELS,
@@ -29,6 +30,14 @@ const IncidentsGlobal = () => {
   return (
     <ICMShell title="Incident Reporting Center" showAIPanel={false}>
       <div className="space-y-5">
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Incidents" },
+          ]}
+        />
         <div>
           <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">Incident Reporting Center</h1>
           <p className="text-[13px] text-icm-text-dim mt-1 font-geist">All incidents across your caseload</p>

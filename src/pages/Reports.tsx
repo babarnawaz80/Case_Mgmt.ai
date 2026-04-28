@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { useRole } from "@/contexts/RoleContext";
 import {
   BarChart3,
@@ -65,6 +66,14 @@ export default function Reports() {
   return (
     <ICMShell title="Reports" showAIPanel={false}>
       <div className="space-y-5">
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Reports" },
+          ]}
+        />
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
             <h1 className="font-manrope text-[24px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
@@ -172,7 +181,7 @@ export default function Reports() {
                         <ReportCard
                           key={r.id}
                           report={r}
-                          onRun={() => navigate(`/dashboard/reports/${r.id}`)}
+                          onRun={() => navigate(`/reports/${r.id}`)}
                         />
                       ))}
                     </div>
@@ -224,7 +233,7 @@ export default function Reports() {
                     Joseph Brown (3), Travis Langston (2), Mohsin Raza (1). All assigned to Kathy Adams.
                   </p>
                   <button
-                    onClick={() => navigate("/dashboard/reports/task-status")}
+                    onClick={() => navigate("/reports/task-status")}
                     className="mt-2 text-[11px] font-semibold text-icm-accent hover:underline"
                   >
                     Open report →
@@ -235,7 +244,7 @@ export default function Reports() {
           </div>
         )}
 
-        {tab === "my" && <MyReportsTab onOpen={(id) => navigate(`/dashboard/reports/${id}`)} />}
+        {tab === "my" && <MyReportsTab onOpen={(id) => navigate(`/reports/${id}`)} />}
         {tab === "audit" && <AuditExportTab isAdmin={isAdmin} />}
       </div>
     </ICMShell>

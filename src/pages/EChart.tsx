@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { demoToast } from "@/lib/demoToast";
@@ -32,19 +32,21 @@ import {
   PenTool,
   Sparkles,
   ChevronDown,
-  ChevronLeft,
   Settings2,
   Video,
+  FileText,
+  Plus,
+  AlertCircle,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 import {
   getPerson,
   initials,
   riskAvatarClass,
-  riskScoreClass,
 } from "@/data/people";
 
-type Tone = "neutral" | "amber" | "red" | "green" | "accent";
+type Category = "Documentation" | "Care" | "Operations";
 
 interface ModuleTile {
   slug: string;
@@ -52,55 +54,83 @@ interface ModuleTile {
   icon: LucideIcon;
   /** Route segment appended to /people/:id/ */
   route: string;
-  /** Numeric badge (e.g., overdue count) */
+  /** Numeric badge in top-right (large) */
   count?: number;
-  /** Pill text shown next to/under the count */
-  meta?: string;
-  metaTone?: Tone;
+  /** Category — drives accent-bar color and grouping */
+  category: Category;
   /** Roles allowed to see this tile. Undefined = visible to all. */
   roles?: ("admin" | "case_manager" | "billing" | "supervisor")[];
 }
 
-// Flat tile order — strict sequence per spec.
+// Grouped tiles per the screenshot. Counts mirror the original demo data.
 const ALL_TILES: ModuleTile[] = [
-  // Row 1
-  { slug: "case-management", label: "Case Management", icon: CheckSquare, route: "case-management", count: 3, meta: "3 overdue", metaTone: "red" },
-  { slug: "care-plan", label: "Care Plan / ISP", icon: FileHeart, route: "care-plan", meta: "Overdue 8d", metaTone: "red" },
-  { slug: "contact-note", label: "Contact Note", icon: MessageSquare, route: "contact-note", count: 2, meta: "2 unsigned", metaTone: "amber" },
-  { slug: "progress-note", label: "Progress Note", icon: Pencil, route: "progress-note", count: 2, meta: "2 unsigned", metaTone: "amber" },
-  // Row 2
-  { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, route: "visit-summary", meta: "Last 02/15", metaTone: "neutral" },
-  { slug: "monitoring-form", label: "Monitoring Form", icon: ClipboardList, route: "monitoring-form", meta: "Due in 7d", metaTone: "amber" },
-  { slug: "assessments", label: "Assessments", icon: ClipboardCheck, route: "assessments", count: 1, meta: "1 overdue", metaTone: "red" },
-  { slug: "eligibility-verification", label: "Eligibility Verification", icon: ShieldCheck, route: "eligibility-verification", meta: "MA Active", metaTone: "green" },
-  // Row 3
-  { slug: "referrals", label: "Referrals", icon: ArrowRightCircle, route: "referrals", count: 1, meta: "1 pending", metaTone: "amber" },
-  { slug: "incident-reporting", label: "Incidents", icon: AlertTriangle, route: "incident-reporting", count: 1, meta: "1 open", metaTone: "red" },
-  { slug: "meeting-notes", label: "Team Meeting Notes", icon: Users, route: "meeting-notes", meta: "2 this month", metaTone: "neutral" },
-  { slug: "communications", label: "Communications Log", icon: Phone, route: "communications", meta: "6 this month", metaTone: "neutral" },
-  // Row 4
-  { slug: "documents", label: "Documents", icon: Folder, route: "documents", count: 3, meta: "3 expiring", metaTone: "amber" },
-  { slug: "services", label: "Services", icon: Briefcase, route: "services", meta: "5 active", metaTone: "neutral" },
-  { slug: "employment", label: "Employment & Education", icon: GraduationCap, route: "employment" },
-  { slug: "care-tracker", label: "Care Tracker", icon: Heart, route: "care-tracker" },
-  // Row 5
-  { slug: "facesheet", label: "Face Sheet", icon: User, route: "facesheet" },
-  { slug: "assigned-staff", label: "Assigned Staff", icon: UserCheck, route: "assigned-staff" },
-  { slug: "managed-documents", label: "Managed Documents", icon: Archive, route: "managed-documents" },
-  { slug: "oncall", label: "On Call Log", icon: PhoneCall, route: "oncall" },
-  // Row 6
-  { slug: "trainings", label: "Person Trainings", icon: BookOpen, route: "trainings" },
-  { slug: "service-plan", label: "Service Plan", icon: LayoutIcon, route: "service-plan" },
-  { slug: "billing", label: "Billing Summary", icon: CreditCard, route: "billing", meta: "12 claims", metaTone: "neutral", roles: ["billing", "admin"] },
-  { slug: "esignature", label: "e-Signature", icon: PenTool, route: "esignature" },
+  // Documentation (blue)
+  { slug: "contact-note", label: "Activity Note", icon: FileText, route: "contact-note", count: 24, category: "Documentation" },
+  { slug: "billable-activity", label: "Billable Activity Note", icon: FileText, route: "contact-note", count: 12, category: "Documentation" },
+  { slug: "case-management", label: "Case Management", icon: Briefcase, route: "case-management", count: 8, category: "Documentation" },
+  { slug: "eligibility-verification", label: "MA Status Verification", icon: ShieldCheck, route: "eligibility-verification", category: "Documentation" },
+  { slug: "monitoring-form", label: "Monitoring Form", icon: ClipboardList, route: "monitoring-form", count: 4, category: "Documentation" },
+  { slug: "care-plan", label: "PCP", icon: Heart, route: "care-plan", count: 1, category: "Documentation" },
+  { slug: "progress-note", label: "Progress Note", icon: Pencil, route: "progress-note", count: 14, category: "Documentation" },
+  { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, route: "visit-summary", count: 6, category: "Documentation" },
+  { slug: "workflow-manager", label: "Workflow Manager", icon: LayoutIcon, route: "workflow-manager", count: 2, category: "Documentation" },
+
+  // Care (green)
+  { slug: "assigned-staff", label: "Assigned Staff", icon: Users, route: "assigned-staff", count: 5, category: "Care" },
+  { slug: "care-notes", label: "Care Notes", icon: FileText, route: "progress-note", count: 18, category: "Care" },
+  { slug: "care-tracker", label: "Care Tracker", icon: Heart, route: "care-tracker", category: "Care" },
+  { slug: "esignature", label: "e-Signature", icon: CheckSquare, route: "esignature", count: 3, category: "Care" },
+  { slug: "employment", label: "Employment & Education", icon: GraduationCap, route: "employment", category: "Care" },
+  { slug: "facesheet", label: "Face Sheet", icon: User, route: "facesheet", count: 1, category: "Care" },
+
+  // Operations (amber)
+  { slug: "incident-reporting", label: "Incident Reporting", icon: AlertTriangle, route: "incident-reporting", count: 2, category: "Operations" },
+  { slug: "discharge-transfer", label: "Discharge & Transfer", icon: ArrowRightCircle, route: "managed-documents", category: "Operations" },
+  { slug: "managed-documents", label: "Managed Documents", icon: Folder, route: "managed-documents", count: 8, category: "Operations" },
+  { slug: "oncall", label: "On Call Log", icon: PhoneCall, route: "oncall", count: 3, category: "Operations" },
+  { slug: "trainings", label: "Person Supported Trainings", icon: BookOpen, route: "trainings", count: 4, category: "Operations" },
+  { slug: "progress-notes-ops", label: "Progress Notes", icon: MessageSquare, route: "progress-note", count: 14, category: "Operations" },
+  { slug: "services", label: "Services", icon: Briefcase, route: "services", category: "Operations" },
+  { slug: "service-plan", label: "Service Plan", icon: LayoutIcon, route: "service-plan", count: 1, category: "Operations" },
+  { slug: "billing", label: "General Ledger", icon: CreditCard, route: "billing", category: "Operations", roles: ["billing", "admin"] },
 ];
 
-const metaToneClasses: Record<Tone, string> = {
-  neutral: "bg-icm-bg text-icm-text-dim ring-icm-border",
-  amber: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
-  red: "bg-icm-red-soft text-icm-red ring-icm-red/20",
-  green: "bg-icm-green-soft text-icm-green ring-icm-green/20",
-  accent: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
+// Category visual language
+const CATEGORY_META: Record<
+  Category,
+  {
+    dot: string;
+    accentBar: string;
+    iconBg: string;
+    iconColor: string;
+    pillActive: string;
+    pillIdle: string;
+  }
+> = {
+  Documentation: {
+    dot: "bg-icm-accent",
+    accentBar: "bg-icm-accent",
+    iconBg: "bg-icm-accent-soft",
+    iconColor: "text-icm-accent",
+    pillActive: "bg-icm-accent text-white",
+    pillIdle: "bg-icm-panel border border-icm-border text-icm-text-dim",
+  },
+  Care: {
+    dot: "bg-icm-green",
+    accentBar: "bg-icm-green",
+    iconBg: "bg-icm-green-soft",
+    iconColor: "text-icm-green",
+    pillActive: "bg-icm-green text-white",
+    pillIdle: "bg-icm-panel border border-icm-border text-icm-text-dim",
+  },
+  Operations: {
+    dot: "bg-icm-amber",
+    accentBar: "bg-icm-amber",
+    iconBg: "bg-icm-amber-soft",
+    iconColor: "text-icm-amber",
+    pillActive: "bg-icm-amber text-white",
+    pillIdle: "bg-icm-panel border border-icm-border text-icm-text-dim",
+  },
 };
 
 const EChart = () => {
@@ -109,6 +139,7 @@ const EChart = () => {
   const person = getPerson(id ?? "");
   const { role } = useRole();
   const [showPreVisit, setShowPreVisit] = useState(false);
+  const [filter, setFilter] = useState<"All" | Category>("All");
 
   if (!person) {
     return (
@@ -130,126 +161,160 @@ const EChart = () => {
     (t) => !t.roles || t.roles.includes(role as "admin" | "case_manager" | "billing" | "supervisor"),
   );
 
-  const urgent = person.aiSuggestions?.find((s) => s.tone === "urgent");
+  const filtered = filter === "All" ? visibleTiles : visibleTiles.filter((t) => t.category === filter);
+
+  const grouped = useMemo(() => {
+    const order: Category[] = ["Documentation", "Care", "Operations"];
+    return order
+      .map((cat) => ({ cat, tiles: filtered.filter((t) => t.category === cat) }))
+      .filter((g) => g.tiles.length > 0);
+  }, [filtered]);
+
+  // Compact header metrics — hard-coded demo values mapped to the mock person.
+  const allergies = person.allergies ?? "Penicillin · Peanuts";
+  const specialInstructions =
+    person.specialInstructions ?? "Requires 1:1 staffing during community outings · No driving";
 
   return (
     <ICMShell title="eChart" rightPanel={<PersonAIPanel person={person} />}>
-      <div className="space-y-5">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
-          <button onClick={() => navigate("/people")} className="hover:text-icm-text">
-            People
-          </button>
-          <ChevronLeft className="w-3 h-3 rotate-180 text-icm-text-faint" />
-          <span className="text-icm-text font-medium">
-            {person.lastName}, {person.firstName}
-          </span>
-          <ChevronLeft className="w-3 h-3 rotate-180 text-icm-text-faint" />
-          <span className="text-icm-text font-medium">eChart</span>
-        </nav>
+      <div className="space-y-4">
+        {/* Person header card with gradient accent + alerts */}
+        <div className="relative rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
+          {/* Top gradient stripe */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-icm-accent via-purple-400 to-icm-red" />
 
-        {/* Sticky person header */}
-        <div className="sticky top-0 z-10 -mx-6 px-6 pt-1 pb-3 bg-icm-bg/95 backdrop-blur-sm">
-          <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
+          <div className="p-5 pt-6">
             <div className="flex items-start gap-4 flex-wrap">
+              {/* Avatar */}
               <div
-                className={`w-16 h-16 rounded-2xl border flex items-center justify-center font-mono text-[18px] font-bold shrink-0 ${riskAvatarClass(
+                className={`w-16 h-16 rounded-full border flex items-center justify-center font-mono text-[18px] font-bold shrink-0 ${riskAvatarClass(
                   person.riskScore,
                 )}`}
               >
                 {initials(person)}
               </div>
 
+              {/* Identity + chips */}
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">
-                    {person.lastName}, {person.firstName}
-                    {person.nickname && (
-                      <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
-                    )}
-                  </h1>
-                  {person.riskScore !== undefined && (
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ring-1 ring-current/20 ${riskScoreClass(
-                        person.riskScore,
-                      )}`}
-                    >
-                      RISK {person.riskScore}
-                    </span>
+                <h1 className="font-manrope font-extrabold text-[24px] text-icm-text tracking-tight leading-tight">
+                  {person.lastName}, {person.firstName}
+                  {person.nickname && (
+                    <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
                   )}
-                </div>
-                <p className="text-[12px] font-mono text-icm-text-dim mt-1">
-                  {person.gender} · {person.age}y · {person.dob} · {person.county} · ID #{person.id}
+                </h1>
+                <p className="text-[12px] font-geist text-icm-text-dim mt-1 flex items-center gap-3 flex-wrap">
+                  <span>
+                    {person.gender} · {person.age} years · {person.dob}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-icm-red" />
+                    {person.county}
+                  </span>
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                  <InlineField label="Allergies" value={person.allergies ?? "None recorded"} />
-                  <InlineField label="Special Instructions" value={person.specialInstructions ?? "—"} />
+                <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+                  <StatusChip tone="green" label={person.status} />
+                  <StatusChip tone="accent" label="eChart" />
+                  <StatusChip tone="amber" label="Manage Programs" />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Allergies card */}
+              <AlertPanel
+                tone="red"
+                icon={AlertTriangle}
+                label="ALLERGIES"
+                title={allergies}
+                subtitle="Severe reactions documented"
+              />
+
+              {/* Special instructions card */}
+              <AlertPanel
+                tone="amber"
+                icon={AlertCircle}
+                label="SPECIAL INSTRUCTIONS"
+                title={specialInstructions}
+              />
+
+              {/* Action stack */}
+              <div className="flex flex-col gap-2 shrink-0">
+                <button
+                  onClick={() => demoToast("Summarize chart")}
+                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-text text-icm-panel hover:opacity-90 transition"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Summarize chart
+                </button>
                 <button
                   onClick={() => setShowPreVisit(true)}
-                  className="h-9 px-3 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-green-soft text-icm-green ring-1 ring-icm-green/30 hover:brightness-95 transition"
+                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong transition"
                 >
-                  <Video className="w-3.5 h-3.5" />
-                  Start Visit
+                  <Plus className="w-3.5 h-3.5" />
+                  New note
                 </button>
-                <HeaderButton label={person.status} icon={ChevronDown} variant="status" />
-                <HeaderButton label="eChart" icon={ChevronDown} />
-                <HeaderButton label="Manage Programs" icon={Settings2} />
               </div>
             </div>
 
-            {urgent && (
-              <div className="mt-4 rounded-xl bg-icm-accent-soft border border-icm-accent/20 px-3.5 py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center shrink-0">
-                    <Sparkles className="w-3.5 h-3.5 text-white" />
-                  </div>
-                  <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                    <span className="font-semibold">AI noticed: </span>
-                    <span className="text-icm-text-dim">{urgent.body}</span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => demoToast(urgent.cta)}
-                  className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0"
-                >
-                  {urgent.cta} →
-                </button>
-              </div>
-            )}
+            {/* Metric strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-5 pt-5 border-t border-icm-border">
+              <Metric label="PCP STATUS" value="On track" valueClass="text-icm-green" foot="Reviewed Apr 12" />
+              <Metric label="RISK SCORE" value="22" valueClass="text-icm-green" foot="Low · ↓ 4 pts" />
+              <Metric label="LAST VISIT" value="2 days ago" valueClass="text-icm-text" foot="K. Vargas · 45m" />
+              <Metric label="NEXT ISP" value="May 22" valueClass="text-icm-accent" foot="in 24 days" />
+              <Metric label="OPEN GOALS" value="4" valueClass="text-purple-600" foot="2 progressing" />
+              <Metric label="ASSIGNED STAFF" value="5" valueClass="text-icm-text" foot="J. Thollander lead" />
+            </div>
           </div>
         </div>
 
-        {/* ONE flat tile grid */}
-        <section>
-          <div className="flex items-baseline justify-between mb-3">
-            <div>
-              <h2 className="font-manrope font-bold text-[15px] text-icm-text tracking-tight">
-                Modules
-              </h2>
-              <p className="text-[11.5px] text-icm-text-dim font-geist">
-                Open any module for {person.firstName}
-              </p>
-            </div>
-            <span className="text-[11px] font-mono text-icm-text-faint">
-              {visibleTiles.length} modules
-            </span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {visibleTiles.map((t) => (
-              <ModuleTileCard
-                key={t.slug}
-                tile={t}
-                onOpen={() => navigate(`/people/${person.id}/${t.route}`)}
+        {/* Filter pills */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <FilterPill
+              label="All"
+              active={filter === "All"}
+              onClick={() => setFilter("All")}
+            />
+            {(["Documentation", "Care", "Operations"] as Category[]).map((c) => (
+              <FilterPill
+                key={c}
+                label={c}
+                category={c}
+                active={filter === c}
+                onClick={() => setFilter(c)}
               />
             ))}
           </div>
-        </section>
+          <span className="text-[11.5px] font-geist text-icm-text-dim">
+            {visibleTiles.length} modules · last activity 12 min ago
+          </span>
+        </div>
+
+        {/* Grouped tile sections */}
+        {grouped.map(({ cat, tiles }) => (
+          <section key={cat} className="space-y-2.5">
+            <div className="flex items-center gap-2 border-t border-icm-border pt-3">
+              <span className={`w-2 h-2 rounded-full ${CATEGORY_META[cat].dot}`} />
+              <h2 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">
+                {cat}
+              </h2>
+              <span className="text-[11px] font-geist text-icm-text-dim">
+                {tiles.length} modules
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {tiles.map((t) => (
+                <ModuleTileCard
+                  key={t.slug}
+                  tile={t}
+                  onOpen={() => navigate(`/people/${person.id}/${t.route}`)}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
+
       <PreVisitModal
         open={showPreVisit}
         onClose={() => setShowPreVisit(false)}
@@ -260,87 +325,159 @@ const EChart = () => {
   );
 };
 
-function InlineField({ label, value }: { label: string; value: string }) {
+/* ---------- subcomponents ---------- */
+
+function StatusChip({
+  tone,
+  label,
+}: {
+  tone: "green" | "accent" | "amber";
+  label: string;
+}) {
+  const map = {
+    green: "bg-icm-green-soft text-icm-green ring-icm-green/20",
+    accent: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
+    amber: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
+  } as const;
   return (
-    <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist font-medium">
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-geist font-medium ring-1 ${map[tone]}`}
+    >
+      {tone === "green" && <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />}
+      {label}
+    </span>
+  );
+}
+
+function AlertPanel({
+  tone,
+  icon: Icon,
+  label,
+  title,
+  subtitle,
+}: {
+  tone: "red" | "amber";
+  icon: LucideIcon;
+  label: string;
+  title: string;
+  subtitle?: string;
+}) {
+  const map = {
+    red: "bg-icm-red-soft border-icm-red/20 text-icm-red",
+    amber: "bg-icm-amber-soft border-icm-amber/20 text-icm-amber",
+  } as const;
+  const titleColor = tone === "red" ? "text-icm-text" : "text-icm-text";
+  return (
+    <div
+      className={`rounded-xl border px-3.5 py-2.5 max-w-[260px] min-w-[200px] ${map[tone]}`}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] font-geist font-bold uppercase tracking-wide">
+        <Icon className="w-3 h-3" />
         {label}
+      </div>
+      <p className={`mt-1 text-[12.5px] font-geist font-semibold leading-snug ${titleColor}`}>
+        {title}
       </p>
-      <p className="text-[12px] text-icm-text font-geist mt-0.5 truncate">{value}</p>
+      {subtitle && (
+        <p className="text-[11px] font-geist text-icm-text-dim mt-0.5 leading-snug">
+          {subtitle}
+        </p>
+      )}
     </div>
   );
 }
 
-function HeaderButton({
+function Metric({
   label,
-  icon: Icon,
-  variant,
+  value,
+  foot,
+  valueClass = "text-icm-text",
 }: {
   label: string;
-  icon: LucideIcon;
-  variant?: "status";
+  value: string;
+  foot: string;
+  valueClass?: string;
 }) {
-  const base =
-    "h-9 px-3 rounded-xl text-[12px] font-geist font-medium flex items-center gap-1.5 transition-colors";
-  if (variant === "status") {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist font-semibold">
+        {label}
+      </p>
+      <p className={`mt-1 font-manrope font-extrabold text-[18px] leading-tight tracking-tight truncate ${valueClass}`}>
+        {value}
+      </p>
+      <p className="text-[11px] font-geist text-icm-text-dim mt-0.5 truncate">{foot}</p>
+    </div>
+  );
+}
+
+function FilterPill({
+  label,
+  category,
+  active,
+  onClick,
+}: {
+  label: string;
+  category?: Category;
+  active: boolean;
+  onClick: () => void;
+}) {
+  // "All" pill is solid black when active.
+  if (!category) {
     return (
       <button
-        onClick={() => demoToast(`${label} details`)}
-        className={`${base} bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 hover:brightness-95`}
+        onClick={onClick}
+        className={`h-7 px-3 rounded-full text-[12px] font-geist font-semibold transition-colors ${
+          active
+            ? "bg-icm-text text-icm-panel"
+            : "bg-icm-panel border border-icm-border text-icm-text-dim hover:text-icm-text"
+        }`}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
         {label}
-        <Icon className="w-3 h-3 opacity-70" />
       </button>
     );
   }
+  const meta = CATEGORY_META[category];
   return (
     <button
-      onClick={() => demoToast(label)}
-      className={`${base} border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong`}
+      onClick={onClick}
+      className={`h-7 px-3 rounded-full text-[12px] font-geist font-medium inline-flex items-center gap-1.5 transition-colors ${
+        active ? meta.pillActive : meta.pillIdle + " hover:text-icm-text"
+      }`}
     >
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white/80" : meta.dot}`} />
       {label}
-      <Icon className="w-3 h-3 opacity-70" />
     </button>
   );
 }
 
 function ModuleTileCard({ tile, onOpen }: { tile: ModuleTile; onOpen: () => void }) {
   const Icon = tile.icon;
-  const tone = tile.metaTone ? metaToneClasses[tile.metaTone] : metaToneClasses.neutral;
+  const meta = CATEGORY_META[tile.category];
   return (
     <button
       onClick={onOpen}
-      className="text-left rounded-xl border border-icm-border bg-icm-panel p-3.5 min-h-[112px] hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col gap-2"
+      className="group relative text-left rounded-xl border border-icm-border bg-icm-panel pl-4 pr-3.5 py-3 min-h-[96px] hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col justify-between overflow-hidden"
     >
+      {/* Left accent bar */}
+      <span className={`absolute left-0 top-0 bottom-0 w-1 ${meta.accentBar}`} />
+
       <div className="flex items-start justify-between">
-        <div className="w-9 h-9 rounded-lg bg-icm-bg border border-icm-border flex items-center justify-center text-icm-text-dim">
-          <Icon className="w-[18px] h-[18px]" />
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.iconBg} ${meta.iconColor}`}
+        >
+          <Icon className="w-4 h-4" />
         </div>
         {tile.count !== undefined && (
-          <span
-            className={`px-1.5 min-w-[20px] h-5 rounded-full text-[10px] font-mono font-semibold flex items-center justify-center ${
-              tile.metaTone === "red"
-                ? "bg-icm-red text-white"
-                : tile.metaTone === "amber"
-                ? "bg-icm-amber text-white"
-                : "bg-icm-bg border border-icm-border text-icm-text-dim"
-            }`}
-          >
+          <span className="font-mono font-bold text-[15px] text-icm-text leading-none">
             {tile.count}
           </span>
         )}
       </div>
-      <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight">
+
+      <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight mt-2">
         {tile.label}
       </p>
-      {tile.meta && (
-        <span
-          className={`inline-flex items-center self-start px-1.5 py-0.5 rounded-full text-[10px] font-geist font-medium ring-1 ${tone}`}
-        >
-          {tile.meta}
-        </span>
-      )}
     </button>
   );
 }

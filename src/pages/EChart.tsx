@@ -367,7 +367,7 @@ function AlertPanel({
   const titleColor = tone === "red" ? "text-icm-text" : "text-icm-text";
   return (
     <div
-      className={`rounded-xl border px-3.5 py-2.5 max-w-[260px] min-w-[200px] ${map[tone]}`}
+      className={`rounded-xl border px-3.5 py-2.5 ${map[tone]}`}
     >
       <div className="flex items-center gap-1.5 text-[10px] font-geist font-bold uppercase tracking-wide">
         <Icon className="w-3 h-3" />

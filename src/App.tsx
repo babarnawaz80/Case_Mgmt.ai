@@ -71,6 +71,21 @@ import PersonDocuments from "./pages/PersonDocuments";
 import Documents from "./pages/Documents";
 import Messages from "./pages/Messages";
 import VirtualVisit from "./pages/VirtualVisit";
+import BillingHub from "./pages/BillingHub";
+import {
+  PersonCareTracker,
+  PersonMeetingNotes,
+  PersonCommunications,
+  PersonServices,
+  PersonEmployment,
+  PersonAssignedStaff,
+  PersonManagedDocuments,
+  PersonOnCall,
+  PersonTrainings,
+  PersonServicePlan,
+  PersonBillingSummary,
+  PersonESignature,
+} from "./pages/PersonPlaceholders";
 import NotFound from "./pages/NotFound";
 
 // Billing module (copied verbatim from IDDBilling.ai)
@@ -184,6 +199,32 @@ const App = () => (
             <Route path="/platform/guidelines-engines/:engineId" element={<EngineDetail />} />
             <Route path="/platform/rule-library" element={<RuleLibrary />} />
             <Route path="/platform/agents" element={<LifePlanBoard />} />
+            <Route path="/platform/agents/new" element={<RuntimeAgentBuilder />} />
+            <Route path="/platform/agents/:agentId/runs" element={<Layer2AgentBuilder />} />
+            <Route path="/platform/agents/:agentId/drafts" element={<AgentDraftRuns />} />
+            <Route path="/platform/agents/:agentId/monitoring" element={<AgentMonitoringSettings />} />
+
+            {/* Per-person placeholder routes (modules not yet built) */}
+            <Route path="/people/:id/care-tracker" element={<PersonCareTracker />} />
+            <Route path="/people/:id/meeting-notes" element={<PersonMeetingNotes />} />
+            <Route path="/people/:id/communications" element={<PersonCommunications />} />
+            <Route path="/people/:id/services" element={<PersonServices />} />
+            <Route path="/people/:id/employment" element={<PersonEmployment />} />
+            <Route path="/people/:id/assigned-staff" element={<PersonAssignedStaff />} />
+            <Route path="/people/:id/managed-documents" element={<PersonManagedDocuments />} />
+            <Route path="/people/:id/oncall" element={<PersonOnCall />} />
+            <Route path="/people/:id/trainings" element={<PersonTrainings />} />
+            <Route path="/people/:id/service-plan" element={<PersonServicePlan />} />
+            <Route path="/people/:id/billing" element={<PersonBillingSummary />} />
+            <Route path="/people/:id/esignature" element={<PersonESignature />} />
+
+            {/* Billing hub (Fix 3) */}
+            <Route path="/billing" element={<BillingHub />} />
+
+            {/* Legacy /lifeplan redirects → /platform/agents (Fix 4) */}
+            <Route path="/lifeplan" element={<Navigate to="/platform/agents" replace />} />
+            <Route path="/lifeplan/agent/new/layer2" element={<Navigate to="/platform/agents" replace />} />
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="/visit/:sessionId" element={<VirtualVisit />} />
             <Route path="*" element={<NotFound />} />

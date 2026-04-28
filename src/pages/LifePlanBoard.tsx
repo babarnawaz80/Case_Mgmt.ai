@@ -186,7 +186,7 @@ export default function LifePlanBoard() {
           </>
         )}
       </AnimatePresence>
-    </div>
+    </ICMShell>
   );
 }
 

@@ -9,10 +9,11 @@ import {
   User,
   CheckSquare,
   MessageSquare,
+  CreditCard,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useRole } from "@/contexts/RoleContext";
+import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
 
@@ -20,7 +21,7 @@ interface NavItem {
   title: string;
   url: string;
   icon: typeof Home;
-  roles?: ("admin" | "case_manager")[];
+  roles?: UserRole[];
 }
 
 const items: NavItem[] = [
@@ -30,7 +31,8 @@ const items: NavItem[] = [
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Documentation", url: "/documentation", icon: FileText },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
-  { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin"] },
+  { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
+  { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
   { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
 ];
 

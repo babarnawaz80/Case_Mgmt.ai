@@ -46,7 +46,7 @@ const toneStyles: Record<Tone, { wrap: string; chip: string }> = {
 
 export function AIPanel() {
   return (
-    <aside className="w-[320px] shrink-0 border-l border-icm-border bg-icm-panel flex flex-col h-full">
+    <aside className="hidden lg:flex w-[320px] shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-icm-border">
         <div className="flex items-center gap-2.5">

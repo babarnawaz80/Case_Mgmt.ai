@@ -10,7 +10,7 @@ import {
   CheckSquare,
   MessageSquare,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -46,6 +46,7 @@ const OPEN_INCIDENT_COUNT = 1;
 
 export function ICMSidebar() {
   const loc = useLocation();
+  const navigate = useNavigate();
   const { role } = useRole();
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();

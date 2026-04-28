@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import AmbientFlowV2 from "@/components/ambient/AmbientFlowV2";
 import { motion, AnimatePresence } from "framer-motion";
+import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 import {
   Sparkles,
   Send,
@@ -145,10 +146,11 @@ const Index = () => {
               {historyOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="font-display font-semibold text-foreground">Case Management AI</span>
+              <img
+                src={brandLogo}
+                alt="CaseManagement AI by iCareManager"
+                className="h-8 w-auto object-contain"
+              />
               <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </div>
           </div>
@@ -180,9 +182,11 @@ const Index = () => {
             className="text-center max-w-2xl"
           >
             <div className="flex justify-center mb-6">
-              <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center animate-float">
-                <Sparkles className="w-7 h-7 text-primary-foreground" />
-              </div>
+              <img
+                src={brandLogo}
+                alt="CaseManagement AI"
+                className="h-14 w-auto object-contain animate-float"
+              />
             </div>
             <h1 className="font-display text-3xl font-bold text-foreground mb-2">
               Good evening, Kathy

@@ -4,35 +4,36 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { demoToast } from "@/lib/demoToast";
 import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
+import { useRole } from "@/contexts/RoleContext";
 import {
+  CheckSquare,
+  FileHeart,
   MessageSquare,
-  ListChecks,
-  FileCheck2,
-  ClipboardList,
-  CalendarCheck,
-  ShieldCheck,
   Pencil,
+  CalendarCheck,
+  ClipboardList,
+  ClipboardCheck,
+  ShieldCheck,
+  ArrowRightCircle,
+  AlertTriangle,
   Users,
-  StickyNote,
-  Activity,
-  Signature,
+  Phone,
+  Folder,
   Briefcase,
-  IdCard,
-  Siren,
-  ArrowRightLeft,
-  FolderOpen,
-  PhoneCall,
   GraduationCap,
-  HandHeart,
-  ScrollText,
-  Receipt,
+  Heart,
+  User,
+  UserCheck,
+  Archive,
+  PhoneCall,
+  BookOpen,
+  Layout as LayoutIcon,
+  CreditCard,
+  PenTool,
   Sparkles,
   ChevronDown,
   ChevronLeft,
   Settings2,
-  ClipboardCheck,
-  ArrowRightCircle,
-  Phone,
   Video,
   type LucideIcon,
 } from "lucide-react";
@@ -42,53 +43,59 @@ import {
   riskAvatarClass,
   riskScoreClass,
 } from "@/data/people";
-import { BillingSummaryWidget } from "@/components/billing/BillingSummaryWidget";
+
+type Tone = "neutral" | "amber" | "red" | "green" | "accent";
 
 interface ModuleTile {
   slug: string;
   label: string;
   icon: LucideIcon;
+  /** Route segment appended to /people/:id/ */
+  route: string;
+  /** Numeric badge (e.g., overdue count) */
   count?: number;
+  /** Pill text shown next to/under the count */
   meta?: string;
-  metaTone?: "neutral" | "amber" | "red" | "green" | "accent";
-  aiBadge?: string;
+  metaTone?: Tone;
+  /** Roles allowed to see this tile. Undefined = visible to all. */
+  roles?: ("admin" | "case_manager" | "billing" | "supervisor")[];
 }
 
-const caseManagementModules: ModuleTile[] = [
-  { slug: "contact-note", label: "Contact Note", icon: MessageSquare, count: 12, meta: "Last 02/22", aiBadge: "Draft ready" },
-  { slug: "case-management", label: "Case Management", icon: ListChecks, count: 8, meta: "3 tasks overdue", metaTone: "amber" },
-  { slug: "care-plan", label: "Care Plan / ISP", icon: FileCheck2, meta: "Overdue 8 days", metaTone: "red", aiBadge: "Talking points" },
-  { slug: "monitoring-form", label: "Monitoring Form", icon: ClipboardList, meta: "Due in 7 days", metaTone: "amber" },
-  { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, count: 5, meta: "Last 02/15" },
-  { slug: "eligibility", label: "Eligibility Verification", icon: ShieldCheck, meta: "MA Active", metaTone: "green" },
-  { slug: "progress-note", label: "Progress Note", icon: Pencil, count: 4, meta: "2 unsigned", metaTone: "amber" },
-  { slug: "assessments", label: "Assessments", icon: ClipboardCheck, count: 1, meta: "Annual due", metaTone: "amber", aiBadge: "AI pre-fill" },
+// Flat tile order — strict sequence per spec.
+const ALL_TILES: ModuleTile[] = [
+  // Row 1
+  { slug: "case-management", label: "Case Management", icon: CheckSquare, route: "case-management", count: 3, meta: "3 overdue", metaTone: "red" },
+  { slug: "care-plan", label: "Care Plan / ISP", icon: FileHeart, route: "care-plan", meta: "Overdue 8d", metaTone: "red" },
+  { slug: "contact-note", label: "Contact Note", icon: MessageSquare, route: "contact-note", count: 2, meta: "2 unsigned", metaTone: "amber" },
+  { slug: "progress-note", label: "Progress Note", icon: Pencil, route: "progress-note", count: 2, meta: "2 unsigned", metaTone: "amber" },
+  // Row 2
+  { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, route: "visit-summary", meta: "Last 02/15", metaTone: "neutral" },
+  { slug: "monitoring-form", label: "Monitoring Form", icon: ClipboardList, route: "monitoring-form", meta: "Due in 7d", metaTone: "amber" },
+  { slug: "assessments", label: "Assessments", icon: ClipboardCheck, route: "assessments", count: 1, meta: "1 overdue", metaTone: "red" },
+  { slug: "eligibility-verification", label: "Eligibility Verification", icon: ShieldCheck, route: "eligibility-verification", meta: "MA Active", metaTone: "green" },
+  // Row 3
+  { slug: "referrals", label: "Referrals", icon: ArrowRightCircle, route: "referrals", count: 1, meta: "1 pending", metaTone: "amber" },
+  { slug: "incident-reporting", label: "Incidents", icon: AlertTriangle, route: "incident-reporting", count: 1, meta: "1 open", metaTone: "red" },
+  { slug: "meeting-notes", label: "Team Meeting Notes", icon: Users, route: "meeting-notes", meta: "2 this month", metaTone: "neutral" },
+  { slug: "communications", label: "Communications Log", icon: Phone, route: "communications", meta: "6 this month", metaTone: "neutral" },
+  // Row 4
+  { slug: "documents", label: "Documents", icon: Folder, route: "documents", count: 3, meta: "3 expiring", metaTone: "amber" },
+  { slug: "services", label: "Services", icon: Briefcase, route: "services", meta: "5 active", metaTone: "neutral" },
+  { slug: "employment", label: "Employment & Education", icon: GraduationCap, route: "employment" },
+  { slug: "care-tracker", label: "Care Tracker", icon: Heart, route: "care-tracker" },
+  // Row 5
+  { slug: "facesheet", label: "Face Sheet", icon: User, route: "facesheet" },
+  { slug: "assigned-staff", label: "Assigned Staff", icon: UserCheck, route: "assigned-staff" },
+  { slug: "managed-documents", label: "Managed Documents", icon: Archive, route: "managed-documents" },
+  { slug: "oncall", label: "On Call Log", icon: PhoneCall, route: "oncall" },
+  // Row 6
+  { slug: "trainings", label: "Person Trainings", icon: BookOpen, route: "trainings" },
+  { slug: "service-plan", label: "Service Plan", icon: LayoutIcon, route: "service-plan" },
+  { slug: "billing", label: "Billing Summary", icon: CreditCard, route: "billing", meta: "12 claims", metaTone: "neutral", roles: ["billing", "admin"] },
+  { slug: "esignature", label: "e-Signature", icon: PenTool, route: "esignature" },
 ];
 
-const individualRecordModules: ModuleTile[] = [
-  { slug: "assigned-staff", label: "Assigned Staff", icon: Users, count: 4 },
-  { slug: "care-notes", label: "Care Notes", icon: StickyNote, count: 18 },
-  { slug: "care-tracker", label: "Care Tracker", icon: Activity, count: 6 },
-  { slug: "e-signature", label: "e-Signature", icon: Signature, count: 2 },
-  { slug: "employment-education", label: "Employment & Education", icon: Briefcase },
-  { slug: "face-sheet", label: "Face Sheet", icon: IdCard },
-  { slug: "incident-reporting", label: "Incident Reporting", icon: Siren, count: 1 },
-  { slug: "discharge-transfer", label: "Global Discharge & Transfer", icon: ArrowRightLeft },
-  { slug: "managed-documents", label: "Managed Documents", icon: FolderOpen, count: 24 },
-  { slug: "on-call-log", label: "On Call Log", icon: PhoneCall, count: 3 },
-  { slug: "person-trainings", label: "Person Trainings", icon: GraduationCap, count: 7 },
-  { slug: "services", label: "Services", icon: HandHeart, count: 5 },
-  { slug: "service-plan", label: "Service Plan", icon: ScrollText },
-  { slug: "general-ledger", label: "General Ledger", icon: Receipt },
-];
-
-const coordinationModules: ModuleTile[] = [
-  { slug: "referrals", label: "Referrals", icon: ArrowRightCircle, count: 1, meta: "1 pending", metaTone: "amber" },
-  { slug: "meeting-notes", label: "Team Meeting Notes", icon: Users, count: 2, meta: "2 this month" },
-  { slug: "communications", label: "Communications Log", icon: Phone, count: 6, meta: "6 this month" },
-];
-
-const metaToneClasses: Record<NonNullable<ModuleTile["metaTone"]>, string> = {
+const metaToneClasses: Record<Tone, string> = {
   neutral: "bg-icm-bg text-icm-text-dim ring-icm-border",
   amber: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
   red: "bg-icm-red-soft text-icm-red ring-icm-red/20",
@@ -100,6 +107,7 @@ const EChart = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const person = getPerson(id ?? "");
+  const { role } = useRole();
   const [showPreVisit, setShowPreVisit] = useState(false);
 
   if (!person) {
@@ -118,18 +126,27 @@ const EChart = () => {
     );
   }
 
+  const visibleTiles = ALL_TILES.filter(
+    (t) => !t.roles || t.roles.includes(role as "admin" | "case_manager" | "billing" | "supervisor"),
+  );
+
   const urgent = person.aiSuggestions?.find((s) => s.tone === "urgent");
 
   return (
     <ICMShell title="eChart" rightPanel={<PersonAIPanel person={person} />}>
       <div className="space-y-5">
-        <button
-          onClick={() => navigate("/people")}
-          className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          People Supported
-        </button>
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
+          <button onClick={() => navigate("/people")} className="hover:text-icm-text">
+            People
+          </button>
+          <ChevronLeft className="w-3 h-3 rotate-180 text-icm-text-faint" />
+          <span className="text-icm-text font-medium">
+            {person.lastName}, {person.firstName}
+          </span>
+          <ChevronLeft className="w-3 h-3 rotate-180 text-icm-text-faint" />
+          <span className="text-icm-text font-medium">eChart</span>
+        </nav>
 
         {/* Sticky person header */}
         <div className="sticky top-0 z-10 -mx-6 px-6 pt-1 pb-3 bg-icm-bg/95 backdrop-blur-sm">
@@ -207,28 +224,31 @@ const EChart = () => {
           </div>
         </div>
 
-        <ModuleSection
-          title="Case Management"
-          subtitle="Primary working modules"
-          tiles={caseManagementModules}
-          personId={person.id}
-        />
-
-        <ModuleSection
-          title="Individual Record"
-          subtitle="Supporting information"
-          tiles={individualRecordModules}
-          personId={person.id}
-        />
-
-        <ModuleSection
-          title="Coordination"
-          subtitle="Referrals and communications"
-          tiles={coordinationModules}
-          personId={person.id}
-        />
-
-        <BillingSummaryWidget individualId={person.id} />
+        {/* ONE flat tile grid */}
+        <section>
+          <div className="flex items-baseline justify-between mb-3">
+            <div>
+              <h2 className="font-manrope font-bold text-[15px] text-icm-text tracking-tight">
+                Modules
+              </h2>
+              <p className="text-[11.5px] text-icm-text-dim font-geist">
+                Open any module for {person.firstName}
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-icm-text-faint">
+              {visibleTiles.length} modules
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {visibleTiles.map((t) => (
+              <ModuleTileCard
+                key={t.slug}
+                tile={t}
+                onOpen={() => navigate(`/people/${person.id}/${t.route}`)}
+              />
+            ))}
+          </div>
+        </section>
       </div>
       <PreVisitModal
         open={showPreVisit}
@@ -285,93 +305,31 @@ function HeaderButton({
   );
 }
 
-function ModuleSection({
-  title,
-  subtitle,
-  tiles,
-  personId,
-}: {
-  title: string;
-  subtitle: string;
-  tiles: ModuleTile[];
-  personId: string;
-}) {
-  const navigate = useNavigate();
-  return (
-    <section>
-      <div className="flex items-baseline justify-between mb-3">
-        <div>
-          <h2 className="font-manrope font-bold text-[15px] text-icm-text tracking-tight">{title}</h2>
-          <p className="text-[11.5px] text-icm-text-dim font-geist">{subtitle}</p>
-        </div>
-        <span className="text-[11px] font-mono text-icm-text-faint">{tiles.length} modules</span>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {tiles.map((t) => (
-          <ModuleTileCard
-            key={t.slug}
-            tile={t}
-            onOpen={() => {
-              if (t.slug === "contact-note") {
-                navigate(`/people/${personId}/contact-note`);
-              } else if (t.slug === "case-management") {
-                navigate(`/people/${personId}/case-management`);
-              } else if (t.slug === "care-plan") {
-                navigate(`/people/${personId}/care-plan`);
-              } else if (t.slug === "monitoring-form") {
-                navigate(`/people/${personId}/monitoring-form`);
-              } else if (t.slug === "visit-summary") {
-                navigate(`/people/${personId}/visit-summary`);
-              } else if (t.slug === "eligibility") {
-                navigate(`/people/${personId}/eligibility-verification`);
-              } else if (t.slug === "progress-note") {
-                navigate(`/people/${personId}/progress-note`);
-              } else if (t.slug === "workflow-manager") {
-                navigate(`/people/${personId}/workflow-manager`);
-              } else if (t.slug === "incident-reporting") {
-                navigate(`/people/${personId}/incident-reporting`);
-              } else if (t.slug === "assessments") {
-                navigate(`/people/${personId}/assessments`);
-              } else if (t.slug === "referrals") {
-                navigate(`/people/${personId}/referrals`);
-              } else if (t.slug === "managed-documents") {
-                navigate(`/people/${personId}/documents`);
-              } else {
-                navigate(`/people/${personId}/module/${t.slug}`);
-              }
-            }}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function ModuleTileCard({ tile, onOpen }: { tile: ModuleTile; onOpen: () => void }) {
   const Icon = tile.icon;
   const tone = tile.metaTone ? metaToneClasses[tile.metaTone] : metaToneClasses.neutral;
   return (
     <button
       onClick={onOpen}
-      className="text-left rounded-xl border border-icm-border bg-icm-panel p-3.5 hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col gap-2"
+      className="text-left rounded-xl border border-icm-border bg-icm-panel p-3.5 min-h-[112px] hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col gap-2"
     >
       <div className="flex items-start justify-between">
         <div className="w-9 h-9 rounded-lg bg-icm-bg border border-icm-border flex items-center justify-center text-icm-text-dim">
           <Icon className="w-[18px] h-[18px]" />
         </div>
-        <div className="flex items-center gap-1.5">
-          {tile.aiBadge && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-geist font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
-              <Sparkles className="w-2.5 h-2.5" />
-              {tile.aiBadge}
-            </span>
-          )}
-          {tile.count !== undefined && (
-            <span className="px-1.5 min-w-[20px] h-5 rounded-full bg-icm-bg border border-icm-border text-[10px] font-mono font-semibold text-icm-text-dim flex items-center justify-center">
-              {tile.count}
-            </span>
-          )}
-        </div>
+        {tile.count !== undefined && (
+          <span
+            className={`px-1.5 min-w-[20px] h-5 rounded-full text-[10px] font-mono font-semibold flex items-center justify-center ${
+              tile.metaTone === "red"
+                ? "bg-icm-red text-white"
+                : tile.metaTone === "amber"
+                ? "bg-icm-amber text-white"
+                : "bg-icm-bg border border-icm-border text-icm-text-dim"
+            }`}
+          >
+            {tile.count}
+          </span>
+        )}
       </div>
       <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight">
         {tile.label}

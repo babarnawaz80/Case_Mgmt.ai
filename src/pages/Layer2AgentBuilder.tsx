@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
-  ArrowLeft, Bot, User, Plus, Search, Shield, Database, Settings,
+  Bot, Plus, Search, Database, Settings, ChevronLeft,
 } from "lucide-react";
 import { StepIndicator } from "@/components/agentbuilder/StepIndicator";
 import { Layer2Step1Service } from "@/components/layer2/Layer2Step1Service";
@@ -17,6 +16,8 @@ import { Layer2State } from "@/types/guidelinePack";
 import { mockComplianceRuns, FIXED_WORKFLOW_STEPS } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { ICMShell } from "@/components/icm/ICMShell";
+import { User } from "lucide-react";
 
 const STEPS = FIXED_WORKFLOW_STEPS.map(s => ({ label: s.name, description: s.description }));
 
@@ -42,54 +43,69 @@ export default function Layer2AgentBuilder() {
       title: "Run Complete",
       description: "All outputs have been pushed to iCM modules. Service authorization is ready.",
     });
-    navigate("/lifeplan");
+    navigate("/platform/agents");
   };
 
   const handleStartNew = () => setShowLanding(false);
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-background">
-      <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={() => showLanding ? navigate("/lifeplan") : setShowLanding(true)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+    <ICMShell title="Agent Execution" showAIPanel={false}>
+      <div className="space-y-5">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
+          <button onClick={() => navigate("/platform")} className="hover:text-icm-text">
+            Platform
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
-              <Bot className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <div>
-              <h2 className="font-display font-semibold text-foreground text-sm">Agent Execution</h2>
-              <p className="text-[11px] text-muted-foreground">Case Manager Runtime · Compliance enforcement using published engines</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/lifeplan")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
-            <Settings className="w-3.5 h-3.5" /> Agent Settings
-          </motion.button>
-          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
-            <User className="w-5 h-5 text-muted-foreground" />
-          </div>
-        </div>
-      </header>
+          <span className="text-icm-text-faint">›</span>
+          <button onClick={() => navigate("/platform/agents")} className="hover:text-icm-text">
+            Agents
+          </button>
+          <span className="text-icm-text-faint">›</span>
+          <span className="text-icm-text font-medium">{runLabel}</span>
+        </nav>
 
-      {showLanding ? (
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-[1000px] mx-auto space-y-6">
+        {/* Page header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => (showLanding ? navigate("/platform/agents") : setShowLanding(true))}
+              className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              {showLanding ? "Back to Agents" : "Back to runs"}
+            </button>
+            <span className="text-icm-text-faint">·</span>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                <Bot className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="font-display font-semibold text-foreground text-sm">Agent Execution</h1>
+                <p className="text-[11px] text-muted-foreground">Case Manager Runtime · Compliance enforcement using published engines</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/platform/agents")}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border"
+          >
+            <Settings className="w-3.5 h-3.5" /> Agent Settings
+          </button>
+        </div>
+
+        {showLanding ? (
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-display font-bold text-foreground">{runLabel}</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">View existing runs or start a new one.</p>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
+              <button
                 onClick={handleStartNew}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all"
               >
                 <Plus className="h-4 w-4" /> New Run
-              </motion.button>
+              </button>
             </div>
 
             <div className="relative max-w-sm">
@@ -112,17 +128,18 @@ export default function Layer2AgentBuilder() {
                 <tbody>
                   {mockComplianceRuns.map((run) => (
                     <tr key={run.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={handleStartNew}>
-                      <td className="px-4 py-3 font-medium text-foreground flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <User className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        {run.individual}
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <User className="h-3.5 w-3.5 text-primary" />
+                          </span>
+                          {run.individual}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{run.service}</td>
                       <td className="px-4 py-3 text-muted-foreground">{run.date}</td>
                       <td className="px-4 py-3">
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <Shield className="h-3 w-3" />
+                        <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1">
                           {run.engineName} v{run.engineVersion}
                         </span>
                       </td>
@@ -149,27 +166,22 @@ export default function Layer2AgentBuilder() {
               </table>
             </div>
           </div>
-        </main>
-      ) : (
-        <>
-          {/* Data source transparency banner */}
-          <div className="px-6 py-2 bg-muted/30 border-b border-border/40">
-            <div className="max-w-[1200px] mx-auto flex items-center gap-2">
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted/30 border border-border/40 px-4 py-2 flex items-center gap-2">
               <Database className="h-3.5 w-3.5 text-primary shrink-0" />
               <p className="text-[11px] text-muted-foreground">
                 All compliance checks pull <span className="font-medium text-foreground">real-time data from iCM modules</span>. AI does not guess — it reads structured data.
               </p>
             </div>
-          </div>
 
-          <div className="px-6 py-4 border-b border-border/60 bg-card/50 overflow-x-auto">
-            <div className="max-w-[1200px] mx-auto min-w-[700px]">
-              <StepIndicator currentStep={state.step} steps={STEPS} />
+            <div className="rounded-lg border border-border/60 bg-card/50 p-4 overflow-x-auto">
+              <div className="min-w-[700px]">
+                <StepIndicator currentStep={state.step} steps={STEPS} />
+              </div>
             </div>
-          </div>
 
-          <main className="flex-1 overflow-auto p-6">
-            <div className="max-w-[1000px] mx-auto">
+            <div>
               {state.step === 1 && <Layer2Step1Service selectedRulePack={state.selectedRulePack} onRulePackSelected={(rp) => setState((s) => ({ ...s, selectedRulePack: rp }))} onNext={() => goTo(2)} />}
               {state.step === 2 && <Layer2Step2Eligibility rulePack={state.selectedRulePack} onBack={() => goTo(1)} onNext={() => goTo(3)} />}
               {state.step === 3 && <Layer2Step3PCP rulePack={state.selectedRulePack} onBack={() => goTo(2)} onNext={() => goTo(4)} />}
@@ -179,9 +191,9 @@ export default function Layer2AgentBuilder() {
               {state.step === 7 && <Layer2Step7Push rulePack={state.selectedRulePack} onBack={() => goTo(6)} onFinish={() => goTo(8)} />}
               {state.step === 8 && <Layer2Step8Dashboard rulePack={state.selectedRulePack} onBack={() => goTo(7)} onFinish={handleFinish} />}
             </div>
-          </main>
-        </>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </ICMShell>
   );
 }

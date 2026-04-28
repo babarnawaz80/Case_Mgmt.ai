@@ -1,23 +1,32 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
-export type UserRole = "admin" | "case_manager";
+export type UserRole = "admin" | "case_manager" | "billing" | "supervisor";
 
 interface RoleContextType {
   role: UserRole;
   setRole: (role: UserRole) => void;
   isAdmin: boolean;
+  isBilling: boolean;
 }
 
 const RoleContext = createContext<RoleContextType>({
   role: "admin",
   setRole: () => {},
   isAdmin: true,
+  isBilling: false,
 });
 
 export function RoleProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>("admin");
   return (
-    <RoleContext.Provider value={{ role, setRole, isAdmin: role === "admin" }}>
+    <RoleContext.Provider
+      value={{
+        role,
+        setRole,
+        isAdmin: role === "admin",
+        isBilling: role === "billing" || role === "admin",
+      }}
+    >
       {children}
     </RoleContext.Provider>
   );

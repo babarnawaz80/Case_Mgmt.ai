@@ -421,7 +421,7 @@ const AgentSettings = () => {
               <TooltipProvider>
                 <UiTooltip>
                   <TooltipTrigger asChild>
-                    <button type="button" className="text-muted-foreground hover:text-foreground"><Info className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={(e) => e.preventDefault()} className="text-muted-foreground hover:text-foreground"><Info className="h-3.5 w-3.5" /></button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <p className="text-xs">Variance is calculated by comparing the current batch total against the rolling 4-week average for the same program and payer.</p>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { demoToast } from "@/lib/demoToast";
 import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import {
@@ -195,7 +196,10 @@ const EChart = () => {
                     <span className="text-icm-text-dim">{urgent.body}</span>
                   </p>
                 </div>
-                <button className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0">
+                <button
+                  onClick={() => demoToast(urgent.cta)}
+                  className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0"
+                >
                   {urgent.cta} →
                 </button>
               </div>
@@ -260,7 +264,10 @@ function HeaderButton({
     "h-9 px-3 rounded-xl text-[12px] font-geist font-medium flex items-center gap-1.5 transition-colors";
   if (variant === "status") {
     return (
-      <button className={`${base} bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 hover:brightness-95`}>
+      <button
+        onClick={() => demoToast(`${label} details`)}
+        className={`${base} bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 hover:brightness-95`}
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
         {label}
         <Icon className="w-3 h-3 opacity-70" />
@@ -268,7 +275,10 @@ function HeaderButton({
     );
   }
   return (
-    <button className={`${base} border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong`}>
+    <button
+      onClick={() => demoToast(label)}
+      className={`${base} border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong`}
+    >
       {label}
       <Icon className="w-3 h-3 opacity-70" />
     </button>

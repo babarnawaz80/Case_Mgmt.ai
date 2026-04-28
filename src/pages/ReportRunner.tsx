@@ -32,7 +32,7 @@ export default function ReportRunner() {
       <ICMShell title="Report" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim">
           Report not found.{" "}
-          <button onClick={() => navigate("/dashboard/reports")} className="text-icm-accent hover:underline">
+          <button onClick={() => navigate("/reports")} className="text-icm-accent hover:underline">
             Back to Reports
           </button>
         </p>
@@ -52,7 +52,7 @@ export default function ReportRunner() {
     <ICMShell title="Reports" showAIPanel={false}>
       <div className="space-y-5 max-w-[1200px]">
         <button
-          onClick={() => navigate("/dashboard/reports")}
+          onClick={() => navigate("/reports")}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />

@@ -181,7 +181,7 @@ export default function Reports() {
                         <ReportCard
                           key={r.id}
                           report={r}
-                          onRun={() => navigate(`/dashboard/reports/${r.id}`)}
+                          onRun={() => navigate(`/reports/${r.id}`)}
                         />
                       ))}
                     </div>
@@ -233,7 +233,7 @@ export default function Reports() {
                     Joseph Brown (3), Travis Langston (2), Mohsin Raza (1). All assigned to Kathy Adams.
                   </p>
                   <button
-                    onClick={() => navigate("/dashboard/reports/task-status")}
+                    onClick={() => navigate("/reports/task-status")}
                     className="mt-2 text-[11px] font-semibold text-icm-accent hover:underline"
                   >
                     Open report →
@@ -244,7 +244,7 @@ export default function Reports() {
           </div>
         )}
 
-        {tab === "my" && <MyReportsTab onOpen={(id) => navigate(`/dashboard/reports/${id}`)} />}
+        {tab === "my" && <MyReportsTab onOpen={(id) => navigate(`/reports/${id}`)} />}
         {tab === "audit" && <AuditExportTab isAdmin={isAdmin} />}
       </div>
     </ICMShell>

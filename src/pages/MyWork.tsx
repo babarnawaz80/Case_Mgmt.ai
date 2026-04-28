@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { demoSuccess, demoToast } from "@/lib/demoToast";
 import {
   Sparkles,
   ListChecks,
@@ -761,7 +762,12 @@ function TaskRow({
                   placeholder="Add a comment… use @ to mention"
                   className="flex-1 h-8 px-2 rounded border border-icm-border bg-white text-[11.5px] text-icm-text"
                 />
-                <button className="text-[11px] text-icm-accent hover:underline">Post</button>
+                <button
+                  onClick={() => demoSuccess("Comment posted")}
+                  className="text-[11px] text-icm-accent hover:underline"
+                >
+                  Post
+                </button>
               </div>
             </div>
           )}
@@ -909,7 +915,12 @@ function AddTaskModal({ onClose }: { onClose: () => void }) {
           <Sparkle className="w-3.5 h-3.5 text-icm-accent mt-0.5" />
           <span>
             Want me to suggest tasks based on this individual's upcoming compliance deadlines?{" "}
-            <button className="text-icm-accent font-semibold hover:underline">Show suggestions</button>
+            <button
+              onClick={() => demoToast("AI task suggestions")}
+              className="text-icm-accent font-semibold hover:underline"
+            >
+              Show suggestions
+            </button>
           </span>
         </div>
         <div className="flex items-center justify-end gap-2 pt-2">

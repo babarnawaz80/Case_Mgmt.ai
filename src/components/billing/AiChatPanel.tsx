@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Maximize2, Minimize2, Send, Sparkles, ChevronRight, Plus, ShieldCheck, DollarSign, FileText, AlertTriangle, TrendingUp, Users, BarChart3, ClipboardCheck, HeartPulse, CircleAlert, Clock, ArrowLeftRight, Camera, Mic, Calendar, CheckSquare, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { demoToast } from '@/lib/demoToast';
 import { cn } from '@/lib/utils';
 import { AiResponseRenderer, STRUCTURED_RESPONSES, DEFAULT_STRUCTURED_RESPONSE, type StructuredResponse } from './AiResponseRenderer';
 
@@ -230,7 +231,11 @@ const AiChatPanel = ({ open, onClose }: AiChatPanelProps) => {
                 <p className="text-xs text-muted-foreground py-2">No previous chats</p>
               ) : (
                 chatHistory.map(session => (
-                  <button key={session.id} className="w-full text-left px-2 py-2 rounded-lg hover:bg-secondary text-xs text-foreground truncate">
+                  <button
+                    key={session.id}
+                    onClick={() => demoToast("Open previous chat")}
+                    className="w-full text-left px-2 py-2 rounded-lg hover:bg-secondary text-xs text-foreground truncate"
+                  >
                     {session.title}
                   </button>
                 ))
@@ -310,21 +315,41 @@ const AiChatPanel = ({ open, onClose }: AiChatPanelProps) => {
               </form>
               <div className="flex items-center justify-between mt-2.5 px-1">
                 <div className="flex items-center gap-3">
-                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => demoToast("Attach a file")}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     <Plus className="h-4 w-4" />
                   </button>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => demoToast("Capture from camera")}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     <Camera className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="flex items-center gap-4">
-                  <button className="text-xs text-muted-foreground hover:text-foreground font-medium flex items-center gap-1.5 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => demoToast("Ambient listening")}
+                    className="text-xs text-muted-foreground hover:text-foreground font-medium flex items-center gap-1.5 transition-colors"
+                  >
                     <Sparkles className="h-3.5 w-3.5" /> Ambient
                   </button>
-                  <button className="text-xs text-muted-foreground hover:text-foreground font-medium flex items-center gap-1.5 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => demoToast("Scribe mode")}
+                    className="text-xs text-muted-foreground hover:text-foreground font-medium flex items-center gap-1.5 transition-colors"
+                  >
                     <FileText className="h-3.5 w-3.5" /> Scribe
                   </button>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => demoToast("Voice dictation")}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     <Mic className="h-4 w-4" />
                   </button>
                 </div>

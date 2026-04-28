@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Clock, FileText, User, GitBranch, Bot, Shield, Download, AlertCircle, ArrowUp } from "lucide-react";
+import { demoSuccess } from "@/lib/demoToast";
 import { mockComplianceEngines, mockRuntimeAgents } from "@/types/agent";
 import { cn } from "@/lib/utils";
 
@@ -145,7 +146,10 @@ export default function EngineHistory() {
                           <span className="text-xs font-medium text-foreground">{agent.name}</span>
                           <span className="text-[10px] text-muted-foreground">pinned to v{agent.engineVersion}</span>
                         </div>
-                        <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-warning/10 hover:bg-warning/20 text-[10px] font-medium text-warning transition-colors">
+                        <button
+                          onClick={() => demoSuccess(`${agent.name} upgraded to latest engine version`)}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-warning/10 hover:bg-warning/20 text-[10px] font-medium text-warning transition-colors"
+                        >
                           <ArrowUp className="h-3 w-3" /> Upgrade
                         </button>
                       </div>

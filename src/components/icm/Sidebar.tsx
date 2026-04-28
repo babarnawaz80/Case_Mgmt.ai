@@ -10,7 +10,7 @@ import {
   CheckSquare,
   MessageSquare,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -46,6 +46,7 @@ const OPEN_INCIDENT_COUNT = 1;
 
 export function ICMSidebar() {
   const loc = useLocation();
+  const navigate = useNavigate();
   const { role } = useRole();
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
@@ -121,8 +122,9 @@ export function ICMSidebar() {
         })}
       </nav>
       <button
-        className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-icm-text-dim mt-2"
-        title="Profile"
+        onClick={() => navigate("/settings")}
+        className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-icm-text-dim mt-2 hover:text-icm-text hover:border-icm-border-strong transition-colors"
+        title="Profile & Settings"
       >
         <User className="w-4 h-4" />
       </button>

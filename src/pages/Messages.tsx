@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { demoToast } from "@/lib/demoToast";
 import {
   MessageSquare,
   Plus,
@@ -531,6 +532,7 @@ function ActiveConversation({
           </p>
         </div>
         <button
+          onClick={() => demoToast("In-conversation search")}
           className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
           title="Search in conversation"
         >
@@ -699,6 +701,7 @@ function HeaderMenuItem({
 }) {
   return (
     <button
+      onClick={() => demoToast(typeof children === "string" ? children : "Menu action")}
       className={cn(
         "w-full text-left px-3 py-1.5 text-[12px] font-geist hover:bg-icm-bg",
         destructive ? "text-icm-red" : "text-icm-text"

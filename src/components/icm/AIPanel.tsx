@@ -1,5 +1,6 @@
 import { Sparkles, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 type Tone = "urgent" | "insight" | "good";
 
@@ -75,7 +76,10 @@ export function AIPanel() {
                 {s.label}
               </span>
               <p className="text-[12px] text-icm-text font-geist mt-2 leading-relaxed">{s.body}</p>
-              <button className="mt-2 text-[11px] font-geist font-semibold text-icm-text underline-offset-2 hover:underline">
+              <button
+                onClick={() => demoToast(s.cta)}
+                className="mt-2 text-[11px] font-geist font-semibold text-icm-text underline-offset-2 hover:underline"
+              >
                 {s.cta} →
               </button>
             </div>
@@ -90,7 +94,10 @@ export function AIPanel() {
             placeholder="Ask anything about your caseload…"
             className="flex-1 bg-transparent text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint outline-none"
           />
-          <button className="w-7 h-7 rounded-full bg-icm-text text-icm-panel flex items-center justify-center hover:opacity-90">
+          <button
+            onClick={() => demoSuccess("Message sent to AI")}
+            className="w-7 h-7 rounded-full bg-icm-text text-icm-panel flex items-center justify-center hover:opacity-90"
+          >
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>

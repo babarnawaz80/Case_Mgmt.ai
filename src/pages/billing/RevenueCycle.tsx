@@ -2287,7 +2287,13 @@ const ARLedgerSubTab = ({ claimTypeFilter: ctFilter }: { claimTypeFilter: ClaimT
           <span>Showing 1-{Math.min(8, filtered.length)} of {filtered.length} claims</span>
           <div className="flex gap-1">
             {[1, 2, 3].map(p => (
-              <button key={p} className={`w-7 h-7 rounded-lg text-xs font-semibold ${p === 1 ? 'bg-primary text-white' : 'hover:bg-secondary'}`}>{p}</button>
+              <button
+                key={p}
+                onClick={() => {/* demo pagination */}}
+                className={`w-7 h-7 rounded-lg text-xs font-semibold ${p === 1 ? 'bg-primary text-white' : 'hover:bg-secondary'}`}
+              >
+                {p}
+              </button>
             ))}
           </div>
         </div>

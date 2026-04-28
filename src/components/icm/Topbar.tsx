@@ -1,6 +1,7 @@
 import { Search, Sparkles, HelpCircle, ChevronDown, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
+import { demoToast } from "@/lib/demoToast";
 import { useRole } from "@/contexts/RoleContext";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
@@ -48,7 +49,10 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         </div>
 
         {/* Gradient AI button (borrowed from IDDBilling) */}
-        <button className="h-9 px-3.5 rounded-xl text-white text-[12px] font-manrope font-bold flex items-center gap-1.5 ai-gradient shadow-elevated hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all">
+        <button
+          onClick={() => navigate("/")}
+          className="h-9 px-3.5 rounded-xl text-white text-[12px] font-manrope font-bold flex items-center gap-1.5 ai-gradient shadow-elevated hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
+        >
           <Sparkles className="w-3.5 h-3.5" />
           Ask AI
           <ChevronDown className="w-3 h-3 opacity-70" />
@@ -69,11 +73,17 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
         {/* Notifications dropdown (alerts + mentions) */}
         <NotificationsBell />
-        <button className="h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors">
+        <button
+          onClick={() => demoToast("Help & documentation")}
+          className="h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors"
+        >
           <HelpCircle className="w-[18px] h-[18px]" />
         </button>
 
-        <button className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors">
+        <button
+          onClick={() => navigate("/settings")}
+          className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors"
+        >
           <div className="w-7 h-7 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[10px] font-mono font-bold text-icm-accent">
             KA
           </div>

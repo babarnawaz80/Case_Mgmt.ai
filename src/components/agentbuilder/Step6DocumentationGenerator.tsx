@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { demoSuccess, demoToast } from "@/lib/demoToast";
 import {
   Loader2,
   Sparkles,
@@ -118,10 +119,16 @@ export function Step6DocumentationGenerator({ onBack, onNext }: Step6Props) {
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-xs font-medium text-foreground border border-border transition-all">
+                    <button
+                      onClick={() => demoToast("Preview template")}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-xs font-medium text-foreground border border-border transition-all"
+                    >
                       <Eye className="h-3 w-3" /> Preview
                     </button>
-                    <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-xs font-medium text-primary transition-all">
+                    <button
+                      onClick={() => demoSuccess("Template exported")}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-xs font-medium text-primary transition-all"
+                    >
                       <Download className="h-3 w-3" /> Export
                     </button>
                   </div>

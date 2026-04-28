@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { useRole } from "@/contexts/RoleContext";
 import {
   BarChart3,
@@ -65,6 +66,14 @@ export default function Reports() {
   return (
     <ICMShell title="Reports" showAIPanel={false}>
       <div className="space-y-5">
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Reports" },
+          ]}
+        />
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
             <h1 className="font-manrope text-[24px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">

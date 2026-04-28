@@ -18,6 +18,7 @@ import {
   Activity,
 } from "lucide-react";
 import ReviewApplyModal from "@/components/ambient/ReviewApplyModal";
+import { demoToast } from "@/lib/demoToast";
 import { toast } from "@/hooks/use-toast";
 
 type Phase = "in-call" | "ending" | "processing" | "review";
@@ -280,7 +281,10 @@ const VirtualVisit = () => {
             <MessageSquare className="w-3.5 h-3.5" />
             Notes
           </button>
-          <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 flex items-center justify-center">
+          <button
+            onClick={() => demoToast("Visit options menu")}
+            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 flex items-center justify-center"
+          >
             <MoreVertical className="w-3.5 h-3.5" />
           </button>
         </div>

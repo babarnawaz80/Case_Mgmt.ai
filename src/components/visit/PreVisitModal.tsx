@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Trash2,
 } from "lucide-react";
+import { demoSuccess } from "@/lib/demoToast";
 
 interface Participant {
   id: string;
@@ -352,6 +353,10 @@ export function PreVisitModal({
                 </button>
                 <button
                   disabled={!consent}
+                  onClick={() => {
+                    demoSuccess("Invite sent to participants");
+                    onClose();
+                  }}
                   className="h-9 px-3.5 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text hover:border-icm-border-strong disabled:opacity-40"
                 >
                   Send invite only

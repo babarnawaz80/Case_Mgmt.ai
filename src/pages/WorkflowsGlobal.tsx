@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowRight, GitBranch } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   getAllWorkflows, globalSummary, progressFraction, workflowProgressTone,
   type WorkflowRecord, type WorkflowStatus,
@@ -29,6 +30,14 @@ const WorkflowsGlobal = () => {
   return (
     <ICMShell title="Workflows" showAIPanel={false}>
       <div className="space-y-5">
+        <Breadcrumbs
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Workflows" },
+          ]}
+        />
         <div>
           <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">Workflows</h1>
           <p className="text-[13px] text-icm-text-dim mt-1 font-geist">Active workflows across all individuals</p>

@@ -2,17 +2,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, Search, Sparkles, LayoutDashboard, User,
-  ArrowLeft, Layers, BookOpen, Bot, Shield,
+  Plus, Search, Sparkles, LayoutDashboard,
+  Layers, BookOpen, Bot, Shield,
   TrendingUp, Users,
-  Play, Clock, Eye, FileText,
+  Play, Eye, FileText,
   MoreVertical, Pencil, Copy, Trash2, AlertTriangle, Lock,
   UserCog,
 } from "lucide-react";
-import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent, mockComplianceEngines } from "@/types/agent";
+import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { toast } from "@/hooks/use-toast";
+import { ICMShell } from "@/components/icm/ICMShell";
 
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,103 +68,97 @@ export default function LifePlanBoard() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-background">
-      <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/dashboard")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+    <ICMShell title="Agents Dashboard" showAIPanel={false}>
+      <div className="space-y-6">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
+          <button onClick={() => navigate("/platform")} className="hover:text-icm-text">
+            Platform
           </button>
-          <h2 className="font-display font-semibold text-foreground text-lg">Agents Dashboard</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Role Switcher */}
-          <button
-            onClick={() => {
-              const newRole = role === "admin" ? "case_manager" : "admin";
-              setRole(newRole);
-              toast({ title: "Role Switched", description: `Now viewing as: ${newRole === "admin" ? "Admin" : "Case Manager"}` });
-            }}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/60 hover:bg-muted text-foreground font-medium text-xs transition-all border border-border"
-          >
-            <UserCog className="w-3.5 h-3.5" />
-            {role === "admin" ? "Admin" : "Case Manager"}
-          </button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-sm transition-all">
-            <Sparkles className="w-4 h-4" /> AI Companion
-          </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate("/dashboard")} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-sm transition-all border border-border">
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
-          </motion.button>
-          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
-            <User className="w-5 h-5 text-muted-foreground" />
-          </div>
-        </div>
-      </header>
+          <span className="text-icm-text-faint">›</span>
+          <span className="text-icm-text font-medium">Agents</span>
+        </nav>
 
-      <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-[1600px] mx-auto">
-          {/* Hero */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative mb-8 p-6 rounded-2xl bg-gradient-to-r from-primary/5 via-primary/10 to-accent/5 border border-primary/10 overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl gradient-primary shadow-lg">
-                  <Layers className="h-7 w-7 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-display font-bold text-foreground">Agents Dashboard</h1>
-                  <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-                    {isAdmin ? (
-                      <>
-                        <p className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-primary" /> Build Guidelines Engines from state guidelines</p>
-                        <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Create and manage Runtime Agents</p>
-                      </>
-                    ) : (
-                      <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Run compliance agents to check authorizations and documentation</p>
-                    )}
-                  </div>
+        {/* Hero */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative p-6 rounded-2xl bg-gradient-to-r from-primary/5 via-primary/10 to-accent/5 border border-primary/10 overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl gradient-primary shadow-lg">
+                <Layers className="h-7 w-7 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-display font-bold text-foreground">Agents Dashboard</h1>
+                <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
+                  {isAdmin ? (
+                    <>
+                      <p className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-primary" /> Build Guidelines Engines from state guidelines</p>
+                      <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Create and manage Runtime Agents</p>
+                    </>
+                  ) : (
+                    <p className="flex items-center gap-1.5"><Bot className="h-3.5 w-3.5 text-primary" /> Run compliance agents to check authorizations and documentation</p>
+                  )}
                 </div>
               </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  const newRole = role === "admin" ? "case_manager" : "admin";
+                  setRole(newRole);
+                  toast({ title: "Role Switched", description: `Now viewing as: ${newRole === "admin" ? "Admin" : "Case Manager"}` });
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/60 hover:bg-muted text-foreground font-medium text-xs transition-all border border-border"
+              >
+                <UserCog className="w-3.5 h-3.5" />
+                {role === "admin" ? "Admin" : "Case Manager"}
+              </button>
+              <button onClick={() => navigate("/platform")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
+                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
+              </button>
               {isAdmin && (
-                <div className="flex items-center gap-3">
-                  <button onClick={() => navigate("/lifeplan/agent/new")} className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-lg hover:-translate-y-0.5 transition-all">
-                    <Plus className="h-4 w-4" /> Create Agent
+                <>
+                  <button onClick={() => navigate("/settings")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
+                    <Shield className="w-3.5 h-3.5" /> Admin
                   </button>
-                  <button onClick={() => navigate("/lifeplan/guidelines-engines")} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border text-foreground font-medium text-sm hover:bg-secondary transition-all">
-                    <Shield className="h-4 w-4" /> Guidelines Engines
+                  <button onClick={() => navigate("/platform/guidelines-engines")} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border text-foreground font-medium text-xs hover:bg-secondary transition-all">
+                    <Shield className="h-3.5 w-3.5" /> Guidelines Engines
                   </button>
-                </div>
+                  <button onClick={() => navigate("/platform/agents/new")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-xs shadow-lg hover:-translate-y-0.5 transition-all">
+                    <Plus className="h-3.5 w-3.5" /> Create Agent
+                  </button>
+                </>
               )}
             </div>
-          </motion.div>
+          </div>
+        </motion.div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {overviewStats.map((stat, i) => (
-              <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{stat.label}</p>
-                    <p className="text-2xl font-display font-bold text-foreground">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{stat.trend}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-primary/10"><stat.icon className="h-5 w-5 text-primary" /></div>
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {overviewStats.map((stat, i) => (
+            <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{stat.label}</p>
+                  <p className="text-2xl font-display font-bold text-foreground">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.trend}</p>
                 </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input placeholder="Search agents..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
-            </div>
-          </div>
-
-          <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} onDelete={(id) => setDeleteConfirm(id)} onClone={handleClone} />
+                <div className="p-2 rounded-lg bg-primary/10"><stat.icon className="h-5 w-5 text-primary" /></div>
+              </div>
+            </motion.div>
+          ))}
         </div>
-      </main>
+
+        {/* Search */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input placeholder="Search agents..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+          </div>
+        </div>
+
+        <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} onDelete={(id) => setDeleteConfirm(id)} onClone={handleClone} />
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <AnimatePresence>

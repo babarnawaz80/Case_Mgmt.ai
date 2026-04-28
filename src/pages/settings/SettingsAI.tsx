@@ -4,6 +4,7 @@ import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { aiFeatures } from "@/data/settings";
 import { cn } from "@/lib/utils";
 import { Sparkles, ShieldCheck, ArrowRight, Lock, Video } from "lucide-react";
+import { demoToast } from "@/lib/demoToast";
 
 const SettingsAI = () => {
   const navigate = useNavigate();
@@ -162,7 +163,10 @@ const SettingsAI = () => {
           without explicit written authorization. All AI processing uses isolated,
           customer-specific context only.
         </p>
-        <button className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent inline-flex items-center gap-1">
+        <button
+          onClick={() => demoToast("Data Processing Agreement")}
+          className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent inline-flex items-center gap-1"
+        >
           View data processing agreement →
         </button>
       </div>

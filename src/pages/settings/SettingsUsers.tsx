@@ -25,6 +25,7 @@ import {
   type UserStatus,
 } from "@/data/settings";
 import { cn } from "@/lib/utils";
+import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 const SettingsUsers = () => {
   const navigate = useNavigate();
@@ -208,7 +209,7 @@ const SettingsUsers = () => {
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); demoToast(`More actions for ${u.firstName} ${u.lastName}`); }}
                           className="h-7 w-7 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
                           title="More"
                         >
@@ -340,7 +341,10 @@ function RolesPermissionsView() {
             </div>
           ))}
         </div>
-        <button className="mt-2 h-8 px-3 rounded-xl border border-dashed border-icm-border bg-icm-panel text-icm-text-dim text-[11.5px] font-geist font-semibold hover:border-icm-border-strong hover:text-icm-text transition-colors">
+        <button
+          onClick={() => demoToast("Custom role builder")}
+          className="mt-2 h-8 px-3 rounded-xl border border-dashed border-icm-border bg-icm-panel text-icm-text-dim text-[11.5px] font-geist font-semibold hover:border-icm-border-strong hover:text-icm-text transition-colors"
+        >
           + Create custom role
         </button>
       </div>
@@ -393,7 +397,10 @@ function RolesPermissionsView() {
           </div>
         </div>
         <div className="flex justify-end mt-3">
-          <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold">
+          <button
+            onClick={() => demoSuccess("Permissions saved", "Updated for all roles.")}
+            className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+          >
             Save permissions
           </button>
         </div>
@@ -473,7 +480,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
           Cancel
         </button>
         <button
-          onClick={onClose}
+          onClick={() => { demoSuccess("Invitation sent"); onClose(); }}
           className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
         >
           Send invitation
@@ -493,7 +500,10 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           </span>
           <div className="flex-1">
             <p className="font-semibold">Download template</p>
-            <button className="mt-1 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-semibold hover:border-icm-border-strong transition-colors">
+            <button
+              onClick={() => demoToast("CSV template download")}
+              className="mt-1 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-semibold hover:border-icm-border-strong transition-colors"
+            >
               Download CSV template
             </button>
           </div>
@@ -534,7 +544,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           Cancel
         </button>
         <button
-          onClick={onClose}
+          onClick={() => { demoSuccess("Users imported", "0 errors found in CSV."); onClose(); }}
           className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
         >
           Import

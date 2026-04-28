@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import AmbientFlowV2 from "@/components/ambient/AmbientFlowV2";
 import { motion, AnimatePresence } from "framer-motion";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
@@ -21,10 +21,12 @@ import {
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
-  
+  ArrowRight,
   User,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { people } from "@/data/people";
+import { demoToast } from "@/lib/demoToast";
 
 interface ChatHistoryItem {
   id: string;
@@ -43,31 +45,83 @@ const chatHistory: ChatHistoryItem[] = [
 ];
 
 const quickStats = [
-  { label: "People Supported", value: "48", icon: Users },
-  { label: "Pending Tasks", value: "5", icon: ClipboardList },
-  { label: "Unsigned Notes", value: "3", icon: FileText },
-  { label: "Critical Alerts", value: "2", icon: AlertTriangle, highlight: true },
+  { label: "People Supported", value: "48", icon: Users, route: "/people" },
+  { label: "Pending Tasks", value: "5", icon: ClipboardList, route: "/my-work" },
+  { label: "Unsigned Notes", value: "3", icon: FileText, route: "/documentation" },
+  { label: "Critical Alerts", value: "2", icon: AlertTriangle, route: "/my-work?view=alerts", highlight: true },
 ];
 
-const suggestedPrompts = [
-  { icon: AlertTriangle, text: "Show incidents in the last 24 hours" },
-  { icon: Heart, text: "Individuals with overdue health assessments" },
-  { icon: Shield, text: "Who is out of PCP compliance?" },
-  { icon: Calendar, text: "Any overdue ISP reviews?" },
-  { icon: Search, text: "Who am I seeing today?" },
-  { icon: Users, text: "New admissions since my last shift" },
-  { icon: FileText, text: "Pending notes awaiting signature" },
-  { icon: ClipboardList, text: "Show high-risk individuals" },
+interface PromptRoute {
+  icon: typeof AlertTriangle;
+  text: string;
+  reply: string;
+  cta: { label: string; href: string };
+}
+
+const suggestedPrompts: PromptRoute[] = [
+  {
+    icon: AlertTriangle,
+    text: "Show incidents in the last 24 hours",
+    reply:
+      "I found **2 incidents** logged in the last 24 hours. 1 medication error (Joseph Brown, low severity) and 1 fall (Ashley Walker, moderate). Both have follow-up actions assigned.",
+    cta: { label: "Open Incidents", href: "/incidents" },
+  },
+  {
+    icon: Heart,
+    text: "Individuals with overdue health assessments",
+    reply:
+      "**3 individuals** have overdue health assessments: Joseph Brown (12 days overdue), Travis Langston (5 days), and Mohsin Raza (due tomorrow — flagged early).",
+    cta: { label: "View People", href: "/people" },
+  },
+  {
+    icon: Shield,
+    text: "Who is out of PCP compliance?",
+    reply:
+      "**Joseph Brown** is currently out of PCP compliance — ISP review is 8 days past due. Draft talking points have been generated from last quarter's notes.",
+    cta: { label: "Open Joseph's eChart", href: "/people/1/echart" },
+  },
+  {
+    icon: Calendar,
+    text: "Any overdue ISP reviews?",
+    reply:
+      "**1 ISP review** is overdue (Joseph Brown, 8 days). **2 more** are due in the next 14 days (Ashley Walker, Travis Langston).",
+    cta: { label: "Open My Work", href: "/my-work" },
+  },
+  {
+    icon: Search,
+    text: "Who am I seeing today?",
+    reply:
+      "You have **3 visits** scheduled today: Ashley Walker (10:30 AM, virtual), Joseph Brown (1:15 PM, in-person), and Mohsin Raza (3:45 PM, virtual).",
+    cta: { label: "Open Dashboard", href: "/dashboard" },
+  },
+  {
+    icon: Users,
+    text: "New admissions since my last shift",
+    reply:
+      "**1 new admission** since your last shift: Steve Smith (admitted 06/01/2020, Franklin County). Intake assessment is pending.",
+    cta: { label: "Open People", href: "/people" },
+  },
+  {
+    icon: FileText,
+    text: "Pending notes awaiting signature",
+    reply:
+      "You have **3 unsigned notes**: 2 contact notes from last week (Joseph Brown) and 1 progress note (Ashley Walker).",
+    cta: { label: "Open Documentation", href: "/documentation" },
+  },
+  {
+    icon: ClipboardList,
+    text: "Show high-risk individuals",
+    reply:
+      "**2 individuals** are currently flagged high-risk: Joseph Brown (risk 71) and Travis Langston (risk 42, watchlist).",
+    cta: { label: "Open Watchlist", href: "/dashboard" },
+  },
 ];
 
-const individuals = [
-  "Select Individual",
-  "John Doe",
-  "Jane Smith",
-  "Robert Johnson",
-  "Maria Garcia",
-  "David Wilson",
-];
+interface ChatTurn {
+  role: "user" | "ai";
+  text: string;
+  cta?: { label: string; href: string };
+}
 
 const Index = () => {
   const [message, setMessage] = useState("");
@@ -75,8 +129,11 @@ const Index = () => {
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [ambientOpen, setAmbientOpen] = useState(false);
+  const [thread, setThread] = useState<ChatTurn[]>([]);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  const individualOptions = ["Select Individual", ...people.map((p) => `${p.firstName} ${p.lastName}`)];
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -85,6 +142,33 @@ const Index = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
+    const match = suggestedPrompts.find((p) => p.text.toLowerCase() === text.trim().toLowerCase());
+    if (match) return { reply: match.reply, cta: match.cta };
+    // Fuzzy keyword routing
+    const t = text.toLowerCase();
+    if (t.includes("incident")) return { reply: suggestedPrompts[0].reply, cta: suggestedPrompts[0].cta };
+    if (t.includes("health") || t.includes("assessment")) return { reply: suggestedPrompts[1].reply, cta: suggestedPrompts[1].cta };
+    if (t.includes("pcp") || t.includes("compliance")) return { reply: suggestedPrompts[2].reply, cta: suggestedPrompts[2].cta };
+    if (t.includes("isp") || t.includes("review")) return { reply: suggestedPrompts[3].reply, cta: suggestedPrompts[3].cta };
+    if (t.includes("today") || t.includes("schedule")) return { reply: suggestedPrompts[4].reply, cta: suggestedPrompts[4].cta };
+    if (t.includes("admission") || t.includes("new")) return { reply: suggestedPrompts[5].reply, cta: suggestedPrompts[5].cta };
+    if (t.includes("note") || t.includes("sign")) return { reply: suggestedPrompts[6].reply, cta: suggestedPrompts[6].cta };
+    if (t.includes("risk")) return { reply: suggestedPrompts[7].reply, cta: suggestedPrompts[7].cta };
+    return {
+      reply:
+        "I can help with compliance reviews, ISP/PCP status, incidents, schedules, and unsigned documentation. Try one of the suggested prompts below.",
+    };
+  }
+
+  function handleSend(text?: string) {
+    const content = (text ?? message).trim();
+    if (!content) return;
+    const { reply, cta } = findReply(content);
+    setThread((prev) => [...prev, { role: "user", text: content }, { role: "ai", text: reply, cta }]);
+    setMessage("");
+  }
 
   const ambientOverlay = ambientOpen ? (
     <AmbientFlowV2
@@ -110,10 +194,18 @@ const Index = () => {
             <div className="h-16 flex items-center justify-between px-4 border-b border-border shrink-0">
               <h3 className="font-display font-semibold text-foreground text-sm">Chat History</h3>
               <div className="flex gap-1">
-                <button className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                <button
+                  onClick={() => { setThread([]); setMessage(""); }}
+                  title="New chat"
+                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                >
                   <MessageSquare className="w-4 h-4" />
                 </button>
-                <button className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                <button
+                  onClick={() => demoToast("Chat export coming soon")}
+                  title="Copy thread"
+                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                >
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
@@ -122,6 +214,12 @@ const Index = () => {
               {chatHistory.map((item) => (
                 <button
                   key={item.id}
+                  onClick={() => {
+                    setThread([
+                      { role: "user", text: item.title },
+                      { role: "ai", text: item.preview + " (Loaded from history.)" },
+                    ]);
+                  }}
                   className="w-full text-left px-4 py-3 hover:bg-secondary/60 transition-colors border-b border-border/30"
                 >
                   <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
@@ -156,7 +254,6 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Dashboard Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -167,55 +264,97 @@ const Index = () => {
               <span>Dashboard</span>
             </motion.button>
 
-            <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
+            <button
+              onClick={() => navigate("/settings")}
+              title="Profile / Settings"
+              className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
+            >
               <User className="w-5 h-5 text-muted-foreground" />
-            </div>
+            </button>
           </div>
         </header>
 
         {/* Chat Content */}
-        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-6 py-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-center max-w-2xl"
-          >
-            <div className="flex justify-center mb-6">
-              <img
-                src={brandLogo}
-                alt="CaseManagement AI"
-                className="h-14 w-auto object-contain animate-float"
-              />
-            </div>
-            <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-              Good evening, Kathy
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              Your <span className="text-primary font-medium">AI case manager</span> is ready to assist you
-            </p>
-          </motion.div>
-
-          {/* Quick Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex flex-wrap justify-center gap-4 mt-8"
-          >
-            {quickStats.map((stat) => (
-              <div
-                key={stat.label}
-                className="glass rounded-xl px-5 py-4 flex flex-col items-center gap-1 min-w-[120px]"
-              >
-                <stat.icon className={`w-5 h-5 ${stat.highlight ? "text-destructive" : "text-muted-foreground"}`} />
-                <span className={`text-2xl font-display font-bold ${stat.highlight ? "text-destructive" : "text-foreground"}`}>
-                  {stat.value}
-                </span>
-                <span className="text-[11px] text-muted-foreground text-center">{stat.label}</span>
+        <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-10">
+          {thread.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-center max-w-2xl"
+            >
+              <div className="flex justify-center mb-6">
+                <img
+                  src={brandLogo}
+                  alt="CaseManagement AI"
+                  className="h-14 w-auto object-contain animate-float"
+                />
               </div>
-            ))}
-          </motion.div>
+              <h1 className="font-display text-3xl font-bold text-foreground mb-2">
+                Good evening, Kathy
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Your <span className="text-primary font-medium">AI case manager</span> is ready to assist you
+              </p>
+            </motion.div>
+          )}
+
+          {/* Quick Stats — clickable */}
+          {thread.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="flex flex-wrap justify-center gap-4 mt-8"
+            >
+              {quickStats.map((stat) => (
+                <button
+                  key={stat.label}
+                  onClick={() => navigate(stat.route)}
+                  className="glass rounded-xl px-5 py-4 flex flex-col items-center gap-1 min-w-[120px] hover:scale-[1.02] hover:border-primary/40 transition-all"
+                >
+                  <stat.icon className={`w-5 h-5 ${stat.highlight ? "text-destructive" : "text-muted-foreground"}`} />
+                  <span className={`text-2xl font-display font-bold ${stat.highlight ? "text-destructive" : "text-foreground"}`}>
+                    {stat.value}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground text-center">{stat.label}</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+
+          {/* Conversation thread */}
+          {thread.length > 0 && (
+            <div className="w-full max-w-2xl space-y-4 mt-2 mb-6">
+              {thread.map((turn, idx) => (
+                <div key={idx} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                      turn.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "glass text-foreground"
+                    }`}
+                  >
+                    <div
+                      className="whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{
+                        __html: turn.text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
+                      }}
+                    />
+                    {turn.cta && (
+                      <button
+                        onClick={() => navigate(turn.cta!.href)}
+                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        {turn.cta.label}
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Chat Input */}
           <motion.div
@@ -228,6 +367,12 @@ const Index = () => {
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
                 placeholder="Ask about individuals, start documentation, or review cases..."
                 className="w-full bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm min-h-[44px] max-h-[120px]"
                 rows={2}
@@ -247,7 +392,7 @@ const Index = () => {
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Individual</p>
                         </div>
                         <div className="max-h-56 overflow-y-auto">
-                          {individuals.map((ind) => (
+                          {individualOptions.map((ind) => (
                             <button
                               key={ind}
                               onClick={() => { setSelectedIndividual(ind); setPlusMenuOpen(false); }}
@@ -263,12 +408,15 @@ const Index = () => {
                       </div>
                     )}
                   </div>
-                  {selectedIndividual && (
+                  {selectedIndividual && selectedIndividual !== "Select Individual" && (
                     <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-lg">
                       {selectedIndividual}
                     </span>
                   )}
-                  <button className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                  <button
+                    onClick={() => demoToast("Camera capture coming soon")}
+                    className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     <Camera className="w-4 h-4" />
                   </button>
                 </div>
@@ -291,6 +439,7 @@ const Index = () => {
                           Ambient
                         </button>
                         <button
+                          onClick={() => isIndividualSelected && setAmbientOpen(true)}
                           disabled={!isIndividualSelected}
                           className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
                             isIndividualSelected
@@ -305,10 +454,16 @@ const Index = () => {
                       </>
                     );
                   })()}
-                  <button className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                  <button
+                    onClick={() => demoToast("Voice dictation coming soon")}
+                    className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     <Mic className="w-4 h-4" />
                   </button>
-                  <button className="p-2 rounded-lg gradient-primary text-primary-foreground transition-colors">
+                  <button
+                    onClick={() => handleSend()}
+                    className="p-2 rounded-lg gradient-primary text-primary-foreground transition-colors hover:opacity-90"
+                  >
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
@@ -326,7 +481,7 @@ const Index = () => {
             {suggestedPrompts.map((prompt, i) => (
               <button
                 key={i}
-                onClick={() => setMessage(prompt.text)}
+                onClick={() => handleSend(prompt.text)}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200"
               >
                 <prompt.icon className="w-3.5 h-3.5 text-primary" />

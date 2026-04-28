@@ -31,9 +31,9 @@ const tiles: Tile[] = [
   { label: "Incidents", icon: AlertTriangle, count: 3, alert: true, to: "/incidents" },
   { label: "People", icon: Users, count: 48, to: "/people" },
   { label: "Care Tracker", icon: Heart, to: "/documentation" },
-  { label: "Sites", icon: Building2, count: 4, to: "/settings" },
+  { label: "Sites", icon: Building2, count: 4, to: "/settings/organization" },
   { label: "Plan of Correction", icon: Shield, count: 1, to: "/documentation" },
-  { label: "Outreach", icon: Phone },
+  { label: "Outreach", icon: Phone, to: "/documentation" },
   { label: "Training", icon: GraduationCap, to: "/settings" },
   { label: "All Modules", icon: LayoutGrid, to: "/documentation" },
 ];

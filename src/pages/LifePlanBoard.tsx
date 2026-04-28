@@ -260,7 +260,7 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { ag
         return (
           <motion.div key={agent.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}>
             <div className={cn("group relative rounded-xl bg-card border border-border/50 border-l-4 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer", accent.border)}
-              onClick={() => navigate("/lifeplan/agent/new/layer2", { state: { agentName: agent.name } })}
+              onClick={() => navigate(`/platform/agents/${agent.id}/runs`, { state: { agentName: agent.name } })}
             >
               <div className="p-5">
                 {/* Header row */}

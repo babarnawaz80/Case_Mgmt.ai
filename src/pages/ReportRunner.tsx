@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   ChevronLeft,
   Download,
@@ -51,13 +52,15 @@ export default function ReportRunner() {
   return (
     <ICMShell title="Reports" showAIPanel={false}>
       <div className="space-y-5 max-w-[1200px]">
-        <button
-          onClick={() => navigate("/reports")}
-          className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          Reports
-        </button>
+        <Breadcrumbs
+          backTo="/reports"
+          backLabel="Reports"
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Reports", to: "/reports" },
+            { label: report.name },
+          ]}
+        />
 
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>

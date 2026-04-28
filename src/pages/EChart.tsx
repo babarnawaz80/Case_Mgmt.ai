@@ -178,76 +178,74 @@ const EChart = () => {
   return (
     <ICMShell title="eChart" rightPanel={<PersonAIPanel person={person} />}>
       <div className="space-y-4">
-        {/* Person header card with gradient accent + alerts */}
+        {/* Person header card with gradient accent */}
         <div className="relative rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
           {/* Top gradient stripe */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-icm-accent via-purple-400 to-icm-red" />
 
           <div className="p-5 pt-6">
-            <div className="flex items-start gap-4 flex-wrap">
-              {/* Avatar */}
-              <div
-                className={`w-16 h-16 rounded-full border flex items-center justify-center font-mono text-[18px] font-bold shrink-0 ${riskAvatarClass(
-                  person.riskScore,
-                )}`}
-              >
-                {initials(person)}
-              </div>
-
-              {/* Identity + chips */}
-              <div className="min-w-0 flex-1">
-                <h1 className="font-manrope font-extrabold text-[24px] text-icm-text tracking-tight leading-tight">
-                  {person.lastName}, {person.firstName}
-                  {person.nickname && (
-                    <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
-                  )}
-                </h1>
-                <p className="text-[12px] font-geist text-icm-text-dim mt-1 flex items-center gap-3 flex-wrap">
-                  <span>
+            {/* Top row: identity (left) · alerts (center, flexible) · actions (right) */}
+            <div className="flex items-start gap-5">
+              {/* LEFT — avatar + identity (fixed width so it never truncates) */}
+              <div className="flex items-start gap-4 shrink-0 w-[280px]">
+                <div
+                  className={`w-16 h-16 rounded-full border flex items-center justify-center font-mono text-[18px] font-bold shrink-0 ${riskAvatarClass(
+                    person.riskScore,
+                  )}`}
+                >
+                  {initials(person)}
+                </div>
+                <div className="min-w-0">
+                  <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">
+                    {person.lastName}, {person.firstName}
+                    {person.nickname && (
+                      <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
+                    )}
+                  </h1>
+                  <p className="text-[12px] font-geist text-icm-text-dim mt-1 leading-snug">
                     {person.gender} · {person.age} years · {person.dob}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-icm-red" />
+                  </p>
+                  <p className="text-[12px] font-geist text-icm-text-dim mt-0.5 inline-flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-icm-red shrink-0" />
                     {person.county}
-                  </span>
-                </p>
-
-                <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                  <StatusChip tone="green" label={person.status} />
-                  <StatusChip tone="accent" label="eChart" />
-                  <StatusChip tone="amber" label="Manage Programs" />
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <StatusChip tone="green" label={person.status} />
+                    <StatusChip tone="accent" label="eChart" />
+                    <StatusChip tone="amber" label="Manage Programs" />
+                  </div>
                 </div>
               </div>
 
-              {/* Allergies card */}
-              <AlertPanel
-                tone="red"
-                icon={AlertTriangle}
-                label="ALLERGIES"
-                title={allergies}
-                subtitle="Severe reactions documented"
-              />
+              {/* CENTER — alert panels (flex grow, side by side) */}
+              <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0">
+                <AlertPanel
+                  tone="red"
+                  icon={AlertTriangle}
+                  label="ALLERGIES"
+                  title={allergies}
+                  subtitle="Severe reactions documented"
+                />
+                <AlertPanel
+                  tone="amber"
+                  icon={AlertCircle}
+                  label="SPECIAL INSTRUCTIONS"
+                  title={specialInstructions}
+                />
+              </div>
 
-              {/* Special instructions card */}
-              <AlertPanel
-                tone="amber"
-                icon={AlertCircle}
-                label="SPECIAL INSTRUCTIONS"
-                title={specialInstructions}
-              />
-
-              {/* Action stack */}
-              <div className="flex flex-col gap-2 shrink-0">
+              {/* RIGHT — action stack (fixed width) */}
+              <div className="flex flex-col gap-2 shrink-0 w-[180px]">
                 <button
                   onClick={() => demoToast("Summarize chart")}
-                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-text text-icm-panel hover:opacity-90 transition"
+                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center justify-center gap-1.5 bg-icm-text text-icm-panel hover:opacity-90 transition"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   Summarize chart
                 </button>
                 <button
                   onClick={() => setShowPreVisit(true)}
-                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong transition"
+                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center justify-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   New note

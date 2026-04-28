@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface Person {
@@ -29,17 +30,25 @@ function avatarBg(level: Person["level"]) {
 }
 
 export function WatchlistCard() {
+  const navigate = useNavigate();
   return (
     <div className="rounded-[12px] border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong transition-colors">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-tight font-semibold text-[15px] text-icm-text">People needing attention</h3>
-        <button className="text-[12px] font-geist text-icm-accent hover:underline flex items-center gap-0.5">
+        <button
+          onClick={() => navigate("/people")}
+          className="text-[12px] font-geist text-icm-accent hover:underline flex items-center gap-0.5"
+        >
           All 48 <ChevronRight className="w-3 h-3" />
         </button>
       </div>
       <ul className="divide-y divide-icm-border">
         {people.map((p) => (
-          <li key={p.name} className="flex items-center gap-3 py-2.5">
+          <li
+            key={p.name}
+            onClick={() => navigate("/people")}
+            className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-icm-bg/40 -mx-2 px-2 rounded-lg transition-colors"
+          >
             <div className={cn("w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-mono font-semibold shrink-0", avatarBg(p.level))}>
               {p.initials}
             </div>

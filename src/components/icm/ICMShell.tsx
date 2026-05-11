@@ -1,6 +1,7 @@
 import { ICMSidebar } from "./Sidebar";
 import { ICMTopbar } from "./Topbar";
 import { AIPanel } from "./AIPanel";
+import { AIPanelProvider, useAIPanel } from "@/contexts/AIPanelContext";
 
 interface ICMShellProps {
   children: React.ReactNode;
@@ -9,9 +10,9 @@ interface ICMShellProps {
   rightPanel?: React.ReactNode;
 }
 
-export function ICMShell({ children, title, showAIPanel = true, rightPanel }: ICMShellProps) {
-  // rightPanel takes precedence over the default AIPanel.
-  const panel = rightPanel ?? (showAIPanel ? <AIPanel /> : null);
+function ShellInner({ children, title, showAIPanel = true, rightPanel }: ICMShellProps) {
+  const { open } = useAIPanel();
+  const panel = open ? (rightPanel ?? (showAIPanel ? <AIPanel /> : null)) : null;
   return (
     <div className="flex h-screen w-full bg-icm-bg font-geist text-icm-text">
       <ICMSidebar />
@@ -25,5 +26,13 @@ export function ICMShell({ children, title, showAIPanel = true, rightPanel }: IC
         </div>
       </div>
     </div>
+  );
+}
+
+export function ICMShell(props: ICMShellProps) {
+  return (
+    <AIPanelProvider>
+      <ShellInner {...props} />
+    </AIPanelProvider>
   );
 }

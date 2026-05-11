@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 import { demoToast } from "@/lib/demoToast";
 import { useRole } from "@/contexts/RoleContext";
+import { useAIPanel } from "@/contexts/AIPanelContext";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 interface TopbarProps {
@@ -12,6 +13,7 @@ interface TopbarProps {
 export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const navigate = useNavigate();
   const { isAdmin } = useRole();
+  const { toggle: toggleAI, open: aiOpen } = useAIPanel();
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",

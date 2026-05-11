@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 import { demoToast } from "@/lib/demoToast";
 import { useRole } from "@/contexts/RoleContext";
+import { useAIPanel } from "@/contexts/AIPanelContext";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 interface TopbarProps {
@@ -12,6 +13,7 @@ interface TopbarProps {
 export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const navigate = useNavigate();
   const { isAdmin } = useRole();
+  const { toggle: toggleAI, open: aiOpen } = useAIPanel();
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -59,12 +61,13 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
         {/* Gradient AI button (borrowed from IDDBilling) */}
         <button
-          onClick={() => navigate("/")}
+          onClick={toggleAI}
+          aria-pressed={aiOpen}
           className="h-9 px-2.5 sm:px-3.5 rounded-xl text-white text-[12px] font-manrope font-bold flex items-center gap-1.5 ai-gradient shadow-elevated hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Ask AI</span>
-          <ChevronDown className="w-3 h-3 opacity-70 hidden sm:inline" />
+          <ChevronDown className={`w-3 h-3 opacity-70 hidden sm:inline transition-transform ${aiOpen ? "rotate-180" : ""}`} />
         </button>
 
         {isAdmin && (

@@ -12,7 +12,8 @@ interface ICMShellProps {
 
 function ShellInner({ children, title, showAIPanel = true, rightPanel }: ICMShellProps) {
   const { open } = useAIPanel();
-  const panel = open ? (rightPanel ?? (showAIPanel ? <AIPanel /> : null)) : null;
+  // Ask AI button always opens a panel — falls back to the generic AIPanel when no page-specific one is provided.
+  const panel = open ? (rightPanel ?? <AIPanel />) : null;
   return (
     <div className="flex h-screen w-full bg-icm-bg font-geist text-icm-text">
       <ICMSidebar />

@@ -291,7 +291,7 @@ const Index = () => {
               <h3 className="font-display font-semibold text-foreground text-sm">Chat History</h3>
               <div className="flex gap-1">
                 <button
-                  onClick={() => { setThread([]); setMessage(""); }}
+                  onClick={startNewChat}
                   title="New chat"
                   className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                 >

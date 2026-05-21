@@ -26,6 +26,9 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { VoiceCompanionCard } from "@/components/VoiceCompanionCard";
 import { cn } from "@/lib/utils";
 import { getPerson, initials, riskAvatarClass, riskScoreClass } from "@/data/people";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
+
 import {
   getProfile,
   tabCompleteness,
@@ -90,25 +93,23 @@ const PersonProfile = () => {
   return (
     <ICMShell title="Profile" rightPanel={<ProfileAIPanel pct={overall.pct} />}>
       <div className="space-y-5">
-        {/* Breadcrumb */}
-        <button
-          onClick={() => navigate(`/people/${person.id}/echart`)}
-          className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          People → {person.firstName} {person.lastName} → Profile →{" "}
-          <span className="text-icm-text">{TABS.find((t) => t.key === tab)?.label}</span>
-        </button>
+        <Breadcrumbs
+          backTo={`/people/${person.id}/echart`}
+          backLabel="eChart"
+          items={[
+            { label: "People Supported", to: "/people" },
+            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+            { label: "Profile", to: `/people/${person.id}/profile` },
+            { label: TABS.find((t) => t.key === tab)?.label ?? "" },
+          ]}
+        />
 
         {/* Sticky header */}
         <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-3 bg-icm-bg/95 backdrop-blur-sm">
           <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
             <div className="flex items-start gap-4 flex-wrap">
-              <div
-                className={`w-16 h-16 rounded-2xl border flex items-center justify-center font-mono text-[18px] font-bold shrink-0 ${riskAvatarClass(person.riskScore)}`}
-              >
-                {initials(person)}
-              </div>
+              <PersonAvatar person={person} size={64} shape="square" className="text-[18px]" />
+
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">

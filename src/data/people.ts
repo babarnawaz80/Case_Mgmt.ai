@@ -178,7 +178,8 @@ export const people: Person[] = [
       detail: "Person-Centered Plan is approaching renewal window.",
     },
   },
-];
+].map((p) => ({ ...p, photoUrl: p.photoUrl ?? PHOTOS[p.id] })) as Person[];
+
 
 export function getPerson(id: string): Person | undefined {
   return people.find((p) => p.id === id);

@@ -184,7 +184,7 @@ const PersonCarePlan = () => {
                 Review draft →
               </button>
             )}
-            <button className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
+            <button onClick={() => toast.success("AI draft dismissed", { description: "Banner hidden for this session." })} className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
           </div>
         </div>
 

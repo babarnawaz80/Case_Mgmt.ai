@@ -700,3 +700,67 @@ function SignaturePill({ status }: { status: "Signed" | "Pending" | "Not require
 }
 
 export default PersonCarePlanDetail;
+
+function NSRColumn({
+  title, tone, items, disabled,
+}: {
+  title: string;
+  tone: "amber" | "green" | "red";
+  items: { text: string; source: string; severity?: "warning" | "critical" }[];
+  disabled?: boolean;
+}) {
+  const toneClass =
+    tone === "green" ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+    : tone === "amber" ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+    : "bg-icm-red-soft text-icm-red ring-icm-red/20";
+  return (
+    <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ring-1 uppercase tracking-wide ${toneClass}`}>
+          {title}
+        </span>
+        <span className="text-[10px] font-mono text-icm-text-faint">{items.length}</span>
+      </div>
+      <ul className="space-y-1.5">
+        {items.map((it, i) => (
+          <li key={i} className="text-[12px] text-icm-text leading-snug">
+            <div className="flex items-start gap-1.5">
+              {it.severity === "critical" && <span className="w-1.5 h-1.5 rounded-full bg-icm-red mt-1.5 shrink-0" />}
+              {it.severity === "warning" && <span className="w-1.5 h-1.5 rounded-full bg-icm-amber mt-1.5 shrink-0" />}
+              <span>{it.text}</span>
+            </div>
+            <p className="text-[10px] text-icm-text-faint mt-0.5">↳ {it.source}</p>
+          </li>
+        ))}
+      </ul>
+      {!disabled && (
+        <button className="mt-2 text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
+          <Plus className="w-3 h-3" /> Add item
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LifeCourseCard({
+  icon: Icon, title, body, disabled,
+}: {
+  icon: typeof Compass;
+  title: string;
+  body: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon className="w-3.5 h-3.5 text-icm-accent" />
+        <h4 className="font-tight font-semibold text-[13px] text-icm-text">{title}</h4>
+      </div>
+      <p className="text-[12px] text-icm-text-dim leading-relaxed">{body}</p>
+      {!disabled && (
+        <button className="mt-2 text-[11px] text-icm-accent hover:underline">Edit</button>
+      )}
+    </div>
+  );
+}
+

@@ -1,6 +1,6 @@
 import { Search, Sparkles, HelpCircle, ChevronDown, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
+import brandLogo from "@/assets/casemanagement-logo.png";
 import { demoToast } from "@/lib/demoToast";
 import { useRole } from "@/contexts/RoleContext";
 import { useAIPanel } from "@/contexts/AIPanelContext";
@@ -27,7 +27,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         <img
           src={brandLogo}
           alt="CaseManagement AI by iCareManager"
-          className="h-7 w-auto object-contain shrink-0"
+          className="h-6 w-auto object-contain shrink-0"
         />
         <span className="hidden sm:block w-px h-5 bg-icm-border" />
         <div className="hidden sm:flex items-center gap-2 text-[13px] font-geist min-w-0">

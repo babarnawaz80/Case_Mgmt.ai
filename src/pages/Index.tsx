@@ -44,6 +44,32 @@ interface ChatHistoryItem {
   time: string;
 }
 
+interface TopNavItem {
+  title: string;
+  url: string;
+  icon: typeof Home;
+  roles?: UserRole[];
+}
+
+const topNavItems: TopNavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "People Supported", url: "/people", icon: Users },
+  { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Messages", url: "/messages", icon: MessageSquare },
+  { title: "Documentation", url: "/documentation", icon: FileText },
+  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
+  { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
+  { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
+  { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
+];
+
+const OVERDUE_TASK_COUNT = 3;
+const OPEN_INCIDENT_COUNT = 1;
+  title: string;
+  preview: string;
+  time: string;
+}
+
 const chatHistory: ChatHistoryItem[] = [
   { id: "1", title: "Compliance Review — Zone A", preview: "3 individuals flagged out of compliance...", time: "Today 08:15 AM" },
   { id: "2", title: "ISP Updates Due This Week", preview: "5 ISP reviews are due before Friday...", time: "Today 07:30 AM" },

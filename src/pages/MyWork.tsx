@@ -455,6 +455,9 @@ const MyWork = () => {
             onMarkAllRead={notif.markAllMentionsRead}
           />
         )}
+        {view === "ai_checkins" && <AICheckInsTab />}
+
+
 
         {/* Stat strip — quiet, minimal */}
         {view === "my_work" && (
@@ -578,10 +581,11 @@ const MyWork = () => {
         )}
 
         {/* Content */}
-        {grouped.length === 0 ? (
+        {view !== "ai_checkins" && (grouped.length === 0 ? (
           <EmptyState tab={tab} onJumpWeek={() => setTab("week")} />
         ) : (
           <div className="space-y-5">
+
             {grouped.map((g) => {
               const collapsed = collapsedGroups[g.id];
               const hasOverdue = g.overdueCount > 0 && groupMode === "individual";

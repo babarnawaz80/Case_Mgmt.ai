@@ -72,10 +72,6 @@ export default function LifePlanBoard() {
       <div className="space-y-6">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
-          <button onClick={() => navigate("/platform")} className="hover:text-icm-text">
-            Platform
-          </button>
-          <span className="text-icm-text-faint">›</span>
           <span className="text-icm-text font-medium">Agents</span>
         </nav>
 
@@ -112,9 +108,6 @@ export default function LifePlanBoard() {
               >
                 <UserCog className="w-3.5 h-3.5" />
                 {role === "admin" ? "Admin" : "Case Manager"}
-              </button>
-              <button onClick={() => navigate("/platform")} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border">
-                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
               </button>
               {isAdmin && (
                 <>

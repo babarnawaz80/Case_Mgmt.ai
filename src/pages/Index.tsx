@@ -304,17 +304,43 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-sm transition-all border border-border"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard</span>
-            </motion.button>
+          {/* Center: horizontal nav of iCM modules */}
+          <nav className="flex items-center gap-1">
+            {topNavItems.map((item) => {
+              if (item.roles && !item.roles.includes(role)) return null;
+              const badge = badgeFor(item);
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.title}
+                  to={item.url}
+                  title={item.title}
+                  className={({ isActive }) =>
+                    cn(
+                      "relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                      isActive
+                        ? "bg-icm-accent-soft text-icm-accent"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )
+                  }
+                >
+                  <Icon className="w-[18px] h-[18px]" />
+                  {badge && (
+                    <span
+                      className={cn(
+                        "absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center ring-2 ring-background",
+                        badgeToneClass[badge.tone]
+                      )}
+                    >
+                      {badge.count}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </nav>
 
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/settings")}
               title="Profile / Settings"
@@ -324,6 +350,7 @@ const Index = () => {
             </button>
           </div>
         </header>
+
 
         {/* Chat Content */}
         <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-10">

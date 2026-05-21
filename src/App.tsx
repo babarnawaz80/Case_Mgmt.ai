@@ -228,7 +228,7 @@ const App = () => (
             <Route path="/reports/builder" element={<ReportBuilder />} />
             <Route path="/reports/audit-evidence" element={<AuditEvidence />} />
             <Route path="/reports/:reportId" element={<ReportRunner />} />
-            <Route path="/platform" element={<PlatformHub />} />
+            <Route path="/platform" element={<LifePlanBoard />} />
             <Route path="/platform/guidelines-engines" element={<GuidelinesEnginesList />} />
             <Route path="/platform/guidelines-engines/new" element={<NewEngineWizard />} />
             <Route path="/platform/guidelines-engines/:engineId" element={<EngineDetail />} />

@@ -72,10 +72,6 @@ export default function LifePlanBoard() {
       <div className="space-y-6">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
-          <button onClick={() => navigate("/platform")} className="hover:text-icm-text">
-            Platform
-          </button>
-          <span className="text-icm-text-faint">›</span>
           <span className="text-icm-text font-medium">Agents</span>
         </nav>
 

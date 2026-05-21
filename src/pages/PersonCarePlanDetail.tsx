@@ -172,10 +172,10 @@ const PersonCarePlanDetail = () => {
           </div>
           {!readOnly && (
             <div className="flex items-center gap-2 mt-4">
-              <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <button onClick={() => toast("Add goal", { description: "Opening goal builder…" })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Add goal
               </button>
-              <button className="h-9 px-3 rounded-xl border border-icm-accent/20 bg-icm-accent-soft text-[12px] font-medium text-icm-accent hover:bg-icm-accent-soft/70 inline-flex items-center gap-1.5">
+              <button onClick={() => toast.success("AI drafting goals", { description: "Reviewing last 12 mo of notes & assessments…" })} className="h-9 px-3 rounded-xl border border-icm-accent/20 bg-icm-accent-soft text-[12px] font-medium text-icm-accent hover:bg-icm-accent-soft/70 inline-flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" /> AI: Add goals based on recent notes
               </button>
             </div>

@@ -569,39 +569,44 @@ const MyWork = () => {
               return (
                 <div
                   key={g.id}
-                  className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden"
+                  className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden"
                 >
                   {/* Group header */}
                   <button
                     onClick={() => toggleGroup(g.id)}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/50 transition-colors text-left"
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/60"
                   >
                     {groupMode === "individual" ? (
-                      <div className="w-8 h-8 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[10px] font-mono font-bold text-icm-accent shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-[11px] font-geist font-bold text-icm-text shrink-0">
                         {g.initials}
                       </div>
                     ) : (
-                      <CalendarIcon
-                        className={cn("w-4 h-4 shrink-0", (g as any).tone ?? "text-icm-text-dim")}
-                      />
+                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center shrink-0">
+                        <CalendarIcon
+                          className={cn("w-4 h-4", (g as any).tone ?? "text-icm-text-dim")}
+                        />
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={cn(
-                            "text-[13px] font-semibold font-geist",
-                            groupMode === "individual" ? "text-icm-text" : "tracking-wider",
+                            "text-[13.5px] font-semibold font-geist",
                             groupMode === "due" ? (g as any).tone : "text-icm-text",
+                            groupMode === "due" && "tracking-wide text-[11.5px] uppercase",
                           )}
                         >
                           {g.label}
                         </span>
-                        {g.sub && <span className="text-[11px] text-icm-text-faint">{g.sub}</span>}
-                        <span className="px-1.5 py-0.5 rounded bg-icm-bg text-icm-text-dim text-[10px] font-mono">
-                          {g.items.length}
+                        {g.sub && (
+                          <span className="text-[11.5px] text-icm-text-faint font-geist">{g.sub}</span>
+                        )}
+                        <span className="text-[11.5px] text-icm-text-faint font-geist">
+                          · {g.items.length} task{g.items.length === 1 ? "" : "s"}
                         </span>
                         {g.overdueCount > 0 && groupMode === "individual" && (
-                          <span className="px-1.5 py-0.5 rounded bg-icm-red-soft text-icm-red text-[10px] font-mono font-semibold">
+                          <span className="text-[11px] font-semibold text-icm-red inline-flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-icm-red" />
                             {g.overdueCount} overdue
                           </span>
                         )}

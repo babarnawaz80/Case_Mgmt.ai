@@ -14,25 +14,25 @@ const PlatformHub = () => {
   if (!isAdmin) return <AdminOnly />;
 
   return (
-    <ICMShell title="Platform" showAIPanel={false}>
+    <ICMShell title="AI Agent" showAIPanel={false}>
       <div className="space-y-5 max-w-[1100px]">
         <Breadcrumbs
           backTo="/dashboard"
           backLabel="Dashboard"
           items={[
             { label: "Dashboard", to: "/dashboard" },
-            { label: "Platform" },
+            { label: "AI Agent" },
           ]}
         />
 
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
             <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
-              Platform
+              AI Agent
             </h1>
             <p className="text-[13px] text-icm-text-dim mt-1 font-geist max-w-[640px]">
-              The intelligence and configuration layer. Build engines, manage
-              compliance agents, and configure organization-wide tools.
+              Build guideline engines and manage the compliance agents that
+              apply them across your caseload.
             </p>
           </div>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
@@ -59,34 +59,6 @@ const PlatformHub = () => {
             onClick={() => navigate("/lifeplan")}
             tone="green"
             size="large"
-          />
-        </div>
-
-        {/* Three secondary cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <PlatformCard
-            icon={ClipboardCheck}
-            title="Assessment Builder"
-            description="Create custom assessment templates for your organization."
-            onClick={() => navigate("/admin/assessment-builder")}
-            tone="accent"
-            size="small"
-          />
-          <PlatformCard
-            icon={MapPin}
-            title="Provider Directory"
-            description="Manage community providers for referral tracking."
-            onClick={() => navigate("/admin/provider-directory")}
-            tone="green"
-            size="small"
-          />
-          <PlatformCard
-            icon={BarChart3}
-            title="Report Builder"
-            description="Build custom reports without vendor intervention."
-            onClick={() => navigate("/reports")}
-            tone="accent"
-            size="small"
           />
         </div>
       </div>

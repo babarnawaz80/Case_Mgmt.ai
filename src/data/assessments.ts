@@ -539,7 +539,56 @@ export const assessments: AssessmentInstance[] = [
 ];
 
 export function listAssessments(individualId: string) {
-  return assessments.filter((a) => a.individualId === individualId);
+  const existing = assessments.filter((a) => a.individualId === individualId);
+  if (existing.length > 0) return existing;
+  return generateAssessmentsFor(individualId);
+}
+
+// ---- Synthetic fallback so every individual has assessment history ----
+function ah(seed: string, n: number): number {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0;
+  return x % n;
+}
+function generateAssessmentsFor(individualId: string): AssessmentInstance[] {
+  const cm = ["Babar Nawaz, CM", "Jennie Thollander, CM", "Brenda Smith, CM"][ah(individualId, 3)];
+  const score = 30 + ah(individualId + "s", 50);
+  const loc: AssessmentInstance["loc"] = score >= 75 ? "High" : score >= 50 ? "Moderate" : "Low";
+  return [
+    {
+      id: `A-gen-${individualId}-1`,
+      individualId,
+      templateId: "tpl-comp-initial",
+      templateVersion: "v2.0",
+      date: "01/15/2026",
+      status: "Completed",
+      completedBy: cm,
+      totalScore: score,
+      loc,
+      answers: [
+        { questionId: "q-name", value: "—" },
+        { questionId: "q-lang", value: "English" },
+        { questionId: "q-adl-bath", value: ah(individualId, 3) === 0 ? "Independent" : "Supervision" },
+        { questionId: "q-adl-eat", value: "Independent" },
+        { questionId: "q-iadl-meds", value: "Moderate Assist" },
+        { questionId: "q-comm-mode", value: "Verbal" },
+        { questionId: "q-h-dx", value: "Per medical record" },
+        { questionId: "q-env-living", value: "Group home" },
+      ],
+    },
+    {
+      id: `A-gen-${individualId}-2`,
+      individualId,
+      templateId: "tpl-annual",
+      templateVersion: "v1.0",
+      date: "07/15/2025",
+      status: "Completed",
+      completedBy: cm,
+      totalScore: Math.max(20, score - 5),
+      loc,
+      answers: [],
+    },
+  ];
 }
 
 export function getAssessment(id: string) {

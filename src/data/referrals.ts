@@ -454,7 +454,62 @@ export const referrals: Referral[] = [
 ];
 
 export function getReferralsForPerson(personId: string) {
-  return referrals.filter((r) => r.personId === personId);
+  const existing = referrals.filter((r) => r.personId === personId);
+  if (existing.length > 0) return existing;
+  return generateReferralsFor(personId);
+}
+
+// ---- Synthetic fallback so every individual has referral history ----
+function rh(seed: string, n: number): number {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0;
+  return x % n;
+}
+function generateReferralsFor(personId: string): Referral[] {
+  const cm = ["Kathy Adams", "Babar Nawaz CM", "Jennie Thollander"][rh(personId, 3)];
+  const provider = providers[rh(personId + "p", providers.length)];
+  const types: ReferralType[] = ["Employment & Vocational", "Healthcare — Primary Care", "Behavioral Support", "Transportation", "Benefits Assistance"];
+  const t1 = types[rh(personId + "t1", types.length)];
+  const t2 = types[rh(personId + "t2", types.length)];
+  return [
+    {
+      id: `R-gen-${personId}-1`,
+      personId, date: "03/15/2026", type: t1, priority: "Routine",
+      reason: `Routine ${t1.toLowerCase()} referral to support active ISP goals.`,
+      sourceOfNeed: "Case manager recommendation",
+      providerId: provider.id, providerName: provider.name, providerPhone: provider.phone, providerAddress: provider.address,
+      acceptsMedicaid: provider.acceptsMedicaid,
+      referralMethod: "Online portal", contactDate: "03/15/2026",
+      infoShared: ["Name and contact information", "Diagnosis", "Medicaid / insurance information"],
+      consentDocumented: true, consentDate: "03/14/2026", consentMethod: "Written",
+      expectedTimeframe: "2 weeks", followUpDate: "03/29/2026", assignedTo: cm,
+      status: "Pending Response", daysOpen: 30, lastActivity: "03/15/2026",
+      timeline: [
+        { id: "t1", date: "03/15/2026", type: "created", title: "Referral created", by: cm },
+        { id: "t2", date: "03/15/2026", type: "submitted", title: `Submitted to ${provider.name}`, by: cm },
+      ],
+    },
+    {
+      id: `R-gen-${personId}-2`,
+      personId, date: "11/02/2025", type: t2, priority: "Routine",
+      reason: `Closed — successfully connected to provider.`,
+      sourceOfNeed: "Individual's request",
+      providerId: provider.id, providerName: provider.name, providerPhone: provider.phone, providerAddress: provider.address,
+      acceptsMedicaid: provider.acceptsMedicaid,
+      referralMethod: "Phone call", contactDate: "11/02/2025",
+      infoShared: ["Name and contact information"],
+      consentDocumented: true, consentDate: "11/01/2025", consentMethod: "Verbal",
+      expectedTimeframe: "1 week", followUpDate: "11/09/2025", assignedTo: cm,
+      status: "Closed — Successful", daysOpen: 0, lastActivity: "11/20/2025",
+      serviceStartDate: "11/15/2025",
+      outcomeNotes: "Provider connection established. Service ongoing.",
+      timeline: [
+        { id: "t1", date: "11/02/2025", type: "created", title: "Referral created", by: cm },
+        { id: "t2", date: "11/15/2025", type: "started", title: "Service started", by: provider.name },
+        { id: "t3", date: "11/20/2025", type: "closed", title: "Closed — Successful", by: cm },
+      ],
+    },
+  ];
 }
 
 export function getReferral(id: string) {

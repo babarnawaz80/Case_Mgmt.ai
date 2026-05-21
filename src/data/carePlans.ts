@@ -228,7 +228,61 @@ export const plans: CarePlan[] = [
 ];
 
 export function getPlansForPerson(personId: string): CarePlan[] {
-  return plans.filter((p) => p.personId === personId);
+  const existing = plans.filter((p) => p.personId === personId);
+  if (existing.length > 0) return existing;
+  return [generatePlanFor(personId)];
+}
+
+// ---- Synthetic fallback so every individual has an ISP / Care Plan ----
+function ph(seed: string, n: number): number {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0;
+  return x % n;
+}
+function generatePlanFor(personId: string): CarePlan {
+  const cm = ["Babar Nawaz CM", "Jennie Thollander", "Brenda Smith"][ph(personId, 3)];
+  const goalSets = [
+    { title: "Increase community participation", obj: "Attend 1 community event per month" },
+    { title: "Build independent living skills", obj: "Practice meal prep with staff support weekly" },
+    { title: "Maintain stable health management", obj: "Attend all scheduled medical appointments" },
+    { title: "Develop employment readiness", obj: "Complete job-readiness workshop" },
+  ];
+  const pickGoal = (salt: string) => goalSets[ph(personId + salt, goalSets.length)];
+  const g1 = pickGoal("g1"); const g2 = pickGoal("g2x");
+  return {
+    id: `plan-gen-${personId}`,
+    personId,
+    status: "In Progress",
+    internalDueDate: "08/01/2026",
+    updatedBy: cm,
+    updatedOn: "04/01/2026",
+    effectiveDate: "08/01/2025",
+    reviewDate: "08/01/2026",
+    aiDrafted: false,
+    goals: [
+      { id: "g1", number: 1, title: g1.title, description: `Plan objective: ${g1.obj}.`, targetDate: "07/31/2026", responsibleParty: cm, progress: "In Progress", objectives: [{ id: "g1o1", description: g1.obj, status: "In Progress" }] },
+      { id: "g2", number: 2, title: g2.title, description: `Plan objective: ${g2.obj}.`, targetDate: "07/31/2026", responsibleParty: cm, progress: "Not Started", objectives: [{ id: "g2o1", description: g2.obj, status: "Not Started" }] },
+    ],
+    services: [
+      { id: "s1", name: "Case Management", provider: "Iowa CM Services", startDate: "08/01/2025", endDate: "07/31/2026", units: "4 hrs/mo", status: "Active" },
+      { id: "s2", name: "Day Habilitation", provider: "Community Day Programs", startDate: "08/01/2025", endDate: "07/31/2026", units: "20 hrs/wk", status: "Active" },
+    ],
+    supportNeeds: {
+      workingWell: { value: "Routine and predictability help engagement; family communication is consistent." },
+      notWorking: { value: "Occasional transportation gaps to community events." },
+      preferences: { value: "Prefers structured group activities over unstructured social time." },
+      healthSafety: { value: "No active safety concerns. Standard supervision protocols in place." },
+    },
+    team: [
+      { role: "Individual", name: "—", status: "Pending" },
+      { role: "Guardian / Representative", name: "—", status: "Pending" },
+      { role: "Case Manager", name: cm, status: "Signed", signedOn: "04/01/2026" },
+    ],
+    history: [
+      { date: "04/01/2026", user: cm, action: "Plan updated" },
+      { date: "08/01/2025", user: cm, action: "Plan effective" },
+    ],
+  };
 }
 
 export function getPlan(planId: string): CarePlan | undefined {

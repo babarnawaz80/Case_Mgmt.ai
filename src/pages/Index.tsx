@@ -192,10 +192,23 @@ const Index = () => {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (plusRef.current && !plusRef.current.contains(e.target as Node)) setPlusMenuOpen(false);
+      if (snapshotRef.current && !snapshotRef.current.contains(e.target as Node)) setSnapshotPickerOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  function openSnapshotFor(personId: string) {
+    const p = getPerson(personId);
+    if (!p) return;
+    setSnapshotPickerOpen(false);
+    setSnapshotQuery("");
+    setThread((prev) => [
+      ...prev,
+      { role: "user", text: `Individual Snapshot for ${p.firstName} ${p.lastName}` },
+      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything — or convert it into a note below.` },
+    ]);
+  }
 
   function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
     const match = suggestedPrompts.find((p) => p.text.toLowerCase() === text.trim().toLowerCase());

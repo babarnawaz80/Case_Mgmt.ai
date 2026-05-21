@@ -326,8 +326,158 @@ const profiles: Record<string, ProfileData> = {
   "1": josephProfile,
 };
 
+// ---------------------------------------------------------------------------
+// Synthetic profile generator
+// Produces a complete, internally-consistent ProfileData record for any person
+// in the seed who doesn't have a hand-crafted profile. Deterministic per id.
+// ---------------------------------------------------------------------------
+
+import { people, type Person } from "./people";
+
+const DIAG_POOL: Array<Pick<Diagnosis, "code" | "description">> = [
+  { code: "F70",    description: "Mild intellectual disability" },
+  { code: "F71",    description: "Moderate intellectual disability" },
+  { code: "F84.0",  description: "Autism spectrum disorder" },
+  { code: "G40.909",description: "Epilepsy, unspecified" },
+  { code: "F41.1",  description: "Generalized anxiety disorder" },
+  { code: "F33.1",  description: "Major depressive disorder, recurrent, moderate" },
+  { code: "I10",    description: "Essential (primary) hypertension" },
+  { code: "E11.9",  description: "Type 2 diabetes mellitus without complications" },
+  { code: "J44.9",  description: "COPD, unspecified" },
+  { code: "M19.90", description: "Osteoarthritis, unspecified site" },
+];
+
+const MED_POOL: Array<Pick<Medication, "name" | "dosage" | "frequency">> = [
+  { name: "Sertraline",   dosage: "50mg",  frequency: "Once daily" },
+  { name: "Levetiracetam",dosage: "500mg", frequency: "Twice daily" },
+  { name: "Risperidone",  dosage: "1mg",   frequency: "Twice daily" },
+  { name: "Lisinopril",   dosage: "10mg",  frequency: "Once daily" },
+  { name: "Metformin",    dosage: "500mg", frequency: "Twice daily with meals" },
+  { name: "Albuterol",    dosage: "90mcg", frequency: "As needed" },
+  { name: "Melatonin",    dosage: "3mg",   frequency: "At bedtime" },
+  { name: "Acetaminophen",dosage: "500mg", frequency: "Every 6 hours PRN" },
+];
+
+const PROVIDER_POOL = [
+  { name: "Dr. Sarah Chen",     specialty: "Primary Care",  phone: "319-555-0202", address: "University of Iowa Hospitals" },
+  { name: "Dr. Marcus Patel",   specialty: "Neurology",     phone: "319-555-0303", address: "Mercy Medical Center" },
+  { name: "Dr. Elaine Foster",  specialty: "Psychiatry",    phone: "319-555-0404", address: "Behavioral Health Associates" },
+  { name: "Dr. James Whitlock", specialty: "Cardiology",    phone: "319-555-0505", address: "Iowa Heart Center" },
+  { name: "Dr. Priya Iyer",     specialty: "Endocrinology", phone: "319-555-0606", address: "Iowa Diabetes Clinic" },
+];
+
+const EM_REL = ["Mother", "Father", "Sister", "Brother", "Guardian", "Aunt", "Uncle"];
+const CMS = ["Babar Nawaz CM", "Jennie Thollander", "Brenda Smith", "Kathy Adams"];
+const CITIES = ["Des Moines", "Cedar Rapids", "Davenport", "Iowa City", "Waterloo", "Ames", "Sioux City"];
+
+function h(seed: string, n: number): number {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0;
+  return x % n;
+}
+const pick = <T,>(arr: T[], seed: string, salt = ""): T => arr[h(seed + salt, arr.length)];
+
+function generateProfile(p: Person): ProfileData {
+  const seed = p.id;
+  const cm = p.serviceContact ?? pick(CMS, seed, "cm");
+  const primaryDiag = pick(DIAG_POOL, seed, "d1");
+  const secondaryDiag = pick(DIAG_POOL.filter((d) => d.code !== primaryDiag.code), seed, "d2");
+  const med1 = pick(MED_POOL, seed, "m1");
+  const med2 = pick(MED_POOL.filter((m) => m.name !== med1.name), seed, "m2");
+  const provider = pick(PROVIDER_POOL, seed, "prov");
+
+  const allergies: Allergy[] = p.allergies && p.allergies !== "None known"
+    ? p.allergies.split(",").map((a) => ({
+        allergen: a.trim(),
+        reaction: pick(["Hives", "Anaphylaxis", "Swelling", "Rash"], seed, a),
+        severity: pick<Severity>(["Moderate", "Severe", "Life-threatening", "Mild"], seed, a),
+        identifiedOn: p.admittedOn,
+      }))
+    : [];
+
+  const baseline = defaultBaselines();
+  baseline[0] = { ...baseline[0], baseline: `${110 + h(seed, 30)}/${65 + h(seed + "d", 20)} mmHg`, lastMeasured: p.updatedOn, measuredBy: cm };
+  baseline[1] = { ...baseline[1], baseline: `${68 + h(seed, 24)} bpm`, lastMeasured: p.updatedOn, measuredBy: cm };
+  baseline[2] = { ...baseline[2], baseline: `${130 + h(seed, 80)} lb`, lastMeasured: p.updatedOn, measuredBy: cm };
+
+  const emName = `${pick(["Linda", "Robert", "Maria", "James", "Patricia", "John"], seed, "em")} ${p.lastName}`;
+  const emPhone = `319-555-${String(1000 + h(seed + "ec", 8999)).padStart(4, "0")}`;
+
+  return {
+    preferredName: p.nickname,
+    pronouns: p.gender === "M" ? "he/him" : "she/her",
+    primaryLanguage: "English",
+    communicationNeeds: p.specialInstructions,
+    street: `${100 + h(seed + "house", 9000)} ${pick(["Maple", "Oak", "Elm", "Cedar", "Pine", "Birch"], seed, "st")} St`,
+    city: pick(CITIES, seed, "city"),
+    state: "IA",
+    zip: String(50000 + h(seed + "zip", 9999)),
+    livingSituation: pick(["Family home", "Group home", "Supported living", "Independent apartment"], seed, "ls"),
+    ssn: `XXX-XX-${String(1000 + h(seed + "ssn", 8999)).padStart(4, "0")}`,
+    medicaidId: `IA${10000000 + h(seed + "mid", 89999999)}`,
+    stateId: `IA-${1000 + h(seed + "sid", 8999)}`,
+    referralSource: pick(["DHS", "Self-referral", "Family", "Hospital discharge", "School transition"], seed, "ref"),
+    primaryPhone: `319-555-${String(2000 + h(seed + "pp", 7999)).padStart(4, "0")}`,
+    email: `${p.firstName.toLowerCase()}.${p.lastName.toLowerCase().replace(/[^a-z]/g, "")}@example.org`,
+    preferredContact: pick<"Phone" | "Email" | "Text" | "Mail">(["Phone", "Email", "Text"], seed, "pc"),
+
+    diagnoses: [
+      { ...primaryDiag, addedOn: p.admittedOn, addedBy: cm, primary: true },
+      { ...secondaryDiag, addedOn: p.updatedOn, addedBy: "Dr. Sarah Chen" },
+    ],
+    medications: [
+      { ...med1, prescriber: "Dr. Sarah Chen", startDate: p.admittedOn, status: "Active" },
+      { ...med2, prescriber: "Dr. Sarah Chen", startDate: p.updatedOn, status: h(seed, 4) === 0 ? "As Needed" : "Active" },
+    ],
+    allergies,
+    hrstScore: 1 + h(seed + "hrst", 5),
+    hrstScoredOn: p.admittedOn,
+    hrstSource: "Manual entry",
+    providers: [{ ...provider, lastVisit: p.updatedOn, nextAppointment: p.updatedOn, notes: "Quarterly follow-up scheduled." }],
+    insurance: [{ type: "Medicaid", provider: "Iowa Medicaid", policyNumber: `IA${10000000 + h(seed + "pol", 89999999)}`, effectiveDate: p.admittedOn }],
+
+    vitalBaselines: baseline,
+    healthMonitoringNotes: "",
+    behavioralMonitoringNotes: "",
+
+    pharmacies: [{ name: pick(["CVS Pharmacy", "Walgreens", "Hy-Vee Pharmacy", "Medicap"], seed, "ph"), phone: `319-555-${String(3000 + h(seed + "phn", 6999)).padStart(4, "0")}`, primary: true }],
+
+    enrollments: [{ program: p.county, serviceCategory: "Medicaid | Case Management", startDate: p.admittedOn, status: p.status === "Discharged" ? "Closed" : "Active", caseManager: cm }],
+    funding: [{ type: "Medicaid Waiver", authorizedUnits: 40, usedUnits: h(seed + "u", 35), period: "Current quarter", authorizationNumber: `SA-2026-${String(100 + h(seed + "auth", 899)).padStart(3, "0")}`, status: "Active" }],
+
+    emergencyContacts: [{ name: emName, relationship: pick(EM_REL, seed, "rel"), primaryPhone: emPhone, priority: 1, notes: "Best to call after 5pm" }],
+    supportCircle: [{ name: emName, role: "Primary caregiver", phone: emPhone, involvement: "High" }],
+    professionalContacts: [{ name: provider.name, organization: provider.address ?? "", role: provider.specialty, phone: provider.phone, service: provider.specialty, lastContacted: p.updatedOn }],
+
+    documents: [],
+
+    caseManager: cm,
+    supervisor: "Kathy Adams",
+    caseloadWeight: 1 + h(seed + "cw", 20) / 10,
+    complexity: ((): "Standard" | "Moderate" | "Complex" | "High complexity" => {
+      const r = p.riskScore ?? 30;
+      if (r >= 70) return "High complexity";
+      if (r >= 50) return "Complex";
+      if (r >= 30) return "Moderate";
+      return "Standard";
+    })(),
+    referralDate: p.admittedOn,
+    admissionType: p.status === "Pending" ? "Intake in progress" : "New admission",
+    lastChartReview: p.updatedOn,
+    nextChartReviewDue: p.updatedOn,
+    changeHistory: [
+      { date: p.admittedOn, user: cm, field: "Admission", oldValue: "—", newValue: "Active" },
+      { date: p.updatedOn, user: cm, field: "Chart review", oldValue: "—", newValue: "Reviewed" },
+    ],
+  };
+}
+
 export function getProfile(id: string): ProfileData {
-  return profiles[id] ?? { ...empty, vitalBaselines: defaultBaselines() };
+  if (profiles[id]) return profiles[id];
+  const person = people.find((p) => p.id === id);
+  if (!person) return { ...empty, vitalBaselines: defaultBaselines() };
+  profiles[id] = generateProfile(person);
+  return profiles[id];
 }
 
 // Completeness — required fields per tab.

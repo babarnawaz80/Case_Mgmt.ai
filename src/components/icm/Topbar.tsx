@@ -27,7 +27,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         <img
           src={brandLogo}
           alt="CaseManagement AI by iCareManager"
-          className="h-7 w-auto object-contain shrink-0"
+          className="h-6 w-auto object-contain shrink-0"
         />
         <span className="hidden sm:block w-px h-5 bg-icm-border" />
         <div className="hidden sm:flex items-center gap-2 text-[13px] font-geist min-w-0">

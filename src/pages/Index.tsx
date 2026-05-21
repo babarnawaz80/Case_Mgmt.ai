@@ -36,6 +36,7 @@ import { useMessages } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
 import { people } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
+import { IndividualSnapshotDialog } from "@/components/IndividualSnapshotDialog";
 
 interface ChatHistoryItem {
   id: string;
@@ -159,6 +160,7 @@ const Index = () => {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { role } = useRole();
@@ -228,6 +230,7 @@ const Index = () => {
   return (
     <>
     {ambientOverlay}
+    <IndividualSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
     <div className="flex h-screen w-full bg-background">
       {/* Collapsible Chat History Sidebar */}
       <AnimatePresence initial={false}>
@@ -366,6 +369,19 @@ const Index = () => {
                 Your <span className="text-primary font-medium">AI case manager</span> is ready to assist you
               </p>
             </motion.div>
+          )}
+
+          {thread.length === 0 && (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              onClick={() => setSnapshotOpen(true)}
+              className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-sm font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
+            >
+              <Sparkles className="w-4 h-4" />
+              Individual Snapshot
+            </motion.button>
           )}
 
           {/* Quick Stats — clickable */}

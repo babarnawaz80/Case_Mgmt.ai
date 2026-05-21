@@ -137,6 +137,7 @@ const App = () => (
             <Route path="/people/:id/monitoring-form" element={<PersonMonitoringForm />} />
             <Route path="/people/:id/monitoring-form/:formId" element={<PersonMonitoringFormDetail />} />
             <Route path="/people/:id/visit-summary" element={<PersonVisitSummary />} />
+            <Route path="/people/:id/visit-summary/schedule" element={<PersonVisitScheduler />} />
             <Route path="/people/:id/visit-summary/:visitId" element={<PersonVisitSummaryDetail />} />
             <Route path="/people/:id/eligibility-verification" element={<PersonEligibilityVerification />} />
             <Route path="/people/:id/eligibility-verification/:verificationId" element={<PersonEligibilityVerificationDetail />} />

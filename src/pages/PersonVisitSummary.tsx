@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck, Smartphone } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import { getPerson, riskAvatarClass, initials } from "@/data/people";
@@ -106,6 +106,9 @@ const PersonVisitSummary = () => {
           <div className="flex items-center gap-2">
             <button onClick={() => navigate(`/people/${person.id}/visit-summary/schedule`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
               <CalendarCheck className="w-3.5 h-3.5" /> Schedule visit
+            </button>
+            <button onClick={() => navigate(`/people/${person.id}/visit-summary/document`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5" /> Document visit (mobile)
             </button>
             <button onClick={newVisit} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" /> Add Visit Summary

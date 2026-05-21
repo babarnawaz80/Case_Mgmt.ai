@@ -594,13 +594,56 @@ const Index = () => {
                 {prompt.text}
               </button>
             ))}
-            <button
-              onClick={() => setSnapshotOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Individual Snapshot
-            </button>
+            <div className="relative" ref={snapshotRef}>
+              <button
+                onClick={() => setSnapshotPickerOpen((v) => !v)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Individual Snapshot
+              </button>
+              {snapshotPickerOpen && (
+                <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
+                  <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">
+                      Pick an individual
+                    </p>
+                    <input
+                      autoFocus
+                      value={snapshotQuery}
+                      onChange={(e) => setSnapshotQuery(e.target.value)}
+                      placeholder="Search…"
+                      className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {people
+                      .filter((p) =>
+                        `${p.firstName} ${p.lastName} ${p.nickname ?? ""}`
+                          .toLowerCase()
+                          .includes(snapshotQuery.trim().toLowerCase())
+                      )
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => openSnapshotFor(p.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
+                        >
+                          <PersonAvatar person={p} size={28} shape="circle" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {p.firstName} {p.lastName}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {p.county} · {p.status}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
           </motion.div>
         </div>

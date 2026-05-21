@@ -247,7 +247,7 @@ const PersonEligibilityVerificationDetail = () => {
                   <p className="text-[11px] text-icm-text-dim font-mono">Uploaded {form.documentUploadedOn}</p>
                 </div>
               </div>
-              <button className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">View document</button>
+              <button onClick={() => toast("Opening document viewer", { description: form.documentName })} className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">View document</button>
             </div>
           )}
           {docProcessing === "processing" && (

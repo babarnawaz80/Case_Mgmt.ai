@@ -307,6 +307,17 @@ const Index = () => {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto py-2">
+              {thread.length > 0 && (() => {
+                const active = activeIndividualId ? getPerson(activeIndividualId) : null;
+                const title = active ? `${active.firstName} ${active.lastName} — Snapshot` : (thread[0]?.text ?? "Current chat");
+                return (
+                  <div className="px-4 py-3 mx-2 mb-2 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300 mb-1">Active chat</p>
+                    <p className="text-sm font-medium text-foreground truncate">{title}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{thread.length} messages · just now</p>
+                  </div>
+                );
+              })()}
               {chatHistory.map((item) => (
                 <button
                   key={item.id}

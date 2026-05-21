@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import logo from "@/assets/casemanagement-logo.png";
+import heroImg from "@/assets/login-hero.jpg";
 
 const GoogleLogo = () => (
   <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -42,8 +44,7 @@ const testimonials = [
   },
 ];
 
-const heroImage =
-  "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1400&q=80";
+const heroImage = heroImg;
 
 export default function Login() {
   const navigate = useNavigate();

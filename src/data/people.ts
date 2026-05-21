@@ -39,15 +39,23 @@ export interface Person {
   aiSuggestions?: AISuggestion[];
 }
 
-// Stable demo portraits (pravatar deterministic by img id).
+// Portraits depicting people with disabilities (locally bundled).
+import p1 from "@/assets/people/p1.jpg";
+import p2 from "@/assets/people/p2.jpg";
+import p3 from "@/assets/people/p3.jpg";
+import p4 from "@/assets/people/p4.jpg";
+import p5 from "@/assets/people/p5.jpg";
+import p6 from "@/assets/people/p6.jpg";
+import p7 from "@/assets/people/p7.jpg";
+
 const PHOTOS: Record<string, string> = {
-  "1": "https://i.pravatar.cc/160?img=12",
-  "2": "https://i.pravatar.cc/160?img=33",
-  "3": "https://i.pravatar.cc/160?img=15",
-  "4": "https://i.pravatar.cc/160?img=68",
-  "5": "https://i.pravatar.cc/160?img=51",
-  "6": "https://i.pravatar.cc/160?img=47",
-  "7": "https://i.pravatar.cc/160?img=45",
+  "1": p1,
+  "2": p2,
+  "3": p3,
+  "4": p4,
+  "5": p5,
+  "6": p6,
+  "7": p7,
 };
 
 

@@ -434,9 +434,8 @@ const Dashboard = () => {
         <HeroRow />
         <DonutRow />
 
-        {/* Schedule + Watchlist (kept from your version) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ScheduleCard />
+        {/* Watchlist */}
+        <div className="grid grid-cols-1 gap-4">
           <WatchlistCard />
         </div>
 

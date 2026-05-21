@@ -969,6 +969,29 @@ function FocusedSessionDone({ onClose }: { onClose: () => void }) {
 }
 
 // ---------- Reusable bits ----------
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "neutral" | "red" | "amber" | "accent";
+}) {
+  const accent = {
+    neutral: "text-icm-text",
+    red: "text-icm-red",
+    amber: "text-icm-amber",
+    accent: "text-icm-accent",
+  }[tone];
+  return (
+    <div className="rounded-2xl border border-icm-border bg-icm-panel px-4 py-3">
+      <p className="text-[11px] uppercase tracking-wider text-icm-text-faint font-geist">{label}</p>
+      <p className={cn("text-[22px] font-manrope font-bold mt-0.5 leading-none", accent)}>{value}</p>
+    </div>
+  );
+}
+
 function Chip({
   tone,
   label,

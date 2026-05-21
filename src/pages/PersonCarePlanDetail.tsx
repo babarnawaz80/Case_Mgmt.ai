@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
   CheckCircle2, Clock, Mail, FileText, Users, Heart, ListChecks, Briefcase, History,
-  AlertCircle,
+  AlertCircle, Compass, Star, Link2, ShieldCheck, GitBranch, Eye, ExternalLink,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
@@ -18,7 +18,7 @@ const planSuggestions: AISuggestion[] = [
   { tone: "good", label: "Good news", body: "All service authorizations are current. Next renewal: August 2026.", cta: "View services" },
 ];
 
-type SectionKey = "details" | "profile" | "goals" | "services" | "support" | "team" | "history";
+type SectionKey = "details" | "profile" | "nsr" | "goals" | "services" | "support" | "lifecourse" | "linkages" | "team" | "history";
 
 const PersonCarePlanDetail = () => {
   const { id, planId } = useParams<{ id: string; planId: string }>();

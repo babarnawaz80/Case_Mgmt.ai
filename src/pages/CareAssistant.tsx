@@ -4,7 +4,6 @@ import { Mic, Send, CheckCircle2 } from "lucide-react";
 import SiriOrb from "@/components/ui/siri-orb";
 import {
   TOKEN_MAP,
-  openingMessage,
   matchBotReply,
   buildSummary,
   buildTasks,
@@ -37,8 +36,9 @@ export default function CareAssistant() {
     );
   }
 
+  const greeting = `Hey ${person.firstName}, I am your AI case manager assistant. How can I help you?`;
   const [messages, setMessages] = useState<CheckInMessage[]>(() => [
-    { id: "m0", role: "bot", text: openingMessage(person.firstName), ts: Date.now() },
+    { id: "m0", role: "bot", text: greeting, ts: Date.now() },
   ]);
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
@@ -47,10 +47,32 @@ export default function CareAssistant() {
   const [ended, setEnded] = useState(false);
   const [startedAt] = useState(Date.now());
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const spokenRef = useRef(false);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, ended]);
+
+  // Speak the greeting once on mount via browser TTS
+  useEffect(() => {
+    if (spokenRef.current) return;
+    spokenRef.current = true;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      const utter = new SpeechSynthesisUtterance(greeting);
+      utter.rate = 1;
+      utter.pitch = 1;
+      utter.volume = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // ignore — voice is enhancement only
+    }
+    return () => {
+      try { window.speechSynthesis.cancel(); } catch { /* noop */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const exchangeCount = useMemo(
     () => messages.filter((m) => m.role === "individual").length,
@@ -173,9 +195,9 @@ export default function CareAssistant() {
           <SiriOrb
             size="160px"
             colors={{
-              c1: "oklch(78% 0.13 180)",
-              c2: "oklch(82% 0.10 200)",
-              c3: "oklch(75% 0.14 220)",
+              c1: "oklch(82% 0.14 195)",
+              c2: "oklch(78% 0.16 340)",
+              c3: "oklch(80% 0.10 260)",
             }}
             animationDuration={18}
           />
@@ -243,9 +265,6 @@ export default function CareAssistant() {
       {/* Input */}
       <div className="border-t border-gray-200 bg-white px-4 md:px-6 py-4 pb-6">
         <div className="max-w-2xl mx-auto">
-          <p className="text-[11px] text-gray-400 text-center mb-2">
-            This conversation is shared with your care team.
-          </p>
           <form
             onSubmit={(e) => {
               e.preventDefault();

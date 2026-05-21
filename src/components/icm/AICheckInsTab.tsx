@@ -38,46 +38,6 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function StatTile({
-  label,
-  value,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  tone: "neutral" | "red" | "amber" | "accent" | "green";
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  const value$ = {
-    neutral: "text-icm-text",
-    red: "text-icm-red",
-    amber: "text-icm-amber",
-    accent: "text-icm-accent",
-    green: "text-icm-green",
-  }[tone];
-  const iconBg = {
-    neutral: "bg-icm-bg text-icm-text-dim",
-    red: "bg-icm-red-soft text-icm-red/70",
-    amber: "bg-icm-amber-soft text-icm-amber/70",
-    accent: "bg-icm-accent-soft text-icm-accent/70",
-    green: "bg-icm-green-soft text-icm-green/70",
-  }[tone];
-  return (
-    <div className="group bg-icm-panel border border-icm-border/70 p-6 rounded-[1.75rem] shadow-[0_15px_35px_-12px_rgba(15,23,42,0.06),0_4px_10px_-2px_rgba(15,23,42,0.02)] transition-all duration-300">
-      <p className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest">
-        {label}
-      </p>
-      <div className="flex items-end justify-between mt-3">
-        <span className={cn("font-manrope text-[44px] font-black leading-none tracking-tighter", value$)}>
-          {value}
-        </span>
-        <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm", iconBg)}>
-          <Icon className="w-5 h-5" />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function AICheckInsTab() {

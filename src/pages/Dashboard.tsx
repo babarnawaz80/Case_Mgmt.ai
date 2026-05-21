@@ -141,6 +141,77 @@ function HeroKpiCard({ kpi }: { kpi: HeroKpi }) {
   );
 }
 
+/* Hero meter card — donut-based, matches HeroKpiCard pastel styling */
+interface HeroMeter {
+  label: string;
+  value: number; // 0-100
+  centerLabel: string;
+  sub: string;
+  icon: LucideIcon;
+  to: string;
+  cta: string;
+  tone: "blue" | "amber" | "emerald" | "rose";
+  donutColor: string;
+}
+
+const METER_TONES: Record<HeroMeter["tone"], { bg: string; ring: string; iconBg: string; iconText: string }> = {
+  blue: {
+    bg: "bg-gradient-to-br from-[hsl(210,90%,97%)] to-[hsl(210,80%,92%)]",
+    ring: "ring-[hsl(210,80%,80%)]/40",
+    iconBg: "bg-white/70",
+    iconText: "text-icm-accent",
+  },
+  amber: {
+    bg: "bg-gradient-to-br from-[hsl(28,100%,97%)] to-[hsl(20,90%,93%)]",
+    ring: "ring-[hsl(28,90%,80%)]/40",
+    iconBg: "bg-white/70",
+    iconText: "text-icm-amber",
+  },
+  emerald: {
+    bg: "bg-gradient-to-br from-[hsl(155,70%,96%)] to-[hsl(155,60%,90%)]",
+    ring: "ring-[hsl(155,60%,75%)]/40",
+    iconBg: "bg-white/70",
+    iconText: "text-icm-green",
+  },
+  rose: {
+    bg: "bg-gradient-to-br from-[hsl(350,90%,97%)] to-[hsl(350,80%,92%)]",
+    ring: "ring-[hsl(350,80%,80%)]/40",
+    iconBg: "bg-white/70",
+    iconText: "text-icm-red",
+  },
+};
+
+function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
+  const t = METER_TONES[kpi.tone];
+  const Icon = kpi.icon;
+  return (
+    <NavLink
+      to={kpi.to}
+      className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
+    >
+      <div className="flex items-start justify-between">
+        <div className={`w-10 h-10 rounded-xl ${t.iconBg} flex items-center justify-center`}>
+          <Icon className={`w-5 h-5 ${t.iconText}`} />
+        </div>
+        <div className="relative">
+          <Donut value={kpi.value} size={64} stroke={7} color={kpi.donutColor} />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono font-bold text-[12px] text-icm-text">{kpi.centerLabel}</span>
+          </div>
+        </div>
+      </div>
+      <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">
+        {kpi.label}
+      </p>
+      <p className="text-[12px] text-icm-text-dim mt-1 font-geist">{kpi.sub}</p>
+      <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
+        {kpi.cta} <ArrowRight className="w-3 h-3" />
+      </span>
+      <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
+    </NavLink>
+  );
+}
+
 function HeroRow() {
   const kpis: HeroKpi[] = [
     {
@@ -173,11 +244,23 @@ function HeroRow() {
       trend: { value: "+1.4%", positive: true },
     },
   ];
+  const attention: HeroMeter = {
+    label: "People Needing Attention",
+    value: (4 / 48) * 100,
+    centerLabel: "4/48",
+    sub: "2 high-risk · 2 review",
+    icon: AlertTriangle,
+    to: "/people",
+    cta: "View Watchlist",
+    tone: "rose",
+    donutColor: "hsl(var(--icm-red))",
+  };
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {kpis.map((k) => (
         <HeroKpiCard key={k.label} kpi={k} />
       ))}
+      <HeroMeterCard kpi={attention} />
     </div>
   );
 }

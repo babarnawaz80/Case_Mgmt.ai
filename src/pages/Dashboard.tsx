@@ -490,10 +490,19 @@ function QuickActions() {
         {(["Documentation", "Operations", "Care"] as ActionCategory[]).map((cat) => {
           const items = ACTIONS.filter((a) => a.category === cat);
           if (items.length === 0) return null;
+          // Distribute items into rows of up to 4, then stretch each row to fill width
+          const rows: typeof items[] = [];
+          for (let i = 0; i < items.length; i += 4) rows.push(items.slice(i, i + 4));
           return (
-            <div key={cat} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {items.map((a) => (
-                <ActionTileBtn key={a.label} tile={a} />
+            <div key={cat} className="space-y-2.5">
+              {rows.map((row, ri) => (
+                <div key={ri} className="flex gap-2.5">
+                  {row.map((a) => (
+                    <div key={a.label} className="flex-1 min-w-0">
+                      <ActionTileBtn tile={a} />
+                    </div>
+                  ))}
+                </div>
               ))}
             </div>
           );

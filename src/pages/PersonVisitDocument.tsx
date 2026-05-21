@@ -313,6 +313,23 @@ const PersonVisitDocument = () => {
           </label>
         </div>
 
+        {errors.length > 0 && (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-rose-800 font-manrope font-bold text-[14px]">
+              <AlertTriangle className="w-4 h-4" /> Validation failed — {errors.filter(e=>e.severity==="block").length} blocking, {errors.filter(e=>e.severity==="warn").length} warning
+            </div>
+            <ul className="space-y-1.5">
+              {errors.map(e => (
+                <li key={e.code} className="text-[12.5px] flex gap-2 items-start">
+                  <span className={`px-1.5 h-5 inline-flex items-center rounded text-[10.5px] font-mono ${e.severity==="block" ? "bg-rose-200 text-rose-800" : "bg-amber-200 text-amber-800"}`}>{e.code}</span>
+                  <span><span className="font-semibold text-icm-text">{e.rule}.</span> <span className="text-icm-text-dim">{e.message}</span>{e.overridable && <span className="ml-1 text-[10.5px] text-amber-700">(supervisor-overridable)</span>}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11.5px] text-rose-700">Correct the items above or open the <button onClick={()=>navigate("/exceptions")} className="underline font-semibold">Exception Queue</button> to request a supervisor override.</p>
+          </div>
+        )}
+
         <div className="sticky bottom-0 -mx-4 sm:mx-0 bg-icm-panel/95 backdrop-blur border-t border-icm-border p-3 rounded-b-2xl flex gap-2 justify-end">
           <button onClick={saveDraft} className="h-11 px-4 rounded-xl border border-icm-border text-[13px] font-medium inline-flex items-center gap-1.5 bg-white"><Save className="w-4 h-4" /> Save draft</button>
           <button onClick={submit} className="h-11 px-5 rounded-xl bg-icm-text text-icm-panel text-[13px] font-semibold inline-flex items-center gap-1.5"><Send className="w-4 h-4" /> Submit for supervisor review</button>

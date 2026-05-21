@@ -150,8 +150,9 @@ const suggestedPrompts: PromptRoute[] = [
 
 interface ChatTurn {
   role: "user" | "ai";
-  text: string;
+  text?: string;
   cta?: { label: string; href: string };
+  snapshotPersonId?: string;
 }
 
 const Index = () => {

@@ -304,8 +304,8 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Center: horizontal nav of iCM modules */}
-          <nav className="flex items-center gap-1">
+          {/* Center: horizontal nav of iCM modules — icon + label pills */}
+          <nav className="flex items-center gap-0.5 overflow-x-auto">
             {topNavItems.map((item) => {
               if (item.roles && !item.roles.includes(role)) return null;
               const badge = badgeFor(item);
@@ -314,21 +314,21 @@ const Index = () => {
                 <NavLink
                   key={item.title}
                   to={item.url}
-                  title={item.title}
                   className={({ isActive }) =>
                     cn(
-                      "relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                      "relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors",
                       isActive
-                        ? "bg-icm-accent-soft text-icm-accent"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        ? "bg-primary/10 text-primary"
+                        : "text-foreground hover:bg-secondary"
                     )
                   }
                 >
-                  <Icon className="w-[18px] h-[18px]" />
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.title}</span>
                   {badge && (
                     <span
                       className={cn(
-                        "absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center ring-2 ring-background",
+                        "ml-0.5 min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-mono font-bold flex items-center justify-center",
                         badgeToneClass[badge.tone]
                       )}
                     >
@@ -350,6 +350,7 @@ const Index = () => {
             </button>
           </div>
         </header>
+
 
 
         {/* Chat Content */}

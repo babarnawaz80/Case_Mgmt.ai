@@ -23,6 +23,7 @@ import EngineHistory from "./pages/EngineHistory";
 import AgentDraftRuns from "./pages/AgentDraftRuns";
 import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import EChart from "./pages/EChart";
+import PersonMonitorsBaselines from "./pages/PersonMonitorsBaselines";
 import ContactNote from "./pages/ContactNote";
 import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";

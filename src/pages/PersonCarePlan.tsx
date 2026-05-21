@@ -151,7 +151,7 @@ const PersonCarePlan = () => {
               <span className="font-semibold text-icm-text">Person-Centered Plan (ISP)</span>
               <span className="text-icm-text-faint"> · </span>
               Annual renewal: <span className="font-mono text-icm-text">August 31</span>
-              <button className="ml-1.5 text-icm-accent hover:underline text-[12px]">Modify</button>
+              <button onClick={() => toast("Modify renewal date", { description: "Opening renewal scheduler…" })} className="ml-1.5 text-icm-accent hover:underline text-[12px]">Modify</button>
             </p>
           </div>
           <button

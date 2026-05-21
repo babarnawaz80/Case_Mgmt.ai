@@ -1,41 +1,118 @@
-import { Search, Sparkles, HelpCircle, ChevronDown, Layers } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Search, Sparkles, HelpCircle, ChevronDown, Layers,
+  Home, Users, CheckSquare, MessageSquare, FileText, AlertTriangle,
+  BarChart3, CreditCard, Settings,
+} from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-logo.png";
 import { demoToast } from "@/lib/demoToast";
-import { useRole } from "@/contexts/RoleContext";
+import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useAIPanel } from "@/contexts/AIPanelContext";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useMessages } from "@/hooks/useMessages";
+import { cn } from "@/lib/utils";
 
 interface TopbarProps {
   title?: string;
 }
 
+interface TopNavItem {
+  title: string;
+  url: string;
+  icon: typeof Home;
+  roles?: UserRole[];
+}
+
+const topNavItems: TopNavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "People", url: "/people", icon: Users },
+  { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Messages", url: "/messages", icon: MessageSquare },
+  { title: "Docs", url: "/documentation", icon: FileText },
+  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
+  { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
+  { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
+  { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
+];
+
+const OVERDUE_TASK_COUNT = 3;
+const OPEN_INCIDENT_COUNT = 1;
+
+const badgeTone: Record<"red" | "amber" | "accent", string> = {
+  red: "bg-icm-red text-white",
+  amber: "bg-icm-amber text-white",
+  accent: "bg-icm-accent text-white",
+};
+
 export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const navigate = useNavigate();
-  const { isAdmin } = useRole();
+  const { isAdmin, role } = useRole();
   const { toggle: toggleAI, open: aiOpen } = useAIPanel();
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const { unreadAlerts, unreadMentions } = useNotifications();
+  const { unreadTotal: unreadMessages } = useMessages();
+
+  function badgeFor(item: TopNavItem): { count: number; tone: "red" | "amber" | "accent" } | null {
+    if (item.url === "/my-work") {
+      const unread = unreadAlerts + unreadMentions;
+      if (OVERDUE_TASK_COUNT > 0) return { count: OVERDUE_TASK_COUNT, tone: "red" };
+      if (unread > 0) return { count: unread, tone: "accent" };
+      return null;
+    }
+    if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" };
+    if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" };
+    return null;
+  }
 
   return (
     <header className="h-14 border-b border-icm-border bg-icm-panel flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2">
-      {/* Left: brand + title */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        <img
-          src={brandLogo}
-          alt="CaseManagement AI by iCareManager"
-          className="h-6 w-auto object-contain shrink-0"
-        />
-        <span className="hidden sm:block w-px h-5 bg-icm-border" />
-        <div className="hidden sm:flex items-center gap-2 text-[13px] font-geist min-w-0">
-          <span className="font-tight font-semibold text-icm-text truncate">{title}</span>
-          <span className="text-icm-text-faint hidden md:inline">·</span>
-          <span className="text-icm-text-dim hidden md:inline">{today}</span>
-        </div>
+      {/* Left: brand */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+        <NavLink to="/" className="flex items-center gap-2 shrink-0" title="AI Companion">
+          <img
+            src={brandLogo}
+            alt="CaseManagement AI"
+            className="h-6 w-auto object-contain shrink-0"
+          />
+        </NavLink>
+        <span className="hidden lg:block w-px h-5 bg-icm-border" />
       </div>
+
+      {/* Center: horizontal nav */}
+      <nav className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto min-w-0">
+        {topNavItems.map((item) => {
+          if (item.roles && !item.roles.includes(role)) return null;
+          const badge = badgeFor(item);
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.title}
+              to={item.url}
+              className={({ isActive }) =>
+                cn(
+                  "relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-geist font-medium whitespace-nowrap transition-colors",
+                  isActive
+                    ? "bg-icm-accent-soft text-icm-accent"
+                    : "text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
+                )
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="hidden md:inline">{item.title}</span>
+              {badge && (
+                <span
+                  className={cn(
+                    "ml-0.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center",
+                    badgeTone[badge.tone]
+                  )}
+                >
+                  {badge.count}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
+      </nav>
 
       {/* Right: search + actions */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">

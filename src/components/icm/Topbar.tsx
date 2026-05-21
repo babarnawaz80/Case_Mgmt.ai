@@ -1,6 +1,6 @@
 import { Search, Sparkles, HelpCircle, ChevronDown, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
+import brandLogo from "@/assets/casemanagement-logo.png";
 import { demoToast } from "@/lib/demoToast";
 import { useRole } from "@/contexts/RoleContext";
 import { useAIPanel } from "@/contexts/AIPanelContext";

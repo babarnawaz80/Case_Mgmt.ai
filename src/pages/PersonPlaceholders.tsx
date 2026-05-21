@@ -48,7 +48,7 @@ export const PersonCommunications = makePersonPlaceholder("communications");
 export const PersonServices = makePersonPlaceholder("services");
 export const PersonEmployment = makePersonPlaceholder("employment");
 export const PersonAssignedStaff = makePersonPlaceholder("assigned-staff");
-export const PersonManagedDocuments = makePersonPlaceholder("managed-documents");
+export { default as PersonManagedDocuments } from "./PersonManagedDocuments";
 export const PersonOnCall = makePersonPlaceholder("oncall");
 export const PersonTrainings = makePersonPlaceholder("trainings");
 export const PersonServicePlan = makePersonPlaceholder("service-plan");

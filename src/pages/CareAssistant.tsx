@@ -201,8 +201,8 @@ export default function CareAssistant() {
               <div key={gi} className={`flex ${isBot ? "justify-start" : "justify-end"}`}>
                 <div className={`flex items-end gap-2 max-w-[85%] ${isBot ? "" : "flex-row-reverse"}`}>
                   {isBot && (
-                    <div className="w-7 h-7 rounded-full bg-[#00C2B2] text-white flex items-center justify-center shrink-0">
-                      <Bot className="w-4 h-4" />
+                    <div className="shrink-0">
+                      <SiriOrb size="28px" animationDuration={14} />
                     </div>
                   )}
                   <div className="space-y-1">

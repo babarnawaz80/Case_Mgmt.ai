@@ -81,11 +81,9 @@ import VirtualVisit from "./pages/VirtualVisit";
 import BillingHub from "./pages/BillingHub";
 import {
   PersonCareTracker,
-  PersonMeetingNotes,
   PersonCommunications,
   PersonServices,
   PersonEmployment,
-  PersonAssignedStaff,
   PersonManagedDocuments,
   PersonOnCall,
   PersonTrainings,
@@ -93,6 +91,8 @@ import {
   PersonBillingSummary,
   PersonESignature,
 } from "./pages/PersonPlaceholders";
+import PersonCareTeam from "./pages/PersonCareTeam";
+import PersonMeetingNotesPage from "./pages/PersonMeetingNotesPage";
 import NotFound from "./pages/NotFound";
 import Companion from "./pages/Companion";
 

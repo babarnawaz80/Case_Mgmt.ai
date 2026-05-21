@@ -379,12 +379,21 @@ function AuditExportTab({ isAdmin }: { isAdmin: boolean }) {
               Every record access, edit, approval, and export logged permanently.
             </p>
           </div>
-          {isAdmin && (
-            <button className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5">
-              <Download className="w-3 h-3" />
-              Export audit log
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/reports/audit-evidence")}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5"
+            >
+              <Shield className="w-3 h-3" />
+              Open Audit Evidence
             </button>
-          )}
+            {isAdmin && (
+              <button className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5">
+                <Download className="w-3 h-3" />
+                Export audit log
+              </button>
+            )}
+          </div>
         </div>
         <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
           <table className="w-full text-[12px] font-geist">

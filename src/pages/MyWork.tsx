@@ -35,6 +35,7 @@ import {
 import { AlertsTab } from "@/components/notifications/AlertsTab";
 import { MentionsTab } from "@/components/notifications/MentionsTab";
 import { AICheckInsTab } from "@/components/icm/AICheckInsTab";
+import { StatCard } from "@/components/icm/StatCard";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSearchParams } from "react-router-dom";
 import { loadCheckIns } from "@/lib/aiCheckIns";

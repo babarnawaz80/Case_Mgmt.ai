@@ -97,6 +97,8 @@ import PersonCareTeam from "./pages/PersonCareTeam";
 import PersonMeetingNotesPage from "./pages/PersonMeetingNotesPage";
 import NotFound from "./pages/NotFound";
 import Companion from "./pages/Companion";
+import MultiStateConfig from "./pages/MultiStateConfig";
+import CommunicationsHub from "./pages/CommunicationsHub";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
@@ -245,6 +247,9 @@ const App = () => (
             {/* Legacy /lifeplan redirects → /platform/agents (Fix 4) */}
             <Route path="/lifeplan" element={<Navigate to="/platform/agents" replace />} />
             <Route path="/lifeplan/agent/new/layer2" element={<Navigate to="/platform/agents" replace />} />
+
+            <Route path="/admin/multi-state" element={<MultiStateConfig />} />
+            <Route path="/communications" element={<CommunicationsHub />} />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="/visit/:sessionId" element={<VirtualVisit />} />

@@ -83,10 +83,10 @@ const PersonCarePlanDetail = () => {
           <div className="ml-auto flex items-center gap-2">
             {!readOnly && (
               <>
-                <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+                <button onClick={() => toast.success("Draft saved", { description: `Plan #${plan.id} autosaved at ${new Date().toLocaleTimeString()}` })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
-                <button className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+                <button onClick={() => toast.success("Marked complete", { description: "Plan locked. Past versions remain pinned for audit." })} className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Mark complete
                 </button>
               </>

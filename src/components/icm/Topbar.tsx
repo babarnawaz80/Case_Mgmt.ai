@@ -4,7 +4,7 @@ import {
   BarChart3, CreditCard, Settings,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
-import brandLogo from "@/assets/casemanagement-logo.png";
+import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
 import { demoToast } from "@/lib/demoToast";
 import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useAIPanel } from "@/contexts/AIPanelContext";

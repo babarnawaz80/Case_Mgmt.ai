@@ -29,9 +29,19 @@ interface VisitDoc {
   participantSignature: string;
   guardianSignature: string;
   attested: boolean;
-  status: "Draft" | "Submitted for review" | "Pending sync";
+  status: "Draft" | "Submitted for review" | "Pending sync" | "Exception — needs correction" | "Exception — supervisor override";
   createdBy: string;
   submittedAt?: string;
+  exceptions?: ValidationError[];
+  override?: { by: string; at: string; reason: string; codes: string[] };
+}
+
+export interface ValidationError {
+  code: string;
+  rule: string;
+  message: string;
+  severity: "block" | "warn";
+  overridable: boolean;
 }
 
 const STORAGE_KEY = "icm.visits.docs";

@@ -292,16 +292,41 @@ export default function PersonAssessmentForm() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-icm-bg flex items-center justify-center p-6">
-        <div className="max-w-[480px] w-full rounded-xl border border-icm-border bg-icm-panel p-8 text-center">
-          <div className="w-14 h-14 rounded-full bg-icm-green-soft text-icm-green mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-7 h-7" />
+        <div className="max-w-[520px] w-full rounded-xl border border-icm-border bg-icm-panel p-8">
+          <div className="text-center">
+            <div className="w-14 h-14 rounded-full bg-icm-green-soft text-icm-green mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <h1 className="font-manrope font-extrabold text-[20px] text-icm-text mt-4">
+              Assessment Completed & Signed
+            </h1>
+            <p className="text-[12.5px] text-icm-text-dim mt-2">
+              {template.name} {template.version} · Score {score} · LOC {loc}
+            </p>
+            <p className="text-[11px] text-icm-text-faint mt-1">
+              Snapshot retained as version v{historyCount}.0 · audit entry written
+            </p>
           </div>
-          <h1 className="font-manrope font-extrabold text-[20px] text-icm-text mt-4">
-            Assessment Completed
-          </h1>
-          <p className="text-[12.5px] text-icm-text-dim mt-2">
-            {template.name} · Score {score} · LOC {loc}
-          </p>
+
+          {generatedTasks.length > 0 && (
+            <div className="mt-5 rounded-lg bg-icm-amber-soft/40 border border-icm-amber/30 p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <ClipboardList className="w-3.5 h-3.5 text-icm-amber" />
+                <p className="text-[11.5px] font-semibold text-icm-text">
+                  {generatedTasks.length} task{generatedTasks.length > 1 ? "s" : ""} auto-created from findings
+                </p>
+              </div>
+              <ul className="space-y-1">
+                {generatedTasks.map((t, i) => (
+                  <li key={i} className="text-[11.5px] text-icm-text-dim flex justify-between gap-2">
+                    <span className="truncate">• {t.title}</span>
+                    <span className="font-mono text-[10.5px] text-icm-text-faint shrink-0">due {t.due}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mt-5 space-y-2">
             <button
               onClick={() => navigate(`/people/${id}/care-plan`)}
@@ -320,6 +345,7 @@ export default function PersonAssessmentForm() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-icm-bg font-geist text-icm-text">

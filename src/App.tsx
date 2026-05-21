@@ -29,6 +29,7 @@ import PersonVisitSummary from "./pages/PersonVisitSummary";
 import PersonVisitSummaryDetail from "./pages/PersonVisitSummaryDetail";
 import PersonVisitScheduler from "./pages/PersonVisitScheduler";
 import PersonVisitDocument from "./pages/PersonVisitDocument";
+import ExceptionsQueue from "./pages/ExceptionsQueue";
 import PersonEligibilityVerification from "./pages/PersonEligibilityVerification";
 import PersonEligibilityVerificationDetail from "./pages/PersonEligibilityVerificationDetail";
 import PersonProgressNote from "./pages/PersonProgressNote";

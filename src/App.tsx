@@ -145,6 +145,9 @@ const App = () => (
             <Route path="/people/:id/visit-summary/schedule" element={<PersonVisitScheduler />} />
             <Route path="/people/:id/visit-summary/document" element={<PersonVisitDocument />} />
             <Route path="/exceptions" element={<ExceptionsQueue />} />
+            <Route path="/supervisor" element={<SupervisorDashboard />} />
+            <Route path="/supervisor/review/:docId" element={<SupervisorReviewNote />} />
+            <Route path="/supervisor/compliance" element={<SupervisorCompliance />} />
             <Route path="/people/:id/visit-summary/:visitId" element={<PersonVisitSummaryDetail />} />
             <Route path="/people/:id/eligibility-verification" element={<PersonEligibilityVerification />} />
             <Route path="/people/:id/eligibility-verification/:verificationId" element={<PersonEligibilityVerificationDetail />} />

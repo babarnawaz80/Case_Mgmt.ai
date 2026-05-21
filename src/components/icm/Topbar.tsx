@@ -57,7 +57,6 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
       return null;
     }
     if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" };
-    if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" };
     return null;
   }
 

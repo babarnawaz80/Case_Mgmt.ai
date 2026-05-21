@@ -759,7 +759,7 @@ function LifeCourseCard({
       </div>
       <p className="text-[12px] text-icm-text-dim leading-relaxed">{body}</p>
       {!disabled && (
-        <button className="mt-2 text-[11px] text-icm-accent hover:underline">Edit</button>
+        <button onClick={() => toast(`Edit "${title}"`, { description: "Opening inline editor…" })} className="mt-2 text-[11px] text-icm-accent hover:underline">Edit</button>
       )}
     </div>
   );

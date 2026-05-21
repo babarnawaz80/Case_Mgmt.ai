@@ -81,29 +81,29 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-gradient-to-br from-[#f6f8fc] via-white to-[#eef3fb] font-inter">
+    <div className="min-h-screen w-full flex bg-gradient-to-br from-[#faf7ff] via-white to-[#eef0ff] font-inter">
       {/* Left: form column */}
       <section className="relative flex-1 flex items-center justify-center px-6 py-10">
-        {/* Ambient glow */}
-        <div className="pointer-events-none absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-sky-300/40 via-blue-200/30 to-transparent blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-40 -right-10 w-[380px] h-[380px] rounded-full bg-gradient-to-tr from-indigo-200/40 via-cyan-200/30 to-transparent blur-3xl" />
+        {/* Ambient glow — logo palette */}
+        <div className="pointer-events-none absolute -top-32 -left-32 w-[460px] h-[460px] rounded-full bg-gradient-to-tr from-fuchsia-300/40 via-violet-300/30 to-transparent blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 -right-10 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-indigo-300/40 via-blue-300/30 to-transparent blur-3xl" />
 
         <div className="relative w-full max-w-md">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div className="leading-tight">
-              <p className="text-[15px] font-semibold tracking-tight text-slate-800">
-                Case Management <span className="text-blue-600">AI</span>
-              </p>
-              <p className="text-[11px] text-slate-500">The audit-grade AI companion</p>
-            </div>
+          <div className="mb-10">
+            <img
+              src={logo}
+              alt="CaseManagement AI"
+              className="h-9 w-auto select-none"
+              draggable={false}
+            />
+            <p className="text-[11px] text-slate-500 mt-2 ml-0.5">
+              The audit-grade AI companion for case managers
+            </p>
           </div>
 
           <div className="space-y-1.5 mb-8">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-gradient-to-r from-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">
               Welcome back
             </p>
             <h1 className="font-manrope text-4xl font-black tracking-tight text-slate-900">

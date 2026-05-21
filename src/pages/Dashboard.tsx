@@ -354,7 +354,6 @@ const ACTIONS: ActionTile[] = [
   { label: "Workflow Manager", icon: Briefcase, to: "/workflows", category: "Documentation", count: 2 },
 
   // Operations (orange)
-  { label: "Incidents", icon: AlertTriangle, to: "/incidents", category: "Operations", count: 3 },
   { label: "Plan of Correction", icon: Shield, to: "/documentation", category: "Operations", count: 1 },
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
   { label: "On Call Log", icon: PhoneCall, to: "/documentation", category: "Operations", count: 3 },
@@ -362,18 +361,15 @@ const ACTIONS: ActionTile[] = [
   { label: "Outreach", icon: Phone, to: "/documentation", category: "Operations" },
 
   // Care (purple)
-  { label: "People Supported", icon: Users, to: "/people", category: "Care", count: 48 },
   { label: "Care Tracker", icon: Heart, to: "/documentation", category: "Care" },
-  { label: "Care Plans (PCP)", icon: ClipboardCheck, to: "/documentation/care-plans", category: "Care" },
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },
   { label: "e-Signature", icon: CheckSquare, to: "/documentation", category: "Care", count: 3 },
   { label: "Referrals", icon: Phone, to: "/documentation", category: "Care" },
 
   // Schedule / Billing (green)
-  { label: "My Work", icon: CheckSquare, to: "/my-work", category: "Schedule", count: 14 },
   { label: "Schedule", icon: Calendar, to: "/dashboard", category: "Schedule" },
-  { label: "Billing Hub", icon: Receipt, to: "/billing", category: "Schedule" },
   { label: "Reports", icon: BarChart3, to: "/reports", category: "Schedule" },
+
 ];
 
 function ActionTileBtn({ tile }: { tile: ActionTile }) {

@@ -443,6 +443,16 @@ export default function PersonAssessmentForm() {
             </div>
           )}
 
+          {missingIds.length > 0 && (
+            <div className="rounded-xl bg-icm-red-soft border border-icm-red/30 p-3 flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-icm-red mt-0.5" />
+              <p className="text-[12px] text-icm-text">
+                <span className="font-semibold text-icm-red">{missingIds.length} required field{missingIds.length > 1 ? "s" : ""} missing.</span>{" "}
+                <span className="text-icm-text-dim">Submission is blocked until all required fields are answered.</span>
+              </p>
+            </div>
+          )}
+
           {template.sections.map((s, i) => (
             <SectionCard
               key={s.id}
@@ -452,12 +462,104 @@ export default function PersonAssessmentForm() {
               answers={answers}
               setAnswer={setAnswer}
               readonly={readonly}
+              missingIds={missingIds}
             />
           ))}
+
+          {/* Document attachments */}
+          {!readonly && (
+            <section className="rounded-xl border border-icm-border bg-icm-panel p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Paperclip className="w-4 h-4 text-icm-text-dim" />
+                <h2 className="font-manrope font-bold text-[15px] text-icm-text">Document Attachments</h2>
+                <span className="text-[10px] text-icm-text-faint">({attachments.length})</span>
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.docx"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setAttachments((prev) => [...prev, ...files.map((f) => ({ name: f.name, size: f.size, type: f.type }))]);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="h-9 px-3 rounded-lg border border-dashed border-icm-border text-[12px] text-icm-text-dim hover:border-icm-accent hover:text-icm-accent"
+              >
+                + Attach supporting documents
+              </button>
+              {attachments.length > 0 && (
+                <ul className="mt-3 space-y-1.5">
+                  {attachments.map((a, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border text-[11.5px]">
+                      <span className="truncate">{a.name}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="text-icm-text-faint font-mono">{(a.size / 1024).toFixed(1)} KB</span>
+                        <button onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))} className="text-icm-text-faint hover:text-icm-red">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {/* Signature & attestation */}
+          {!readonly && (
+            <section id="attestation-block" className="rounded-xl border border-icm-border bg-icm-panel p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <PenLine className="w-4 h-4 text-icm-text-dim" />
+                <h2 className="font-manrope font-bold text-[15px] text-icm-text">Attestation & Signatures</h2>
+              </div>
+              <label className="flex items-start gap-2 mb-4">
+                <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5" />
+                <span className="text-[12px] text-icm-text">
+                  I attest that the information recorded in this assessment is accurate to the best of my knowledge
+                  and was completed in accordance with applicable program requirements.
+                  <span className="text-icm-red"> *</span>
+                </span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-icm-text-dim mb-1">Care Manager Signature <span className="text-icm-red">*</span></p>
+                  <input
+                    value={signCM}
+                    onChange={(e) => setSignCM(e.target.value)}
+                    placeholder="Type full name as signature"
+                    className="h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] italic focus:outline-none focus:border-icm-accent"
+                  />
+                  <input
+                    type="date"
+                    value={signCMDate}
+                    onChange={(e) => setSignCMDate(e.target.value)}
+                    className="mt-2 h-8 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] focus:outline-none focus:border-icm-accent"
+                  />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-icm-text-dim mb-1">Participant / Guardian Signature</p>
+                  <input
+                    value={signParticipant}
+                    onChange={(e) => setSignParticipant(e.target.value)}
+                    placeholder="Type full name as signature"
+                    className="h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] italic focus:outline-none focus:border-icm-accent"
+                  />
+                  <p className="mt-2 text-[10.5px] text-icm-text-faint">
+                    Optional — capture in person or via secure link.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Score */}
-        <aside className="lg:sticky lg:top-[72px] lg:self-start">
+        <aside className="lg:sticky lg:top-[72px] lg:self-start space-y-3">
           <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
             <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-semibold">
               Current score
@@ -476,11 +578,50 @@ export default function PersonAssessmentForm() {
               {template.loc.high}
             </p>
           </div>
+
+          {/* Risk findings preview */}
+          {(() => {
+            const findings = detectRiskFindings();
+            if (findings.length === 0) return null;
+            return (
+              <div className="rounded-xl border border-icm-amber/40 bg-icm-amber-soft/40 p-4">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-icm-amber" />
+                  <p className="text-[11px] font-semibold text-icm-text uppercase tracking-wide">
+                    Risk findings ({findings.length})
+                  </p>
+                </div>
+                <ul className="space-y-1">
+                  {findings.slice(0, 5).map((f, i) => (
+                    <li key={i} className="text-[11px] text-icm-text-dim flex gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${f.severity === "critical" ? "bg-icm-red" : "bg-icm-amber"}`} />
+                      <span>{f.label}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[10px] text-icm-text-faint">
+                  Tasks will be auto-created on submit and routed to the supervisor.
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* Version history badge */}
+          <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex items-center gap-2">
+            <History className="w-3.5 h-3.5 text-icm-text-dim" />
+            <div className="text-[11px]">
+              <p className="font-semibold text-icm-text">Version history</p>
+              <p className="text-icm-text-faint">
+                {historyCount === 0 ? "No prior completed versions" : `${historyCount} prior version${historyCount > 1 ? "s" : ""} retained`}
+              </p>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
   );
 }
+
 
 function SectionCard({
   id,

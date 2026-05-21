@@ -381,4 +381,26 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
+function ContactNoteCrumbs() {
+  const { id } = useParams<{ id: string }>();
+  const person = id ? getPerson(id) : undefined;
+  if (!person) {
+    return (
+      <Breadcrumbs items={[{ label: "People Supported", to: "/people" }, { label: "Contact Note" }]} />
+    );
+  }
+  return (
+    <Breadcrumbs
+      backTo={`/people/${person.id}/echart`}
+      backLabel="eChart"
+      items={[
+        { label: "People Supported", to: "/people" },
+        { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+        { label: "Contact Note" },
+      ]}
+    />
+  );
+}
+
 export default ContactNote;
+

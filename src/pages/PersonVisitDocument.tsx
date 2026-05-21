@@ -86,6 +86,7 @@ const PersonVisitDocument = () => {
   const [attested, setAttested] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [now, setNow] = useState(Date.now());
+  const [errors, setErrors] = useState<ValidationError[]>([]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);

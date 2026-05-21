@@ -1,6 +1,8 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { ChevronLeft, Printer, AlertTriangle } from "lucide-react";
+
 import { getPerson, initials, riskAvatarClass } from "@/data/people";
 import { getProfile } from "@/data/profiles";
 import { cn } from "@/lib/utils";
@@ -37,14 +39,19 @@ const PersonFaceSheet = () => {
   return (
     <ICMShell title="Face Sheet" showAIPanel={false}>
       <div className="space-y-4 max-w-[900px] mx-auto">
+        <Breadcrumbs
+          backTo={`/people/${person.id}/profile`}
+          backLabel="Profile"
+          className="print:hidden"
+          items={[
+            { label: "People Supported", to: "/people" },
+            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/profile` },
+            { label: "Face Sheet" },
+          ]}
+        />
         {/* Toolbar */}
-        <div className="flex items-center justify-between print:hidden">
-          <button
-            onClick={() => navigate(`/people/${person.id}/profile`)}
-            className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" /> Back to Profile
-          </button>
+        <div className="flex items-center justify-end print:hidden">
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}

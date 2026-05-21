@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
+
 import {
   Search,
   Plus,
@@ -196,13 +198,8 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
   return (
     <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
       {/* Avatar */}
-      <div
-        className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 font-mono text-[13px] font-bold ${riskAvatarClass(
-          person.riskScore,
-        )}`}
-      >
-        {initials(person)}
-      </div>
+      <PersonAvatar person={person} size={48} shape="rounded" />
+
 
       {/* Identity */}
       <div className="min-w-0 flex-1">

@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { getPerson } from "@/data/people";
 import { Plus, Eye, Printer, Trash2, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
 
 interface ContactNote {
   id: string;
@@ -127,7 +131,9 @@ const ContactNote = () => {
   return (
     <ICMShell title="Contact Note" showAIPanel={false}>
       <div className="space-y-5">
+        <ContactNoteCrumbs />
         <div className="flex items-center justify-between">
+
           <div>
             <h1 className="font-tight text-[24px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">
               Contact Note
@@ -375,4 +381,26 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
+function ContactNoteCrumbs() {
+  const { id } = useParams<{ id: string }>();
+  const person = id ? getPerson(id) : undefined;
+  if (!person) {
+    return (
+      <Breadcrumbs items={[{ label: "People Supported", to: "/people" }, { label: "Contact Note" }]} />
+    );
+  }
+  return (
+    <Breadcrumbs
+      backTo={`/people/${person.id}/echart`}
+      backLabel="eChart"
+      items={[
+        { label: "People Supported", to: "/people" },
+        { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+        { label: "Contact Note" },
+      ]}
+    />
+  );
+}
+
 export default ContactNote;
+

@@ -34,9 +34,22 @@ export interface Person {
   updatedOn: string;
   allergies?: string;
   specialInstructions?: string;
+  photoUrl?: string;
   aiFlag?: AIFlag;
   aiSuggestions?: AISuggestion[];
 }
+
+// Stable demo portraits (pravatar deterministic by img id).
+const PHOTOS: Record<string, string> = {
+  "1": "https://i.pravatar.cc/160?img=12",
+  "2": "https://i.pravatar.cc/160?img=33",
+  "3": "https://i.pravatar.cc/160?img=15",
+  "4": "https://i.pravatar.cc/160?img=68",
+  "5": "https://i.pravatar.cc/160?img=51",
+  "6": "https://i.pravatar.cc/160?img=47",
+  "7": "https://i.pravatar.cc/160?img=45",
+};
+
 
 export const people: Person[] = [
   {
@@ -165,7 +178,8 @@ export const people: Person[] = [
       detail: "Person-Centered Plan is approaching renewal window.",
     },
   },
-];
+].map((p) => ({ ...p, photoUrl: PHOTOS[p.id] })) as Person[];
+
 
 export function getPerson(id: string): Person | undefined {
   return people.find((p) => p.id === id);

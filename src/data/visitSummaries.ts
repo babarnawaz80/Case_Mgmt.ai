@@ -77,7 +77,47 @@ export const visitSummaries: VisitSummary[] = [
 ];
 
 export function getVisitSummariesForPerson(personId: string): VisitSummary[] {
-  return visitSummaries.filter(v => v.personId === personId);
+  const existing = visitSummaries.filter(v => v.personId === personId);
+  if (existing.length > 0) return existing;
+  return generateVisitsFor(personId);
+}
+
+// ---- Synthetic fallback so every individual has visit history ----
+function vh(seed: string, n: number): number {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0;
+  return x % n;
+}
+function generateVisitsFor(personId: string): VisitSummary[] {
+  // 3 quarterly visits going back in time.
+  const months = [["04","2026"],["01","2026"],["10","2025"]];
+  const cm = ["Babar Nawaz CM","Jennie Thollander","Brenda Smith"][vh(personId, 3)];
+  return months.map(([m,y], idx) => ({
+    id: `vs-gen-${personId}-${idx}`,
+    personId,
+    visitDate: `${m}/${10 + vh(personId + m, 18)}/${y}`,
+    startTime: "10:00",
+    endTime: "11:00",
+    location: "Residence",
+    othersPresent: idx === 0 ? "Family member present" : "",
+    purposeOfSupport: idx === 0 ? "Quarterly check-in" : "Routine monthly visit",
+    whatIsWorking: "Stable engagement with day program; no new safety concerns.",
+    whatIsNotWorking: idx === 0 ? "Transportation reliability remains an intermittent challenge." : "No new concerns reported.",
+    immediateAction: "None required.",
+    visitSummary: idx === 0
+      ? "Quarterly review completed. Individual reports satisfaction with current supports. Next visit scheduled."
+      : "Routine visit. No service changes needed.",
+    nextVisitDate: idx === 0 ? `07/${15 + vh(personId, 10)}/2026` : undefined,
+    status: idx === 0 ? "Submitted" : "Signed",
+    caseManager: cm,
+    updatedBy: cm,
+    updatedOn: `${m}/${12 + vh(personId + m, 16)}/${y}`,
+    signatures: [
+      { role: "Case Manager", name: cm, signedDate: `${m}/${12 + vh(personId + m, 16)}/${y}`, status: "Signed" },
+      { role: "Individual", name: "—", status: idx === 0 ? "Pending" : "Signed" },
+      { role: "Guardian/Representative", name: "—", status: "Not required" },
+    ],
+  }));
 }
 
 export function getVisitSummary(id: string): VisitSummary | undefined {

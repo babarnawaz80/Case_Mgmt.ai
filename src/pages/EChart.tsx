@@ -244,13 +244,6 @@ const EChart = () => {
               {/* RIGHT — action stack (fixed width) */}
               <div className="flex flex-col gap-2 shrink-0 w-[180px]">
                 <button
-                  onClick={() => demoToast("Summarize chart")}
-                  className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center justify-center gap-1.5 bg-icm-text text-icm-panel hover:opacity-90 transition"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Summarize chart
-                </button>
-                <button
                   onClick={() => setShowPreVisit(true)}
                   className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center justify-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong transition"
                 >

@@ -124,6 +124,7 @@ const App = () => (
             <Route path="/companion/:token" element={<Companion />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/people" element={<PeopleSupported />} />
+            <Route path="/people/new" element={<NewParticipantIntake />} />
             <Route path="/people/:id/profile" element={<PersonProfile />} />
             <Route path="/people/:id/facesheet" element={<PersonFaceSheet />} />
             <Route path="/people/:id/echart" element={<EChart />} />

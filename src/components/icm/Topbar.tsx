@@ -29,8 +29,6 @@ const topNavItems: TopNavItem[] = [
   { title: "People", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
   { title: "Messages", url: "/messages", icon: MessageSquare },
-  { title: "Docs", url: "/documentation", icon: FileText },
-  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
   { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
   { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },

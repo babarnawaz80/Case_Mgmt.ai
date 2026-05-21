@@ -204,13 +204,15 @@ const Index = () => {
     if (!p) return;
     setSnapshotPickerOpen(false);
     setSnapshotQuery("");
+    // Always start a fresh chat when an individual is picked — one chat per individual.
+    setMessage("");
     setActiveIndividualId(p.id);
-    setThread((prev) => [
-      ...prev,
+    setThread([
       { role: "user", text: `Individual Snapshot for ${p.firstName} ${p.lastName}` },
-      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything about ${p.firstName} — or convert it into a note below.` },
+      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. This chat is scoped to ${p.firstName} ${p.lastName} — ask follow-up questions or convert into a note below.` },
     ]);
   }
+
 
   function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
     const t = text.toLowerCase();

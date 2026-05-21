@@ -34,10 +34,12 @@ import {
 } from "@/data/myWork";
 import { AlertsTab } from "@/components/notifications/AlertsTab";
 import { MentionsTab } from "@/components/notifications/MentionsTab";
+import { AICheckInsTab } from "@/components/icm/AICheckInsTab";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSearchParams } from "react-router-dom";
+import { loadCheckIns } from "@/lib/aiCheckIns";
 
-type TopView = "my_work" | "alerts" | "mentions" | "completed";
+type TopView = "my_work" | "alerts" | "mentions" | "ai_checkins" | "completed";
 type TabKey = "today" | "week" | "all" | "completed";
 type GroupMode = "individual" | "due";
 

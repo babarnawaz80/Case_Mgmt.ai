@@ -14,8 +14,10 @@ import {
   GitBranch,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import { getPerson, riskAvatarClass, initials } from "@/data/people";
+
 import type { AISuggestion } from "@/data/people";
 import {
   getWorkflowsForPerson,
@@ -209,14 +211,16 @@ const PersonCaseManagement = () => {
       }
     >
       <div className="space-y-5">
-        {/* Breadcrumb */}
-        <button
-          onClick={() => navigate(`/people/${person.id}/echart`)}
-          className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Case Management
-        </button>
+        <Breadcrumbs
+          backTo={`/people/${person.id}/echart`}
+          backLabel="eChart"
+          items={[
+            { label: "People Supported", to: "/people" },
+            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+            { label: "Case Management" },
+          ]}
+        />
+
 
         {/* Sticky person header (compact version) */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">

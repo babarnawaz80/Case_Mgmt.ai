@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Mic, Send, Bot, CheckCircle2 } from "lucide-react";
+import { Mic, Send, CheckCircle2 } from "lucide-react";
+import SiriOrb from "@/components/ui/siri-orb";
 import {
   TOKEN_MAP,
   openingMessage,

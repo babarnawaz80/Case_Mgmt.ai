@@ -36,6 +36,7 @@ import { useMessages } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
 import { people } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
+import { IndividualSnapshotDialog } from "@/components/IndividualSnapshotDialog";
 
 interface ChatHistoryItem {
   id: string;

@@ -84,7 +84,7 @@ export default function Reports() {
             </p>
           </div>
           <button
-            onClick={() => alert("Report Builder — coming next iteration. For now, save filters from any report runner to create a custom report.")}
+            onClick={() => navigate("/reports/builder")}
             className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />

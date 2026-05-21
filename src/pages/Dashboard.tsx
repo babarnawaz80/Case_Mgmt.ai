@@ -517,10 +517,7 @@ const Dashboard = () => {
         <HeroRow />
         <DonutRow />
 
-        {/* Watchlist */}
-        <div className="grid grid-cols-1 gap-4">
-          <WatchlistCard />
-        </div>
+
 
         <QuickActions />
       </div>

@@ -1,6 +1,6 @@
 import {
   Search, Sparkles, HelpCircle, ChevronDown, Layers,
-  Home, Users, CheckSquare, MessageSquare, FileText, AlertTriangle,
+  Home, Users, CheckSquare, MessageSquare,
   BarChart3, CreditCard, Settings,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";

@@ -80,10 +80,10 @@ export function AICheckInsTab() {
     <div className="space-y-5">
       {/* Stat strip — mirror My Work */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile label="Total check-ins" value={counts.total} tone="neutral" icon={Bot} />
-        <StatTile label="Urgent" value={counts.urgent} tone="red" icon={AlertCircle} />
-        <StatTile label="Pending review" value={counts.pending} tone="amber" icon={Clock} />
-        <StatTile label="Reviewed" value={counts.reviewed} tone="green" icon={CheckCircle2} />
+        <StatCard label="Total check-ins" value={counts.total} tone="neutral" icon={Bot} subtext="All sessions" />
+        <StatCard label="Urgent" value={counts.urgent} tone="red" icon={AlertCircle} subtext="Needs review" />
+        <StatCard label="Pending review" value={counts.pending} tone="amber" icon={Clock} subtext="Awaiting action" />
+        <StatCard label="Reviewed" value={counts.reviewed} tone="green" icon={CheckCircle2} subtext="Completed" />
       </div>
 
       {/* Toolbar — mirror My Work */}

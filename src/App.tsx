@@ -23,6 +23,7 @@ import EngineHistory from "./pages/EngineHistory";
 import AgentDraftRuns from "./pages/AgentDraftRuns";
 import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import EChart from "./pages/EChart";
+import PersonMonitorsBaselines from "./pages/PersonMonitorsBaselines";
 import ContactNote from "./pages/ContactNote";
 import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";
@@ -149,7 +150,8 @@ const App = () => (
             <Route path="/people/new" element={<NewParticipantIntake />} />
             <Route path="/people/:id/profile" element={<PersonProfile />} />
             <Route path="/people/:id/facesheet" element={<PersonFaceSheet />} />
-            <Route path="/people/:id/echart" element={<EChart />} />
+           <Route path="/people/:id/echart" element={<EChart />} />
+           <Route path="/people/:id/monitors-baselines" element={<PersonMonitorsBaselines />} />
             <Route path="/people/:id/contact-note" element={<ContactNote />} />
             <Route path="/people/:id/case-management" element={<PersonCaseManagement />} />
             <Route path="/people/:id/care-plan" element={<PersonCarePlan />} />

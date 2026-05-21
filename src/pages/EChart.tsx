@@ -36,6 +36,7 @@ import {
   Video,
   FileText,
   Plus,
+  Activity,
   AlertCircle,
   MapPin,
   type LucideIcon,
@@ -45,10 +46,8 @@ import {
   initials,
   riskAvatarClass,
 } from "@/data/people";
-import { getProfile } from "@/data/profiles";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
-import { MonitorsBaselines } from "@/components/profile/MonitorsBaselines";
 
 
 type Category = "Documentation" | "Care" | "Operations";
@@ -87,6 +86,7 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "esignature", label: "e-Signature", icon: CheckSquare, route: "esignature", count: 3, category: "Care" },
   { slug: "employment", label: "Employment & Education", icon: GraduationCap, route: "employment", category: "Care" },
   { slug: "facesheet", label: "Face Sheet", icon: User, route: "facesheet", count: 1, category: "Care" },
+  { slug: "monitors-baselines", label: "Monitors & Baselines", icon: Activity, route: "monitors-baselines", category: "Care" },
 
   // Operations (amber)
   { slug: "incident-reporting", label: "Incident Reporting", icon: AlertTriangle, route: "incident-reporting", count: 2, category: "Operations" },
@@ -142,7 +142,6 @@ const EChart = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const person = getPerson(id ?? "");
-  const profile = person ? getProfile(person.id) : null;
   const { role } = useRole();
   const [showPreVisit, setShowPreVisit] = useState(false);
   const [filter, setFilter] = useState<"All" | Category>("All");
@@ -311,19 +310,7 @@ const EChart = () => {
                   onOpen={() => navigate(`/people/${person.id}/${t.route}`)}
                 />
         ))}
-
-        {profile && (
-          <section className="space-y-2.5">
-            <div className="flex items-center gap-2 border-t border-icm-border pt-3">
-              <span className="w-2 h-2 rounded-full bg-icm-accent" />
-              <h2 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">
-                Monitors &amp; Baselines
-              </h2>
             </div>
-            <MonitorsBaselines profile={profile} />
-          </section>
-        )}
-      </div>
           </section>
         ))}
       </div>

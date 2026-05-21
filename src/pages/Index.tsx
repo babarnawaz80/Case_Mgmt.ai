@@ -164,6 +164,25 @@ const Index = () => {
   const [thread, setThread] = useState<ChatTurn[]>([]);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { role } = useRole();
+  const { unreadAlerts, unreadMentions } = useNotifications();
+  const { unreadTotal: unreadMessages } = useMessages();
+
+  const badgeFor = (item: TopNavItem) => {
+    if (item.url === "/my-work") {
+      const unread = unreadAlerts + unreadMentions;
+      if (OVERDUE_TASK_COUNT > 0) return { count: OVERDUE_TASK_COUNT, tone: "red" as const };
+      if (unread > 0) return { count: unread, tone: "accent" as const };
+    }
+    if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" as const };
+    if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" as const };
+    return null;
+  };
+
+  const badgeToneClass: Record<"red" | "accent", string> = {
+    red: "bg-icm-red text-white",
+    accent: "bg-icm-accent text-white",
+  };
 
   const individualOptions = ["Select Individual", ...people.map((p) => `${p.firstName} ${p.lastName}`)];
 

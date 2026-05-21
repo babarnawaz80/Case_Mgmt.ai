@@ -486,10 +486,18 @@ function QuickActions() {
           {ACTIONS.length} modules
         </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-        {ACTIONS.map((a) => (
-          <ActionTileBtn key={a.label} tile={a} />
-        ))}
+      <div className="space-y-2.5">
+        {(["Documentation", "Operations", "Care"] as ActionCategory[]).map((cat) => {
+          const items = ACTIONS.filter((a) => a.category === cat);
+          if (items.length === 0) return null;
+          return (
+            <div key={cat} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {items.map((a) => (
+                <ActionTileBtn key={a.label} tile={a} />
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       {/* Category legend */}

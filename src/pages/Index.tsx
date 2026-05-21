@@ -34,9 +34,10 @@ import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
-import { people } from "@/data/people";
+import { people, getPerson } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
-import { IndividualSnapshotDialog } from "@/components/IndividualSnapshotDialog";
+import { InlineIndividualSnapshot } from "@/components/InlineIndividualSnapshot";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
 
 interface ChatHistoryItem {
   id: string;
@@ -149,8 +150,9 @@ const suggestedPrompts: PromptRoute[] = [
 
 interface ChatTurn {
   role: "user" | "ai";
-  text: string;
+  text?: string;
   cta?: { label: string; href: string };
+  snapshotPersonId?: string;
 }
 
 const Index = () => {
@@ -160,7 +162,9 @@ const Index = () => {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
-  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [snapshotPickerOpen, setSnapshotPickerOpen] = useState(false);
+  const [snapshotQuery, setSnapshotQuery] = useState("");
+  const snapshotRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { role } = useRole();
@@ -188,10 +192,23 @@ const Index = () => {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (plusRef.current && !plusRef.current.contains(e.target as Node)) setPlusMenuOpen(false);
+      if (snapshotRef.current && !snapshotRef.current.contains(e.target as Node)) setSnapshotPickerOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  function openSnapshotFor(personId: string) {
+    const p = getPerson(personId);
+    if (!p) return;
+    setSnapshotPickerOpen(false);
+    setSnapshotQuery("");
+    setThread((prev) => [
+      ...prev,
+      { role: "user", text: `Individual Snapshot for ${p.firstName} ${p.lastName}` },
+      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything — or convert it into a note below.` },
+    ]);
+  }
 
   function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
     const match = suggestedPrompts.find((p) => p.text.toLowerCase() === text.trim().toLowerCase());
@@ -230,7 +247,7 @@ const Index = () => {
   return (
     <>
     {ambientOverlay}
-    <IndividualSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
+    
     <div className="flex h-screen w-full bg-background">
       {/* Collapsible Chat History Sidebar */}
       <AnimatePresence initial={false}>
@@ -399,35 +416,51 @@ const Index = () => {
           {/* Conversation thread */}
           {thread.length > 0 && (
             <div className="w-full max-w-2xl space-y-4 mt-2 mb-6">
-              {thread.map((turn, idx) => (
-                <div key={idx} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                      turn.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "glass text-foreground"
-                    }`}
-                  >
+              {thread.map((turn, idx) => {
+                const snapPerson = turn.snapshotPersonId ? getPerson(turn.snapshotPersonId) : undefined;
+                if (snapPerson) {
+                  return (
+                    <div key={idx} className="flex justify-start">
+                      <div className="w-full max-w-[92%] space-y-2">
+                        {turn.text && (
+                          <p className="text-sm text-foreground">{turn.text}</p>
+                        )}
+                        <InlineIndividualSnapshot person={snapPerson} />
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={idx} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
-                      className="whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{
-                        __html: turn.text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
-                      }}
-                    />
-                    {turn.cta && (
-                      <button
-                        onClick={() => navigate(turn.cta!.href)}
-                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                      >
-                        {turn.cta.label}
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                        turn.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "glass text-foreground"
+                      }`}
+                    >
+                      <div
+                        className="whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{
+                          __html: (turn.text ?? "").replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
+                        }}
+                      />
+                      {turn.cta && (
+                        <button
+                          onClick={() => navigate(turn.cta!.href)}
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        >
+                          {turn.cta.label}
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+
 
           {/* Chat Input */}
           <motion.div
@@ -561,13 +594,56 @@ const Index = () => {
                 {prompt.text}
               </button>
             ))}
-            <button
-              onClick={() => setSnapshotOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Individual Snapshot
-            </button>
+            <div className="relative" ref={snapshotRef}>
+              <button
+                onClick={() => setSnapshotPickerOpen((v) => !v)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Individual Snapshot
+              </button>
+              {snapshotPickerOpen && (
+                <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
+                  <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">
+                      Pick an individual
+                    </p>
+                    <input
+                      autoFocus
+                      value={snapshotQuery}
+                      onChange={(e) => setSnapshotQuery(e.target.value)}
+                      placeholder="Search…"
+                      className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {people
+                      .filter((p) =>
+                        `${p.firstName} ${p.lastName} ${p.nickname ?? ""}`
+                          .toLowerCase()
+                          .includes(snapshotQuery.trim().toLowerCase())
+                      )
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => openSnapshotFor(p.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
+                        >
+                          <PersonAvatar person={p} size={28} shape="circle" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {p.firstName} {p.lastName}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {p.county} · {p.status}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
           </motion.div>
         </div>

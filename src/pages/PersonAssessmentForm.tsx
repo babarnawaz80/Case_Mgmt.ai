@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -7,7 +7,13 @@ import {
   Send,
   CheckCircle2,
   ClipboardList,
+  AlertTriangle,
+  Paperclip,
+  PenLine,
+  History,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { getPerson } from "@/data/people";
 import {
   AssessmentAnswer,

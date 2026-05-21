@@ -298,13 +298,13 @@ const MyWork = () => {
     <ICMShell title="My Work" rightPanel={<MyWorkAIPanel onStartFocused={() => setFocused(true)} />}>
       <div className="space-y-5">
         {/* Heading */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h1 className="font-manrope text-[34px] md:text-[38px] font-extrabold text-icm-text leading-[1.05] tracking-[-0.025em]">
               My Work
             </h1>
-            <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
-              Every task across your caseload, prioritized for you.
+            <p className="text-[14.5px] text-icm-text-dim font-geist font-medium">
+              Personalized caseload prioritization and task orchestration.
             </p>
           </div>
         </div>
@@ -331,45 +331,57 @@ const MyWork = () => {
           </div>
         )}
 
-        {/* Daily brief — calm, single line */}
+        {/* Daily brief — luminous glass banner */}
         {!briefDismissed && !focused && (
-          <div className="rounded-2xl border border-icm-border bg-icm-panel px-5 py-4 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl ai-gradient flex items-center justify-center shrink-0 shadow-sm">
-                <Sparkles className="w-4 h-4 text-white" />
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-icm-accent to-indigo-500 rounded-[2.2rem] blur-xl opacity-10 group-hover:opacity-20 transition duration-700 pointer-events-none" />
+            <div className="relative bg-white/80 backdrop-blur-2xl border border-white/60 ring-1 ring-icm-border/50 p-6 md:p-7 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.02)] flex items-start gap-5">
+              <div className="ai-gradient p-3.5 rounded-2xl shadow-[0_10px_20px_-5px_rgba(59,130,246,0.45)] shrink-0">
+                <Sparkles className="w-6 h-6 text-white" />
               </div>
-              <div className="min-w-0">
-                <p className="text-[13.5px] font-geist text-icm-text">
-                  <span className="font-semibold">Good morning, Kathy.</span>{" "}
-                  <span className="text-icm-text-dim">
-                    {counts.total} open tasks · {counts.overdue} past due · {counts.today} due today.
-                    Joseph Brown's quarterly visit is the most urgent.
-                  </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-[18px] md:text-[19px] font-manrope font-bold text-icm-text tracking-tight">
+                    Good morning, Kathy.
+                  </h2>
+                  <button
+                    onClick={() => setBriefDismissed(true)}
+                    className="text-icm-text-faint hover:text-icm-text-dim transition-colors shrink-0"
+                    aria-label="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[13.5px] md:text-[14px] text-icm-text-dim leading-relaxed font-geist max-w-2xl">
+                  You have <span className="font-bold text-icm-text">{counts.total} open tasks</span> remaining today.{" "}
+                  <button
+                    onClick={() => { setFilterIndividual("Joseph"); setTab("all"); }}
+                    className="text-icm-accent font-semibold hover:underline underline-offset-4"
+                  >
+                    Joseph Brown's quarterly visit
+                  </button>{" "}
+                  is marked as high priority.
                 </p>
-                <button
-                  onClick={() => {
-                    setFilterIndividual("Joseph");
-                    setTab("all");
-                  }}
-                  className="text-[12px] font-geist font-medium text-icm-accent hover:underline mt-1 inline-flex items-center gap-1"
-                >
-                  Show Joseph's tasks <ArrowRight className="w-3 h-3" />
-                </button>
+                <div className="mt-4 flex gap-2 flex-wrap">
+                  {counts.overdue > 0 && (
+                    <span className="px-3 py-1 bg-icm-red-soft text-icm-red text-[10.5px] font-extrabold rounded-xl border border-icm-red/15 shadow-sm uppercase tracking-widest">
+                      {counts.overdue} Past Due
+                    </span>
+                  )}
+                  {counts.today > 0 && (
+                    <span className="px-3 py-1 bg-icm-amber-soft text-icm-amber text-[10.5px] font-extrabold rounded-xl border border-icm-amber/15 shadow-sm uppercase tracking-widest">
+                      {counts.today} Due Today
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <button
-              onClick={() => setBriefDismissed(true)}
-              className="text-icm-text-faint hover:text-icm-text shrink-0"
-              aria-label="Dismiss"
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
         )}
 
         {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="inline-flex items-center p-1 rounded-xl bg-icm-bg border border-icm-border">
+          <div className="inline-flex items-center p-1.5 rounded-2xl bg-icm-bg/70 ring-1 ring-icm-border/60 shadow-inner">
             {(
               [
                 { key: "my_work", label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
@@ -384,17 +396,17 @@ const MyWork = () => {
                   key={t.key}
                   onClick={() => setView(t.key)}
                   className={cn(
-                    "h-8 px-3 rounded-lg text-[12px] font-geist flex items-center gap-1.5 transition-colors",
+                    "h-9 px-4 rounded-xl text-[12.5px] font-geist flex items-center gap-1.5 transition-all",
                     active
-                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
-                      : "text-icm-text-dim hover:text-icm-text"
+                      ? "bg-icm-panel text-icm-text font-bold shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
+                      : "text-icm-text-dim hover:text-icm-text font-semibold"
                   )}
                 >
                   {t.label}
                   {t.count > 0 && (
                     <span
                       className={cn(
-                        "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-semibold flex items-center justify-center",
+                        "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center",
                         t.alert
                           ? "bg-icm-red/10 text-icm-red"
                           : "bg-icm-bg text-icm-text-faint",
@@ -411,9 +423,9 @@ const MyWork = () => {
           {view === "my_work" && (
             <button
               onClick={() => setAddOpen(true)}
-              className="h-8 px-3 rounded-lg text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text border border-icm-border bg-icm-panel hover:border-icm-border-strong flex items-center gap-1.5"
+              className="group h-10 px-5 rounded-2xl text-[12.5px] font-geist font-bold text-white bg-icm-accent hover:bg-icm-accent/90 shadow-[0_10px_25px_-5px_rgba(59,130,246,0.45)] hover:shadow-[0_15px_30px_-5px_rgba(59,130,246,0.55)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
             >
-              <Plus className="w-3.5 h-3.5" /> Add task
+              <Plus className="w-4 h-4 stroke-[2.5]" /> Add task
             </button>
           )}
         </div>
@@ -564,64 +576,75 @@ const MyWork = () => {
         {grouped.length === 0 ? (
           <EmptyState tab={tab} onJumpWeek={() => setTab("week")} />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-5">
             {grouped.map((g) => {
               const collapsed = collapsedGroups[g.id];
+              const hasOverdue = g.overdueCount > 0 && groupMode === "individual";
               return (
                 <div
                   key={g.id}
-                  className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden"
+                  className={cn(
+                    "bg-icm-panel border border-icm-border/60 rounded-[2rem] overflow-hidden transition-all duration-500",
+                    "shadow-[0_25px_70px_-20px_rgba(15,23,42,0.08),0_4px_10px_-2px_rgba(15,23,42,0.02)] hover:shadow-[0_35px_80px_-20px_rgba(15,23,42,0.1)]"
+                  )}
                 >
                   {/* Group header */}
                   <button
                     onClick={() => toggleGroup(g.id)}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/60"
+                    className="w-full px-6 py-5 flex items-center gap-4 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/40 bg-gradient-to-r from-icm-bg/30 to-transparent"
                   >
                     {groupMode === "individual" ? (
-                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-[11px] font-geist font-bold text-icm-text shrink-0">
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl flex items-center justify-center text-[13px] font-manrope font-black shrink-0 shadow-sm",
+                        hasOverdue
+                          ? "bg-gradient-to-br from-icm-red-soft to-icm-red-soft/60 text-icm-red ring-1 ring-icm-red/15"
+                          : "bg-gradient-to-br from-icm-accent-soft to-icm-accent-soft/60 text-icm-accent ring-1 ring-icm-accent/15"
+                      )}>
                         {g.initials}
                       </div>
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center shrink-0">
+                      <div className="w-12 h-12 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center shrink-0 shadow-sm">
                         <CalendarIcon
-                          className={cn("w-4 h-4", (g as any).tone ?? "text-icm-text-dim")}
+                          className={cn("w-5 h-5", (g as any).tone ?? "text-icm-text-dim")}
                         />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span
                           className={cn(
-                            "text-[13.5px] font-semibold font-geist",
+                            "font-manrope font-bold text-[16px] tracking-tight",
                             groupMode === "due" ? (g as any).tone : "text-icm-text",
-                            groupMode === "due" && "tracking-wide text-[11.5px] uppercase",
+                            groupMode === "due" && "tracking-widest text-[12px] uppercase font-extrabold",
                           )}
                         >
                           {g.label}
                         </span>
                         {g.sub && (
-                          <span className="text-[11.5px] text-icm-text-faint font-geist">{g.sub}</span>
-                        )}
-                        <span className="text-[11.5px] text-icm-text-faint font-geist">
-                          · {g.items.length} task{g.items.length === 1 ? "" : "s"}
-                        </span>
-                        {g.overdueCount > 0 && groupMode === "individual" && (
-                          <span className="text-[11px] font-semibold text-icm-red inline-flex items-center gap-1">
-                            <span className="w-1 h-1 rounded-full bg-icm-red" />
-                            {g.overdueCount} overdue
-                          </span>
+                          <span className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest font-geist">{g.sub}</span>
                         )}
                       </div>
+                      <p className="text-[12px] text-icm-text-dim font-geist font-medium mt-0.5">
+                        {g.items.length} task{g.items.length === 1 ? "" : "s"}
+                        {hasOverdue && (
+                          <>
+                            <span className="mx-1.5 text-icm-text-faint">•</span>
+                            <span className="text-icm-red font-bold">{g.overdueCount} overdue</span>
+                          </>
+                        )}
+                      </p>
                     </div>
-                    {collapsed ? (
-                      <ChevronRight className="w-4 h-4 text-icm-text-faint" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-icm-text-faint" />
-                    )}
+                    <div className="p-2.5 text-icm-text-faint hover:text-icm-text-dim bg-icm-panel rounded-xl shadow-sm border border-icm-border/60 transition-colors">
+                      {collapsed ? (
+                        <ChevronRight className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </div>
                   </button>
 
                   {!collapsed && (
-                    <div className="border-t border-icm-border divide-y divide-icm-border">
+                    <div className="divide-y divide-icm-border/40">
                       {g.items.map((t) => (
                         <TaskRow
                           key={t.id}
@@ -694,63 +717,74 @@ function TaskRow({
   const isOver = diff !== null && diff < 0 && task.status !== "Completed";
 
   return (
-    <div className={cn("px-4 py-3 transition-colors hover:bg-icm-bg/40", isOver && "bg-icm-red/[0.02]")}>
-      <div className="flex items-start gap-3">
-        {/* Status rail */}
-        <div className="pt-1 flex flex-col items-center gap-1 shrink-0">
-          <StatusIcon status={isOver ? "Overdue" : task.status} />
+    <div className={cn("px-6 py-5 transition-all duration-300 hover:bg-icm-bg/40 group/row", isOver && "bg-icm-red/[0.015]")}>
+      <div className="flex items-start gap-5">
+        {/* Status rail — squircle indicator */}
+        <div className="mt-1.5 shrink-0">
+          {isOver ? (
+            <div className="w-6 h-6 rounded-xl border-[2.5px] border-icm-red/25 bg-white flex items-center justify-center shadow-sm">
+              <div className="w-2.5 h-2.5 bg-icm-red rounded-[3px] shadow-[0_0_8px_rgba(239,68,68,0.45)]" />
+            </div>
+          ) : task.status === "Completed" ? (
+            <div className="w-6 h-6 rounded-xl bg-icm-green-soft flex items-center justify-center">
+              <CheckCircle2 className="w-3.5 h-3.5 text-icm-green" />
+            </div>
+          ) : task.status === "In Progress" ? (
+            <div className="w-6 h-6 rounded-xl border-[2.5px] border-icm-amber/30 bg-white flex items-center justify-center shadow-sm">
+              <div className="w-2.5 h-2.5 bg-icm-amber rounded-[3px]" />
+            </div>
+          ) : (
+            <div className="w-6 h-6 rounded-xl border-[2.5px] border-icm-border bg-white" />
+          )}
         </div>
 
         {/* Body */}
         <div className="flex-1 min-w-0">
           <button onClick={onToggleExpand} className="text-left w-full">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[13.5px] font-semibold text-icm-text font-geist leading-tight">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-[15.5px] font-manrope font-bold text-icm-text leading-tight tracking-tight">
                 {task.name}
               </span>
               {showIndividualName && (
-                <span className="text-[11.5px] text-icm-text-dim font-geist">
+                <span className="text-[11.5px] text-icm-text-dim font-geist font-medium">
                   · {task.individualName}
                 </span>
               )}
-              {isOver ? (
-                <span className="text-[10.5px] font-semibold text-icm-red bg-icm-red/10 px-1.5 py-0.5 rounded">
-                  {task.daysOverdue ? `${task.daysOverdue}d overdue` : "Overdue"}
-                </span>
-              ) : task.status === "In Progress" ? (
-                <span className="text-[10.5px] font-medium text-icm-amber">In progress</span>
-              ) : null}
               {task.priority === "Critical" && (
-                <span className="text-[10.5px] font-semibold text-icm-red inline-flex items-center gap-1">
-                  <span className="w-1 h-1 rounded-full bg-icm-red" /> Critical
+                <span className="px-2.5 py-0.5 bg-icm-red-soft text-icm-red text-[10px] font-black rounded-lg uppercase tracking-widest shadow-sm">
+                  Critical
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11.5px] text-icm-text-dim font-geist">
-              <span className={cn(isOver && "text-icm-red font-medium")}>Due {task.dueDate}</span>
-              <span className="text-icm-text-faint">·</span>
-              <span>{task.staffResponsible}</span>
-              <span className="text-icm-text-faint">·</span>
+            <div className="flex items-center gap-5 mt-2 flex-wrap text-[12.5px] font-semibold font-geist">
+              <span className={cn("inline-flex items-center gap-1.5", isOver ? "text-icm-red" : "text-icm-text-dim")}>
+                {isOver && <Clock className="w-3.5 h-3.5" />}
+                Due {task.dueDate}{isOver && task.daysOverdue ? ` (${task.daysOverdue}d overdue)` : ""}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-icm-text-faint">
+                <span className="w-1.5 h-1.5 rounded-full bg-icm-text-faint/60" />
+                {task.staffResponsible}
+              </span>
               <SourceLabel task={task} />
             </div>
 
             {(task.linkedModule || task.aiDraftReady) && (
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {task.linkedModule && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onLinkedModule();
                     }}
-                    className="px-2 py-0.5 rounded-md text-icm-text-dim text-[11px] font-geist border border-icm-border hover:text-icm-text hover:border-icm-border-strong inline-flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl text-icm-accent text-[10.5px] font-extrabold uppercase tracking-tight bg-icm-accent-soft/80 border border-icm-accent/15 shadow-sm hover:bg-icm-accent hover:text-white hover:shadow-md transition-all inline-flex items-center gap-1.5"
                   >
                     {task.linkedModule.label} <ArrowRight className="w-3 h-3" />
                   </button>
                 )}
                 {task.aiDraftReady && (
-                  <span className="px-2 py-0.5 rounded-md bg-icm-accent-soft text-icm-accent text-[11px] font-geist font-medium inline-flex items-center gap-1">
-                    <Sparkle className="w-3 h-3" /> AI draft ready
+                  <span className="px-3.5 py-1.5 rounded-xl bg-white text-indigo-600 text-[10.5px] font-extrabold uppercase tracking-tight border border-indigo-100 shadow-[0_4px_12px_-2px_rgba(79,70,229,0.12)] inline-flex items-center gap-1.5">
+                    <Sparkle className="w-3 h-3 fill-indigo-500 text-indigo-500" /> AI Draft Ready
                   </span>
                 )}
               </div>
@@ -758,7 +792,7 @@ function TaskRow({
           </button>
 
           {expanded && (
-            <div className="mt-3 rounded-lg border border-icm-border bg-icm-bg/60 p-3 space-y-2">
+            <div className="mt-4 rounded-2xl border border-icm-border bg-icm-bg/60 p-4 space-y-2.5">
               {task.description && (
                 <p className="text-[12.5px] text-icm-text font-geist leading-relaxed">
                   {task.description}
@@ -770,11 +804,11 @@ function TaskRow({
               <div className="flex items-center gap-2">
                 <input
                   placeholder="Add a comment… use @ to mention"
-                  className="flex-1 h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
+                  className="flex-1 h-9 px-3 rounded-xl border border-icm-border bg-white text-[12.5px] text-icm-text focus:border-icm-accent focus:ring-2 focus:ring-icm-accent/15 outline-none transition-all"
                 />
                 <button
                   onClick={() => demoSuccess("Comment posted")}
-                  className="text-[11.5px] text-icm-accent hover:underline font-medium"
+                  className="text-[11.5px] text-icm-accent hover:underline font-bold"
                 >
                   Post
                 </button>
@@ -786,13 +820,13 @@ function TaskRow({
         {/* Action */}
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           {task.status === "Completed" ? (
-            <span className="text-[11.5px] text-icm-green font-semibold flex items-center gap-1">
+            <span className="text-[11.5px] text-icm-green font-bold flex items-center gap-1.5 px-3 py-2">
               <CheckCircle2 className="w-3.5 h-3.5" /> Done
             </span>
           ) : (
             <button
               onClick={onAdvance ?? onComplete}
-              className="h-8 px-3 rounded-lg text-[11.5px] font-geist font-semibold text-icm-text border border-icm-border bg-icm-panel hover:border-icm-text hover:bg-icm-bg flex items-center gap-1 transition-colors"
+              className="h-10 px-5 rounded-2xl text-[12px] font-geist font-black text-icm-text bg-white border border-icm-border shadow-sm hover:bg-icm-text hover:text-white hover:border-icm-text hover:shadow-[0_15px_30px_-10px_rgba(15,23,42,0.3)] active:scale-95 transition-all"
             >
               {task.status === "Pending Start" ? "Start" : "Complete"}
             </button>
@@ -993,26 +1027,32 @@ function StatTile({
     accent: "text-icm-accent",
   }[tone];
   const iconBg = {
-    neutral: "bg-icm-bg text-icm-text-dim",
-    red: "bg-icm-red-soft text-icm-red",
-    amber: "bg-icm-amber-soft text-icm-amber",
-    accent: "bg-icm-accent-soft text-icm-accent",
+    neutral: "bg-icm-bg text-icm-text-dim group-hover:bg-icm-accent-soft group-hover:text-icm-accent",
+    red: "bg-icm-red-soft text-icm-red/70",
+    amber: "bg-icm-amber-soft text-icm-amber/70",
+    accent: "bg-icm-accent-soft text-icm-accent/70",
+  }[tone];
+  const hoverShadow = {
+    neutral: "hover:shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08)]",
+    red: "hover:shadow-[0_25px_50px_-12px_rgba(239,68,68,0.18)]",
+    amber: "hover:shadow-[0_25px_50px_-12px_rgba(245,158,11,0.18)]",
+    accent: "hover:shadow-[0_25px_50px_-12px_rgba(59,130,246,0.18)]",
   }[tone];
   return (
-    <div className="rounded-2xl border border-icm-border bg-icm-panel px-4 py-3.5 flex items-start justify-between gap-3 hover:shadow-elevated transition-shadow">
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider text-icm-text-faint font-geist font-medium">
-          {label}
-        </p>
-        <p className={cn("text-[28px] font-manrope font-bold mt-1 leading-none tracking-tight", value$)}>
+    <div className={cn("group bg-icm-panel border border-icm-border/70 p-6 rounded-[1.75rem] shadow-[0_15px_35px_-12px_rgba(15,23,42,0.06),0_4px_10px_-2px_rgba(15,23,42,0.02)] transition-all duration-300 cursor-default", hoverShadow)}>
+      <p className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest">
+        {label}
+      </p>
+      <div className="flex items-end justify-between mt-3">
+        <span className={cn("font-manrope text-[44px] font-black leading-none tracking-tighter", value$)}>
           {value}
-        </p>
+        </span>
+        {Icon && (
+          <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm transition-all", iconBg)}>
+            <Icon className="w-5 h-5" />
+          </div>
+        )}
       </div>
-      {Icon && (
-        <div className={cn("rounded-xl p-2.5 shrink-0", iconBg)}>
-          <Icon className="w-4 h-4" />
-        </div>
-      )}
     </div>
   );
 }

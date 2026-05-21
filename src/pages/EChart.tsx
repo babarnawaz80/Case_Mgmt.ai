@@ -49,7 +49,6 @@ import {
 import { getProfile } from "@/data/profiles";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
-import { MonitorsBaselines } from "@/components/profile/MonitorsBaselines";
 
 
 type Category = "Documentation" | "Care" | "Operations";

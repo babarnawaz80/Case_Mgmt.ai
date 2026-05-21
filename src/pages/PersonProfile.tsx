@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { VoiceCompanionCard } from "@/components/VoiceCompanionCard";
 import { cn } from "@/lib/utils";
 import { getPerson, initials, riskAvatarClass, riskScoreClass } from "@/data/people";
 import {
@@ -250,6 +251,13 @@ const PersonProfile = () => {
             </div>
           </div>
         </div>
+
+        {/* AI Voice Companion link — shareable to the individual */}
+        <VoiceCompanionCard
+          personId={person.id}
+          firstName={person.firstName}
+          phone={(person as { phone?: string }).phone}
+        />
 
         {/* Tab content */}
         {tab === "basic" && (

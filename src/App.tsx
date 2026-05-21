@@ -87,6 +87,7 @@ import {
   PersonESignature,
 } from "./pages/PersonPlaceholders";
 import NotFound from "./pages/NotFound";
+import Companion from "./pages/Companion";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
@@ -120,6 +121,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/companion/:token" element={<Companion />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/people" element={<PeopleSupported />} />
             <Route path="/people/:id/profile" element={<PersonProfile />} />

@@ -184,29 +184,29 @@ export default function CareAssistant() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] font-inter flex flex-col">
+    <div className="min-h-screen bg-[#101a2e] font-inter flex flex-col text-white">
       {/* Header */}
       <header className="pt-8 pb-4 px-6 text-center flex flex-col items-center">
-        <div className="text-[13px] tracking-wide text-gray-500">
-          <span className="font-semibold text-gray-700">CaseManagement</span>
-          <span className="text-[#00C2B2]">.ai</span>
+        <div className="text-[14px] tracking-wide">
+          <span className="font-semibold text-white">CaseManagement</span>
+          <span className="text-[#5eead4]">.ai</span>
         </div>
-        <div className="mt-4">
+        <div className="mt-5">
           <SiriOrb
-            size="160px"
+            size="180px"
             colors={{
-              c1: "oklch(82% 0.14 195)",
-              c2: "oklch(78% 0.16 340)",
-              c3: "oklch(80% 0.10 260)",
+              c1: "oklch(82% 0.18 195)",
+              c2: "oklch(78% 0.22 330)",
+              c3: "oklch(70% 0.18 280)",
             }}
             animationDuration={18}
           />
         </div>
-        <h1 className="mt-4 text-[22px] font-semibold text-gray-900">
+        <h1 className="mt-5 text-[22px] font-semibold text-white">
           Hi {person.firstName} <span>👋</span>
         </h1>
-        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 text-[12px]">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 text-emerald-300 text-[12px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           Your Care Assistant is ready
         </div>
       </header>
@@ -233,14 +233,14 @@ export default function CareAssistant() {
                         key={m.id}
                         className={
                           isBot
-                            ? "bg-gray-100 text-gray-800 rounded-2xl rounded-bl-md px-4 py-2.5 text-[14.5px] leading-relaxed"
-                            : "bg-[#00C2B2] text-white rounded-2xl rounded-br-md px-4 py-2.5 text-[14.5px] leading-relaxed"
+                            ? "bg-white/10 text-white/90 rounded-2xl rounded-bl-md px-4 py-2.5 text-[14.5px] leading-relaxed backdrop-blur-sm"
+                            : "bg-[#5eead4] text-[#0b1220] rounded-2xl rounded-br-md px-4 py-2.5 text-[14.5px] leading-relaxed font-medium"
                         }
                       >
                         {m.text}
                       </div>
                     ))}
-                    <div className={`text-[10.5px] text-gray-400 ${isBot ? "text-left" : "text-right"}`}>
+                    <div className={`text-[10.5px] text-white/40 ${isBot ? "text-left" : "text-right"}`}>
                       {fmtTime(g.ts)}
                     </div>
                   </div>
@@ -254,7 +254,7 @@ export default function CareAssistant() {
           <div className="mt-6 text-center">
             <button
               onClick={handleEndSession}
-              className="text-[12.5px] text-gray-500 hover:text-[#00C2B2] underline-offset-2 hover:underline"
+              className="text-[12.5px] text-white/50 hover:text-[#5eead4] underline-offset-2 hover:underline"
             >
               Done for now? End this check-in →
             </button>
@@ -263,20 +263,20 @@ export default function CareAssistant() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 bg-white px-4 md:px-6 py-4 pb-6">
+      <div className="border-t border-white/10 bg-[#0b1220]/80 backdrop-blur px-4 md:px-6 py-4 pb-6">
         <div className="max-w-2xl mx-auto">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               send(input);
             }}
-            className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm focus-within:border-[#00C2B2]"
+            className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 shadow-sm focus-within:border-[#5eead4]/60"
           >
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={recording ? "Listening..." : "Type your message..."}
-              className="flex-1 bg-transparent outline-none text-[14.5px] text-gray-800 placeholder:text-gray-400 py-1.5"
+              className="flex-1 bg-transparent outline-none text-[14.5px] text-white placeholder:text-white/40 py-1.5"
               disabled={recording}
             />
             {recording && (
@@ -284,7 +284,7 @@ export default function CareAssistant() {
                 {[0, 1, 2, 3, 4].map((i) => (
                   <span
                     key={i}
-                    className="w-0.5 bg-[#00C2B2] rounded-full animate-pulse"
+                    className="w-0.5 bg-[#5eead4] rounded-full animate-pulse"
                     style={{ height: `${6 + (i % 3) * 5}px`, animationDelay: `${i * 120}ms` }}
                   />
                 ))}
@@ -296,12 +296,12 @@ export default function CareAssistant() {
               aria-label="Toggle microphone"
               className={`relative w-9 h-9 rounded-full flex items-center justify-center transition ${
                 recording
-                  ? "bg-[#00C2B2] text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#5eead4] text-[#0b1220]"
+                  : "bg-white/10 text-white/70 hover:bg-white/15"
               }`}
             >
               {recording && (
-                <span className="absolute inset-0 rounded-full ring-2 ring-[#00C2B2]/40 animate-ping" />
+                <span className="absolute inset-0 rounded-full ring-2 ring-[#5eead4]/40 animate-ping" />
               )}
               <Mic className="w-4 h-4" />
             </button>
@@ -309,7 +309,7 @@ export default function CareAssistant() {
               type="submit"
               aria-label="Send"
               disabled={!input.trim()}
-              className="w-9 h-9 rounded-full bg-[#00C2B2] text-white flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full bg-[#5eead4] text-[#0b1220] flex items-center justify-center disabled:opacity-40"
             >
               <Send className="w-4 h-4" />
             </button>

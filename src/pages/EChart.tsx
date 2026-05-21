@@ -143,7 +143,6 @@ const EChart = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const person = getPerson(id ?? "");
-  const profile = person ? getProfile(person.id) : null;
   const { role } = useRole();
   const [showPreVisit, setShowPreVisit] = useState(false);
   const [filter, setFilter] = useState<"All" | Category>("All");

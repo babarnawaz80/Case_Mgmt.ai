@@ -160,6 +160,7 @@ const Index = () => {
   const [historyOpen, setHistoryOpen] = useState(true);
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [plusSearch, setPlusSearch] = useState("");
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
   const [activeIndividualId, setActiveIndividualId] = useState<string | null>(null);

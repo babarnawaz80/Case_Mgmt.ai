@@ -18,10 +18,16 @@ import {
   AlertTriangle,
   Calendar,
   Heart,
-  Stethoscope,
   PenLine,
   ChevronRight,
-  User,
+  ShieldAlert,
+  Activity,
+  Pill,
+  Phone,
+  MapPin,
+  User2,
+  ClipboardCheck,
+  Copy,
 } from "lucide-react";
 import { people, type Person } from "@/data/people";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
@@ -41,17 +47,31 @@ interface SnapshotActivity {
   tone: "default" | "warn" | "danger" | "good";
 }
 
-// Deterministic mock 30-day activity per person.
+interface AlertItem {
+  tone: "danger" | "warn" | "info";
+  label: string;
+}
+
+function getAlertsFor(person: Person): AlertItem[] {
+  const alerts: AlertItem[] = [];
+  if (person.aiFlag?.tone === "urgent") alerts.push({ tone: "danger", label: person.aiFlag.label });
+  if (person.aiFlag?.tone === "attention") alerts.push({ tone: "warn", label: person.aiFlag.label });
+  alerts.push({ tone: "warn", label: "2 unsigned contact notes from last week" });
+  alerts.push({ tone: "info", label: "Monitoring form due in 7 days" });
+  if (person.allergies && person.allergies !== "None known")
+    alerts.push({ tone: "warn", label: `Allergy on file: ${person.allergies}` });
+  return alerts;
+}
+
 function getActivitiesFor(person: Person): SnapshotActivity[] {
   const base: SnapshotActivity[] = [
     { icon: FileText, date: "Apr 27", type: "Progress Note", detail: "Quarterly check-in at residence (AI pre-filled draft).", tone: "default" },
-    { icon: Stethoscope, date: "Apr 22", type: "Contact Note", detail: "Phone advocacy with provider re: satisfaction concern.", tone: "default" },
+    { icon: Phone, date: "Apr 22", type: "Contact Note", detail: "Phone advocacy with provider re: satisfaction concern.", tone: "default" },
     { icon: Calendar, date: "Apr 18", type: "Visit Summary", detail: "In-person visit completed; mother reported behavioral changes.", tone: "warn" },
     { icon: ClipboardList, date: "Apr 14", type: "Monitoring Form", detail: "Monthly home safety monitoring submitted.", tone: "good" },
     { icon: AlertTriangle, date: "Apr 09", type: "Incident", detail: "Low-severity medication error logged; follow-up assigned.", tone: "danger" },
     { icon: Heart, date: "Apr 03", type: "Assessment", detail: "Annual health assessment — 12 days overdue.", tone: "warn" },
   ];
-  // Light personalization
   if (person.aiFlag?.tone === "urgent") {
     base.unshift({
       icon: AlertTriangle,
@@ -80,6 +100,12 @@ const toneClass: Record<SnapshotActivity["tone"], string> = {
   good: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
 };
 
+const alertStyle: Record<AlertItem["tone"], { dot: string; ring: string; text: string }> = {
+  danger: { dot: "bg-red-500", ring: "ring-red-200 dark:ring-red-500/30", text: "text-red-700 dark:text-red-300" },
+  warn: { dot: "bg-amber-500", ring: "ring-amber-200 dark:ring-amber-500/30", text: "text-amber-700 dark:text-amber-300" },
+  info: { dot: "bg-sky-500", ring: "ring-sky-200 dark:ring-sky-500/30", text: "text-sky-700 dark:text-sky-300" },
+};
+
 export function IndividualSnapshotDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -103,9 +129,21 @@ export function IndividualSnapshotDialog({ open, onOpenChange }: Props) {
     onOpenChange(v);
   }
 
+  const activities = selected ? getActivitiesFor(selected) : [];
+  const alerts = selected ? getAlertsFor(selected) : [];
+
+  const stats = selected
+    ? [
+        { label: "Notes (30d)", value: activities.length },
+        { label: "Open flags", value: alerts.filter((a) => a.tone !== "info").length },
+        { label: "Forms due", value: 2 },
+        { label: "Risk", value: selected.riskScore ?? "—" },
+      ]
+    : [];
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
+      <DialogContent className="max-w-3xl p-0 overflow-hidden gap-0">
         {/* Purple header */}
         <DialogHeader className="px-6 py-4 bg-gradient-to-r from-purple-600 to-violet-600 text-white">
           <div className="flex items-center gap-2">
@@ -120,12 +158,12 @@ export function IndividualSnapshotDialog({ open, onOpenChange }: Props) {
             )}
             <Sparkles className="w-5 h-5" />
             <DialogTitle className="text-white text-base font-display">
-              {selected ? `${selected.firstName} ${selected.lastName} — Snapshot` : "Individual Snapshot"}
+              {selected ? `Individual Snapshot — ${selected.firstName} ${selected.lastName}` : "Individual Snapshot"}
             </DialogTitle>
           </div>
           <DialogDescription className="text-white/80 text-xs">
             {selected
-              ? "Last 30 days of case management activity. Create new documentation right from here."
+              ? "Last 30 days of case management activity. Create documentation right from here."
               : "Pick an individual to see a 30-day case management snapshot."}
           </DialogDescription>
         </DialogHeader>
@@ -161,7 +199,10 @@ export function IndividualSnapshotDialog({ open, onOpenChange }: Props) {
                     </p>
                   </div>
                   {p.aiFlag && (
-                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", toneClass[p.aiFlag.tone === "urgent" ? "danger" : p.aiFlag.tone === "attention" ? "warn" : "default"])}>
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium",
+                      p.aiFlag.tone === "urgent" ? "bg-red-100 text-red-700" :
+                      p.aiFlag.tone === "attention" ? "bg-amber-100 text-amber-700" :
+                      "bg-sky-100 text-sky-700")}>
                       {p.aiFlag.label}
                     </span>
                   )}
@@ -176,82 +217,200 @@ export function IndividualSnapshotDialog({ open, onOpenChange }: Props) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col max-h-[70vh]">
-            {/* Person summary */}
-            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
-              <PersonAvatar person={selected} size={48} shape="circle" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">
-                  {selected.firstName} {selected.lastName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {selected.gender} · Age {selected.age} · {selected.county}
-                  {selected.serviceContact ? ` · CM: ${selected.serviceContact}` : ""}
-                </p>
+          <div className="flex flex-col max-h-[78vh] bg-gradient-to-b from-slate-50/60 to-white dark:from-slate-900/40 dark:to-background">
+            <div className="px-6 py-5 overflow-y-auto flex-1 space-y-4">
+              {/* User chat bubble */}
+              <div className="flex justify-end">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white text-sm font-medium px-4 py-2 rounded-2xl rounded-br-sm shadow-sm">
+                  Individual Snapshot for {selected.firstName} {selected.lastName}
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onOpenChange(false);
-                  navigate(`/people/${selected.id}/echart`);
-                }}
-              >
-                Open eChart
-              </Button>
-            </div>
 
-            {/* Chat-style AI intro */}
-            <div className="px-6 pt-4">
-              <div className="flex gap-2 items-start">
+              {/* AI rich snapshot */}
+              <div className="flex gap-3 items-start">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center shrink-0">
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex-1 rounded-2xl bg-purple-50 dark:bg-purple-500/10 border border-purple-100 dark:border-purple-500/20 px-4 py-3 text-sm text-foreground">
-                  Here's <strong>{selected.firstName}</strong>'s case management snapshot for the
-                  last 30 days. I count{" "}
-                  <strong>{getActivitiesFor(selected).length} activities</strong>
-                  {selected.aiFlag ? <> and <strong>1 active flag</strong>: {selected.aiFlag.label}.</> : "."} Use the quick actions below to
-                  create any new documentation right from here.
+                <div className="flex-1 space-y-3">
+                  {/* Header card */}
+                  <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <PersonAvatar person={selected} size={52} shape="circle" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base font-semibold text-foreground font-display">
+                          Snapshot — {selected.firstName} {selected.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {selected.age} · {selected.gender === "M" ? "Male" : "Female"} · DOB {selected.dob} · Updated {selected.updatedOn}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          onOpenChange(false);
+                          navigate(`/people/${selected.id}/echart`);
+                        }}
+                      >
+                        Open eChart
+                      </Button>
+                    </div>
+
+                    {/* Alerts */}
+                    {alerts.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5" /> Alerts & Flags
+                        </p>
+                        <div className="space-y-1.5">
+                          {alerts.map((a, i) => (
+                            <div
+                              key={i}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-lg bg-card ring-1 px-3 py-2 text-sm",
+                                alertStyle[a.tone].ring,
+                                alertStyle[a.tone].text
+                              )}
+                            >
+                              <span className={cn("w-2 h-2 rounded-full", alertStyle[a.tone].dot)} />
+                              <span>{a.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stat tiles */}
+                    <div className="mt-4 grid grid-cols-4 gap-2">
+                      {stats.map((s) => (
+                        <div
+                          key={s.label}
+                          className="rounded-xl border border-border bg-card px-3 py-2.5 text-center"
+                        >
+                          <p className="text-lg font-semibold font-display text-foreground leading-none">
+                            {s.value}
+                          </p>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1.5">
+                            {s.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Demographics + Allergies */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-border bg-card p-4">
+                      <p className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <User2 className="w-3.5 h-3.5" /> Demographics
+                      </p>
+                      <dl className="text-xs space-y-1.5">
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">County</dt>
+                          <dd className="text-foreground font-medium flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {selected.county}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Status</dt>
+                          <dd className="text-foreground font-medium">{selected.status}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Admitted</dt>
+                          <dd className="text-foreground font-medium">{selected.admittedOn}</dd>
+                        </div>
+                        {selected.serviceContact && (
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">CM</dt>
+                            <dd className="text-foreground font-medium truncate ml-2">{selected.serviceContact}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+
+                    <div className={cn(
+                      "rounded-2xl border p-4",
+                      selected.allergies && selected.allergies !== "None known"
+                        ? "bg-red-50/60 dark:bg-red-500/5 border-red-200/60 dark:border-red-500/20"
+                        : "bg-card border-border"
+                    )}>
+                      <p className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Allergies & Notes
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {(selected.allergies ?? "None known").split(",").map((a) => (
+                          <span key={a} className="text-[11px] px-2 py-0.5 rounded-md bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300 font-medium">
+                            {a.trim()}
+                          </span>
+                        ))}
+                      </div>
+                      {selected.specialInstructions && (
+                        <p className="text-xs text-muted-foreground italic">
+                          {selected.specialInstructions}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Activity timeline */}
+                  <div className="rounded-2xl border border-border bg-card p-4">
+                    <p className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5" /> Last 30 days
+                    </p>
+                    <ul className="space-y-1.5">
+                      {activities.map((a, i) => {
+                        const Icon = a.icon;
+                        return (
+                          <li
+                            key={i}
+                            className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2"
+                          >
+                            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", toneClass[a.tone])}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-foreground">{a.type}</p>
+                                <span className="text-[11px] text-muted-foreground">{a.date}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{a.detail}</p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+
+                  {/* Convert to Note CTA */}
+                  <div className="rounded-2xl border border-purple-200 dark:border-purple-500/30 bg-gradient-to-br from-purple-50 to-violet-50/50 dark:from-purple-500/10 dark:to-violet-500/5 p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center shrink-0">
+                      <ClipboardCheck className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">Convert snapshot into a Progress Note</p>
+                      <p className="text-xs text-muted-foreground">AI will pre-fill from the last 30 days. You review & apply.</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onOpenChange(false);
+                        navigate(`/people/${selected.id}/progress-note`);
+                      }}
+                      className="bg-gradient-to-r from-purple-600 to-violet-600 text-white hover:opacity-95"
+                    >
+                      Generate
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Activity timeline */}
-            <div className="px-6 py-4 flex-1 overflow-y-auto">
-              <p className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mb-2">
-                Last 30 days
-              </p>
-              <ul className="space-y-2">
-                {getActivitiesFor(selected).map((a, i) => {
-                  const Icon = a.icon;
-                  return (
-                    <li
-                      key={i}
-                      className="flex items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
-                    >
-                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", toneClass[a.tone])}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-foreground">{a.type}</p>
-                          <span className="text-[11px] text-muted-foreground">{a.date}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{a.detail}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-
-            {/* Quick actions */}
-            <div className="px-6 py-4 border-t border-border bg-muted/30">
-              <p className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mb-2">
-                Create new
-              </p>
-              <div className="grid grid-cols-3 gap-2">
+            {/* Quick actions footer */}
+            <div className="px-6 py-3 border-t border-border bg-card/80 backdrop-blur">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground mr-1">
+                  Create
+                </span>
                 {QUICK_ACTIONS.map((a) => {
                   const Icon = a.icon;
                   return (
@@ -261,24 +420,20 @@ export function IndividualSnapshotDialog({ open, onOpenChange }: Props) {
                         onOpenChange(false);
                         navigate(a.path(selected.id));
                       }}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors text-left"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-background hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors text-xs font-medium text-foreground"
                     >
-                      <Icon className="w-4 h-4 text-purple-600" />
-                      <span className="text-xs font-medium text-foreground">{a.label}</span>
+                      <Icon className="w-3.5 h-3.5 text-purple-600" />
+                      {a.label}
                     </button>
                   );
                 })}
-              </div>
-              <div className="flex justify-end mt-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => demoToast("Snapshot exported to clipboard")}
-                  className="text-xs"
+                <button
+                  onClick={() => demoToast("Snapshot copied to clipboard")}
+                  className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <User className="w-3.5 h-3.5 mr-1" />
-                  Copy snapshot
-                </Button>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy
+                </button>
               </div>
             </div>
           </div>

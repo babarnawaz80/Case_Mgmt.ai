@@ -40,7 +40,6 @@ import {
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "Basic Info" },
   { key: "medical", label: "Medical Info" },
-  { key: "monitors", label: "Monitors & Baselines" },
   { key: "court", label: "Court Involvement" },
   { key: "program", label: "Program" },
   { key: "contacts", label: "Contacts" },

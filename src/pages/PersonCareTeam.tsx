@@ -17,8 +17,18 @@ import {
   X,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson, initials } from "@/data/people";
+import { getPerson } from "@/data/people";
 import { writeAudit } from "@/data/supervisor";
+
+function nameInitials(n: string) {
+  return n
+    .split(/\s+/)
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 type Role =
   | "Guardian"

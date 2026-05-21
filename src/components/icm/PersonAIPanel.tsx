@@ -123,7 +123,12 @@ export function PersonAIPanel({ person, suggestions: override, intro }: Props) {
   }
 
   return (
-    <aside className="hidden lg:flex w-[340px] shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full">
+    <aside
+      className={cn(
+        "hidden lg:flex shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full transition-all duration-300 ease-out",
+        expanded ? "w-[520px]" : "w-[340px]",
+      )}
+    >
       {/* Header */}
       <div className="p-4 border-b border-icm-border">
         <div className="flex items-center gap-2.5">
@@ -139,6 +144,13 @@ export function PersonAIPanel({ person, suggestions: override, intro }: Props) {
               {count > 0 ? `Active · ${count} suggestion${count > 1 ? "s" : ""}` : "Standing by"}
             </p>
           </div>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="w-7 h-7 rounded-lg border border-icm-border bg-icm-bg flex items-center justify-center text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong transition"
+            title={expanded ? "Collapse panel" : "Expand panel"}
+          >
+            {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
         </div>
         <p className="text-[12px] text-icm-text-dim font-geist mt-3 leading-relaxed">
           {intro

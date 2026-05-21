@@ -81,11 +81,9 @@ import VirtualVisit from "./pages/VirtualVisit";
 import BillingHub from "./pages/BillingHub";
 import {
   PersonCareTracker,
-  PersonMeetingNotes,
   PersonCommunications,
   PersonServices,
   PersonEmployment,
-  PersonAssignedStaff,
   PersonManagedDocuments,
   PersonOnCall,
   PersonTrainings,
@@ -93,6 +91,8 @@ import {
   PersonBillingSummary,
   PersonESignature,
 } from "./pages/PersonPlaceholders";
+import PersonCareTeam from "./pages/PersonCareTeam";
+import PersonMeetingNotesPage from "./pages/PersonMeetingNotesPage";
 import NotFound from "./pages/NotFound";
 import Companion from "./pages/Companion";
 
@@ -222,11 +222,12 @@ const App = () => (
 
             {/* Per-person placeholder routes (modules not yet built) */}
             <Route path="/people/:id/care-tracker" element={<PersonCareTracker />} />
-            <Route path="/people/:id/meeting-notes" element={<PersonMeetingNotes />} />
+            <Route path="/people/:id/meeting-notes" element={<PersonMeetingNotesPage />} />
             <Route path="/people/:id/communications" element={<PersonCommunications />} />
             <Route path="/people/:id/services" element={<PersonServices />} />
             <Route path="/people/:id/employment" element={<PersonEmployment />} />
-            <Route path="/people/:id/assigned-staff" element={<PersonAssignedStaff />} />
+            <Route path="/people/:id/assigned-staff" element={<PersonCareTeam />} />
+            <Route path="/people/:id/care-team" element={<PersonCareTeam />} />
             <Route path="/people/:id/managed-documents" element={<PersonManagedDocuments />} />
             <Route path="/people/:id/oncall" element={<PersonOnCall />} />
             <Route path="/people/:id/trainings" element={<PersonTrainings />} />

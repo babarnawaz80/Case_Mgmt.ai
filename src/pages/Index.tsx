@@ -416,35 +416,51 @@ const Index = () => {
           {/* Conversation thread */}
           {thread.length > 0 && (
             <div className="w-full max-w-2xl space-y-4 mt-2 mb-6">
-              {thread.map((turn, idx) => (
-                <div key={idx} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                      turn.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "glass text-foreground"
-                    }`}
-                  >
+              {thread.map((turn, idx) => {
+                const snapPerson = turn.snapshotPersonId ? getPerson(turn.snapshotPersonId) : undefined;
+                if (snapPerson) {
+                  return (
+                    <div key={idx} className="flex justify-start">
+                      <div className="w-full max-w-[92%] space-y-2">
+                        {turn.text && (
+                          <p className="text-sm text-foreground">{turn.text}</p>
+                        )}
+                        <InlineIndividualSnapshot person={snapPerson} />
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={idx} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
-                      className="whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{
-                        __html: turn.text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
-                      }}
-                    />
-                    {turn.cta && (
-                      <button
-                        onClick={() => navigate(turn.cta!.href)}
-                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                      >
-                        {turn.cta.label}
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                        turn.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "glass text-foreground"
+                      }`}
+                    >
+                      <div
+                        className="whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{
+                          __html: (turn.text ?? "").replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
+                        }}
+                      />
+                      {turn.cta && (
+                        <button
+                          onClick={() => navigate(turn.cta!.href)}
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        >
+                          {turn.cta.label}
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+
 
           {/* Chat Input */}
           <motion.div

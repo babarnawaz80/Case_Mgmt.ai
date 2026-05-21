@@ -45,6 +45,9 @@ import {
   initials,
   riskAvatarClass,
 } from "@/data/people";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
+
 
 type Category = "Documentation" | "Care" | "Operations";
 
@@ -178,6 +181,15 @@ const EChart = () => {
   return (
     <ICMShell title="eChart" rightPanel={<PersonAIPanel person={person} />}>
       <div className="space-y-4">
+        <Breadcrumbs
+          backTo="/people"
+          backLabel="People Supported"
+          items={[
+            { label: "People Supported", to: "/people" },
+            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/profile` },
+            { label: "eChart" },
+          ]}
+        />
         {/* Person header card with gradient accent */}
         <div className="relative rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
           {/* Top gradient stripe */}
@@ -188,13 +200,8 @@ const EChart = () => {
             <div className="flex items-start gap-5">
               {/* LEFT — avatar + identity (fixed width so it never truncates) */}
               <div className="flex items-start gap-4 shrink-0 w-[280px]">
-                <div
-                  className={`w-16 h-16 rounded-full border flex items-center justify-center font-mono text-[18px] font-bold shrink-0 ${riskAvatarClass(
-                    person.riskScore,
-                  )}`}
-                >
-                  {initials(person)}
-                </div>
+                <PersonAvatar person={person} size={64} shape="circle" className="text-[18px]" />
+
                 <div className="min-w-0">
                   <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">
                     {person.lastName}, {person.firstName}

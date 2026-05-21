@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Mic, Send, CheckCircle2 } from "lucide-react";
 import SiriOrb from "@/components/ui/siri-orb";
+import logo from "@/assets/casemanagement-logo.png";
 import {
   TOKEN_MAP,
   matchBotReply,
@@ -186,23 +187,28 @@ export default function CareAssistant() {
   return (
     <div className="min-h-screen bg-[#101a2e] font-inter flex flex-col text-white">
       {/* Header */}
-      <header className="pt-8 pb-4 px-6 text-center flex flex-col items-center">
-        <div className="text-[14px] tracking-wide">
-          <span className="font-semibold text-white">CaseManagement</span>
-          <span className="text-[#5eead4]">.ai</span>
+      <header className="pt-6 sm:pt-8 pb-4 px-4 sm:px-6 text-center flex flex-col items-center">
+        <img
+          src={logo}
+          alt="CaseManagement AI"
+          className="h-7 sm:h-8 w-auto select-none brightness-0 invert"
+          draggable={false}
+        />
+        {/* Orb — centered, larger, responsive */}
+        <div className="mt-8 sm:mt-12 flex justify-center w-full">
+          <div className="w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px]">
+            <SiriOrb
+              size="100%"
+              colors={{
+                c1: "oklch(82% 0.18 195)",
+                c2: "oklch(78% 0.22 330)",
+                c3: "oklch(70% 0.18 280)",
+              }}
+              animationDuration={18}
+            />
+          </div>
         </div>
-        <div className="mt-5">
-          <SiriOrb
-            size="180px"
-            colors={{
-              c1: "oklch(82% 0.18 195)",
-              c2: "oklch(78% 0.22 330)",
-              c3: "oklch(70% 0.18 280)",
-            }}
-            animationDuration={18}
-          />
-        </div>
-        <h1 className="mt-5 text-[22px] font-semibold text-white">
+        <h1 className="mt-6 sm:mt-8 text-[22px] sm:text-[26px] font-semibold text-white">
           Hi {person.firstName} <span>👋</span>
         </h1>
         <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 text-emerald-300 text-[12px]">

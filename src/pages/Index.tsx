@@ -162,6 +162,7 @@ const Index = () => {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
+  const [activeIndividualId, setActiveIndividualId] = useState<string | null>(null);
   const [snapshotPickerOpen, setSnapshotPickerOpen] = useState(false);
   const [snapshotQuery, setSnapshotQuery] = useState("");
   const snapshotRef = useRef<HTMLDivElement>(null);
@@ -203,18 +204,40 @@ const Index = () => {
     if (!p) return;
     setSnapshotPickerOpen(false);
     setSnapshotQuery("");
+    setActiveIndividualId(p.id);
     setThread((prev) => [
       ...prev,
       { role: "user", text: `Individual Snapshot for ${p.firstName} ${p.lastName}` },
-      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything — or convert it into a note below.` },
+      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything about ${p.firstName} — or convert it into a note below.` },
     ]);
   }
 
   function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
+    const t = text.toLowerCase();
+    const active = activeIndividualId ? getPerson(activeIndividualId) : null;
+
+    if (active) {
+      const name = `${active.firstName} ${active.lastName}`;
+      if (t.includes("med") || t.includes("allerg"))
+        return { reply: `**${name}** — Allergies on file: ${active.allergies ?? "None known"}. ${active.specialInstructions ?? ""}`.trim() };
+      if (t.includes("isp") || t.includes("pcp") || t.includes("compliance"))
+        return active.aiFlag
+          ? { reply: `**${name}** — ${active.aiFlag.detail ?? active.aiFlag.label}`, cta: { label: "Open eChart", href: `/people/${active.id}/echart` } }
+          : { reply: `**${name}** is currently in compliance. Last review on file ${active.updatedOn}.` };
+      if (t.includes("note") || t.includes("contact"))
+        return { reply: `**${name}** has 2 unsigned contact notes from last week and 1 progress note pending.`, cta: { label: "Open Contact Note", href: `/people/${active.id}/contact-note` } };
+      if (t.includes("incident"))
+        return { reply: `**${name}** — 1 low-severity incident (medication error) logged Apr 09; follow-up assigned.`, cta: { label: "Open Incidents", href: `/people/${active.id}/incident-reporting` } };
+      if (t.includes("risk"))
+        return { reply: `**${name}** — Current risk score: ${active.riskScore ?? "not scored"}.` };
+      if (t.includes("monitor") || t.includes("form"))
+        return { reply: `**${name}** — Monthly monitoring form due in 7 days.`, cta: { label: "Open Monitoring", href: `/people/${active.id}/monitoring-form` } };
+      // Default in-context answer
+      return { reply: `Looking at **${name}**'s record — could you be more specific? You can ask about ISP/PCP status, notes, incidents, allergies, monitoring forms, or risk.` };
+    }
+
     const match = suggestedPrompts.find((p) => p.text.toLowerCase() === text.trim().toLowerCase());
     if (match) return { reply: match.reply, cta: match.cta };
-    // Fuzzy keyword routing
-    const t = text.toLowerCase();
     if (t.includes("incident")) return { reply: suggestedPrompts[0].reply, cta: suggestedPrompts[0].cta };
     if (t.includes("health") || t.includes("assessment")) return { reply: suggestedPrompts[1].reply, cta: suggestedPrompts[1].cta };
     if (t.includes("pcp") || t.includes("compliance")) return { reply: suggestedPrompts[2].reply, cta: suggestedPrompts[2].cta };
@@ -224,8 +247,7 @@ const Index = () => {
     if (t.includes("note") || t.includes("sign")) return { reply: suggestedPrompts[6].reply, cta: suggestedPrompts[6].cta };
     if (t.includes("risk")) return { reply: suggestedPrompts[7].reply, cta: suggestedPrompts[7].cta };
     return {
-      reply:
-        "I can help with compliance reviews, ISP/PCP status, incidents, schedules, and unsigned documentation. Try one of the suggested prompts below.",
+      reply: "I can help with compliance reviews, ISP/PCP status, incidents, schedules, and unsigned documentation. Try one of the suggested prompts below.",
     };
   }
 
@@ -235,6 +257,12 @@ const Index = () => {
     const { reply, cta } = findReply(content);
     setThread((prev) => [...prev, { role: "user", text: content }, { role: "ai", text: reply, cta }]);
     setMessage("");
+  }
+
+  function startNewChat() {
+    setThread([]);
+    setMessage("");
+    setActiveIndividualId(null);
   }
 
   const ambientOverlay = ambientOpen ? (
@@ -263,7 +291,7 @@ const Index = () => {
               <h3 className="font-display font-semibold text-foreground text-sm">Chat History</h3>
               <div className="flex gap-1">
                 <button
-                  onClick={() => { setThread([]); setMessage(""); }}
+                  onClick={startNewChat}
                   title="New chat"
                   className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                 >
@@ -279,6 +307,17 @@ const Index = () => {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto py-2">
+              {thread.length > 0 && (() => {
+                const active = activeIndividualId ? getPerson(activeIndividualId) : null;
+                const title = active ? `${active.firstName} ${active.lastName} — Snapshot` : (thread[0]?.text ?? "Current chat");
+                return (
+                  <div className="px-4 py-3 mx-2 mb-2 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300 mb-1">Active chat</p>
+                    <p className="text-sm font-medium text-foreground truncate">{title}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{thread.length} messages · just now</p>
+                  </div>
+                );
+              })()}
               {chatHistory.map((item) => (
                 <button
                   key={item.id}
@@ -462,12 +501,33 @@ const Index = () => {
           )}
 
 
+          {/* Active context chip */}
+          {thread.length > 0 && (
+            <div className="w-full max-w-2xl flex items-center justify-between gap-2 mt-2 mb-2">
+              {activeIndividualId && (() => {
+                const ap = getPerson(activeIndividualId);
+                return ap ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 text-xs text-purple-800 dark:text-purple-200">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Chatting about <strong className="font-semibold">{ap.firstName} {ap.lastName}</strong>
+                  </div>
+                ) : null;
+              })()}
+              <button
+                onClick={startNewChat}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-secondary transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5" /> New chat
+              </button>
+            </div>
+          )}
+
           {/* Chat Input */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="w-full max-w-2xl mt-8"
+            className="w-full max-w-2xl mt-2"
           >
             <div className="glass rounded-2xl p-4">
               <textarea
@@ -577,14 +637,14 @@ const Index = () => {
             </div>
           </motion.div>
 
-          {/* Suggested Prompts */}
+          {/* Suggested Prompts — only on empty state. Snapshot button always available. */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             className="flex flex-wrap justify-center gap-2 mt-6 max-w-2xl"
           >
-            {suggestedPrompts.map((prompt, i) => (
+            {thread.length === 0 && suggestedPrompts.map((prompt, i) => (
               <button
                 key={i}
                 onClick={() => handleSend(prompt.text)}

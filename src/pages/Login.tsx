@@ -1,16 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-
-const MicrosoftLogo = () => (
-  <svg width="20" height="20" viewBox="0 0 23 23" aria-hidden="true">
-    <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-    <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-    <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-    <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-  </svg>
-);
 
 const GoogleLogo = () => (
   <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -21,140 +12,260 @@ const GoogleLogo = () => (
   </svg>
 );
 
+const MicrosoftLogo = () => (
+  <svg width="20" height="20" viewBox="0 0 23 23" aria-hidden="true">
+    <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+    <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+    <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+    <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+  </svg>
+);
+
+const testimonials = [
+  {
+    avatarSrc: "https://randomuser.me/api/portraits/women/57.jpg",
+    name: "Sarah Chen",
+    handle: "@sarah.cm",
+    text: "Documentation that used to take an hour is done before I leave the parking lot. Audit-ready every time.",
+  },
+  {
+    avatarSrc: "https://randomuser.me/api/portraits/men/64.jpg",
+    name: "Marcus Johnson",
+    handle: "@marcus.lead",
+    text: "Compliance flags catch things before they become exceptions. My supervisors finally trust the queue.",
+  },
+  {
+    avatarSrc: "https://randomuser.me/api/portraits/women/32.jpg",
+    name: "Priya Patel",
+    handle: "@priya.ddd",
+    text: "Feels like a teammate, not a tool. Cites the state guideline every single time.",
+  },
+];
+
+const heroImage =
+  "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1400&q=80";
+
 export default function Login() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState<"microsoft" | "google" | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState<"microsoft" | "google" | "email" | null>(null);
 
-  const handleSSO = (provider: "microsoft" | "google") => {
+  const finishSignIn = (provider: "microsoft" | "google" | "email") => {
     setLoading(provider);
-    toast.success(`Signing in with ${provider === "microsoft" ? "Microsoft" : "Google"}…`, {
-      description: "Demo SSO — no credentials required.",
-    });
+    toast.success(
+      provider === "email"
+        ? "Signing you in…"
+        : `Signing in with ${provider === "microsoft" ? "Microsoft" : "Google"}…`,
+      { description: "Demo mode — no credentials required." }
+    );
     setTimeout(() => {
       try {
-        localStorage.setItem("cm_ai_demo_user", JSON.stringify({
-          provider,
-          name: provider === "microsoft" ? "Jordan Reyes" : "Jordan Reyes",
-          email: "jordan.reyes@casemanagement.ai",
-          loggedInAt: new Date().toISOString(),
-        }));
+        localStorage.setItem(
+          "cm_ai_demo_user",
+          JSON.stringify({
+            provider,
+            name: "Jordan Reyes",
+            email: "jordan.reyes@casemanagement.ai",
+            loggedInAt: new Date().toISOString(),
+          })
+        );
       } catch {}
       navigate("/");
     }, 900);
   };
 
-  return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#f6f8fc] via-white to-[#eef3fb] flex items-center justify-center p-6">
-      {/* Ambient glow */}
-      <div className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full bg-gradient-to-tr from-sky-300/40 via-blue-200/30 to-transparent blur-3xl" />
-      <div className="absolute -bottom-40 -right-32 w-[560px] h-[560px] rounded-full bg-gradient-to-tr from-indigo-200/40 via-cyan-200/30 to-transparent blur-3xl" />
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[300px] rounded-full bg-gradient-to-r from-blue-100/40 to-transparent blur-3xl" />
+  const handleEmailSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    finishSignIn("email");
+  };
 
-      <div className="relative w-full max-w-5xl grid lg:grid-cols-2 gap-10 items-center">
-        {/* Left brand panel */}
-        <div className="hidden lg:flex flex-col gap-8 px-2">
-          <div className="flex items-center gap-3">
+  return (
+    <div className="min-h-screen w-full flex bg-gradient-to-br from-[#f6f8fc] via-white to-[#eef3fb] font-inter">
+      {/* Left: form column */}
+      <section className="relative flex-1 flex items-center justify-center px-6 py-10">
+        {/* Ambient glow */}
+        <div className="pointer-events-none absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-sky-300/40 via-blue-200/30 to-transparent blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 -right-10 w-[380px] h-[380px] rounded-full bg-gradient-to-tr from-indigo-200/40 via-cyan-200/30 to-transparent blur-3xl" />
+
+        <div className="relative w-full max-w-md">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-10">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="text-[15px] font-semibold tracking-tight text-slate-800">
-              Case Management <span className="text-blue-600">AI</span>
-            </span>
+            <div className="leading-tight">
+              <p className="text-[15px] font-semibold tracking-tight text-slate-800">
+                Case Management <span className="text-blue-600">AI</span>
+              </p>
+              <p className="text-[11px] text-slate-500">The audit-grade AI companion</p>
+            </div>
           </div>
 
-          <div>
-            <h1 className="font-manrope text-5xl font-black tracking-tighter text-slate-900 leading-[1.02]">
-              The audit-grade<br />
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 bg-clip-text text-transparent">
-                AI companion
-              </span><br />
-              for case managers.
+          <div className="space-y-1.5 mb-8">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">
+              Welcome back
+            </p>
+            <h1 className="font-manrope text-4xl font-black tracking-tight text-slate-900">
+              Sign in
             </h1>
-            <p className="mt-5 text-slate-500 text-[15px] leading-relaxed max-w-md">
-              Document faster, stay compliant with state guidelines, and let your AI agents handle the busywork — all under your review.
+            <p className="text-sm text-slate-500">
+              Access your workspace and continue your case management work.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 pt-4">
-            {[
-              "HIPAA-aligned. SOC 2 Type II in progress.",
-              "Every AI action is reviewable, reversible, and auditable.",
-              "Trusted by case management teams across 12 states.",
-            ].map((t) => (
-              <div key={t} className="flex items-center gap-3 text-sm text-slate-600">
-                <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0" />
-                <span>{t}</span>
+          <form onSubmit={handleEmailSignIn} className="space-y-4">
+            <div>
+              <label className="text-[12px] font-semibold text-slate-600 mb-1.5 block">
+                Email address
+              </label>
+              <div className="rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  placeholder="you@organization.com"
+                  className="w-full bg-transparent outline-none px-4 h-12 text-[14.5px] text-slate-800 placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-semibold text-slate-600 mb-1.5 block">
+                Password
+              </label>
+              <div className="relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  required
+                  placeholder="Enter your password"
+                  className="w-full bg-transparent outline-none px-4 pr-12 h-12 text-[14.5px] text-slate-800 placeholder:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-[13px]">
+              <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
+                <input type="checkbox" className="accent-blue-600 w-4 h-4 rounded" />
+                Keep me signed in
+              </label>
+              <button
+                type="button"
+                onClick={() => toast("Reset password link sent (demo).")}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Reset password
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading !== null}
+              className="w-full h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-[14.5px] shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all disabled:opacity-60"
+            >
+              {loading === "email" ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Signing in…
+                </span>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
+
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">
+              Or continue with
+            </span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => finishSignIn("microsoft")}
+              disabled={loading !== null}
+              className="flex items-center justify-center gap-2 h-12 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-60"
+            >
+              {loading === "microsoft" ? (
+                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+              ) : (
+                <MicrosoftLogo />
+              )}
+              <span className="text-[13.5px] font-semibold text-slate-800">Microsoft</span>
+            </button>
+            <button
+              onClick={() => finishSignIn("google")}
+              disabled={loading !== null}
+              className="flex items-center justify-center gap-2 h-12 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-60"
+            >
+              {loading === "google" ? (
+                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+              ) : (
+                <GoogleLogo />
+              )}
+              <span className="text-[13.5px] font-semibold text-slate-800">Google</span>
+            </button>
+          </div>
+
+          <p className="text-[12.5px] text-slate-500 text-center mt-8">
+            New to our platform?{" "}
+            <button
+              onClick={() => toast("Account creation is admin-provisioned. Contact your supervisor.")}
+              className="text-blue-600 font-semibold hover:underline"
+            >
+              Create account
+            </button>
+          </p>
+        </div>
+      </section>
+
+      {/* Right: hero + testimonials */}
+      <section className="hidden lg:block relative flex-1 p-4">
+        <div className="relative w-full h-full rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-900/20">
+          <img
+            src={heroImage}
+            alt="Care team collaborating"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-900/30 to-transparent" />
+
+          <div className="absolute top-8 left-8 right-8 flex items-center justify-between text-white/90">
+            <span className="text-[12px] font-semibold tracking-[0.2em] uppercase">
+              HIPAA-aligned · SOC 2 in progress
+            </span>
+            <span className="text-[12px] text-white/70">Trusted across 12 states</span>
+          </div>
+
+          <div className="absolute bottom-8 left-8 right-8 grid grid-cols-1 xl:grid-cols-3 gap-3">
+            {testimonials.map((t, i) => (
+              <div
+                key={t.handle}
+                className={`rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 p-4 text-white ${
+                  i === 0 ? "block" : i === 1 ? "hidden xl:block" : "hidden xl:block"
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <img src={t.avatarSrc} alt={t.name} className="w-9 h-9 rounded-full object-cover" />
+                  <div className="leading-tight">
+                    <p className="text-[13px] font-semibold">{t.name}</p>
+                    <p className="text-[11px] text-white/60">{t.handle}</p>
+                  </div>
+                </div>
+                <p className="text-[12.5px] leading-relaxed text-white/85">{t.text}</p>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Right login card */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/80 to-white/40 rounded-[2rem] blur-xl" />
-          <div className="relative bg-white/80 backdrop-blur-2xl border border-white/70 rounded-[2rem] shadow-[0_30px_80px_-30px_rgba(15,23,42,0.25)] p-10">
-            <div className="lg:hidden flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/30">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-sm font-semibold tracking-tight text-slate-800">
-                Case Management <span className="text-blue-600">AI</span>
-              </span>
-            </div>
-
-            <div className="space-y-1.5 mb-8">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Welcome back</p>
-              <h2 className="font-manrope text-3xl font-black tracking-tight text-slate-900">Sign in to your workspace</h2>
-              <p className="text-sm text-slate-500">Continue with your organization's single sign-on provider.</p>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => handleSSO("microsoft")}
-                disabled={loading !== null}
-                className="group w-full flex items-center justify-center gap-3 h-14 px-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loading === "microsoft" ? (
-                  <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
-                ) : (
-                  <MicrosoftLogo />
-                )}
-                <span className="text-[15px] font-semibold text-slate-800">Continue with Microsoft</span>
-              </button>
-
-              <button
-                onClick={() => handleSSO("google")}
-                disabled={loading !== null}
-                className="group w-full flex items-center justify-center gap-3 h-14 px-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loading === "google" ? (
-                  <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
-                ) : (
-                  <GoogleLogo />
-                )}
-                <span className="text-[15px] font-semibold text-slate-800">Continue with Google</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3 my-7">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">SSO only</span>
-              <div className="flex-1 h-px bg-slate-200" />
-            </div>
-
-            <div className="rounded-2xl bg-blue-50/60 border border-blue-100 p-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                <span className="font-semibold text-blue-700">Demo mode.</span> No credentials required — picking a provider signs you in as <span className="font-medium text-slate-800">Jordan Reyes</span>, a senior case manager.
-              </p>
-            </div>
-
-            <p className="text-[11px] text-slate-400 text-center mt-8 leading-relaxed">
-              By continuing, you agree to the Terms of Service and acknowledge the Privacy Policy.<br />
-              Protected by enterprise-grade encryption.
-            </p>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

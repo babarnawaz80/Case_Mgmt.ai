@@ -160,6 +160,7 @@ const Index = () => {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { role } = useRole();

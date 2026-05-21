@@ -266,9 +266,6 @@ export default function CareAssistant() {
       {/* Input */}
       <div className="border-t border-gray-200 bg-white px-4 md:px-6 py-4 pb-6">
         <div className="max-w-2xl mx-auto">
-          <p className="text-[11px] text-gray-400 text-center mb-2">
-            This conversation is shared with your care team.
-          </p>
           <form
             onSubmit={(e) => {
               e.preventDefault();

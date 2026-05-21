@@ -35,7 +35,6 @@ const topNavItems: TopNavItem[] = [
 ];
 
 const OVERDUE_TASK_COUNT = 3;
-const OPEN_INCIDENT_COUNT = 1;
 
 const badgeTone: Record<"red" | "amber" | "accent", string> = {
   red: "bg-icm-red text-white",

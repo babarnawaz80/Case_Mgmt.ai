@@ -74,6 +74,8 @@ import AIRoadmap from "./pages/AIRoadmap";
 import ProviderDirectory from "./pages/admin/ProviderDirectory";
 import Reports from "./pages/Reports";
 import ReportRunner from "./pages/ReportRunner";
+import ReportBuilder from "./pages/ReportBuilder";
+import AuditEvidence from "./pages/AuditEvidence";
 import PersonDocuments from "./pages/PersonDocuments";
 import Documents from "./pages/Documents";
 import Messages from "./pages/Messages";

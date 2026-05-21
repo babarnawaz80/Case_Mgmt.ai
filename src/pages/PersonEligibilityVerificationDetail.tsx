@@ -478,7 +478,7 @@ function Timeline({ personId }: { personId: string }) {
               {r.documentName && (
                 <>
                   <span>·</span>
-                  <button className="inline-flex items-center gap-1 text-icm-accent hover:underline">
+                  <button onClick={() => toast("Opening document viewer", { description: r.documentName })} className="inline-flex items-center gap-1 text-icm-accent hover:underline">
                     <FileText className="w-3 h-3" /> Document uploaded
                   </button>
                 </>

@@ -311,19 +311,7 @@ const EChart = () => {
                   onOpen={() => navigate(`/people/${person.id}/${t.route}`)}
                 />
         ))}
-
-        {profile && (
-          <section className="space-y-2.5">
-            <div className="flex items-center gap-2 border-t border-icm-border pt-3">
-              <span className="w-2 h-2 rounded-full bg-icm-accent" />
-              <h2 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">
-                Monitors &amp; Baselines
-              </h2>
             </div>
-            <MonitorsBaselines profile={profile} />
-          </section>
-        )}
-      </div>
           </section>
         ))}
       </div>

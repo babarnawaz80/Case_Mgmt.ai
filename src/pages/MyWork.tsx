@@ -331,35 +331,36 @@ const MyWork = () => {
           </div>
         )}
 
-        {/* Daily brief */}
+        {/* Daily brief — calm, single line */}
         {!briefDismissed && !focused && (
-          <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft px-4 py-3 flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg ai-gradient flex items-center justify-center shrink-0">
+          <div className="rounded-2xl border border-icm-border bg-icm-panel px-5 py-4 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl ai-gradient flex items-center justify-center shrink-0 shadow-sm">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
-              <div>
-                <p className="text-[12.5px] font-geist text-icm-text font-semibold">
-                  Good morning, Kathy. Here's your day:
-                </p>
-                <p className="text-[12px] font-geist text-icm-text-dim leading-relaxed mt-0.5">
-                  You have {counts.total} open tasks — {counts.overdue} are past due, {counts.today} are
-                  due today. Most urgent: Joseph Brown's quarterly visit is 76 days overdue.
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-geist text-icm-text">
+                  <span className="font-semibold">Good morning, Kathy.</span>{" "}
+                  <span className="text-icm-text-dim">
+                    {counts.total} open tasks · {counts.overdue} past due · {counts.today} due today.
+                    Joseph Brown's quarterly visit is the most urgent.
+                  </span>
                 </p>
                 <button
                   onClick={() => {
                     setFilterIndividual("Joseph");
                     setTab("all");
                   }}
-                  className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline mt-1.5 flex items-center gap-1"
+                  className="text-[12px] font-geist font-medium text-icm-accent hover:underline mt-1 inline-flex items-center gap-1"
                 >
-                  Show me Joseph's tasks <ArrowRight className="w-3 h-3" />
+                  Show Joseph's tasks <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
             <button
               onClick={() => setBriefDismissed(true)}
-              className="text-icm-text-faint hover:text-icm-text"
+              className="text-icm-text-faint hover:text-icm-text shrink-0"
+              aria-label="Dismiss"
             >
               <X className="w-4 h-4" />
             </button>

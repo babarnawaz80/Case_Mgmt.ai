@@ -119,7 +119,7 @@ export default function Login() {
               <label className="text-[12px] font-semibold text-slate-600 mb-1.5 block">
                 Email address
               </label>
-              <div className="rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+              <div className="rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm focus-within:border-violet-400 focus-within:ring-4 focus-within:ring-violet-500/15 transition-all">
                 <input
                   type="email"
                   name="email"
@@ -134,7 +134,7 @@ export default function Login() {
               <label className="text-[12px] font-semibold text-slate-600 mb-1.5 block">
                 Password
               </label>
-              <div className="relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+              <div className="relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm focus-within:border-violet-400 focus-within:ring-4 focus-within:ring-violet-500/15 transition-all">
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
@@ -155,13 +155,13 @@ export default function Login() {
 
             <div className="flex items-center justify-between text-[13px]">
               <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                <input type="checkbox" className="accent-blue-600 w-4 h-4 rounded" />
+                <input type="checkbox" className="accent-violet-600 w-4 h-4 rounded" />
                 Keep me signed in
               </label>
               <button
                 type="button"
                 onClick={() => toast("Reset password link sent (demo).")}
-                className="text-blue-600 hover:underline font-medium"
+                className="text-violet-600 hover:underline font-medium"
               >
                 Reset password
               </button>
@@ -170,7 +170,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading !== null}
-              className="w-full h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-[14.5px] shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all disabled:opacity-60"
+              className="w-full h-12 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 text-white font-semibold text-[14.5px] shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all disabled:opacity-60"
             >
               {loading === "email" ? (
                 <span className="inline-flex items-center gap-2">
@@ -221,7 +221,7 @@ export default function Login() {
             New to our platform?{" "}
             <button
               onClick={() => toast("Account creation is admin-provisioned. Contact your supervisor.")}
-              className="text-blue-600 font-semibold hover:underline"
+              className="text-violet-600 font-semibold hover:underline"
             >
               Create account
             </button>

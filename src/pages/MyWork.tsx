@@ -381,19 +381,6 @@ const MyWork = () => {
 
         {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="inline-flex items-center p-1 rounded-xl bg-icm-bg border border-icm-border">
-            {(
-              [
-                { key: "my_work", label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
-                { key: "alerts", label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
-                { key: "mentions", label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
-                { key: "completed", label: "Completed", count: counts.completed, alert: false },
-              ] as const
-            ).map((t) => {
-              const active = view === t.key;
-              return (
-        {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="inline-flex items-center p-1.5 rounded-2xl bg-icm-bg/70 ring-1 ring-icm-border/60 shadow-inner">
             {(
               [

@@ -4,7 +4,6 @@ import { Mic, Send, CheckCircle2 } from "lucide-react";
 import SiriOrb from "@/components/ui/siri-orb";
 import {
   TOKEN_MAP,
-  openingMessage,
   matchBotReply,
   buildSummary,
   buildTasks,

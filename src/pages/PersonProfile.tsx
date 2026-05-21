@@ -505,62 +505,6 @@ function MedicalInfoTab({ profile }: { profile: ProfileData }) {
   );
 }
 
-// =============================================================
-// TAB 3 — Monitors & Baselines
-// =============================================================
-function MonitorsTab({ profile }: { profile: ProfileData }) {
-  return (
-    <div className="space-y-4">
-      <Section title="Vital Sign Baselines">
-        <DataTable
-          columns={["Measurement", "Baseline", "Normal Range", "Last Measured", "Notes"]}
-          rows={profile.vitalBaselines.map((v) => [
-            <span key="m" className="font-semibold">{v.measurement}</span>,
-            v.baseline,
-            <span key="r" className="text-[11px] text-icm-text-dim">{v.normalRange}</span>,
-            v.lastMeasured ?? "—",
-            v.notes ?? "—",
-          ])}
-          emptyText="No baselines recorded."
-          addLabel="Add measurement"
-        />
-      </Section>
-
-      <Section title="Monitoring Instructions">
-        <div className="space-y-3">
-          <Field label="Health monitoring notes">
-            <textarea
-              defaultValue={profile.healthMonitoringNotes}
-              placeholder="Special monitoring requirements, medical equipment, positioning needs, etc."
-              className="modal-input min-h-[72px]"
-            />
-          </Field>
-          <Field label="Behavioral monitoring notes">
-            <textarea
-              defaultValue={profile.behavioralMonitoringNotes}
-              placeholder="Behavioral baselines, triggers, de-escalation strategies, etc."
-              className="modal-input min-h-[72px]"
-            />
-          </Field>
-          <div className="rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-2.5 text-[11.5px] font-geist text-icm-text flex items-start gap-2">
-            <Sparkle className="w-3.5 h-3.5 text-icm-accent mt-0.5" />
-            <span>
-              AI will surface monitoring content detected in ambient sessions or contact notes here as suggestions.
-            </span>
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Measurement History">
-        <div className="rounded-lg border border-icm-border bg-icm-bg p-6 text-center">
-          <p className="text-[12px] text-icm-text-dim font-geist">
-            No measurement history yet. Recorded vitals will appear here as a chronological log with trend lines.
-          </p>
-        </div>
-      </Section>
-    </div>
-  );
-}
 
 // =============================================================
 // TAB 4 — Court Involvement

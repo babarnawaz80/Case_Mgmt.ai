@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { BookOpen, Bot, ArrowRight, Layers, ClipboardCheck, MapPin, BarChart3 } from "lucide-react";
+import { BookOpen, Bot, ArrowRight } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { engineSummary } from "@/data/guidelinesEngines";
 import { AdminOnly } from "@/components/platform/AdminOnly";

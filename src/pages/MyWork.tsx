@@ -442,11 +442,12 @@ const MyWork = () => {
         {/* Stat strip — quiet, minimal */}
         {view === "my_work" && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatTile label="Open" value={counts.total} tone="neutral" />
-            <StatTile label="Past due" value={counts.overdue} tone="red" />
-            <StatTile label="Due today" value={counts.today} tone="amber" />
-            <StatTile label="This week" value={counts.week} tone="accent" />
+            <StatTile label="Open" value={counts.total} tone="neutral" icon={ListChecks} />
+            <StatTile label="Past due" value={counts.overdue} tone="red" icon={AlertCircle} />
+            <StatTile label="Due today" value={counts.today} tone="amber" icon={Clock} />
+            <StatTile label="This week" value={counts.week} tone="accent" icon={CalendarIcon} />
           </div>
+
         )}
 
         {/* Unified toolbar: timeframe + sort/filter */}
@@ -978,24 +979,44 @@ function StatTile({
   label,
   value,
   tone,
+  icon: Icon,
 }: {
   label: string;
   value: number;
   tone: "neutral" | "red" | "amber" | "accent";
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
-  const accent = {
+  const value$ = {
     neutral: "text-icm-text",
     red: "text-icm-red",
     amber: "text-icm-amber",
     accent: "text-icm-accent",
   }[tone];
+  const iconBg = {
+    neutral: "bg-icm-bg text-icm-text-dim",
+    red: "bg-icm-red-soft text-icm-red",
+    amber: "bg-icm-amber-soft text-icm-amber",
+    accent: "bg-icm-accent-soft text-icm-accent",
+  }[tone];
   return (
-    <div className="rounded-2xl border border-icm-border bg-icm-panel px-4 py-3">
-      <p className="text-[11px] uppercase tracking-wider text-icm-text-faint font-geist">{label}</p>
-      <p className={cn("text-[22px] font-manrope font-bold mt-0.5 leading-none", accent)}>{value}</p>
+    <div className="rounded-2xl border border-icm-border bg-icm-panel px-4 py-3.5 flex items-start justify-between gap-3 hover:shadow-elevated transition-shadow">
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wider text-icm-text-faint font-geist font-medium">
+          {label}
+        </p>
+        <p className={cn("text-[28px] font-manrope font-bold mt-1 leading-none tracking-tight", value$)}>
+          {value}
+        </p>
+      </div>
+      {Icon && (
+        <div className={cn("rounded-xl p-2.5 shrink-0", iconBg)}>
+          <Icon className="w-4 h-4" />
+        </div>
+      )}
     </div>
   );
 }
+
 
 function Chip({
   tone,

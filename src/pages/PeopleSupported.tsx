@@ -13,6 +13,7 @@ import {
   FileText,
   ClipboardList,
   MapPin,
+  User,
 } from "lucide-react";
 import {
   people,

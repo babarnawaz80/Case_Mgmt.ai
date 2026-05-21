@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
+
 import {
   Search,
   Plus,

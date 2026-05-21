@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
   CheckCircle2, Clock, Mail, FileText, Users, Heart, ListChecks, Briefcase, History,
-  AlertCircle,
+  AlertCircle, Compass, Star, Link2, ShieldCheck, GitBranch, Eye, ExternalLink,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
@@ -18,7 +18,7 @@ const planSuggestions: AISuggestion[] = [
   { tone: "good", label: "Good news", body: "All service authorizations are current. Next renewal: August 2026.", cta: "View services" },
 ];
 
-type SectionKey = "details" | "profile" | "goals" | "services" | "support" | "team" | "history";
+type SectionKey = "details" | "profile" | "nsr" | "goals" | "services" | "support" | "lifecourse" | "linkages" | "team" | "history";
 
 const PersonCarePlanDetail = () => {
   const { id, planId } = useParams<{ id: string; planId: string }>();
@@ -27,7 +27,8 @@ const PersonCarePlanDetail = () => {
   const plan = getPlan(planId ?? "");
 
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
-    details: true, profile: false, goals: true, services: false, support: false, team: false, history: false,
+    details: true, profile: false, nsr: true, goals: true, services: false,
+    support: false, lifecourse: false, linkages: true, team: false, history: false,
   });
   const [aiBannerVisible, setAiBannerVisible] = useState(true);
   const [printOpen, setPrintOpen] = useState(false);
@@ -239,6 +240,240 @@ const PersonCarePlanDetail = () => {
             <SupportField label="Health and safety considerations" data={plan.supportNeeds.healthSafety} disabled={readOnly} />
           </div>
         </PlanSection>
+
+        {/* SECTION 5b — Needs / Strengths / Risks */}
+        <PlanSection icon={ListChecks} title="Needs, Strengths & Risks" complete={3} total={3} open={open.nsr} onToggle={() => toggle("nsr")} aiBadge>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <NSRColumn
+              title="Needs"
+              tone="amber"
+              items={[
+                { text: "Daily support for medication management", source: "Assessment HRA-2026" },
+                { text: "Transportation to community activities", source: "Visit note 04/27" },
+                { text: "Behavioral support during transitions", source: "Care team input" },
+              ]}
+              disabled={readOnly}
+            />
+            <NSRColumn
+              title="Strengths"
+              tone="green"
+              items={[
+                { text: "Strong family support network", source: "Intake" },
+                { text: "Motivated to participate in community events", source: "Visit note 04/27" },
+                { text: "Excellent communication when given visual cues", source: "Assessment FA-2026" },
+              ]}
+              disabled={readOnly}
+            />
+            <NSRColumn
+              title="Risks"
+              tone="red"
+              items={[
+                { text: "Fall risk during transfers", source: "Assessment HRA-2026", severity: "critical" },
+                { text: "Medication interaction risk (3 active prescriptions)", source: "Pharmacy review", severity: "warning" },
+                { text: "Elopement risk in unfamiliar environments", source: "Incident log", severity: "warning" },
+              ]}
+              disabled={readOnly}
+            />
+          </div>
+          <p className="mt-3 text-[11px] text-icm-text-faint">
+            Items linked back to source assessments and notes — click to trace origin.
+          </p>
+        </PlanSection>
+
+        {/* SECTION 7 — LifeCourse Framework (7.3) */}
+        <PlanSection icon={Compass} title="LifeCourse Framework" complete={4} total={5} open={open.lifecourse} onToggle={() => toggle("lifecourse")} aiBadge>
+          <div className="rounded-lg bg-icm-accent-soft/40 border border-icm-accent/20 px-3 py-2 mb-4">
+            <p className="text-[11.5px] text-icm-text">
+              <span className="font-semibold">Charting the LifeCourse</span> is included in proposed pricing —
+              an evidence-based framework focused on the participant's vision for a good life.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <LifeCourseCard
+              icon={Eye}
+              title="Vision for a Good Life"
+              body={`${person.firstName} wants to live independently with family support, work part-time in a community setting, and stay active with friends.`}
+              disabled={readOnly}
+            />
+            <LifeCourseCard
+              icon={Compass}
+              title="Life Trajectory"
+              body="Today: lives at home, attends day program 3 days/week. Future: own apartment with shared supports, part-time job in retail, expanded social circle."
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className="mt-3 rounded-lg border border-icm-border bg-icm-panel p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Star className="w-3.5 h-3.5 text-icm-amber" />
+              <h4 className="font-tight font-semibold text-[13px] text-icm-text">Integrated Supports Star</h4>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {[
+                { k: "Personal Strengths", v: "Communication, motivation" },
+                { k: "Relationships", v: "Family, day-program peers" },
+                { k: "Community Based", v: "Library, YMCA, church" },
+                { k: "Eligibility Specific", v: "Waiver CIH, Medicaid SP" },
+                { k: "Technology", v: "Smartphone reminders, AAC app" },
+              ].map((c) => (
+                <div key={c.k} className="rounded-lg border border-icm-border bg-icm-bg p-2.5">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint">{c.k}</p>
+                  <p className="text-[11.5px] text-icm-text mt-0.5 leading-snug">{c.v}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-icm-border bg-icm-panel p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="w-3.5 h-3.5 text-icm-accent" />
+              <h4 className="font-tight font-semibold text-[13px] text-icm-text">Supported Decision-Making</h4>
+            </div>
+            <p className="text-[12px] text-icm-text-dim leading-relaxed">
+              {person.firstName} makes decisions with support from mother (Linda), older brother (David),
+              and care manager. Decisions about medical care require co-signature; daily routine decisions
+              are made independently.
+            </p>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2 min-w-0">
+              <Link2 className="w-3.5 h-3.5 text-icm-accent mt-0.5 shrink-0" />
+              <p className="text-[12px] text-icm-text leading-snug">
+                <span className="font-semibold">Goal linkage:</span>{" "}
+                <span className="text-icm-text-dim">3 of {plan.goals.length} plan goals are mapped to the Life Trajectory and Integrated Supports Star.</span>
+              </p>
+            </div>
+            {!readOnly && (
+              <button className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">
+                Map remaining →
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <Printer className="w-3.5 h-3.5" /> Export LifeCourse one-page profile
+            </button>
+            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> View LifeCourse report
+            </button>
+          </div>
+        </PlanSection>
+
+        {/* SECTION 7b — Linkages, Versioning & Access (7.2) */}
+        <PlanSection icon={GitBranch} title="Linkages, Versioning & Access" complete={5} total={5} open={open.linkages} onToggle={() => toggle("linkages")}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Linked assessments */}
+            <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">Linked Assessments</p>
+              <ul className="space-y-1.5">
+                {[
+                  { id: "A-2026-01", name: "Health Risk Assessment v3.1", date: "04/12/2026", score: "LOC High (32)" },
+                  { id: "A-2026-02", name: "Functional Assessment v2.0", date: "03/28/2026", score: "Score 18/30" },
+                ].map((a) => (
+                  <li key={a.id}>
+                    <button
+                      onClick={() => navigate(`/people/${person.id}/assessments/${a.id}`)}
+                      className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border hover:border-icm-accent text-left"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium text-icm-text truncate">{a.name}</p>
+                        <p className="text-[10.5px] text-icm-text-faint font-mono">{a.id} · {a.date} · {a.score}</p>
+                      </div>
+                      <ExternalLink className="w-3 h-3 text-icm-text-faint shrink-0" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Service authorizations / billable linkage */}
+            <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">Service Authorizations</p>
+              <ul className="space-y-1.5">
+                {[
+                  { id: "AUTH-2026-0123", service: "Targeted Case Management", units: "120 / mo", expires: "08/31/2026" },
+                  { id: "AUTH-2026-0124", service: "Community Habilitation", units: "60 hrs / mo", expires: "08/31/2026" },
+                ].map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium text-icm-text truncate">{a.service}</p>
+                      <p className="text-[10.5px] text-icm-text-faint font-mono">{a.id} · {a.units} · exp {a.expires}</p>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 shrink-0">Billable</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[10.5px] text-icm-text-faint">
+                Visit notes referencing these services flow to billing automatically.
+              </p>
+            </div>
+
+            {/* Monitoring frequency */}
+            <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">Monitoring Frequency</p>
+              <ul className="text-[12px] text-icm-text space-y-1">
+                <li className="flex justify-between"><span>Monthly contact</span><span className="font-mono text-icm-text-dim">required</span></li>
+                <li className="flex justify-between"><span>Quarterly in-home visit</span><span className="font-mono text-icm-text-dim">required</span></li>
+                <li className="flex justify-between"><span>Semi-annual plan review</span><span className="font-mono text-icm-text-dim">required</span></li>
+                <li className="flex justify-between"><span>Annual recertification</span><span className="font-mono text-icm-text-dim">required</span></li>
+              </ul>
+            </div>
+
+            {/* Guardian / Participant portal access */}
+            <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">Guardian & Participant Access</p>
+              <div className="space-y-2">
+                {[
+                  { name: `${person.firstName} (participant)`, access: "View plan + comment", status: "Active" },
+                  { name: "Linda Brown (guardian)", access: "View plan + e-sign", status: "Active" },
+                ].map((p) => (
+                  <div key={p.name} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium text-icm-text truncate">{p.name}</p>
+                      <p className="text-[10.5px] text-icm-text-faint">{p.access}</p>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 shrink-0">{p.status}</span>
+                  </div>
+                ))}
+                {!readOnly && (
+                  <button className="text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
+                    <Mail className="w-3 h-3" /> Resend portal invitation
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Plan versions */}
+          <div className="mt-4 rounded-lg border border-icm-border bg-icm-panel p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint">Plan Version History</p>
+              <span className="text-[10px] text-icm-text-faint">Immutable — edits create a new version</span>
+            </div>
+            <ol className="space-y-1.5">
+              {[
+                { v: "v3.0", date: "04/15/2026", who: "Kathy Adams, CM", note: "Current draft — incorporates 04/12 HRA findings" },
+                { v: "v2.1", date: "08/30/2025", who: "Kathy Adams, CM", note: "Annual renewal, approved" },
+                { v: "v2.0", date: "08/15/2024", who: "Marcus Lee, CM", note: "Annual renewal, approved" },
+                { v: "v1.0", date: "08/01/2023", who: "Marcus Lee, CM", note: "Initial plan" },
+              ].map((vv, i) => (
+                <li key={vv.v} className="flex items-center gap-3 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border">
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${i === 0 ? "bg-icm-amber-soft text-icm-amber" : "bg-icm-bg text-icm-text-dim border border-icm-border"}`}>
+                    {vv.v}
+                  </span>
+                  <span className="text-[11px] font-mono text-icm-text-faint w-20 shrink-0">{vv.date}</span>
+                  <span className="text-[11.5px] text-icm-text-dim w-32 shrink-0 truncate">{vv.who}</span>
+                  <span className="text-[11.5px] text-icm-text truncate flex-1">{vv.note}</span>
+                  <button className="text-[11px] text-icm-accent hover:underline shrink-0">View</button>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </PlanSection>
+
 
         {/* SECTION 6 — Team & Signatures */}
         <PlanSection icon={Users} title="Team & Signatures" complete={plan.team.filter(t => t.status === "Signed").length} total={plan.team.filter(t => t.status !== "Not required").length} open={open.team} onToggle={() => toggle("team")}>
@@ -465,3 +700,67 @@ function SignaturePill({ status }: { status: "Signed" | "Pending" | "Not require
 }
 
 export default PersonCarePlanDetail;
+
+function NSRColumn({
+  title, tone, items, disabled,
+}: {
+  title: string;
+  tone: "amber" | "green" | "red";
+  items: { text: string; source: string; severity?: "warning" | "critical" }[];
+  disabled?: boolean;
+}) {
+  const toneClass =
+    tone === "green" ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+    : tone === "amber" ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+    : "bg-icm-red-soft text-icm-red ring-icm-red/20";
+  return (
+    <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ring-1 uppercase tracking-wide ${toneClass}`}>
+          {title}
+        </span>
+        <span className="text-[10px] font-mono text-icm-text-faint">{items.length}</span>
+      </div>
+      <ul className="space-y-1.5">
+        {items.map((it, i) => (
+          <li key={i} className="text-[12px] text-icm-text leading-snug">
+            <div className="flex items-start gap-1.5">
+              {it.severity === "critical" && <span className="w-1.5 h-1.5 rounded-full bg-icm-red mt-1.5 shrink-0" />}
+              {it.severity === "warning" && <span className="w-1.5 h-1.5 rounded-full bg-icm-amber mt-1.5 shrink-0" />}
+              <span>{it.text}</span>
+            </div>
+            <p className="text-[10px] text-icm-text-faint mt-0.5">↳ {it.source}</p>
+          </li>
+        ))}
+      </ul>
+      {!disabled && (
+        <button className="mt-2 text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
+          <Plus className="w-3 h-3" /> Add item
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LifeCourseCard({
+  icon: Icon, title, body, disabled,
+}: {
+  icon: typeof Compass;
+  title: string;
+  body: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-icm-border bg-icm-panel p-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon className="w-3.5 h-3.5 text-icm-accent" />
+        <h4 className="font-tight font-semibold text-[13px] text-icm-text">{title}</h4>
+      </div>
+      <p className="text-[12px] text-icm-text-dim leading-relaxed">{body}</p>
+      {!disabled && (
+        <button className="mt-2 text-[11px] text-icm-accent hover:underline">Edit</button>
+      )}
+    </div>
+  );
+}
+

@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { getPerson } from "@/data/people";
 import { Plus, Eye, Printer, Trash2, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
 
 interface ContactNote {
   id: string;
@@ -127,7 +131,9 @@ const ContactNote = () => {
   return (
     <ICMShell title="Contact Note" showAIPanel={false}>
       <div className="space-y-5">
+        <ContactNoteBreadcrumb />
         <div className="flex items-center justify-between">
+
           <div>
             <h1 className="font-tight text-[24px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">
               Contact Note

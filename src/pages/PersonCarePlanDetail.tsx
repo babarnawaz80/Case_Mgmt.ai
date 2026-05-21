@@ -440,7 +440,7 @@ const PersonCarePlanDetail = () => {
                   </div>
                 ))}
                 {!readOnly && (
-                  <button className="text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
+                  <button onClick={() => toast.success("Portal invitation resent", { description: "Email sent to Linda Brown · audit logged." })} className="text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
                     <Mail className="w-3 h-3" /> Resend portal invitation
                   </button>
                 )}

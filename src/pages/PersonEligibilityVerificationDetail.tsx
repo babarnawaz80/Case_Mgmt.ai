@@ -117,10 +117,10 @@ const PersonEligibilityVerificationDetail = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={() => toast.success("Eligibility record saved", { description: `MA status: ${form.maStatus}` })} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
               <Save className="w-3.5 h-3.5" /> Save
             </button>
-            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => window.print()} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Printer className="w-3.5 h-3.5" /> Print
             </button>
             <button onClick={simulateUpload} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">

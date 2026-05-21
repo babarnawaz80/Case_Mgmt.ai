@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
   CheckCircle2, Clock, Mail, FileText, Users, Heart, ListChecks, Briefcase, History,
@@ -82,10 +83,10 @@ const PersonCarePlanDetail = () => {
           <div className="ml-auto flex items-center gap-2">
             {!readOnly && (
               <>
-                <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+                <button onClick={() => toast.success("Draft saved", { description: `Plan #${plan.id} autosaved at ${new Date().toLocaleTimeString()}` })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
-                <button className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+                <button onClick={() => toast.success("Marked complete", { description: "Plan locked. Past versions remain pinned for audit." })} className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Mark complete
                 </button>
               </>
@@ -100,7 +101,7 @@ const PersonCarePlanDetail = () => {
               {printOpen && (
                 <div className="absolute right-0 mt-1 w-56 rounded-lg border border-icm-border bg-white shadow-lg z-10 overflow-hidden">
                   {["Print care plan (formatted)", "Export as PDF", "Export as Word document", "Copy shareable link"].map((opt) => (
-                    <button key={opt} onClick={() => setPrintOpen(false)} className="w-full text-left px-3 py-2 text-[12px] text-icm-text hover:bg-icm-bg">
+                    <button key={opt} onClick={() => { setPrintOpen(false); if (opt.startsWith("Print")) window.print(); else if (opt.startsWith("Copy")) { navigator.clipboard?.writeText(window.location.href); toast.success("Shareable link copied"); } else toast.success(opt + " started"); }} className="w-full text-left px-3 py-2 text-[12px] text-icm-text hover:bg-icm-bg">
                       {opt}
                     </button>
                   ))}
@@ -160,7 +161,7 @@ const PersonCarePlanDetail = () => {
           </div>
           <div className="mt-3 flex items-center justify-between text-[11.5px]">
             <span className="text-icm-text-faint">Pulled from face sheet. Last updated 01/15/2026.</span>
-            <button className="text-icm-accent hover:underline">Update in Face Sheet →</button>
+            <button onClick={() => navigate(`/people/${person.id}/face-sheet`)} className="text-icm-accent hover:underline">Update in Face Sheet →</button>
           </div>
         </PlanSection>
 
@@ -171,10 +172,10 @@ const PersonCarePlanDetail = () => {
           </div>
           {!readOnly && (
             <div className="flex items-center gap-2 mt-4">
-              <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <button onClick={() => toast("Add goal", { description: "Opening goal builder…" })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Add goal
               </button>
-              <button className="h-9 px-3 rounded-xl border border-icm-accent/20 bg-icm-accent-soft text-[12px] font-medium text-icm-accent hover:bg-icm-accent-soft/70 inline-flex items-center gap-1.5">
+              <button onClick={() => toast.success("AI drafting goals", { description: "Reviewing last 12 mo of notes & assessments…" })} className="h-9 px-3 rounded-xl border border-icm-accent/20 bg-icm-accent-soft text-[12px] font-medium text-icm-accent hover:bg-icm-accent-soft/70 inline-flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" /> AI: Add goals based on recent notes
               </button>
             </div>
@@ -207,7 +208,7 @@ const PersonCarePlanDetail = () => {
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">{s.status}</span>
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {!readOnly && <button className="text-icm-text-faint hover:text-icm-red"><Trash2 className="w-3.5 h-3.5" /></button>}
+                        {!readOnly && <button onClick={() => toast(`Remove ${s.name}?`, { action: { label: "Remove", onClick: () => toast.success(`${s.name} removed from plan`) } })} className="text-icm-text-faint hover:text-icm-red"><Trash2 className="w-3.5 h-3.5" /></button>}
                       </td>
                     </tr>
                   ))}
@@ -217,7 +218,7 @@ const PersonCarePlanDetail = () => {
           )}
           {!readOnly && (
             <>
-              <button className="mt-3 h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <button onClick={() => toast("Add service", { description: "Opening service authorization picker…" })} className="mt-3 h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Add service
               </button>
               <div className="mt-3 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 flex items-start justify-between gap-3">
@@ -225,7 +226,7 @@ const PersonCarePlanDetail = () => {
                   <Sparkles className="inline w-3 h-3 text-icm-accent mr-1" />
                   {person.firstName} mentioned interest in employment support during the 04/27/2026 visit. Consider adding Supported Employment service.
                 </p>
-                <button className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">Add suggested service</button>
+                <button onClick={() => toast.success("Supported Employment added as draft service", { description: "Review & Apply required before billing." })} className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">Add suggested service</button>
               </div>
             </>
           )}
@@ -346,17 +347,17 @@ const PersonCarePlanDetail = () => {
               </p>
             </div>
             {!readOnly && (
-              <button className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">
+              <button onClick={() => toast.success("Mapping suggestions ready", { description: "2 goals proposed for LifeCourse linkage." })} className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">
                 Map remaining →
               </button>
             )}
           </div>
 
           <div className="mt-3 flex items-center gap-2">
-            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => toast.success("LifeCourse one-page profile exported (PDF)")} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Printer className="w-3.5 h-3.5" /> Export LifeCourse one-page profile
             </button>
-            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => toast("LifeCourse report", { description: "Opening full LifeCourse report…" })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" /> View LifeCourse report
             </button>
           </div>
@@ -439,7 +440,7 @@ const PersonCarePlanDetail = () => {
                   </div>
                 ))}
                 {!readOnly && (
-                  <button className="text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
+                  <button onClick={() => toast.success("Portal invitation resent", { description: "Email sent to Linda Brown · audit logged." })} className="text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
                     <Mail className="w-3 h-3" /> Resend portal invitation
                   </button>
                 )}
@@ -467,7 +468,7 @@ const PersonCarePlanDetail = () => {
                   <span className="text-[11px] font-mono text-icm-text-faint w-20 shrink-0">{vv.date}</span>
                   <span className="text-[11.5px] text-icm-text-dim w-32 shrink-0 truncate">{vv.who}</span>
                   <span className="text-[11.5px] text-icm-text truncate flex-1">{vv.note}</span>
-                  <button className="text-[11px] text-icm-accent hover:underline shrink-0">View</button>
+                  <button onClick={() => toast(`Plan ${vv.v}`, { description: `Opened read-only snapshot from ${vv.date}` })} className="text-[11px] text-icm-accent hover:underline shrink-0">View</button>
                 </li>
               ))}
             </ol>
@@ -495,7 +496,7 @@ const PersonCarePlanDetail = () => {
                     <td className="px-3 py-2 font-mono text-icm-text-dim">{t.signedOn ?? "—"}</td>
                     <td className="px-3 py-2 text-right">
                       {!readOnly && t.status === "Pending" && (
-                        <button className="text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
+                        <button onClick={() => toast.success(`E-sign request sent to ${t.name}`)} className="text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
                           <Mail className="w-3 h-3" /> Request e-signature
                         </button>
                       )}
@@ -507,7 +508,7 @@ const PersonCarePlanDetail = () => {
           </div>
           {!readOnly && (
             <div className="mt-3 flex justify-end">
-              <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+              <button onClick={() => toast.success("E-sign requests sent", { description: `${plan.team.filter(t => t.status === "Pending").length} pending signers notified.` })} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" /> Send all for signature
               </button>
             </div>
@@ -614,7 +615,7 @@ function GoalCard({ goal, readOnly }: { goal: PlanGoal; readOnly?: boolean }) {
           </span>
         )}
         {!readOnly && (
-          <button className="text-icm-text-faint hover:text-icm-red p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => toast(`Remove G${goal.number}?`, { action: { label: "Remove", onClick: () => toast.success(`Goal G${goal.number} removed`) } })} className="text-icm-text-faint hover:text-icm-red p-1"><Trash2 className="w-3.5 h-3.5" /></button>
         )}
       </div>
       <textarea
@@ -649,7 +650,7 @@ function GoalCard({ goal, readOnly }: { goal: PlanGoal; readOnly?: boolean }) {
           ))}
         </ul>
         {!readOnly && (
-          <button className="mt-2 text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
+          <button onClick={() => toast("Add objective", { description: "Opening objective editor…" })} className="mt-2 text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
             <Plus className="w-3 h-3" /> Add objective
           </button>
         )}
@@ -734,7 +735,7 @@ function NSRColumn({
         ))}
       </ul>
       {!disabled && (
-        <button className="mt-2 text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
+        <button onClick={() => toast(`Add ${title.toLowerCase().slice(0,-1)} item`, { description: "Opening editor…" })} className="mt-2 text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
           <Plus className="w-3 h-3" /> Add item
         </button>
       )}
@@ -758,7 +759,7 @@ function LifeCourseCard({
       </div>
       <p className="text-[12px] text-icm-text-dim leading-relaxed">{body}</p>
       {!disabled && (
-        <button className="mt-2 text-[11px] text-icm-accent hover:underline">Edit</button>
+        <button onClick={() => toast(`Edit "${title}"`, { description: "Opening inline editor…" })} className="mt-2 text-[11px] text-icm-accent hover:underline">Edit</button>
       )}
     </div>
   );

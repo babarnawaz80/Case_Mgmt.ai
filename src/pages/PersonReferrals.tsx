@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft,
   Plus,
@@ -285,7 +286,7 @@ const PersonReferrals = () => {
                             <IconBtn icon={Eye} onClick={() => open(r.id)} />
                             <IconBtn icon={Pencil} onClick={() => open(r.id)} />
                             <IconBtn icon={Printer} onClick={() => window.print()} />
-                            <IconBtn icon={Trash2} onClick={() => {}} />
+                            <IconBtn icon={Trash2} onClick={() => toast(`Withdraw referral ${r.id}?`, { action: { label: "Withdraw", onClick: () => toast.success(`Referral ${r.id} withdrawn — audit entry created`) } })} />
                           </div>
                         </td>
                       </tr>

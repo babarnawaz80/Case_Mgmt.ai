@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft,
   ChevronDown,
@@ -87,10 +88,10 @@ const PersonCarePlan = () => {
             Start {person.firstName}'s first plan or let AI draft one based on existing records.
           </p>
           <div className="flex gap-2">
-            <button className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
+            <button onClick={() => setNewPlanOpen(true)} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
               + Start blank plan
             </button>
-            <button className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={() => { setNewPlanOpen(true); setDraftingAI(true); }} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> Draft with AI
             </button>
           </div>
@@ -150,7 +151,7 @@ const PersonCarePlan = () => {
               <span className="font-semibold text-icm-text">Person-Centered Plan (ISP)</span>
               <span className="text-icm-text-faint"> · </span>
               Annual renewal: <span className="font-mono text-icm-text">August 31</span>
-              <button className="ml-1.5 text-icm-accent hover:underline text-[12px]">Modify</button>
+              <button onClick={() => toast("Modify renewal date", { description: "Opening renewal scheduler…" })} className="ml-1.5 text-icm-accent hover:underline text-[12px]">Modify</button>
             </p>
           </div>
           <button
@@ -183,7 +184,7 @@ const PersonCarePlan = () => {
                 Review draft →
               </button>
             )}
-            <button className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
+            <button onClick={() => toast.success("AI draft dismissed", { description: "Banner hidden for this session." })} className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
           </div>
         </div>
 
@@ -355,7 +356,7 @@ function PlanTable({ plans, onOpen, variant }: { plans: CarePlan[]; onOpen: (id:
                 <div className="font-mono text-[11px] text-icm-text-faint">{p.updatedOn}</div>
               </td>
               <td className="px-4 py-3 text-right">
-                <button className="text-icm-text-faint hover:text-icm-red p-1 rounded">
+                <button onClick={() => toast(`Delete plan ${p.id}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${p.id} deleted`) } })} className="text-icm-text-faint hover:text-icm-red p-1 rounded">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </td>
@@ -369,7 +370,7 @@ function PlanTable({ plans, onOpen, variant }: { plans: CarePlan[]; onOpen: (id:
 
 function DateCell({ value }: { value?: string }) {
   if (!value || value === "—") {
-    return <button className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Set date</button>;
+    return <button onClick={() => toast("Set date", { description: "Opening date picker…" })} className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Set date</button>;
   }
   return <span className="font-mono text-icm-text">{value}</span>;
 }

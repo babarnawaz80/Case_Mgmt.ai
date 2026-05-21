@@ -298,13 +298,13 @@ const MyWork = () => {
     <ICMShell title="My Work" rightPanel={<MyWorkAIPanel onStartFocused={() => setFocused(true)} />}>
       <div className="space-y-5">
         {/* Heading */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h1 className="font-manrope text-[34px] md:text-[38px] font-extrabold text-icm-text leading-[1.05] tracking-[-0.025em]">
               My Work
             </h1>
-            <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
-              Every task across your caseload, prioritized for you.
+            <p className="text-[14.5px] text-icm-text-dim font-geist font-medium">
+              Personalized caseload prioritization and task orchestration.
             </p>
           </div>
         </div>

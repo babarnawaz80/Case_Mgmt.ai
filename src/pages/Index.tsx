@@ -23,8 +23,17 @@ import {
   PanelLeftOpen,
   ArrowRight,
   User,
+  Home,
+  CheckSquare,
+  BarChart3,
+  Settings,
+  CreditCard,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, NavLink } from "react-router-dom";
+import { useRole, type UserRole } from "@/contexts/RoleContext";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useMessages } from "@/hooks/useMessages";
+import { cn } from "@/lib/utils";
 import { people } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
 
@@ -34,6 +43,29 @@ interface ChatHistoryItem {
   preview: string;
   time: string;
 }
+
+interface TopNavItem {
+  title: string;
+  url: string;
+  icon: typeof Home;
+  roles?: UserRole[];
+}
+
+const topNavItems: TopNavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "People Supported", url: "/people", icon: Users },
+  { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Messages", url: "/messages", icon: MessageSquare },
+  { title: "Documentation", url: "/documentation", icon: FileText },
+  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
+  { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
+  { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
+  { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
+];
+
+const OVERDUE_TASK_COUNT = 3;
+const OPEN_INCIDENT_COUNT = 1;
+
 
 const chatHistory: ChatHistoryItem[] = [
   { id: "1", title: "Compliance Review — Zone A", preview: "3 individuals flagged out of compliance...", time: "Today 08:15 AM" },
@@ -132,6 +164,25 @@ const Index = () => {
   const [thread, setThread] = useState<ChatTurn[]>([]);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { role } = useRole();
+  const { unreadAlerts, unreadMentions } = useNotifications();
+  const { unreadTotal: unreadMessages } = useMessages();
+
+  const badgeFor = (item: TopNavItem) => {
+    if (item.url === "/my-work") {
+      const unread = unreadAlerts + unreadMentions;
+      if (OVERDUE_TASK_COUNT > 0) return { count: OVERDUE_TASK_COUNT, tone: "red" as const };
+      if (unread > 0) return { count: unread, tone: "accent" as const };
+    }
+    if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" as const };
+    if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" as const };
+    return null;
+  };
+
+  const badgeToneClass: Record<"red" | "accent", string> = {
+    red: "bg-icm-red text-white",
+    accent: "bg-icm-accent text-white",
+  };
 
   const individualOptions = ["Select Individual", ...people.map((p) => `${p.firstName} ${p.lastName}`)];
 
@@ -253,17 +304,43 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-sm transition-all border border-border"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard</span>
-            </motion.button>
+          {/* Center: horizontal nav of iCM modules */}
+          <nav className="flex items-center gap-1">
+            {topNavItems.map((item) => {
+              if (item.roles && !item.roles.includes(role)) return null;
+              const badge = badgeFor(item);
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.title}
+                  to={item.url}
+                  title={item.title}
+                  className={({ isActive }) =>
+                    cn(
+                      "relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                      isActive
+                        ? "bg-icm-accent-soft text-icm-accent"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )
+                  }
+                >
+                  <Icon className="w-[18px] h-[18px]" />
+                  {badge && (
+                    <span
+                      className={cn(
+                        "absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center ring-2 ring-background",
+                        badgeToneClass[badge.tone]
+                      )}
+                    >
+                      {badge.count}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </nav>
 
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/settings")}
               title="Profile / Settings"
@@ -273,6 +350,7 @@ const Index = () => {
             </button>
           </div>
         </header>
+
 
         {/* Chat Content */}
         <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-10">

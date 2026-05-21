@@ -131,7 +131,7 @@ const ContactNote = () => {
   return (
     <ICMShell title="Contact Note" showAIPanel={false}>
       <div className="space-y-5">
-        <ContactNoteBreadcrumb />
+        <ContactNoteCrumbs />
         <div className="flex items-center justify-between">
 
           <div>

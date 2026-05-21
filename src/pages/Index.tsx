@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import AmbientFlowV2 from "@/components/ambient/AmbientFlowV2";
 import { motion, AnimatePresence } from "framer-motion";
-import brandLogo from "@/assets/casemanagement-ai-logo.jpg";
+import brandLogo from "@/assets/casemanagement-ai-logo.png";
 import {
   Sparkles,
   Send,

@@ -253,16 +253,16 @@ const PersonProfile = () => {
           </div>
         </div>
 
-        {/* AI Voice Companion link — shareable to the individual */}
-        <VoiceCompanionCard
-          personId={person.id}
-          firstName={person.firstName}
-          phone={(person as { phone?: string }).phone}
-        />
-
         {/* Tab content */}
         {tab === "basic" && (
-          <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} />
+          <>
+            <VoiceCompanionCard
+              personId={person.id}
+              firstName={person.firstName}
+              phone={(person as { phone?: string }).phone}
+            />
+            <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} />
+          </>
         )}
         {tab === "medical" && <MedicalInfoTab profile={profile} />}
         {tab === "monitors" && <MonitorsTab profile={profile} />}

@@ -65,7 +65,7 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-manrope font-bold text-[15px] text-icm-text">AI Care Assistant</h2>
+              <h2 className="font-manrope font-bold text-[15px] text-icm-text">AI Case Companion</h2>
               <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
                 PRIVATE LINK
               </span>

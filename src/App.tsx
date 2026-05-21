@@ -7,6 +7,7 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import SignDocument from "./pages/SignDocument";
+import SmartNoteAttacher from "./components/SmartNoteAttacher";
 import Dashboard from "./pages/Dashboard";
 import PeopleSupported from "./pages/PeopleSupported";
 import NewParticipantIntake from "./pages/NewParticipantIntake";
@@ -132,6 +133,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <SmartNoteAttacher />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />

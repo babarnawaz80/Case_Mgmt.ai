@@ -688,68 +688,73 @@ function TaskRow({
   const isOver = diff !== null && diff < 0 && task.status !== "Completed";
 
   return (
-    <div className="px-4 py-3">
+    <div className={cn("px-4 py-3 transition-colors hover:bg-icm-bg/40", isOver && "bg-icm-red/[0.02]")}>
       <div className="flex items-start gap-3">
-        <div className="pt-0.5">
+        {/* Status rail */}
+        <div className="pt-1 flex flex-col items-center gap-1 shrink-0">
           <StatusIcon status={isOver ? "Overdue" : task.status} />
         </div>
+
+        {/* Body */}
         <div className="flex-1 min-w-0">
           <button onClick={onToggleExpand} className="text-left w-full">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[13px] font-semibold text-icm-text font-geist">{task.name}</span>
+              <span className="text-[13.5px] font-semibold text-icm-text font-geist leading-tight">
+                {task.name}
+              </span>
               {showIndividualName && (
-                <span className="text-[11px] text-icm-text-dim font-geist">
+                <span className="text-[11.5px] text-icm-text-dim font-geist">
                   · {task.individualName}
                 </span>
               )}
-              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold", tone.chip)}>
-                {isOver ? "Overdue" : task.status}
-              </span>
+              {isOver ? (
+                <span className="text-[10.5px] font-semibold text-icm-red bg-icm-red/10 px-1.5 py-0.5 rounded">
+                  {task.daysOverdue ? `${task.daysOverdue}d overdue` : "Overdue"}
+                </span>
+              ) : task.status === "In Progress" ? (
+                <span className="text-[10.5px] font-medium text-icm-amber">In progress</span>
+              ) : null}
               {task.priority === "Critical" && (
-                <span className="px-1.5 py-0.5 rounded bg-icm-red-soft text-icm-red text-[10px] font-mono font-semibold">
-                  Critical
+                <span className="text-[10.5px] font-semibold text-icm-red inline-flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-icm-red" /> Critical
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
+
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11.5px] text-icm-text-dim font-geist">
+              <span className={cn(isOver && "text-icm-red font-medium")}>Due {task.dueDate}</span>
+              <span className="text-icm-text-faint">·</span>
+              <span>{task.staffResponsible}</span>
+              <span className="text-icm-text-faint">·</span>
               <SourceLabel task={task} />
-              {task.startDate && (
-                <span className="text-[11px] font-mono text-icm-text-faint">
-                  Start {task.startDate}
-                </span>
-              )}
-              <span className={cn("text-[11px] font-mono", dueTone(task))}>
-                Due {task.dueDate}
-                {isOver && task.daysOverdue ? ` (${task.daysOverdue}d overdue)` : ""}
-              </span>
-              <span className="text-[11px] text-icm-text-faint font-geist">
-                · {task.staffResponsible}
-              </span>
             </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {task.linkedModule && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLinkedModule();
-                  }}
-                  className="px-2 py-0.5 rounded border border-icm-accent/30 text-icm-accent text-[10.5px] font-geist hover:bg-icm-accent-soft transition-colors"
-                >
-                  → {task.linkedModule.label}
-                </button>
-              )}
-              {task.aiDraftReady && (
-                <span className="px-2 py-0.5 rounded bg-icm-accent-soft text-icm-accent text-[10.5px] font-geist font-semibold flex items-center gap-1">
-                  <Sparkle className="w-3 h-3" /> AI draft ready
-                </span>
-              )}
-            </div>
+
+            {(task.linkedModule || task.aiDraftReady) && (
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {task.linkedModule && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLinkedModule();
+                    }}
+                    className="px-2 py-0.5 rounded-md text-icm-text-dim text-[11px] font-geist border border-icm-border hover:text-icm-text hover:border-icm-border-strong inline-flex items-center gap-1"
+                  >
+                    {task.linkedModule.label} <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+                {task.aiDraftReady && (
+                  <span className="px-2 py-0.5 rounded-md bg-icm-accent-soft text-icm-accent text-[11px] font-geist font-medium inline-flex items-center gap-1">
+                    <Sparkle className="w-3 h-3" /> AI draft ready
+                  </span>
+                )}
+              </div>
+            )}
           </button>
 
           {expanded && (
-            <div className="mt-3 rounded-lg border border-icm-border bg-icm-bg p-3 space-y-2">
+            <div className="mt-3 rounded-lg border border-icm-border bg-icm-bg/60 p-3 space-y-2">
               {task.description && (
-                <p className="text-[12px] text-icm-text font-geist leading-relaxed">
+                <p className="text-[12.5px] text-icm-text font-geist leading-relaxed">
                   {task.description}
                 </p>
               )}
@@ -759,11 +764,11 @@ function TaskRow({
               <div className="flex items-center gap-2">
                 <input
                   placeholder="Add a comment… use @ to mention"
-                  className="flex-1 h-8 px-2 rounded border border-icm-border bg-white text-[11.5px] text-icm-text"
+                  className="flex-1 h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
                 />
                 <button
                   onClick={() => demoSuccess("Comment posted")}
-                  className="text-[11px] text-icm-accent hover:underline"
+                  className="text-[11.5px] text-icm-accent hover:underline font-medium"
                 >
                   Post
                 </button>
@@ -772,17 +777,18 @@ function TaskRow({
           )}
         </div>
 
+        {/* Action */}
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           {task.status === "Completed" ? (
-            <span className="text-[11px] text-icm-green font-semibold flex items-center gap-1">
+            <span className="text-[11.5px] text-icm-green font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Done
             </span>
           ) : (
             <button
               onClick={onAdvance ?? onComplete}
-              className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold hover:opacity-90 flex items-center gap-1"
+              className="h-8 px-3 rounded-lg text-[11.5px] font-geist font-semibold text-icm-text border border-icm-border bg-icm-panel hover:border-icm-text hover:bg-icm-bg flex items-center gap-1 transition-colors"
             >
-              {task.status === "Pending Start" ? "Start" : "Complete"} <ArrowRight className="w-3 h-3" />
+              {task.status === "Pending Start" ? "Start" : "Complete"}
             </button>
           )}
         </div>

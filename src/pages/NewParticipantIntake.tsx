@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -26,39 +26,73 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
-  Users,
   Stethoscope,
   Sparkles,
   CheckCircle2,
+  AlertTriangle,
+  ClipboardList,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { people as SEED_PEOPLE } from "@/data/people";
 
-const INDIANA_COUNTIES = [
+const COUNTIES = [
   "Adams","Allen","Bartholomew","Benton","Blackford","Boone","Brown","Carroll","Cass","Clark",
   "Clay","Clinton","Crawford","Daviess","Dearborn","Decatur","DeKalb","Delaware","Dubois","Elkhart",
   "Fayette","Floyd","Fountain","Franklin","Fulton","Gibson","Grant","Greene","Hamilton","Hancock",
   "Harrison","Hendricks","Henry","Howard","Huntington","Jackson","Jasper","Jay","Jefferson","Jennings",
-  "Johnson","Knox","Kosciusko","LaGrange","Lake","LaPorte","Lawrence","Madison","Marion","Marshall",
+  "Johnson","Knox","Kosciusko","Lake","Lawrence","Madison","Marion","Marshall",
   "Martin","Miami","Monroe","Montgomery","Morgan","Newton","Noble","Ohio","Orange","Owen",
   "Parke","Perry","Pike","Porter","Posey","Pulaski","Putnam","Randolph","Ripley","Rush",
-  "St. Joseph","Scott","Shelby","Spencer","Starke","Steuben","Sullivan","Switzerland","Tippecanoe","Tipton",
-  "Union","Vanderburgh","Vermillion","Vigo","Wabash","Warren","Warrick","Washington","Wayne","Wells",
+  "Scott","Shelby","Spencer","Starke","Steuben","Sullivan","Tippecanoe","Tipton",
+  "Union","Vermillion","Vigo","Wabash","Warren","Warrick","Washington","Wayne","Wells",
   "White","Whitley",
 ];
 
-const BDDS_DISTRICTS = [
-  "District 1 - Gary","District 2 - South Bend","District 3 - Fort Wayne","District 4 - Lafayette",
-  "District 5 - Indianapolis","District 6 - Richmond","District 7 - Bloomington","District 8 - Evansville",
+const PROGRAM_REGIONS = [
+  "Region 1 - Northwest", "Region 2 - North Central", "Region 3 - Northeast",
+  "Region 4 - West Central", "Region 5 - Central / Metro", "Region 6 - East",
+  "Region 7 - South Central", "Region 8 - Southwest",
 ];
 
-const WAIVERS = [
-  { id: "cih", label: "Community Integration & Habilitation (CIH) Waiver" },
-  { id: "fsw", label: "Family Supports Waiver (FSW)" },
-  { id: "pathways", label: "PathWays for Aging Waiver" },
-  { id: "h&w", label: "Indiana Health Coverage Programs (IHCP)" },
-  { id: "tcm", label: "BDDS Targeted Case Management" },
+const PROGRAMS = [
+  { id: "hcbs-community", label: "HCBS Community Integration Waiver" },
+  { id: "hcbs-family", label: "HCBS Family Supports Waiver" },
+  { id: "aging", label: "Aging & Disability Waiver (PathWays)" },
+  { id: "state-plan", label: "State Plan Medicaid" },
+  { id: "tcm", label: "Targeted Case Management" },
 ];
+
+const SERVICE_LINES = [
+  "Targeted Case Management",
+  "Community Integration & Habilitation",
+  "Family Supports",
+  "Behavioral Health",
+  "Aging & Long-Term Services",
+  "Children's Services",
+];
+
+const MONITORING_SCHEDULES = [
+  { id: "monthly", label: "Monthly contact (state minimum)" },
+  { id: "quarterly-visit", label: "Quarterly in-home visit" },
+  { id: "biannual-review", label: "Semi-annual plan review" },
+  { id: "annual-recert", label: "Annual recertification" },
+];
+
+const STAFF = {
+  coordinators: [
+    "Kathy Reynolds (Care Manager)",
+    "Marcus Lee (Care Manager)",
+    "Priya Shah (Care Manager)",
+    "James O'Connor (Care Manager)",
+  ],
+  supervisors: [
+    "Diane Carter (Supervisor)",
+    "Robert Nguyen (Supervisor)",
+    "Elena Vasquez (Regional Supervisor)",
+  ],
+};
 
 const STEPS = [
   { key: "demographics", label: "Demographics", icon: User2 },
@@ -67,8 +101,8 @@ const STEPS = [
   { key: "contact", label: "Contact & Guardian", icon: Phone },
   { key: "consent", label: "Consent & Emergency", icon: ShieldCheck },
   { key: "eligibility", label: "Program Eligibility", icon: Stethoscope },
-  { key: "indiana", label: "Indiana-Specific", icon: FileText },
-  { key: "review", label: "Review & Submit", icon: CheckCircle2 },
+  { key: "enrollment", label: "Program Enrollment", icon: ClipboardList },
+  { key: "review", label: "Review & Tasks", icon: CheckCircle2 },
 ] as const;
 
 interface IntakeData {
@@ -127,12 +161,19 @@ interface IntakeData {
   lonScore: string;
   eligibilityLetterFile: string | null;
 
-  waivers: string[];
+  programs: string[];
   waiverEffectiveDate: string;
 
-  bddsDistrict: string;
-  assignedBDDSCaseManager: string;
+  // Enrollment (6.2)
+  programStartDate: string;
+  supportCoordinator: string;
+  supervisor: string;
+  serviceLine: string;
+  authorizationNumber: string;
+  monitoringSchedules: string[];
+  programRegion: string;
   notes: string;
+  duplicateAcknowledged: boolean;
 }
 
 const EMPTY: IntakeData = {
@@ -140,16 +181,101 @@ const EMPTY: IntakeData = {
   dob: "", gender: "", pronouns: "", primaryLanguage: "English", needsInterpreter: false,
   race: "", ethnicity: "", maritalStatus: "Single",
   medicaidId: "", ssnLast4: "", bddsId: "", mrn: `MRN-${Math.floor(10000 + Math.random() * 89999)}`,
-  street: "", city: "", state: "IN", zip: "", county: "", residenceType: "Family Home",
+  street: "", city: "", state: "", zip: "", county: "", residenceType: "Family Home",
   phone: "", email: "", preferredContact: "phone",
   hasGuardian: false, guardianName: "", guardianRelationship: "", guardianAuthority: "", guardianPhone: "", guardianEmail: "",
   consentHIPAA: false, consentServices: false, consentPhoto: false, consentInfoSharing: false, consentSignedDate: "",
   emergencyName1: "", emergencyPhone1: "", emergencyRelationship1: "",
   emergencyName2: "", emergencyPhone2: "", emergencyRelationship2: "",
   eligibilityStatus: "", primaryDiagnosis: "", diagnosisOnsetBefore22: false, lonScore: "", eligibilityLetterFile: null,
-  waivers: [], waiverEffectiveDate: "",
-  bddsDistrict: "", assignedBDDSCaseManager: "", notes: "",
+  programs: [], waiverEffectiveDate: "",
+  programStartDate: "", supportCoordinator: "", supervisor: "", serviceLine: "",
+  authorizationNumber: "", monitoringSchedules: ["monthly", "quarterly-visit"],
+  programRegion: "", notes: "", duplicateAcknowledged: false,
 };
+
+function addDays(d: Date, n: number) {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r;
+}
+function isoDate(d: Date) { return d.toISOString().slice(0, 10); }
+
+function generateInitialTasks(data: IntakeData, participantId: string) {
+  const today = new Date();
+  const fullName = `${data.firstName} ${data.lastName}`.trim();
+  const owner = data.supportCoordinator || STAFF.coordinators[0];
+  const supervisor = data.supervisor || STAFF.supervisors[0];
+  const base = (offsetDays: number) => isoDate(addDays(today, offsetDays));
+
+  return [
+    {
+      id: `task-${Date.now()}-1`,
+      title: "Complete initial assessment",
+      participantId, participantName: fullName,
+      owner, supervisor,
+      dueDate: base(7),
+      escalationDays: 3,
+      reminders: ["3 days before due", "1 day before due"],
+      status: "open",
+      category: "Assessment",
+    },
+    {
+      id: `task-${Date.now()}-2`,
+      title: "Create person-centered plan",
+      participantId, participantName: fullName,
+      owner, supervisor,
+      dueDate: base(30),
+      escalationDays: 5,
+      reminders: ["7 days before due", "2 days before due"],
+      status: "open",
+      category: "Planning",
+    },
+    {
+      id: `task-${Date.now()}-3`,
+      title: "Schedule first in-home visit",
+      participantId, participantName: fullName,
+      owner, supervisor,
+      dueDate: base(14),
+      escalationDays: 2,
+      reminders: ["3 days before due"],
+      status: "open",
+      category: "Visit",
+    },
+    {
+      id: `task-${Date.now()}-4`,
+      title: "Obtain guardian signature & attestation",
+      participantId, participantName: fullName,
+      owner, supervisor,
+      dueDate: base(10),
+      escalationDays: 3,
+      reminders: ["2 days before due"],
+      status: data.hasGuardian ? "open" : "skipped",
+      category: "Consent",
+    },
+    {
+      id: `task-${Date.now()}-5`,
+      title: "Complete monthly monitoring contact",
+      participantId, participantName: fullName,
+      owner, supervisor,
+      dueDate: base(30),
+      escalationDays: 5,
+      reminders: ["7 days before due"],
+      status: "open",
+      category: "Monitoring",
+      recurring: "monthly",
+    },
+    {
+      id: `task-${Date.now()}-6`,
+      title: "Supervisor review of intake & initial plan",
+      participantId, participantName: fullName,
+      owner: supervisor, supervisor,
+      dueDate: base(35),
+      escalationDays: 3,
+      reminders: ["3 days before due"],
+      status: "open",
+      category: "Supervisor Review",
+    },
+  ];
+}
 
 export default function NewParticipantIntake() {
   const navigate = useNavigate();
@@ -160,49 +286,116 @@ export default function NewParticipantIntake() {
     setData((d) => ({ ...d, [key]: value }));
   }
 
-  function toggleWaiver(id: string) {
+  function toggleProgram(id: string) {
     setData((d) => ({
       ...d,
-      waivers: d.waivers.includes(id) ? d.waivers.filter((w) => w !== id) : [...d.waivers, id],
+      programs: d.programs.includes(id) ? d.programs.filter((w) => w !== id) : [...d.programs, id],
     }));
   }
 
+  function toggleMonitoring(id: string) {
+    setData((d) => ({
+      ...d,
+      monitoringSchedules: d.monitoringSchedules.includes(id)
+        ? d.monitoringSchedules.filter((w) => w !== id)
+        : [...d.monitoringSchedules, id],
+    }));
+  }
+
+  // Duplicate / participant matching
+  const duplicates = useMemo(() => {
+    const fn = data.firstName.trim().toLowerCase();
+    const ln = data.lastName.trim().toLowerCase();
+    const dob = data.dob;
+    const mid = data.medicaidId.trim();
+    if (!fn && !ln && !dob && !mid) return [] as Array<{ id: string; name: string; reason: string; meta: string }>;
+
+    const fromSeed = SEED_PEOPLE.map((p) => {
+      const reasons: string[] = [];
+      if (fn && p.firstName.toLowerCase() === fn && ln && p.lastName.toLowerCase() === ln) reasons.push("Name match");
+      else if (fn && ln && p.firstName.toLowerCase().startsWith(fn) && p.lastName.toLowerCase().startsWith(ln)) reasons.push("Partial name match");
+      if (dob && p.dob && (p.dob === dob || normalizeDob(p.dob) === dob)) reasons.push("DOB match");
+      return reasons.length ? {
+        id: p.id,
+        name: `${p.firstName} ${p.lastName}`,
+        reason: reasons.join(" · "),
+        meta: `${p.county} County · DOB ${p.dob}`,
+      } : null;
+    }).filter(Boolean) as Array<{ id: string; name: string; reason: string; meta: string }>;
+
+    const intakes: Array<any> = JSON.parse(localStorage.getItem("icm.intakes") ?? "[]");
+    const fromIntakes = intakes.map((p) => {
+      const reasons: string[] = [];
+      if (fn && p.firstName?.toLowerCase() === fn && ln && p.lastName?.toLowerCase() === ln) reasons.push("Name match");
+      if (dob && p.dob === dob) reasons.push("DOB match");
+      if (mid && p.medicaidId && p.medicaidId === mid) reasons.push("State ID match");
+      return reasons.length ? {
+        id: p.id,
+        name: `${p.firstName} ${p.lastName}`,
+        reason: reasons.join(" · "),
+        meta: `Intake from ${new Date(p.createdAt).toLocaleDateString()}`,
+      } : null;
+    }).filter(Boolean) as Array<{ id: string; name: string; reason: string; meta: string }>;
+
+    return [...fromIntakes, ...fromSeed].slice(0, 4);
+  }, [data.firstName, data.lastName, data.dob, data.medicaidId]);
+
   function submit() {
-    // Persist for demo
     const stored = JSON.parse(localStorage.getItem("icm.intakes") ?? "[]");
     const id = `new-${Date.now()}`;
     stored.unshift({ id, ...data, createdAt: new Date().toISOString() });
     localStorage.setItem("icm.intakes", JSON.stringify(stored));
 
-    // Write to audit log (best effort — used elsewhere)
+    // Generate and persist initial tasks (6.3)
+    const tasks = generateInitialTasks(data, id);
+    const existing = JSON.parse(localStorage.getItem("icm.tasks") ?? "[]");
+    localStorage.setItem("icm.tasks", JSON.stringify([...tasks, ...existing]));
+
+    // Audit
     const audit = JSON.parse(localStorage.getItem("icm.audit") ?? "[]");
     audit.unshift({
       id: `aud-${Date.now()}`,
       ts: new Date().toISOString(),
-      actor: "Kathy (Care Manager)",
-      action: "Created participant intake",
+      actor: data.supportCoordinator || "Kathy (Care Manager)",
+      action: "Created participant record + enrolled in program",
       target: `${data.firstName} ${data.lastName}`,
-      category: "edit",
+      category: "create",
+      details: `Programs: ${data.programs.join(", ")} · Supervisor: ${data.supervisor}`,
+    });
+    audit.unshift({
+      id: `aud-${Date.now()+1}`,
+      ts: new Date().toISOString(),
+      actor: "System",
+      action: `Generated ${tasks.length} initial tasks`,
+      target: `${data.firstName} ${data.lastName}`,
+      category: "ai",
+      details: tasks.map(t => t.title).join("; "),
     });
     localStorage.setItem("icm.audit", JSON.stringify(audit));
 
     toast.success(`${data.firstName} ${data.lastName} enrolled`, {
-      description: `MRN ${data.mrn} · ${data.waivers.length} waiver(s) selected`,
+      description: `${tasks.length} initial tasks created · routed to ${data.supervisor || "supervisor"} for review`,
     });
     navigate("/people");
   }
 
   const stepKey = STEPS[step].key;
+  const hasUnacknowledgedDup = duplicates.length > 0 && !data.duplicateAcknowledged;
   const canNext = (() => {
-    if (stepKey === "demographics") return data.firstName && data.lastName && data.dob && data.gender;
+    if (stepKey === "demographics") return Boolean(data.firstName && data.lastName && data.dob && data.gender && !hasUnacknowledgedDup);
     if (stepKey === "identifiers") return data.medicaidId.length > 0;
-    if (stepKey === "address") return data.street && data.city && data.zip && data.county;
-    if (stepKey === "contact") return data.phone || data.email;
-    if (stepKey === "consent") return data.consentHIPAA && data.consentServices && data.consentSignedDate;
-    if (stepKey === "eligibility") return data.eligibilityStatus && data.waivers.length > 0;
-    if (stepKey === "indiana") return data.bddsDistrict;
+    if (stepKey === "address") return Boolean(data.street && data.city && data.zip && data.county);
+    if (stepKey === "contact") return Boolean(data.phone || data.email);
+    if (stepKey === "consent") return Boolean(data.consentHIPAA && data.consentServices && data.consentSignedDate);
+    if (stepKey === "eligibility") return Boolean(data.eligibilityStatus && data.programs.length > 0);
+    if (stepKey === "enrollment") return Boolean(
+      data.programStartDate && data.supportCoordinator && data.supervisor &&
+      data.serviceLine && data.monitoringSchedules.length > 0
+    );
     return true;
   })();
+
+  const previewTasks = useMemo(() => generateInitialTasks(data, "preview"), [data.firstName, data.lastName, data.supportCoordinator, data.supervisor, data.hasGuardian]);
 
   return (
     <ICMShell>
@@ -214,13 +407,14 @@ export default function NewParticipantIntake() {
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">New Participant Intake</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Indiana BDDS / iCM enrollment — required fields are marked
+              Required fields are marked
               <span className="text-destructive"> *</span>
+              {" "}· All actions are logged to the audit trail.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-full">
             <Sparkles className="w-3.5 h-3.5" />
-            AI will draft initial assessment from this intake
+            AI will draft initial assessment + tasks from this intake
           </div>
         </div>
 
@@ -330,20 +524,58 @@ export default function NewParticipantIntake() {
                 <Checkbox id="interp" checked={data.needsInterpreter} onCheckedChange={(v) => update("needsInterpreter", Boolean(v))} />
                 <Label htmlFor="interp" className="text-sm">Requires interpreter for clinical visits</Label>
               </div>
+
+              {/* Duplicate / participant match panel */}
+              {duplicates.length > 0 && (
+                <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-amber-900">
+                        Possible duplicate{duplicates.length > 1 ? "s" : ""} found ({duplicates.length})
+                      </p>
+                      <p className="text-xs text-amber-800 mt-0.5">
+                        Review existing records before creating a new participant.
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {duplicates.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-card border border-amber-200">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{d.name}</p>
+                              <p className="text-[11px] text-muted-foreground">{d.meta}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">{d.reason}</span>
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/people/${d.id}`)}>Open</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <label className="mt-3 flex items-center gap-2 text-xs text-amber-900">
+                        <Checkbox
+                          checked={data.duplicateAcknowledged}
+                          onCheckedChange={(v) => update("duplicateAcknowledged", Boolean(v))}
+                        />
+                        I have reviewed the matches above and confirm this is a new participant.
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Section>
           )}
 
           {stepKey === "identifiers" && (
             <Section title="Identifiers">
               <Grid>
-                <Field label="Medicaid ID (RID)" required hint="12-digit Recipient ID">
-                  <Input value={data.medicaidId} onChange={(e) => update("medicaidId", e.target.value)} maxLength={12} placeholder="100000000000" />
+                <Field label="State / Medicaid ID" required hint="Primary state-issued participant identifier">
+                  <Input value={data.medicaidId} onChange={(e) => update("medicaidId", e.target.value)} maxLength={20} placeholder="100000000000" />
                 </Field>
                 <Field label="SSN (last 4)" hint="Stored encrypted; only last 4 shown">
                   <Input value={data.ssnLast4} onChange={(e) => update("ssnLast4", e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" />
                 </Field>
-                <Field label="BDDS / State ID" hint="Indiana BDDS participant identifier">
-                  <Input value={data.bddsId} onChange={(e) => update("bddsId", e.target.value)} placeholder="BDDS-12345" />
+                <Field label="Secondary State ID" hint="Optional — program-specific identifier">
+                  <Input value={data.bddsId} onChange={(e) => update("bddsId", e.target.value)} placeholder="ID-12345" />
                 </Field>
                 <Field label="MRN (auto-generated)">
                   <Input value={data.mrn} disabled />
@@ -362,16 +594,16 @@ export default function NewParticipantIntake() {
                   <Input value={data.city} onChange={(e) => update("city", e.target.value)} />
                 </Field>
                 <Field label="State">
-                  <Input value={data.state} onChange={(e) => update("state", e.target.value)} />
+                  <Input value={data.state} onChange={(e) => update("state", e.target.value)} placeholder="2-letter code" maxLength={2} />
                 </Field>
                 <Field label="ZIP" required>
                   <Input value={data.zip} onChange={(e) => update("zip", e.target.value.replace(/\D/g, "").slice(0, 5))} />
                 </Field>
-                <Field label="County" required hint="Indiana county of residence">
+                <Field label="County" required hint="County of residence">
                   <Select value={data.county} onValueChange={(v) => update("county", v)}>
                     <SelectTrigger><SelectValue placeholder="Select county…" /></SelectTrigger>
                     <SelectContent className="max-h-72">
-                      {INDIANA_COUNTIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {COUNTIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
@@ -393,7 +625,7 @@ export default function NewParticipantIntake() {
             <Section title="Contact Preferences & Guardian">
               <Grid>
                 <Field label="Phone" hint="Mobile preferred">
-                  <Input value={data.phone} onChange={(e) => update("phone", e.target.value)} placeholder="(317) 555-0100" />
+                  <Input value={data.phone} onChange={(e) => update("phone", e.target.value)} placeholder="(555) 555-0100" />
                 </Field>
                 <Field label="Email">
                   <Input type="email" value={data.email} onChange={(e) => update("email", e.target.value)} />
@@ -503,7 +735,7 @@ export default function NewParticipantIntake() {
           )}
 
           {stepKey === "eligibility" && (
-            <Section title="Program Eligibility & Waiver Enrollment">
+            <Section title="Program Eligibility">
               <Grid>
                 <Field label="Eligibility Status" required>
                   <Select value={data.eligibilityStatus} onValueChange={(v) => update("eligibilityStatus", v as IntakeData["eligibilityStatus"])}>
@@ -518,7 +750,7 @@ export default function NewParticipantIntake() {
                 <Field label="Primary Diagnosis (ICD-10)">
                   <Input value={data.primaryDiagnosis} placeholder="e.g. F71.0 Moderate ID" onChange={(e) => update("primaryDiagnosis", e.target.value)} />
                 </Field>
-                <Field label="LON / Level of Need score" hint="Indiana ICAP/LON">
+                <Field label="Level of Need score" hint="Standardized acuity score">
                   <Input value={data.lonScore} placeholder="LON 4" onChange={(e) => update("lonScore", e.target.value)} />
                 </Field>
                 <Field label="Waiver Effective Date">
@@ -535,16 +767,16 @@ export default function NewParticipantIntake() {
 
               <div className="mt-6">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Waiver / Program Enrollment <span className="text-destructive">*</span>
+                  Program / Waiver Eligibility <span className="text-destructive">*</span>
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                  {WAIVERS.map((w) => {
-                    const on = data.waivers.includes(w.id);
+                  {PROGRAMS.map((w) => {
+                    const on = data.programs.includes(w.id);
                     return (
                       <button
                         key={w.id}
                         type="button"
-                        onClick={() => toggleWaiver(w.id)}
+                        onClick={() => toggleProgram(w.id)}
                         className={cn(
                           "flex items-start gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors",
                           on ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
@@ -586,31 +818,96 @@ export default function NewParticipantIntake() {
             </Section>
           )}
 
-          {stepKey === "indiana" && (
-            <Section title="Indiana-Specific Fields">
+          {stepKey === "enrollment" && (
+            <Section title="Program Enrollment">
+              <p className="text-xs text-muted-foreground mb-4">
+                Enrollment configuration is <span className="font-medium text-foreground">configurable</span> per state/program by an Administrator.
+                Fields below reflect the active configuration.
+              </p>
               <Grid>
-                <Field label="BDDS District" required>
-                  <Select value={data.bddsDistrict} onValueChange={(v) => update("bddsDistrict", v)}>
+                <Field label="Program Start Date" required>
+                  <Input type="date" value={data.programStartDate} onChange={(e) => update("programStartDate", e.target.value)} />
+                </Field>
+                <Field label="Service Line" required>
+                  <Select value={data.serviceLine} onValueChange={(v) => update("serviceLine", v)}>
                     <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                     <SelectContent>
-                      {BDDS_DISTRICTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                      {SERVICE_LINES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Assigned BDDS Service Coordinator">
-                  <Input value={data.assignedBDDSCaseManager} onChange={(e) => update("assignedBDDSCaseManager", e.target.value)} placeholder="e.g. Jennie Thollander" />
+                <Field label="Assigned Support Coordinator (Care Manager)" required>
+                  <Select value={data.supportCoordinator} onValueChange={(v) => update("supportCoordinator", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                    <SelectContent>
+                      {STAFF.coordinators.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </Field>
-                <Field label="Intake notes / additional context" colSpan={2}>
-                  <Textarea rows={4} value={data.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Anything else the supervisor or AI should know…" />
+                <Field label="Assigned Supervisor" required>
+                  <Select value={data.supervisor} onValueChange={(v) => update("supervisor", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                    <SelectContent>
+                      {STAFF.supervisors.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Service Authorization #" hint="If applicable — link to authorization">
+                  <Input value={data.authorizationNumber} onChange={(e) => update("authorizationNumber", e.target.value)} placeholder="AUTH-2026-00123" />
+                </Field>
+                <Field label="Program Region">
+                  <Select value={data.programRegion} onValueChange={(v) => update("programRegion", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                    <SelectContent>
+                      {PROGRAM_REGIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </Field>
               </Grid>
+
+              <div className="mt-6">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Required Monitoring Schedule <span className="text-destructive">*</span>
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                  {MONITORING_SCHEDULES.map((m) => {
+                    const on = data.monitoringSchedules.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggleMonitoring(m.id)}
+                        className={cn(
+                          "flex items-start gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors",
+                          on ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border mt-0.5 flex items-center justify-center shrink-0",
+                          on ? "bg-primary border-primary" : "border-border"
+                        )}>
+                          {on && <Check className="w-3 h-3 text-primary-foreground" />}
+                        </div>
+                        <span className="text-sm">{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <Field label="Intake notes / additional context" colSpan={2}>
+                  <Textarea rows={3} value={data.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Anything else the supervisor or AI should know…" />
+                </Field>
+              </div>
             </Section>
           )}
 
           {stepKey === "review" && (
-            <Section title="Review & Submit">
+            <Section title="Review & Initial Tasks">
               <p className="text-sm text-muted-foreground mb-4">
-                Please verify the information below. Submitting creates the participant record, opens the assessment workflow, and writes an audit entry.
+                Verify the information below. Submitting creates the participant record, opens the assessment workflow,
+                generates initial tasks, and routes for supervisor review.
               </p>
               <ReviewBlock title="Demographics">
                 <KV k="Name" v={`${data.firstName} ${data.middleName} ${data.lastName}`} />
@@ -619,8 +916,8 @@ export default function NewParticipantIntake() {
                 <KV k="Language" v={`${data.primaryLanguage}${data.needsInterpreter ? " (interpreter required)" : ""}`} />
               </ReviewBlock>
               <ReviewBlock title="Identifiers">
-                <KV k="Medicaid ID" v={data.medicaidId} />
-                <KV k="BDDS ID" v={data.bddsId || "—"} />
+                <KV k="State / Medicaid ID" v={data.medicaidId} />
+                <KV k="Secondary State ID" v={data.bddsId || "—"} />
                 <KV k="MRN" v={data.mrn} />
               </ReviewBlock>
               <ReviewBlock title="Address">
@@ -633,16 +930,57 @@ export default function NewParticipantIntake() {
                 <KV k="Services" v={data.consentServices ? "Granted" : "—"} />
                 <KV k="Signed" v={data.consentSignedDate} />
               </ReviewBlock>
-              <ReviewBlock title="Eligibility & Waivers">
+              <ReviewBlock title="Eligibility & Programs">
                 <KV k="Status" v={data.eligibilityStatus} />
-                <KV k="Waivers" v={data.waivers.map((id) => WAIVERS.find((w) => w.id === id)?.label).filter(Boolean).join(", ") || "—"} />
+                <KV k="Programs" v={data.programs.map((id) => PROGRAMS.find((w) => w.id === id)?.label).filter(Boolean).join(", ") || "—"} />
                 <KV k="LON" v={data.lonScore || "—"} />
                 <KV k="Eligibility doc" v={data.eligibilityLetterFile ?? "Not uploaded"} />
               </ReviewBlock>
-              <ReviewBlock title="Indiana">
-                <KV k="BDDS District" v={data.bddsDistrict} />
-                <KV k="BDDS Coordinator" v={data.assignedBDDSCaseManager || "—"} />
+              <ReviewBlock title="Enrollment">
+                <KV k="Start Date" v={data.programStartDate} />
+                <KV k="Service Line" v={data.serviceLine} />
+                <KV k="Support Coordinator" v={data.supportCoordinator} />
+                <KV k="Supervisor" v={data.supervisor} />
+                <KV k="Authorization #" v={data.authorizationNumber || "—"} />
+                <KV k="Region" v={data.programRegion || "—"} />
+                <KV k="Monitoring" v={data.monitoringSchedules.map(id => MONITORING_SCHEDULES.find(m => m.id === id)?.label).filter(Boolean).join("; ") || "—"} />
               </ReviewBlock>
+
+              {/* Initial tasks preview (6.3) */}
+              <div className="mt-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <ClipboardList className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-semibold text-foreground">Initial Tasks to be Generated ({previewTasks.filter(t => t.status !== "skipped").length})</p>
+                </div>
+                <div className="space-y-2">
+                  {previewTasks.map((t) => (
+                    <div key={t.id} className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border",
+                      t.status === "skipped" && "opacity-50"
+                    )}>
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <CalendarClock className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {t.title}
+                          {t.status === "skipped" && <span className="ml-2 text-[10px] text-muted-foreground">(skipped — no guardian)</span>}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          Owner: {t.owner} · Supervisor visibility: {t.supervisor} · Escalates after {t.escalationDays}d overdue
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[11px] text-muted-foreground">Due</p>
+                        <p className="text-xs font-medium">{t.dueDate}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Reminders are sent based on task category. Overdue items escalate to the assigned supervisor.
+                </p>
+              </div>
             </Section>
           )}
         </div>
@@ -658,6 +996,9 @@ export default function NewParticipantIntake() {
           </Button>
           <div className="text-xs text-muted-foreground">
             Step {step + 1} of {STEPS.length}
+            {hasUnacknowledgedDup && (
+              <span className="ml-3 text-amber-700 font-medium">Acknowledge duplicate matches to continue</span>
+            )}
           </div>
           {step < STEPS.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} disabled={!canNext}>
@@ -667,7 +1008,7 @@ export default function NewParticipantIntake() {
           ) : (
             <Button onClick={submit} className="bg-gradient-to-r from-primary to-icm-accent">
               <Check className="w-4 h-4 mr-1" />
-              Submit Intake
+              Submit Intake & Generate Tasks
             </Button>
           )}
         </div>
@@ -677,6 +1018,15 @@ export default function NewParticipantIntake() {
 }
 
 /* ---------- helpers ---------- */
+
+function normalizeDob(s: string) {
+  // accept MM/DD/YYYY → YYYY-MM-DD
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [m, d, y] = s.split("/");
+    return `${y}-${m}-${d}`;
+  }
+  return s;
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

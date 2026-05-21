@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { VoiceCompanionCard } from "@/components/VoiceCompanionCard";
 import { cn } from "@/lib/utils";
 import { getPerson, initials, riskAvatarClass, riskScoreClass } from "@/data/people";
 import {

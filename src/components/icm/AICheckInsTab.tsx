@@ -38,7 +38,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-}
+
 
 export function AICheckInsTab() {
   const { role } = useRole();

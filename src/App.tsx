@@ -99,6 +99,7 @@ import NotFound from "./pages/NotFound";
 import Companion from "./pages/Companion";
 import MultiStateConfig from "./pages/MultiStateConfig";
 import CommunicationsHub from "./pages/CommunicationsHub";
+import AIGovernance from "./pages/AIGovernance";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
@@ -250,6 +251,7 @@ const App = () => (
 
             <Route path="/admin/multi-state" element={<MultiStateConfig />} />
             <Route path="/communications" element={<CommunicationsHub />} />
+            <Route path="/admin/ai-governance" element={<AIGovernance />} />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="/visit/:sessionId" element={<VirtualVisit />} />

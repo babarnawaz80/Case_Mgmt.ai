@@ -1005,26 +1005,32 @@ function StatTile({
     accent: "text-icm-accent",
   }[tone];
   const iconBg = {
-    neutral: "bg-icm-bg text-icm-text-dim",
-    red: "bg-icm-red-soft text-icm-red",
-    amber: "bg-icm-amber-soft text-icm-amber",
-    accent: "bg-icm-accent-soft text-icm-accent",
+    neutral: "bg-icm-bg text-icm-text-dim group-hover:bg-icm-accent-soft group-hover:text-icm-accent",
+    red: "bg-icm-red-soft text-icm-red/70",
+    amber: "bg-icm-amber-soft text-icm-amber/70",
+    accent: "bg-icm-accent-soft text-icm-accent/70",
+  }[tone];
+  const hoverShadow = {
+    neutral: "hover:shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08)]",
+    red: "hover:shadow-[0_25px_50px_-12px_rgba(239,68,68,0.18)]",
+    amber: "hover:shadow-[0_25px_50px_-12px_rgba(245,158,11,0.18)]",
+    accent: "hover:shadow-[0_25px_50px_-12px_rgba(59,130,246,0.18)]",
   }[tone];
   return (
-    <div className="rounded-2xl border border-icm-border bg-icm-panel px-4 py-3.5 flex items-start justify-between gap-3 hover:shadow-elevated transition-shadow">
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider text-icm-text-faint font-geist font-medium">
-          {label}
-        </p>
-        <p className={cn("text-[28px] font-manrope font-bold mt-1 leading-none tracking-tight", value$)}>
+    <div className={cn("group bg-icm-panel border border-icm-border/70 p-6 rounded-[1.75rem] shadow-[0_15px_35px_-12px_rgba(15,23,42,0.06),0_4px_10px_-2px_rgba(15,23,42,0.02)] transition-all duration-300 cursor-default", hoverShadow)}>
+      <p className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest">
+        {label}
+      </p>
+      <div className="flex items-end justify-between mt-3">
+        <span className={cn("font-manrope text-[44px] font-black leading-none tracking-tighter", value$)}>
           {value}
-        </p>
+        </span>
+        {Icon && (
+          <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm transition-all", iconBg)}>
+            <Icon className="w-5 h-5" />
+          </div>
+        )}
       </div>
-      {Icon && (
-        <div className={cn("rounded-xl p-2.5 shrink-0", iconBg)}>
-          <Icon className="w-4 h-4" />
-        </div>
-      )}
     </div>
   );
 }

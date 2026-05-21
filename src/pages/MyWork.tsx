@@ -392,21 +392,34 @@ const MyWork = () => {
             ).map((t) => {
               const active = view === t.key;
               return (
+        {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="inline-flex items-center p-1.5 rounded-2xl bg-icm-bg/70 ring-1 ring-icm-border/60 shadow-inner">
+            {(
+              [
+                { key: "my_work", label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
+                { key: "alerts", label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
+                { key: "mentions", label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
+                { key: "completed", label: "Completed", count: counts.completed, alert: false },
+              ] as const
+            ).map((t) => {
+              const active = view === t.key;
+              return (
                 <button
                   key={t.key}
                   onClick={() => setView(t.key)}
                   className={cn(
-                    "h-8 px-3 rounded-lg text-[12px] font-geist flex items-center gap-1.5 transition-colors",
+                    "h-9 px-4 rounded-xl text-[12.5px] font-geist flex items-center gap-1.5 transition-all",
                     active
-                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
-                      : "text-icm-text-dim hover:text-icm-text"
+                      ? "bg-icm-panel text-icm-text font-bold shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
+                      : "text-icm-text-dim hover:text-icm-text font-semibold"
                   )}
                 >
                   {t.label}
                   {t.count > 0 && (
                     <span
                       className={cn(
-                        "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-semibold flex items-center justify-center",
+                        "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center",
                         t.alert
                           ? "bg-icm-red/10 text-icm-red"
                           : "bg-icm-bg text-icm-text-faint",
@@ -423,9 +436,9 @@ const MyWork = () => {
           {view === "my_work" && (
             <button
               onClick={() => setAddOpen(true)}
-              className="h-8 px-3 rounded-lg text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text border border-icm-border bg-icm-panel hover:border-icm-border-strong flex items-center gap-1.5"
+              className="group h-10 px-5 rounded-2xl text-[12.5px] font-geist font-bold text-white bg-icm-accent hover:bg-icm-accent/90 shadow-[0_10px_25px_-5px_rgba(59,130,246,0.45)] hover:shadow-[0_15px_30px_-5px_rgba(59,130,246,0.55)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
             >
-              <Plus className="w-3.5 h-3.5" /> Add task
+              <Plus className="w-4 h-4 stroke-[2.5]" /> Add task
             </button>
           )}
         </div>

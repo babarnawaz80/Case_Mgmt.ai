@@ -88,10 +88,10 @@ const PeopleSupported = () => {
               <Download className="w-3.5 h-3.5" /> Export
             </button>
             <button
-              onClick={() => alert("Add Person (mock)")}
+              onClick={() => navigate("/people/new")}
               className="h-9 px-3.5 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium flex items-center gap-1.5 hover:opacity-90"
             >
-              <Plus className="w-3.5 h-3.5" /> Add Person
+              <Plus className="w-3.5 h-3.5" /> New Participant
             </button>
           </div>
         </div>

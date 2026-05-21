@@ -15,6 +15,8 @@ import {
   Target,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
+  ListChecks,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";
@@ -38,6 +40,14 @@ const navGroups = [
       { title: "Activity Notes", url: "", icon: FileText },
       { title: "Assessments", url: "", icon: ClipboardList },
       { title: "Progress Notes", url: "", icon: FileText },
+    ],
+  },
+  {
+    label: "Supervisor",
+    items: [
+      { title: "Supervisor Dashboard", url: "/supervisor", icon: ShieldCheck },
+      { title: "Compliance Exceptions", url: "/supervisor/compliance", icon: AlertTriangle },
+      { title: "Exception Queue", url: "/exceptions", icon: ListChecks },
     ],
   },
   {

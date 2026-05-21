@@ -145,11 +145,11 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         {isAdmin && (
           <button
             onClick={() => navigate("/platform")}
-            title="Platform"
-            className="hidden md:flex h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text-dim text-[12px] font-geist font-medium items-center gap-1.5 hover:text-icm-text hover:border-icm-border-strong transition-colors"
+            title="AI Agent"
+            className="hidden md:flex h-9 px-3.5 rounded-xl text-white text-[12px] font-manrope font-bold items-center gap-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-sky-500 shadow-[0_8px_20px_-8px_rgba(99,102,241,0.55)] hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
           >
-            <Layers className="w-3.5 h-3.5" />
-            Platform
+            <Bot className="w-3.5 h-3.5" />
+            AI Agent
           </button>
         )}
 

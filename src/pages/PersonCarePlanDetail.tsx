@@ -347,17 +347,17 @@ const PersonCarePlanDetail = () => {
               </p>
             </div>
             {!readOnly && (
-              <button className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">
+              <button onClick={() => toast.success("Mapping suggestions ready", { description: "2 goals proposed for LifeCourse linkage." })} className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">
                 Map remaining →
               </button>
             )}
           </div>
 
           <div className="mt-3 flex items-center gap-2">
-            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => toast.success("LifeCourse one-page profile exported (PDF)")} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Printer className="w-3.5 h-3.5" /> Export LifeCourse one-page profile
             </button>
-            <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => toast("LifeCourse report", { description: "Opening full LifeCourse report…" })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" /> View LifeCourse report
             </button>
           </div>

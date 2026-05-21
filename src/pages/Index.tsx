@@ -162,7 +162,9 @@ const Index = () => {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
-  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [snapshotPickerOpen, setSnapshotPickerOpen] = useState(false);
+  const [snapshotQuery, setSnapshotQuery] = useState("");
+  const snapshotRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { role } = useRole();

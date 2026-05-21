@@ -1,0 +1,290 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import { Mic, Send, Bot, CheckCircle2 } from "lucide-react";
+import {
+  TOKEN_MAP,
+  openingMessage,
+  matchBotReply,
+  buildSummary,
+  buildTasks,
+  topicLabel,
+  appendCheckIn,
+  type CheckInMessage,
+  type TopicKey,
+  type AICheckInSession,
+} from "@/lib/aiCheckIns";
+
+function fmtTime(ts: number) {
+  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+export default function CareAssistant() {
+  const { linkToken = "" } = useParams();
+  const person = TOKEN_MAP[linkToken];
+
+  if (!person) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-inter">
+        <div className="max-w-md text-center">
+          <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center text-2xl">!</div>
+          <h1 className="mt-4 text-xl font-semibold text-gray-900">Link not recognized</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            This link is not recognized. Please contact your case manager.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const [messages, setMessages] = useState<CheckInMessage[]>(() => [
+    { id: "m0", role: "bot", text: openingMessage(person.firstName), ts: Date.now() },
+  ]);
+  const [input, setInput] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [topics, setTopics] = useState<Set<TopicKey>>(new Set());
+  const [urgent, setUrgent] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [startedAt] = useState(Date.now());
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, ended]);
+
+  const exchangeCount = useMemo(
+    () => messages.filter((m) => m.role === "individual").length,
+    [messages]
+  );
+
+  function finalize(allMessages: CheckInMessage[], topicSet: Set<TopicKey>, isUrgent: boolean) {
+    const endedAt = Date.now();
+    const seconds = Math.max(1, Math.round((endedAt - startedAt) / 1000));
+    const mm = Math.floor(seconds / 60);
+    const ss = seconds % 60;
+    const durationLabel = `${mm} min ${String(ss).padStart(2, "0")} sec`;
+    const topicList = Array.from(topicSet);
+    const session: AICheckInSession = {
+      id: `CHK-${Date.now()}`,
+      individualId: person.individualId,
+      individualName: person.individualName,
+      firstName: person.firstName,
+      caseManager: person.caseManager,
+      county: person.county,
+      startedAt,
+      endedAt,
+      durationLabel,
+      contactType: "AI Care Assistant Check-In",
+      transcript: allMessages,
+      summary: buildSummary(person.firstName, topicList),
+      detectedTopics: topicList.map((k) => ({ key: k, label: topicLabel(k) })),
+      tasks: buildTasks(person.firstName, topicList),
+      urgent: isUrgent,
+      status: "Pending Review",
+    };
+    appendCheckIn(session);
+    setEnded(true);
+  }
+
+  function send(textRaw: string) {
+    const text = textRaw.trim();
+    if (!text || ended) return;
+    const userMsg: CheckInMessage = { id: `u-${Date.now()}`, role: "individual", text, ts: Date.now() };
+    const next = [...messages, userMsg];
+    setMessages(next);
+    setInput("");
+
+    setTimeout(() => {
+      const match = matchBotReply(text, person.firstName);
+      const newTopics = new Set(topics);
+      if (match.topic) newTopics.add(match.topic);
+      const isUrgent = urgent || match.topic === "crisis";
+      const botMsg: CheckInMessage = { id: `b-${Date.now()}`, role: "bot", text: match.reply, ts: Date.now() };
+      const withBot = [...next, botMsg];
+      setMessages(withBot);
+      setTopics(newTopics);
+      setUrgent(isUrgent);
+      if (match.end) {
+        setTimeout(() => finalize(withBot, newTopics, isUrgent), 600);
+      }
+    }, 700);
+  }
+
+  function handleEndSession() {
+    finalize(messages, topics, urgent);
+  }
+
+  function toggleMic() {
+    if (recording) {
+      setRecording(false);
+      // Mock: drop a fake transcript into the input for the user to review
+      const samples = [
+        "I'm not feeling well today",
+        "I'd like to explore getting a job",
+        "Everything is going well, thank you",
+        "I want to change my day program",
+      ];
+      const pick = samples[Math.floor(Math.random() * samples.length)];
+      setInput((prev) => (prev ? `${prev} ${pick}` : pick));
+    } else {
+      setRecording(true);
+    }
+  }
+
+  // group messages by minute for timestamp display
+  const grouped: { ts: number; items: CheckInMessage[] }[] = [];
+  for (const m of messages) {
+    const last = grouped[grouped.length - 1];
+    if (last && Math.abs(m.ts - last.ts) < 60000 && last.items[0].role === m.role) {
+      last.items.push(m);
+    } else {
+      grouped.push({ ts: m.ts, items: [m] });
+    }
+  }
+
+  if (ended) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-inter">
+        <div className="max-w-md text-center">
+          <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+          <h1 className="mt-6 text-2xl font-semibold text-gray-900">Thanks for checking in!</h1>
+          <p className="mt-3 text-[15px] text-gray-700 leading-relaxed">
+            Your care team has received your update. Your case manager will follow up with you soon.
+          </p>
+          <p className="mt-6 text-[12.5px] text-gray-500">
+            You can close this window or come back anytime using the same link.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FAFAFA] font-inter flex flex-col">
+      {/* Header */}
+      <header className="pt-8 pb-4 px-6 text-center">
+        <div className="text-[13px] tracking-wide text-gray-500">
+          <span className="font-semibold text-gray-700">CaseManagement</span>
+          <span className="text-[#00C2B2]">.ai</span>
+        </div>
+        <h1 className="mt-3 text-[22px] font-semibold text-gray-900">
+          Hi {person.firstName} <span>👋</span>
+        </h1>
+        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 text-[12px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          Your Care Assistant is ready
+        </div>
+      </header>
+
+      {/* Conversation */}
+      <div
+        ref={scrollerRef}
+        className="flex-1 overflow-y-auto px-4 md:px-6 pb-4 max-w-2xl w-full mx-auto"
+      >
+        <div className="space-y-4">
+          {grouped.map((g, gi) => {
+            const isBot = g.items[0].role === "bot";
+            return (
+              <div key={gi} className={`flex ${isBot ? "justify-start" : "justify-end"}`}>
+                <div className={`flex items-end gap-2 max-w-[85%] ${isBot ? "" : "flex-row-reverse"}`}>
+                  {isBot && (
+                    <div className="w-7 h-7 rounded-full bg-[#00C2B2] text-white flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    {g.items.map((m) => (
+                      <div
+                        key={m.id}
+                        className={
+                          isBot
+                            ? "bg-gray-100 text-gray-800 rounded-2xl rounded-bl-md px-4 py-2.5 text-[14.5px] leading-relaxed"
+                            : "bg-[#00C2B2] text-white rounded-2xl rounded-br-md px-4 py-2.5 text-[14.5px] leading-relaxed"
+                        }
+                      >
+                        {m.text}
+                      </div>
+                    ))}
+                    <div className={`text-[10.5px] text-gray-400 ${isBot ? "text-left" : "text-right"}`}>
+                      {fmtTime(g.ts)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {exchangeCount >= 2 && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={handleEndSession}
+              className="text-[12.5px] text-gray-500 hover:text-[#00C2B2] underline-offset-2 hover:underline"
+            >
+              Done for now? End this check-in →
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-gray-200 bg-white px-4 md:px-6 py-4 pb-6">
+        <div className="max-w-2xl mx-auto">
+          <p className="text-[11px] text-gray-400 text-center mb-2">
+            This conversation is shared with your care team.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send(input);
+            }}
+            className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm focus-within:border-[#00C2B2]"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={recording ? "Listening..." : "Type your message..."}
+              className="flex-1 bg-transparent outline-none text-[14.5px] text-gray-800 placeholder:text-gray-400 py-1.5"
+              disabled={recording}
+            />
+            {recording && (
+              <div className="flex items-end gap-0.5 h-5 mr-1">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <span
+                    key={i}
+                    className="w-0.5 bg-[#00C2B2] rounded-full animate-pulse"
+                    style={{ height: `${6 + (i % 3) * 5}px`, animationDelay: `${i * 120}ms` }}
+                  />
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={toggleMic}
+              aria-label="Toggle microphone"
+              className={`relative w-9 h-9 rounded-full flex items-center justify-center transition ${
+                recording
+                  ? "bg-[#00C2B2] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {recording && (
+                <span className="absolute inset-0 rounded-full ring-2 ring-[#00C2B2]/40 animate-ping" />
+              )}
+              <Mic className="w-4 h-4" />
+            </button>
+            <button
+              type="submit"
+              aria-label="Send"
+              disabled={!input.trim()}
+              className="w-9 h-9 rounded-full bg-[#00C2B2] text-white flex items-center justify-center disabled:opacity-40"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -496,7 +496,7 @@ const PersonCarePlanDetail = () => {
                     <td className="px-3 py-2 font-mono text-icm-text-dim">{t.signedOn ?? "—"}</td>
                     <td className="px-3 py-2 text-right">
                       {!readOnly && t.status === "Pending" && (
-                        <button className="text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
+                        <button onClick={() => toast.success(`E-sign request sent to ${t.name}`)} className="text-[11px] text-icm-accent hover:underline inline-flex items-center gap-1">
                           <Mail className="w-3 h-3" /> Request e-signature
                         </button>
                       )}
@@ -508,7 +508,7 @@ const PersonCarePlanDetail = () => {
           </div>
           {!readOnly && (
             <div className="mt-3 flex justify-end">
-              <button className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+              <button onClick={() => toast.success("E-sign requests sent", { description: `${plan.team.filter(t => t.status === "Pending").length} pending signers notified.` })} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" /> Send all for signature
               </button>
             </div>

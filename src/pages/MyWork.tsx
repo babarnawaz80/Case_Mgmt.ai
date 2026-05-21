@@ -674,8 +674,9 @@ const MyWork = () => {
               );
             })}
           </div>
-        )}
+        ))}
       </div>
+
 
       {/* Modals */}
       {actionTask && (

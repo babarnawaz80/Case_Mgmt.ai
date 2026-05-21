@@ -616,14 +616,14 @@ const Index = () => {
             </div>
           </motion.div>
 
-          {/* Suggested Prompts */}
+          {/* Suggested Prompts — only on empty state. Snapshot button always available. */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             className="flex flex-wrap justify-center gap-2 mt-6 max-w-2xl"
           >
-            {suggestedPrompts.map((prompt, i) => (
+            {thread.length === 0 && suggestedPrompts.map((prompt, i) => (
               <button
                 key={i}
                 onClick={() => handleSend(prompt.text)}

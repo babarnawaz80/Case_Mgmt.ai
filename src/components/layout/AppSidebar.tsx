@@ -15,6 +15,8 @@ import {
   Target,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
+  ListChecks,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";

@@ -26,7 +26,6 @@ interface TopNavItem {
 
 const topNavItems: TopNavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "People", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },

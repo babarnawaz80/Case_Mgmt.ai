@@ -630,6 +630,7 @@ function SectionCard({
   answers,
   setAnswer,
   readonly,
+  missingIds,
 }: {
   id: string;
   section: AssessmentTemplate["sections"][number];
@@ -637,6 +638,7 @@ function SectionCard({
   answers: AssessmentAnswer[];
   setAnswer: (qid: string, value: AssessmentAnswer["value"]) => void;
   readonly: boolean;
+  missingIds: string[];
 }) {
   const aiInSec = section.questions.some((q) =>
     answers.find((a) => a.questionId === q.id && a.aiSuggested),
@@ -658,18 +660,20 @@ function SectionCard({
 
       <div className="space-y-4">
         {section.questions.map((q) => (
-          <QuestionField
-            key={q.id}
-            question={q}
-            answer={answers.find((a) => a.questionId === q.id)}
-            onChange={(v) => setAnswer(q.id, v)}
-            readonly={readonly}
-          />
+          <div key={q.id} id={`q-${q.id}`} className={missingIds.includes(q.id) ? "rounded-lg ring-2 ring-icm-red/40 p-2 -m-2" : ""}>
+            <QuestionField
+              question={q}
+              answer={answers.find((a) => a.questionId === q.id)}
+              onChange={(v) => setAnswer(q.id, v)}
+              readonly={readonly}
+            />
+          </div>
         ))}
       </div>
     </section>
   );
 }
+
 
 function QuestionField({
   question,

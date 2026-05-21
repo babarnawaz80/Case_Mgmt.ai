@@ -152,7 +152,7 @@ const Kpi = ({ icon, label, value, sub, color }: { icon: React.ReactNode; label:
 const Chip = ({ children, color }: { children: React.ReactNode; color: "rose"|"amber"|"blue" }) => (
   <span className={`px-1.5 h-5 inline-flex items-center rounded text-[10.5px] ${color==="rose"?"bg-rose-100 text-rose-700":color==="amber"?"bg-amber-100 text-amber-800":"bg-blue-100 text-blue-700"}`}>{children}</span>
 );
-const Th = ({ children }: { children: React.ReactNode }) => <th className="text-left font-medium px-3 py-2">{children}</th>;
+const Th = ({ children }: { children?: React.ReactNode }) => <th className="text-left font-medium px-3 py-2">{children}</th>;
 const Td = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => <td className={`px-3 py-2 ${className}`}>{children}</td>;
 const Pct = ({ value, good, mid }: { value: number; good: number; mid: number }) => (
   <div className="flex items-center gap-2">

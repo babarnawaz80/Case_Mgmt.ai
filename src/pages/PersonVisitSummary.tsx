@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck, Smartphone } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import { getPerson, riskAvatarClass, initials } from "@/data/people";

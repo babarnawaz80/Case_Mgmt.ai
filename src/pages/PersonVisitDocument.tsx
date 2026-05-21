@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { getPerson, riskAvatarClass, initials } from "@/data/people";
 import { toast } from "sonner";
@@ -29,9 +29,19 @@ interface VisitDoc {
   participantSignature: string;
   guardianSignature: string;
   attested: boolean;
-  status: "Draft" | "Submitted for review" | "Pending sync";
+  status: "Draft" | "Submitted for review" | "Pending sync" | "Exception — needs correction" | "Exception — supervisor override";
   createdBy: string;
   submittedAt?: string;
+  exceptions?: ValidationError[];
+  override?: { by: string; at: string; reason: string; codes: string[] };
+}
+
+export interface ValidationError {
+  code: string;
+  rule: string;
+  message: string;
+  severity: "block" | "warn";
+  overridable: boolean;
 }
 
 const STORAGE_KEY = "icm.visits.docs";
@@ -76,6 +86,7 @@ const PersonVisitDocument = () => {
   const [attested, setAttested] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [now, setNow] = useState(Date.now());
+  const [errors, setErrors] = useState<ValidationError[]>([]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -121,13 +132,52 @@ const PersonVisitDocument = () => {
     toast.success(online ? "Draft saved." : "Draft saved offline — will sync when online.");
   };
 
+  const runValidation = (): ValidationError[] => {
+    const errs: ValidationError[] = [];
+    // Required fields
+    if (!serviceCode) errs.push({ code: "V001", rule: "Required service code", message: "Service code is required for billing.", severity: "block", overridable: false });
+    if (!narrative.trim() || narrative.trim().length < 20) errs.push({ code: "V002", rule: "Required narrative", message: "Narrative case note must be at least 20 characters.", severity: "block", overridable: false });
+    if (!startedAt || !endedAt) errs.push({ code: "V003", rule: "Required time fields", message: "Both start and end time are required.", severity: "block", overridable: false });
+    if (!linkedGoalId && !linkedTaskId) errs.push({ code: "V004", rule: "Plan linkage required", message: "Note must be linked to at least one plan goal or monitoring task.", severity: "block", overridable: true });
+
+    // Authorization units (mock: AUTH-2026-00148 = 240 remaining, AUTH-2026-00077 = 88 remaining)
+    const remaining = authorizationId === "AUTH-2026-00148" ? 240 : authorizationId === "AUTH-2026-00077" ? 88 : 0;
+    if (authorizationId && units > remaining) errs.push({ code: "V005", rule: "Units exceed authorization", message: `Billable units (${units}) exceed remaining authorization (${remaining}).`, severity: "block", overridable: true });
+    if (!authorizationId) errs.push({ code: "V006", rule: "Missing authorization", message: "No service authorization linked — note will not be billable.", severity: "warn", overridable: true });
+
+    // Duplicate / overlap detection
+    const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") as VisitDoc[];
+    const overlap = all.find(d => d.id !== docId && d.personId === id && d.startedAt && d.endedAt && startedAt && endedAt && !(new Date(endedAt) <= new Date(d.startedAt) || new Date(startedAt) >= new Date(d.endedAt)));
+    if (overlap) errs.push({ code: "V007", rule: "Duplicate / overlapping note", message: `Overlaps with an existing visit note on ${new Date(overlap.startedAt).toLocaleString()}.`, severity: "block", overridable: true });
+
+    // Billing rules: narrative must include goal progress + minimum elapsed
+    if (narrative && !/goal|progress|outcome|service|support/i.test(narrative)) errs.push({ code: "V008", rule: "Billing documentation rules", message: "Narrative must reference goals, progress, or services delivered to meet billing documentation requirements.", severity: "block", overridable: true });
+    if (elapsedMin > 0 && elapsedMin < 8) errs.push({ code: "V009", rule: "Billing documentation rules", message: "Encounter under 8 minutes does not meet minimum billable contact duration.", severity: "block", overridable: true });
+
+    if (!attested) errs.push({ code: "V010", rule: "Required attestation", message: "Coordinator attestation is required.", severity: "block", overridable: false });
+    return errs;
+  };
+
   const submit = () => {
-    if (!startedAt || !endedAt) { toast.error("Capture start and end time before submitting."); return; }
-    if (!narrative.trim() || narrative.trim().length < 20) { toast.error("Narrative is required (minimum 20 characters)."); return; }
-    if (!attested) { toast.error("Coordinator attestation is required."); return; }
+    const errs = runValidation();
+    setErrors(errs);
+    const blocking = errs.filter(e => e.severity === "block");
+    if (blocking.length) {
+      // Send to exception queue
+      const doc = buildDoc("Exception — needs correction");
+      doc.exceptions = errs;
+      persistDoc(doc);
+      // Persist to global exceptions queue
+      const queue = JSON.parse(localStorage.getItem("icm.exceptions") || "[]");
+      queue.push({ id: `exc-${Date.now()}`, docId: doc.id, personId: id, personName: `${person.lastName}, ${person.firstName}`, createdAt: new Date().toISOString(), createdBy: doc.createdBy, errors: errs, status: "Open", serviceCode, units: doc.units });
+      localStorage.setItem("icm.exceptions", JSON.stringify(queue));
+      writeAudit({ ts: new Date().toISOString(), action: "Visit note FAILED validation", entity: doc.id, personId: id, by: doc.createdBy, detail: `${blocking.length} blocking error(s): ${blocking.map(e=>e.code).join(", ")}` });
+      toast.error(`${blocking.length} validation error${blocking.length>1?"s":""}. Sent to Exception Queue.`);
+      return;
+    }
     const doc = buildDoc("Submitted for review");
     persistDoc(doc);
-    writeAudit({ ts: doc.submittedAt, action: "Visit note submitted for supervisor review", entity: doc.id, personId: id, by: doc.createdBy, detail: `${serviceCode} · ${doc.units} units` });
+    writeAudit({ ts: doc.submittedAt!, action: "Visit note submitted for supervisor review", entity: doc.id, personId: id, by: doc.createdBy, detail: `${serviceCode} · ${doc.units} units` });
     toast.success("Submitted for supervisor review.");
     setTimeout(() => navigate(`/people/${person.id}/visit-summary`), 700);
   };
@@ -262,6 +312,23 @@ const PersonVisitDocument = () => {
             <span>I attest that the information documented above is accurate and reflects the services delivered to {person.firstName} on this date.</span>
           </label>
         </div>
+
+        {errors.length > 0 && (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-rose-800 font-manrope font-bold text-[14px]">
+              <AlertTriangle className="w-4 h-4" /> Validation failed — {errors.filter(e=>e.severity==="block").length} blocking, {errors.filter(e=>e.severity==="warn").length} warning
+            </div>
+            <ul className="space-y-1.5">
+              {errors.map(e => (
+                <li key={e.code} className="text-[12.5px] flex gap-2 items-start">
+                  <span className={`px-1.5 h-5 inline-flex items-center rounded text-[10.5px] font-mono ${e.severity==="block" ? "bg-rose-200 text-rose-800" : "bg-amber-200 text-amber-800"}`}>{e.code}</span>
+                  <span><span className="font-semibold text-icm-text">{e.rule}.</span> <span className="text-icm-text-dim">{e.message}</span>{e.overridable && <span className="ml-1 text-[10.5px] text-amber-700">(supervisor-overridable)</span>}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11.5px] text-rose-700">Correct the items above or open the <button onClick={()=>navigate("/exceptions")} className="underline font-semibold">Exception Queue</button> to request a supervisor override.</p>
+          </div>
+        )}
 
         <div className="sticky bottom-0 -mx-4 sm:mx-0 bg-icm-panel/95 backdrop-blur border-t border-icm-border p-3 rounded-b-2xl flex gap-2 justify-end">
           <button onClick={saveDraft} className="h-11 px-4 rounded-xl border border-icm-border text-[13px] font-medium inline-flex items-center gap-1.5 bg-white"><Save className="w-4 h-4" /> Save draft</button>

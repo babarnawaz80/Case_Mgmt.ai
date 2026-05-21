@@ -27,7 +27,8 @@ const PersonCarePlanDetail = () => {
   const plan = getPlan(planId ?? "");
 
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
-    details: true, profile: false, goals: true, services: false, support: false, team: false, history: false,
+    details: true, profile: false, nsr: true, goals: true, services: false,
+    support: false, lifecourse: false, linkages: true, team: false, history: false,
   });
   const [aiBannerVisible, setAiBannerVisible] = useState(true);
   const [printOpen, setPrintOpen] = useState(false);

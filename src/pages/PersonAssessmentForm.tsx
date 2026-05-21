@@ -137,20 +137,155 @@ export default function PersonAssessmentForm() {
   );
   const answered = answers.filter((a) => a.value != null && a.value !== "").length;
 
+  // Required-field validation across all visible questions
+  function computeMissing(): string[] {
+    const missing: string[] = [];
+    for (const sec of template!.sections) {
+      for (const q of sec.questions) {
+        if (!q.required) continue;
+        if (["section_header", "divider", "instructions"].includes(q.type)) continue;
+        const a = getAnswer(q.id);
+        const v = a?.value;
+        const empty = v == null || v === "" || (Array.isArray(v) && v.length === 0);
+        if (empty) missing.push(q.id);
+      }
+    }
+    return missing;
+  }
+
+  // Detect risk-flagged answers (yes on a "risk"-labeled question, or high-score option)
+  function detectRiskFindings() {
+    const findings: { label: string; severity: "warning" | "critical" }[] = [];
+    for (const sec of template!.sections) {
+      for (const q of sec.questions) {
+        const a = getAnswer(q.id);
+        if (!a) continue;
+        const labelLc = (q.label || "").toLowerCase();
+        const looksRisky = labelLc.includes("risk") || labelLc.includes("fall") || labelLc.includes("self-harm") || labelLc.includes("suicid") || labelLc.includes("elopement") || labelLc.includes("aggress");
+        if ((q.type === "yes_no" || q.type === "yes_no_na") && a.value === "Yes" && looksRisky) {
+          findings.push({ label: q.label, severity: "critical" });
+        }
+        if (q.type === "scored_choice") {
+          const opt = q.options?.find((o) => o.label === a.value);
+          if (opt?.score != null && opt.score >= 3) findings.push({ label: q.label, severity: "warning" });
+        }
+      }
+    }
+    if (loc === "High") findings.push({ label: `Overall LOC: High (score ${score})`, severity: "warning" });
+    if (loc === "Critical") findings.push({ label: `Overall LOC: Critical (score ${score})`, severity: "critical" });
+    return findings;
+  }
+
   function submit() {
+    // Block on missing required
+    const missing = computeMissing();
+    setMissingIds(missing);
+    if (missing.length > 0) {
+      toast.error(`${missing.length} required field${missing.length > 1 ? "s" : ""} missing`, {
+        description: "Scroll up — missing fields are outlined in red.",
+      });
+      const first = document.getElementById(`q-${missing[0]}`);
+      first?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    // Block on attestation/signature
+    if (!attest || !signCM.trim()) {
+      toast.error("Attestation & care manager signature required");
+      document.getElementById("attestation-block")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     const newId = search.get("aid") ?? `A-${Date.now().toString().slice(-4)}`;
-    assessments.push({
+    const findings = detectRiskFindings();
+    const record = {
       id: newId,
       individualId: id!,
       templateId: template!.id,
       templateVersion: template!.version,
       date: new Date().toLocaleDateString("en-US"),
-      status: "Completed",
-      completedBy: "Kathy Adams, CM",
+      status: "Completed" as const,
+      completedBy: signCM || "Kathy Adams, CM",
       totalScore: score,
       loc: loc as any,
       answers,
+      signatures: { careManager: signCM, careManagerDate: signCMDate, participant: signParticipant, attested: attest },
+      attachments,
+      riskFindings: findings,
+    };
+    assessments.push(record);
+
+    // Persist a versioned snapshot for historical retention (7.1)
+    const histKey = `icm.assessments.history.${id}`;
+    const hist = JSON.parse(localStorage.getItem(histKey) ?? "[]");
+    hist.unshift({
+      ...record,
+      capturedAt: new Date().toISOString(),
+      version: `v${hist.length + 1}.0`,
     });
+    localStorage.setItem(histKey, JSON.stringify(hist));
+
+    // Audit entries
+    const audit = JSON.parse(localStorage.getItem("icm.audit") ?? "[]");
+    audit.unshift({
+      id: `aud-${Date.now()}`,
+      ts: new Date().toISOString(),
+      actor: signCM || "Care Manager",
+      action: `Completed assessment: ${template!.name} ${template!.version}`,
+      target: `${person!.firstName} ${person!.lastName}`,
+      category: "assessment",
+      details: `Score ${score} · LOC ${loc} · ${findings.length} risk finding(s) · ${attachments.length} attachment(s)`,
+    });
+    if (findings.length > 0) {
+      audit.unshift({
+        id: `aud-${Date.now() + 1}`,
+        ts: new Date().toISOString(),
+        actor: "System",
+        action: `Risk findings flagged for review`,
+        target: `${person!.firstName} ${person!.lastName}`,
+        category: "ai",
+        details: findings.map(f => `[${f.severity}] ${f.label}`).join("; "),
+      });
+    }
+    localStorage.setItem("icm.audit", JSON.stringify(audit));
+
+    // Auto-generate downstream tasks from findings (links assessment → tasks/plan)
+    const newTasks: { id: string; title: string; dueDate: string; owner: string; supervisor: string; participantId: string; participantName: string; status: string; category: string; escalationDays: number; reminders: string[]; source: string }[] = [];
+    const today = new Date();
+    const due = (n: number) => { const d = new Date(today); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    if (findings.some(f => f.severity === "critical")) {
+      newTasks.push({
+        id: `task-${Date.now()}-a1`, title: `Update person-centered plan: address critical risk findings`,
+        dueDate: due(3), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
+        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        status: "open", category: "Planning", escalationDays: 1, reminders: ["1 day before due"],
+        source: `Assessment ${newId} ${template!.version}`,
+      });
+    }
+    if (findings.length > 0) {
+      newTasks.push({
+        id: `task-${Date.now()}-a2`, title: `Supervisor review: assessment risk findings`,
+        dueDate: due(2), owner: "Diane Carter (Supervisor)", supervisor: "Diane Carter (Supervisor)",
+        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        status: "open", category: "Supervisor Review", escalationDays: 1, reminders: ["same day"],
+        source: `Assessment ${newId} ${template!.version}`,
+      });
+    }
+    if (loc === "High" || loc === "Critical") {
+      newTasks.push({
+        id: `task-${Date.now()}-a3`, title: `Increase monitoring frequency (LOC ${loc})`,
+        dueDate: due(7), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
+        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        status: "open", category: "Monitoring", escalationDays: 3, reminders: ["3 days before due"],
+        source: `Assessment ${newId} ${template!.version}`,
+      });
+    }
+    if (newTasks.length > 0) {
+      const existing = JSON.parse(localStorage.getItem("icm.tasks") ?? "[]");
+      localStorage.setItem("icm.tasks", JSON.stringify([...newTasks, ...existing]));
+      setGeneratedTasks(newTasks.map(t => ({ title: t.title, due: t.dueDate })));
+    }
+
+    setHistoryCount((c) => c + 1);
     setSubmitted(true);
   }
 

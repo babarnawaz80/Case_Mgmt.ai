@@ -468,7 +468,7 @@ const PersonCarePlanDetail = () => {
                   <span className="text-[11px] font-mono text-icm-text-faint w-20 shrink-0">{vv.date}</span>
                   <span className="text-[11.5px] text-icm-text-dim w-32 shrink-0 truncate">{vv.who}</span>
                   <span className="text-[11.5px] text-icm-text truncate flex-1">{vv.note}</span>
-                  <button className="text-[11px] text-icm-accent hover:underline shrink-0">View</button>
+                  <button onClick={() => toast(`Plan ${vv.v}`, { description: `Opened read-only snapshot from ${vv.date}` })} className="text-[11px] text-icm-accent hover:underline shrink-0">View</button>
                 </li>
               ))}
             </ol>

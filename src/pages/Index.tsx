@@ -65,10 +65,7 @@ const topNavItems: TopNavItem[] = [
 
 const OVERDUE_TASK_COUNT = 3;
 const OPEN_INCIDENT_COUNT = 1;
-  title: string;
-  preview: string;
-  time: string;
-}
+
 
 const chatHistory: ChatHistoryItem[] = [
   { id: "1", title: "Compliance Review — Zone A", preview: "3 individuals flagged out of compliance...", time: "Today 08:15 AM" },

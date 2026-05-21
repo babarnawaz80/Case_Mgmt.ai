@@ -576,64 +576,75 @@ const MyWork = () => {
         {grouped.length === 0 ? (
           <EmptyState tab={tab} onJumpWeek={() => setTab("week")} />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-5">
             {grouped.map((g) => {
               const collapsed = collapsedGroups[g.id];
+              const hasOverdue = g.overdueCount > 0 && groupMode === "individual";
               return (
                 <div
                   key={g.id}
-                  className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden"
+                  className={cn(
+                    "bg-icm-panel border border-icm-border/60 rounded-[2rem] overflow-hidden transition-all duration-500",
+                    "shadow-[0_25px_70px_-20px_rgba(15,23,42,0.08),0_4px_10px_-2px_rgba(15,23,42,0.02)] hover:shadow-[0_35px_80px_-20px_rgba(15,23,42,0.1)]"
+                  )}
                 >
                   {/* Group header */}
                   <button
                     onClick={() => toggleGroup(g.id)}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/60"
+                    className="w-full px-6 py-5 flex items-center gap-4 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/40 bg-gradient-to-r from-icm-bg/30 to-transparent"
                   >
                     {groupMode === "individual" ? (
-                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-[11px] font-geist font-bold text-icm-text shrink-0">
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl flex items-center justify-center text-[13px] font-manrope font-black shrink-0 shadow-sm",
+                        hasOverdue
+                          ? "bg-gradient-to-br from-icm-red-soft to-icm-red-soft/60 text-icm-red ring-1 ring-icm-red/15"
+                          : "bg-gradient-to-br from-icm-accent-soft to-icm-accent-soft/60 text-icm-accent ring-1 ring-icm-accent/15"
+                      )}>
                         {g.initials}
                       </div>
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center shrink-0">
+                      <div className="w-12 h-12 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center shrink-0 shadow-sm">
                         <CalendarIcon
-                          className={cn("w-4 h-4", (g as any).tone ?? "text-icm-text-dim")}
+                          className={cn("w-5 h-5", (g as any).tone ?? "text-icm-text-dim")}
                         />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span
                           className={cn(
-                            "text-[13.5px] font-semibold font-geist",
+                            "font-manrope font-bold text-[16px] tracking-tight",
                             groupMode === "due" ? (g as any).tone : "text-icm-text",
-                            groupMode === "due" && "tracking-wide text-[11.5px] uppercase",
+                            groupMode === "due" && "tracking-widest text-[12px] uppercase font-extrabold",
                           )}
                         >
                           {g.label}
                         </span>
                         {g.sub && (
-                          <span className="text-[11.5px] text-icm-text-faint font-geist">{g.sub}</span>
-                        )}
-                        <span className="text-[11.5px] text-icm-text-faint font-geist">
-                          · {g.items.length} task{g.items.length === 1 ? "" : "s"}
-                        </span>
-                        {g.overdueCount > 0 && groupMode === "individual" && (
-                          <span className="text-[11px] font-semibold text-icm-red inline-flex items-center gap-1">
-                            <span className="w-1 h-1 rounded-full bg-icm-red" />
-                            {g.overdueCount} overdue
-                          </span>
+                          <span className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest font-geist">{g.sub}</span>
                         )}
                       </div>
+                      <p className="text-[12px] text-icm-text-dim font-geist font-medium mt-0.5">
+                        {g.items.length} task{g.items.length === 1 ? "" : "s"}
+                        {hasOverdue && (
+                          <>
+                            <span className="mx-1.5 text-icm-text-faint">•</span>
+                            <span className="text-icm-red font-bold">{g.overdueCount} overdue</span>
+                          </>
+                        )}
+                      </p>
                     </div>
-                    {collapsed ? (
-                      <ChevronRight className="w-4 h-4 text-icm-text-faint" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-icm-text-faint" />
-                    )}
+                    <div className="p-2.5 text-icm-text-faint hover:text-icm-text-dim bg-icm-panel rounded-xl shadow-sm border border-icm-border/60 transition-colors">
+                      {collapsed ? (
+                        <ChevronRight className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </div>
                   </button>
 
                   {!collapsed && (
-                    <div className="border-t border-icm-border divide-y divide-icm-border">
+                    <div className="divide-y divide-icm-border/40">
                       {g.items.map((t) => (
                         <TaskRow
                           key={t.id}

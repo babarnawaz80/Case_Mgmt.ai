@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Mic, Send, Bot, CheckCircle2 } from "lucide-react";
+import { Mic, Send, CheckCircle2 } from "lucide-react";
+import SiriOrb from "@/components/ui/siri-orb";
 import {
   TOKEN_MAP,
   openingMessage,
@@ -163,12 +164,23 @@ export default function CareAssistant() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-inter flex flex-col">
       {/* Header */}
-      <header className="pt-8 pb-4 px-6 text-center">
+      <header className="pt-8 pb-4 px-6 text-center flex flex-col items-center">
         <div className="text-[13px] tracking-wide text-gray-500">
           <span className="font-semibold text-gray-700">CaseManagement</span>
           <span className="text-[#00C2B2]">.ai</span>
         </div>
-        <h1 className="mt-3 text-[22px] font-semibold text-gray-900">
+        <div className="mt-4">
+          <SiriOrb
+            size="160px"
+            colors={{
+              c1: "oklch(78% 0.13 180)",
+              c2: "oklch(82% 0.10 200)",
+              c3: "oklch(75% 0.14 220)",
+            }}
+            animationDuration={18}
+          />
+        </div>
+        <h1 className="mt-4 text-[22px] font-semibold text-gray-900">
           Hi {person.firstName} <span>👋</span>
         </h1>
         <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 text-[12px]">
@@ -189,8 +201,8 @@ export default function CareAssistant() {
               <div key={gi} className={`flex ${isBot ? "justify-start" : "justify-end"}`}>
                 <div className={`flex items-end gap-2 max-w-[85%] ${isBot ? "" : "flex-row-reverse"}`}>
                   {isBot && (
-                    <div className="w-7 h-7 rounded-full bg-[#00C2B2] text-white flex items-center justify-center shrink-0">
-                      <Bot className="w-4 h-4" />
+                    <div className="shrink-0">
+                      <SiriOrb size="28px" animationDuration={14} />
                     </div>
                   )}
                   <div className="space-y-1">

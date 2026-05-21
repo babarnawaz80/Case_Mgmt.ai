@@ -463,10 +463,10 @@ const MyWork = () => {
         {/* Stat strip — quiet, minimal */}
         {view === "my_work" && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Open" value={counts.total} tone="neutral" icon={ListChecks} subtext="Active items" />
-            <StatCard label="Past due" value={counts.overdue} tone="red" icon={AlertCircle} subtext="Needs attention" />
-            <StatCard label="Due today" value={counts.today} tone="amber" icon={Clock} subtext="Today's queue" />
-            <StatCard label="This week" value={counts.week} tone="accent" icon={CalendarIcon} subtext="Next 7 days" />
+            <StatCard label="Open" value={counts.total} tone="neutral" icon={ListChecks} />
+            <StatCard label="Past due" value={counts.overdue} tone="red" icon={AlertCircle} />
+            <StatCard label="Due today" value={counts.today} tone="amber" icon={Clock} />
+            <StatCard label="This week" value={counts.week} tone="accent" icon={CalendarIcon} />
           </div>
 
         )}

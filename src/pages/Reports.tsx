@@ -369,6 +369,7 @@ function MyReportsTab({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 function AuditExportTab({ isAdmin }: { isAdmin: boolean }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-6">
       <section>

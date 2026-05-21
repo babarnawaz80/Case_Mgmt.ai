@@ -370,6 +370,19 @@ const Index = () => {
             </motion.div>
           )}
 
+          {thread.length === 0 && (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              onClick={() => setSnapshotOpen(true)}
+              className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-sm font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
+            >
+              <Sparkles className="w-4 h-4" />
+              Individual Snapshot
+            </motion.button>
+          )}
+
           {/* Quick Stats — clickable */}
           {thread.length === 0 && (
             <motion.div

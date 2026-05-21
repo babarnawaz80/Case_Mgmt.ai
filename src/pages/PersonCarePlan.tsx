@@ -356,7 +356,7 @@ function PlanTable({ plans, onOpen, variant }: { plans: CarePlan[]; onOpen: (id:
                 <div className="font-mono text-[11px] text-icm-text-faint">{p.updatedOn}</div>
               </td>
               <td className="px-4 py-3 text-right">
-                <button className="text-icm-text-faint hover:text-icm-red p-1 rounded">
+                <button onClick={() => toast(`Delete plan ${p.id}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${p.id} deleted`) } })} className="text-icm-text-faint hover:text-icm-red p-1 rounded">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </td>

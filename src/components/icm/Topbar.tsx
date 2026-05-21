@@ -1,6 +1,6 @@
 import {
   Search, Sparkles, HelpCircle, ChevronDown, Layers,
-  Home, Users, CheckSquare, MessageSquare, FileText, AlertTriangle,
+  Home, Users, CheckSquare, MessageSquare,
   BarChart3, CreditCard, Settings,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -29,15 +29,12 @@ const topNavItems: TopNavItem[] = [
   { title: "People", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
   { title: "Messages", url: "/messages", icon: MessageSquare },
-  { title: "Docs", url: "/documentation", icon: FileText },
-  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
   { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
   { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
 ];
 
 const OVERDUE_TASK_COUNT = 3;
-const OPEN_INCIDENT_COUNT = 1;
 
 const badgeTone: Record<"red" | "amber" | "accent", string> = {
   red: "bg-icm-red text-white",
@@ -60,7 +57,6 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
       return null;
     }
     if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" };
-    if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" };
     return null;
   }
 

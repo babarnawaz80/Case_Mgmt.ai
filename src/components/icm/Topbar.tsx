@@ -1,8 +1,18 @@
 import {
   Search, Sparkles, HelpCircle, ChevronDown, Layers, Bot,
   Home, Users, CheckSquare, MessageSquare,
-  BarChart3, CreditCard, Settings,
+  BarChart3, CreditCard, Settings, User, Clock, LogOut,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { NavLink, useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.png";
 import { demoToast } from "@/lib/demoToast";

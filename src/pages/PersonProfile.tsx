@@ -264,7 +264,7 @@ const PersonProfile = () => {
           </>
         )}
         {tab === "medical" && <MedicalInfoTab profile={profile} />}
-        {tab === "monitors" && <MonitorsTab profile={profile} />}
+        
         {tab === "court" && <CourtTab profile={profile} />}
         {tab === "program" && <ProgramTab profile={profile} />}
         {tab === "contacts" && <ContactsTab profile={profile} />}

@@ -1,5 +1,5 @@
 import {
-  Search, Sparkles, HelpCircle, ChevronDown, Layers,
+  Search, Sparkles, HelpCircle, ChevronDown, Layers, Bot,
   Home, Users, CheckSquare, MessageSquare,
   BarChart3, CreditCard, Settings,
 } from "lucide-react";

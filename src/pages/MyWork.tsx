@@ -34,10 +34,12 @@ import {
 } from "@/data/myWork";
 import { AlertsTab } from "@/components/notifications/AlertsTab";
 import { MentionsTab } from "@/components/notifications/MentionsTab";
+import { AICheckInsTab } from "@/components/icm/AICheckInsTab";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSearchParams } from "react-router-dom";
+import { loadCheckIns } from "@/lib/aiCheckIns";
 
-type TopView = "my_work" | "alerts" | "mentions" | "completed";
+type TopView = "my_work" | "alerts" | "mentions" | "ai_checkins" | "completed";
 type TabKey = "today" | "week" | "all" | "completed";
 type GroupMode = "individual" | "due";
 
@@ -106,7 +108,7 @@ const MyWork = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("tab") as TopView | null) ?? "my_work";
   const [view, setViewRaw] = useState<TopView>(
-    initialView === "alerts" || initialView === "mentions" || initialView === "completed"
+    initialView === "alerts" || initialView === "mentions" || initialView === "completed" || initialView === "ai_checkins"
       ? initialView
       : "my_work"
   );
@@ -382,14 +384,17 @@ const MyWork = () => {
         {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="inline-flex items-center p-1.5 rounded-2xl bg-icm-bg/70 ring-1 ring-icm-border/60 shadow-inner">
-            {(
-              [
-                { key: "my_work", label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
-                { key: "alerts", label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
-                { key: "mentions", label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
-                { key: "completed", label: "Completed", count: counts.completed, alert: false },
-              ] as const
-            ).map((t) => {
+            {(() => {
+              const checkInsList = loadCheckIns();
+              const pendingAI = checkInsList.filter((c) => c.status === "Pending Review").length;
+              return [
+                { key: "my_work" as const, label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
+                { key: "alerts" as const, label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
+                { key: "mentions" as const, label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
+                { key: "ai_checkins" as const, label: "AI Check-Ins", count: pendingAI, alert: pendingAI > 0 },
+                { key: "completed" as const, label: "Completed", count: counts.completed, alert: false },
+              ];
+            })().map((t) => {
               const active = view === t.key;
               return (
                 <button
@@ -450,6 +455,9 @@ const MyWork = () => {
             onMarkAllRead={notif.markAllMentionsRead}
           />
         )}
+        {view === "ai_checkins" && <AICheckInsTab />}
+
+
 
         {/* Stat strip — quiet, minimal */}
         {view === "my_work" && (
@@ -573,10 +581,11 @@ const MyWork = () => {
         )}
 
         {/* Content */}
-        {grouped.length === 0 ? (
+        {view !== "ai_checkins" && (grouped.length === 0 ? (
           <EmptyState tab={tab} onJumpWeek={() => setTab("week")} />
         ) : (
           <div className="space-y-5">
+
             {grouped.map((g) => {
               const collapsed = collapsedGroups[g.id];
               const hasOverdue = g.overdueCount > 0 && groupMode === "individual";
@@ -665,8 +674,9 @@ const MyWork = () => {
               );
             })}
           </div>
-        )}
+        ))}
       </div>
+
 
       {/* Modals */}
       {actionTask && (

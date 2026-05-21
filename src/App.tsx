@@ -7,6 +7,8 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import SignDocument from "./pages/SignDocument";
+import CareAssistant from "./pages/CareAssistant";
+import PersonCommunicationsLog from "./pages/PersonCommunicationsLog";
 import SmartNoteAttacher from "./components/SmartNoteAttacher";
 import Dashboard from "./pages/Dashboard";
 import PeopleSupported from "./pages/PeopleSupported";
@@ -140,6 +142,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="/companion/:token" element={<Companion />} />
+            <Route path="/care-assistant/:linkToken" element={<CareAssistant />} />
+            <Route path="/people/:id/communications-log" element={<PersonCommunicationsLog />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/people" element={<PeopleSupported />} />
             <Route path="/people/new" element={<NewParticipantIntake />} />

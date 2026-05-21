@@ -74,6 +74,8 @@ import AIRoadmap from "./pages/AIRoadmap";
 import ProviderDirectory from "./pages/admin/ProviderDirectory";
 import Reports from "./pages/Reports";
 import ReportRunner from "./pages/ReportRunner";
+import ReportBuilder from "./pages/ReportBuilder";
+import AuditEvidence from "./pages/AuditEvidence";
 import PersonDocuments from "./pages/PersonDocuments";
 import Documents from "./pages/Documents";
 import Messages from "./pages/Messages";
@@ -208,6 +210,8 @@ const App = () => (
             <Route path="/ai-roadmap" element={<AIRoadmap />} />
             <Route path="/admin/provider-directory" element={<ProviderDirectory />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/reports/builder" element={<ReportBuilder />} />
+            <Route path="/reports/audit-evidence" element={<AuditEvidence />} />
             <Route path="/reports/:reportId" element={<ReportRunner />} />
             <Route path="/platform" element={<PlatformHub />} />
             <Route path="/platform/guidelines-engines" element={<GuidelinesEnginesList />} />

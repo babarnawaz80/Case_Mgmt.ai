@@ -84,7 +84,7 @@ export default function Reports() {
             </p>
           </div>
           <button
-            onClick={() => alert("Report Builder — coming next iteration. For now, save filters from any report runner to create a custom report.")}
+            onClick={() => navigate("/reports/builder")}
             className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -369,6 +369,7 @@ function MyReportsTab({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 function AuditExportTab({ isAdmin }: { isAdmin: boolean }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-6">
       <section>
@@ -379,12 +380,21 @@ function AuditExportTab({ isAdmin }: { isAdmin: boolean }) {
               Every record access, edit, approval, and export logged permanently.
             </p>
           </div>
-          {isAdmin && (
-            <button className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5">
-              <Download className="w-3 h-3" />
-              Export audit log
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/reports/audit-evidence")}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5"
+            >
+              <Shield className="w-3 h-3" />
+              Open Audit Evidence
             </button>
-          )}
+            {isAdmin && (
+              <button className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5">
+                <Download className="w-3 h-3" />
+                Export audit log
+              </button>
+            )}
+          </div>
         </div>
         <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
           <table className="w-full text-[12px] font-geist">

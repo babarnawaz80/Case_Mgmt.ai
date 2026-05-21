@@ -366,10 +366,6 @@ const ACTIONS: ActionTile[] = [
   { label: "e-Signature", icon: CheckSquare, to: "/documentation", category: "Care", count: 3 },
   { label: "Referrals", icon: Phone, to: "/documentation", category: "Care" },
 
-  // Schedule / Billing (green)
-  { label: "Schedule", icon: Calendar, to: "/dashboard", category: "Schedule" },
-  { label: "Reports", icon: BarChart3, to: "/reports", category: "Schedule" },
-
 ];
 
 function ActionTileBtn({ tile }: { tile: ActionTile }) {

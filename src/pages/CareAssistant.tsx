@@ -37,8 +37,9 @@ export default function CareAssistant() {
     );
   }
 
+  const greeting = `Hey ${person.firstName}, I am your AI case manager assistant. How can I help you?`;
   const [messages, setMessages] = useState<CheckInMessage[]>(() => [
-    { id: "m0", role: "bot", text: openingMessage(person.firstName), ts: Date.now() },
+    { id: "m0", role: "bot", text: greeting, ts: Date.now() },
   ]);
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
@@ -47,10 +48,32 @@ export default function CareAssistant() {
   const [ended, setEnded] = useState(false);
   const [startedAt] = useState(Date.now());
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const spokenRef = useRef(false);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, ended]);
+
+  // Speak the greeting once on mount via browser TTS
+  useEffect(() => {
+    if (spokenRef.current) return;
+    spokenRef.current = true;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      const utter = new SpeechSynthesisUtterance(greeting);
+      utter.rate = 1;
+      utter.pitch = 1;
+      utter.volume = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // ignore — voice is enhancement only
+    }
+    return () => {
+      try { window.speechSynthesis.cancel(); } catch { /* noop */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const exchangeCount = useMemo(
     () => messages.filter((m) => m.role === "individual").length,

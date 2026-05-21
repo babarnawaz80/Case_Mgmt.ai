@@ -36,6 +36,7 @@ import {
   Video,
   FileText,
   Plus,
+  Activity,
   AlertCircle,
   MapPin,
   type LucideIcon,

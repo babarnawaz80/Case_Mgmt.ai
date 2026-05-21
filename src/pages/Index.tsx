@@ -53,7 +53,7 @@ interface TopNavItem {
 
 const topNavItems: TopNavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "People Supported", url: "/people", icon: Users },
+  { title: "People", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Documentation", url: "/documentation", icon: FileText },

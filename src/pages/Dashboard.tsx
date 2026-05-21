@@ -457,7 +457,7 @@ function ActionTileBtn({ tile }: { tile: ActionTile }) {
   return (
     <button
       onClick={() => navigate(tile.to)}
-      className={`relative text-left rounded-xl ${tone.bg} ${tone.hover} ring-1 ${tone.ring} px-3.5 py-3 flex items-center gap-3 text-white shadow-sm hover:shadow-elevated hover:-translate-y-0.5 transition-all overflow-hidden`}
+      className={`relative w-full text-left rounded-xl ${tone.bg} ${tone.hover} ring-1 ${tone.ring} px-3.5 py-3 flex items-center gap-3 text-white shadow-sm hover:shadow-elevated hover:-translate-y-0.5 transition-all overflow-hidden`}
     >
       <div className={`w-9 h-9 rounded-lg ${tone.iconBg} flex items-center justify-center shrink-0`}>
         <Icon className="w-4 h-4" />

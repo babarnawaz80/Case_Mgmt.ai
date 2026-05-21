@@ -7,6 +7,7 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import PeopleSupported from "./pages/PeopleSupported";
+import NewParticipantIntake from "./pages/NewParticipantIntake";
 import LifePlanBoard from "./pages/LifePlanBoard";
 import LifePlanAgentDetail from "./pages/LifePlanAgentDetail";
 import RuleLibraryBuilder from "./pages/RuleLibraryBuilder";

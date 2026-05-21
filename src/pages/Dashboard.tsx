@@ -434,16 +434,16 @@ const ACTIONS: ActionTile[] = [
   { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-forms", category: "Documentation", count: 4 },
 
   // Operations (orange)
-  { label: "Plan of Correction", icon: Shield, to: "/documentation", category: "Operations", count: 1 },
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
   { label: "On Call Log", icon: PhoneCall, to: "/documentation", category: "Operations", count: 3 },
   { label: "Training", icon: GraduationCap, to: "/settings", category: "Operations", count: 4 },
+  { label: "Outreach", icon: Phone, to: "/documentation", category: "Operations" },
 
   // Care (purple)
-  { label: "Care Tracker", icon: Heart, to: "/documentation", category: "Care" },
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },
-  { label: "e-Signature", icon: CheckSquare, to: "/documentation", category: "Care", count: 3 },
   { label: "Referrals", icon: Phone, to: "/documentation", category: "Care" },
+  { label: "Care Team", icon: Heart, to: "/documentation", category: "Care" },
+  { label: "Communications", icon: PhoneCall, to: "/documentation", category: "Care", count: 5 },
 ];
 
 function ActionTileBtn({ tile }: { tile: ActionTile }) {

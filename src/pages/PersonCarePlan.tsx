@@ -88,10 +88,10 @@ const PersonCarePlan = () => {
             Start {person.firstName}'s first plan or let AI draft one based on existing records.
           </p>
           <div className="flex gap-2">
-            <button className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
+            <button onClick={() => setNewPlanOpen(true)} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
               + Start blank plan
             </button>
-            <button className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={() => { setNewPlanOpen(true); setDraftingAI(true); }} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> Draft with AI
             </button>
           </div>

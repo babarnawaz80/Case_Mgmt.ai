@@ -370,7 +370,7 @@ function PlanTable({ plans, onOpen, variant }: { plans: CarePlan[]; onOpen: (id:
 
 function DateCell({ value }: { value?: string }) {
   if (!value || value === "—") {
-    return <button className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Set date</button>;
+    return <button onClick={() => toast("Set date", { description: "Opening date picker…" })} className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Set date</button>;
   }
   return <span className="font-mono text-icm-text">{value}</span>;
 }

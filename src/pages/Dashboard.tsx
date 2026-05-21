@@ -1,7 +1,6 @@
 import { ICMShell } from "@/components/icm/ICMShell";
 
-import { WatchlistCard } from "@/components/icm/WatchlistCard";
-import { Donut, Sparkline } from "@/components/icm/charts";
+import { Donut } from "@/components/icm/charts";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Sun,

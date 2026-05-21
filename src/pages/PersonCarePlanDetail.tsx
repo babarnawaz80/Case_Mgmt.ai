@@ -208,7 +208,7 @@ const PersonCarePlanDetail = () => {
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">{s.status}</span>
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {!readOnly && <button className="text-icm-text-faint hover:text-icm-red"><Trash2 className="w-3.5 h-3.5" /></button>}
+                        {!readOnly && <button onClick={() => toast(`Remove ${s.name}?`, { action: { label: "Remove", onClick: () => toast.success(`${s.name} removed from plan`) } })} className="text-icm-text-faint hover:text-icm-red"><Trash2 className="w-3.5 h-3.5" /></button>}
                       </td>
                     </tr>
                   ))}
@@ -218,7 +218,7 @@ const PersonCarePlanDetail = () => {
           )}
           {!readOnly && (
             <>
-              <button className="mt-3 h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+              <button onClick={() => toast("Add service", { description: "Opening service authorization picker…" })} className="mt-3 h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Add service
               </button>
               <div className="mt-3 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 flex items-start justify-between gap-3">
@@ -226,7 +226,7 @@ const PersonCarePlanDetail = () => {
                   <Sparkles className="inline w-3 h-3 text-icm-accent mr-1" />
                   {person.firstName} mentioned interest in employment support during the 04/27/2026 visit. Consider adding Supported Employment service.
                 </p>
-                <button className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">Add suggested service</button>
+                <button onClick={() => toast.success("Supported Employment added as draft service", { description: "Review & Apply required before billing." })} className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">Add suggested service</button>
               </div>
             </>
           )}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -7,7 +7,13 @@ import {
   Send,
   CheckCircle2,
   ClipboardList,
+  AlertTriangle,
+  Paperclip,
+  PenLine,
+  History,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { getPerson } from "@/data/people";
 import {
   AssessmentAnswer,
@@ -43,6 +49,22 @@ export default function PersonAssessmentForm() {
     template?.sections[0]?.id ?? null,
   );
   const [submitted, setSubmitted] = useState(false);
+
+  // 7.1 — Signatures / attestation, attachments, validation errors
+  const [signCM, setSignCM] = useState("");
+  const [signCMDate, setSignCMDate] = useState(new Date().toISOString().slice(0, 10));
+  const [signParticipant, setSignParticipant] = useState("");
+  const [attest, setAttest] = useState(false);
+  const [attachments, setAttachments] = useState<{ name: string; size: number; type: string }[]>([]);
+  const [missingIds, setMissingIds] = useState<string[]>([]);
+  const [generatedTasks, setGeneratedTasks] = useState<{ title: string; due: string }[]>([]);
+  const [historyCount, setHistoryCount] = useState<number>(() => {
+    try {
+      const h = JSON.parse(localStorage.getItem(`icm.assessments.history.${id}`) ?? "[]");
+      return Array.isArray(h) ? h.length : 0;
+    } catch { return 0; }
+  });
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   if (!person || !template) {
     return (
@@ -115,36 +137,196 @@ export default function PersonAssessmentForm() {
   );
   const answered = answers.filter((a) => a.value != null && a.value !== "").length;
 
+  // Required-field validation across all visible questions
+  function computeMissing(): string[] {
+    const missing: string[] = [];
+    for (const sec of template!.sections) {
+      for (const q of sec.questions) {
+        if (!q.required) continue;
+        if (["section_header", "divider", "instructions"].includes(q.type)) continue;
+        const a = getAnswer(q.id);
+        const v = a?.value;
+        const empty = v == null || v === "" || (Array.isArray(v) && v.length === 0);
+        if (empty) missing.push(q.id);
+      }
+    }
+    return missing;
+  }
+
+  // Detect risk-flagged answers (yes on a "risk"-labeled question, or high-score option)
+  function detectRiskFindings() {
+    const findings: { label: string; severity: "warning" | "critical" }[] = [];
+    for (const sec of template!.sections) {
+      for (const q of sec.questions) {
+        const a = getAnswer(q.id);
+        if (!a) continue;
+        const labelLc = (q.label || "").toLowerCase();
+        const looksRisky = labelLc.includes("risk") || labelLc.includes("fall") || labelLc.includes("self-harm") || labelLc.includes("suicid") || labelLc.includes("elopement") || labelLc.includes("aggress");
+        if ((q.type === "yes_no" || q.type === "yes_no_na") && a.value === "Yes" && looksRisky) {
+          findings.push({ label: q.label, severity: "critical" });
+        }
+        if (q.type === "scored_choice") {
+          const opt = q.options?.find((o) => o.label === a.value);
+          if (opt?.score != null && opt.score >= 3) findings.push({ label: q.label, severity: "warning" });
+        }
+      }
+    }
+    if (loc === "High") findings.push({ label: `Overall LOC: High (score ${score})`, severity: "warning" });
+    if (loc === "Critical") findings.push({ label: `Overall LOC: Critical (score ${score})`, severity: "critical" });
+    return findings;
+  }
+
   function submit() {
+    // Block on missing required
+    const missing = computeMissing();
+    setMissingIds(missing);
+    if (missing.length > 0) {
+      toast.error(`${missing.length} required field${missing.length > 1 ? "s" : ""} missing`, {
+        description: "Scroll up — missing fields are outlined in red.",
+      });
+      const first = document.getElementById(`q-${missing[0]}`);
+      first?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    // Block on attestation/signature
+    if (!attest || !signCM.trim()) {
+      toast.error("Attestation & care manager signature required");
+      document.getElementById("attestation-block")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     const newId = search.get("aid") ?? `A-${Date.now().toString().slice(-4)}`;
-    assessments.push({
+    const findings = detectRiskFindings();
+    const record = {
       id: newId,
       individualId: id!,
       templateId: template!.id,
       templateVersion: template!.version,
       date: new Date().toLocaleDateString("en-US"),
-      status: "Completed",
-      completedBy: "Kathy Adams, CM",
+      status: "Completed" as const,
+      completedBy: signCM || "Kathy Adams, CM",
       totalScore: score,
       loc: loc as any,
       answers,
+      signatures: { careManager: signCM, careManagerDate: signCMDate, participant: signParticipant, attested: attest },
+      attachments,
+      riskFindings: findings,
+    };
+    assessments.push(record);
+
+    // Persist a versioned snapshot for historical retention (7.1)
+    const histKey = `icm.assessments.history.${id}`;
+    const hist = JSON.parse(localStorage.getItem(histKey) ?? "[]");
+    hist.unshift({
+      ...record,
+      capturedAt: new Date().toISOString(),
+      version: `v${hist.length + 1}.0`,
     });
+    localStorage.setItem(histKey, JSON.stringify(hist));
+
+    // Audit entries
+    const audit = JSON.parse(localStorage.getItem("icm.audit") ?? "[]");
+    audit.unshift({
+      id: `aud-${Date.now()}`,
+      ts: new Date().toISOString(),
+      actor: signCM || "Care Manager",
+      action: `Completed assessment: ${template!.name} ${template!.version}`,
+      target: `${person!.firstName} ${person!.lastName}`,
+      category: "assessment",
+      details: `Score ${score} · LOC ${loc} · ${findings.length} risk finding(s) · ${attachments.length} attachment(s)`,
+    });
+    if (findings.length > 0) {
+      audit.unshift({
+        id: `aud-${Date.now() + 1}`,
+        ts: new Date().toISOString(),
+        actor: "System",
+        action: `Risk findings flagged for review`,
+        target: `${person!.firstName} ${person!.lastName}`,
+        category: "ai",
+        details: findings.map(f => `[${f.severity}] ${f.label}`).join("; "),
+      });
+    }
+    localStorage.setItem("icm.audit", JSON.stringify(audit));
+
+    // Auto-generate downstream tasks from findings (links assessment → tasks/plan)
+    const newTasks: { id: string; title: string; dueDate: string; owner: string; supervisor: string; participantId: string; participantName: string; status: string; category: string; escalationDays: number; reminders: string[]; source: string }[] = [];
+    const today = new Date();
+    const due = (n: number) => { const d = new Date(today); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    if (findings.some(f => f.severity === "critical")) {
+      newTasks.push({
+        id: `task-${Date.now()}-a1`, title: `Update person-centered plan: address critical risk findings`,
+        dueDate: due(3), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
+        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        status: "open", category: "Planning", escalationDays: 1, reminders: ["1 day before due"],
+        source: `Assessment ${newId} ${template!.version}`,
+      });
+    }
+    if (findings.length > 0) {
+      newTasks.push({
+        id: `task-${Date.now()}-a2`, title: `Supervisor review: assessment risk findings`,
+        dueDate: due(2), owner: "Diane Carter (Supervisor)", supervisor: "Diane Carter (Supervisor)",
+        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        status: "open", category: "Supervisor Review", escalationDays: 1, reminders: ["same day"],
+        source: `Assessment ${newId} ${template!.version}`,
+      });
+    }
+    if (loc === "High" || loc === "Critical") {
+      newTasks.push({
+        id: `task-${Date.now()}-a3`, title: `Increase monitoring frequency (LOC ${loc})`,
+        dueDate: due(7), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
+        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        status: "open", category: "Monitoring", escalationDays: 3, reminders: ["3 days before due"],
+        source: `Assessment ${newId} ${template!.version}`,
+      });
+    }
+    if (newTasks.length > 0) {
+      const existing = JSON.parse(localStorage.getItem("icm.tasks") ?? "[]");
+      localStorage.setItem("icm.tasks", JSON.stringify([...newTasks, ...existing]));
+      setGeneratedTasks(newTasks.map(t => ({ title: t.title, due: t.dueDate })));
+    }
+
+    setHistoryCount((c) => c + 1);
     setSubmitted(true);
   }
 
   if (submitted) {
     return (
       <div className="min-h-screen bg-icm-bg flex items-center justify-center p-6">
-        <div className="max-w-[480px] w-full rounded-xl border border-icm-border bg-icm-panel p-8 text-center">
-          <div className="w-14 h-14 rounded-full bg-icm-green-soft text-icm-green mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-7 h-7" />
+        <div className="max-w-[520px] w-full rounded-xl border border-icm-border bg-icm-panel p-8">
+          <div className="text-center">
+            <div className="w-14 h-14 rounded-full bg-icm-green-soft text-icm-green mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <h1 className="font-manrope font-extrabold text-[20px] text-icm-text mt-4">
+              Assessment Completed & Signed
+            </h1>
+            <p className="text-[12.5px] text-icm-text-dim mt-2">
+              {template.name} {template.version} · Score {score} · LOC {loc}
+            </p>
+            <p className="text-[11px] text-icm-text-faint mt-1">
+              Snapshot retained as version v{historyCount}.0 · audit entry written
+            </p>
           </div>
-          <h1 className="font-manrope font-extrabold text-[20px] text-icm-text mt-4">
-            Assessment Completed
-          </h1>
-          <p className="text-[12.5px] text-icm-text-dim mt-2">
-            {template.name} · Score {score} · LOC {loc}
-          </p>
+
+          {generatedTasks.length > 0 && (
+            <div className="mt-5 rounded-lg bg-icm-amber-soft/40 border border-icm-amber/30 p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <ClipboardList className="w-3.5 h-3.5 text-icm-amber" />
+                <p className="text-[11.5px] font-semibold text-icm-text">
+                  {generatedTasks.length} task{generatedTasks.length > 1 ? "s" : ""} auto-created from findings
+                </p>
+              </div>
+              <ul className="space-y-1">
+                {generatedTasks.map((t, i) => (
+                  <li key={i} className="text-[11.5px] text-icm-text-dim flex justify-between gap-2">
+                    <span className="truncate">• {t.title}</span>
+                    <span className="font-mono text-[10.5px] text-icm-text-faint shrink-0">due {t.due}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mt-5 space-y-2">
             <button
               onClick={() => navigate(`/people/${id}/care-plan`)}
@@ -163,6 +345,7 @@ export default function PersonAssessmentForm() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-icm-bg font-geist text-icm-text">
@@ -260,6 +443,16 @@ export default function PersonAssessmentForm() {
             </div>
           )}
 
+          {missingIds.length > 0 && (
+            <div className="rounded-xl bg-icm-red-soft border border-icm-red/30 p-3 flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-icm-red mt-0.5" />
+              <p className="text-[12px] text-icm-text">
+                <span className="font-semibold text-icm-red">{missingIds.length} required field{missingIds.length > 1 ? "s" : ""} missing.</span>{" "}
+                <span className="text-icm-text-dim">Submission is blocked until all required fields are answered.</span>
+              </p>
+            </div>
+          )}
+
           {template.sections.map((s, i) => (
             <SectionCard
               key={s.id}
@@ -269,12 +462,104 @@ export default function PersonAssessmentForm() {
               answers={answers}
               setAnswer={setAnswer}
               readonly={readonly}
+              missingIds={missingIds}
             />
           ))}
+
+          {/* Document attachments */}
+          {!readonly && (
+            <section className="rounded-xl border border-icm-border bg-icm-panel p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Paperclip className="w-4 h-4 text-icm-text-dim" />
+                <h2 className="font-manrope font-bold text-[15px] text-icm-text">Document Attachments</h2>
+                <span className="text-[10px] text-icm-text-faint">({attachments.length})</span>
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.docx"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setAttachments((prev) => [...prev, ...files.map((f) => ({ name: f.name, size: f.size, type: f.type }))]);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="h-9 px-3 rounded-lg border border-dashed border-icm-border text-[12px] text-icm-text-dim hover:border-icm-accent hover:text-icm-accent"
+              >
+                + Attach supporting documents
+              </button>
+              {attachments.length > 0 && (
+                <ul className="mt-3 space-y-1.5">
+                  {attachments.map((a, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border text-[11.5px]">
+                      <span className="truncate">{a.name}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="text-icm-text-faint font-mono">{(a.size / 1024).toFixed(1)} KB</span>
+                        <button onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))} className="text-icm-text-faint hover:text-icm-red">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {/* Signature & attestation */}
+          {!readonly && (
+            <section id="attestation-block" className="rounded-xl border border-icm-border bg-icm-panel p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <PenLine className="w-4 h-4 text-icm-text-dim" />
+                <h2 className="font-manrope font-bold text-[15px] text-icm-text">Attestation & Signatures</h2>
+              </div>
+              <label className="flex items-start gap-2 mb-4">
+                <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5" />
+                <span className="text-[12px] text-icm-text">
+                  I attest that the information recorded in this assessment is accurate to the best of my knowledge
+                  and was completed in accordance with applicable program requirements.
+                  <span className="text-icm-red"> *</span>
+                </span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-icm-text-dim mb-1">Care Manager Signature <span className="text-icm-red">*</span></p>
+                  <input
+                    value={signCM}
+                    onChange={(e) => setSignCM(e.target.value)}
+                    placeholder="Type full name as signature"
+                    className="h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] italic focus:outline-none focus:border-icm-accent"
+                  />
+                  <input
+                    type="date"
+                    value={signCMDate}
+                    onChange={(e) => setSignCMDate(e.target.value)}
+                    className="mt-2 h-8 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] focus:outline-none focus:border-icm-accent"
+                  />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-icm-text-dim mb-1">Participant / Guardian Signature</p>
+                  <input
+                    value={signParticipant}
+                    onChange={(e) => setSignParticipant(e.target.value)}
+                    placeholder="Type full name as signature"
+                    className="h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] italic focus:outline-none focus:border-icm-accent"
+                  />
+                  <p className="mt-2 text-[10.5px] text-icm-text-faint">
+                    Optional — capture in person or via secure link.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Score */}
-        <aside className="lg:sticky lg:top-[72px] lg:self-start">
+        <aside className="lg:sticky lg:top-[72px] lg:self-start space-y-3">
           <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
             <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-semibold">
               Current score
@@ -293,11 +578,50 @@ export default function PersonAssessmentForm() {
               {template.loc.high}
             </p>
           </div>
+
+          {/* Risk findings preview */}
+          {(() => {
+            const findings = detectRiskFindings();
+            if (findings.length === 0) return null;
+            return (
+              <div className="rounded-xl border border-icm-amber/40 bg-icm-amber-soft/40 p-4">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-icm-amber" />
+                  <p className="text-[11px] font-semibold text-icm-text uppercase tracking-wide">
+                    Risk findings ({findings.length})
+                  </p>
+                </div>
+                <ul className="space-y-1">
+                  {findings.slice(0, 5).map((f, i) => (
+                    <li key={i} className="text-[11px] text-icm-text-dim flex gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${f.severity === "critical" ? "bg-icm-red" : "bg-icm-amber"}`} />
+                      <span>{f.label}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[10px] text-icm-text-faint">
+                  Tasks will be auto-created on submit and routed to the supervisor.
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* Version history badge */}
+          <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex items-center gap-2">
+            <History className="w-3.5 h-3.5 text-icm-text-dim" />
+            <div className="text-[11px]">
+              <p className="font-semibold text-icm-text">Version history</p>
+              <p className="text-icm-text-faint">
+                {historyCount === 0 ? "No prior completed versions" : `${historyCount} prior version${historyCount > 1 ? "s" : ""} retained`}
+              </p>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
   );
 }
+
 
 function SectionCard({
   id,
@@ -306,6 +630,7 @@ function SectionCard({
   answers,
   setAnswer,
   readonly,
+  missingIds,
 }: {
   id: string;
   section: AssessmentTemplate["sections"][number];
@@ -313,6 +638,7 @@ function SectionCard({
   answers: AssessmentAnswer[];
   setAnswer: (qid: string, value: AssessmentAnswer["value"]) => void;
   readonly: boolean;
+  missingIds: string[];
 }) {
   const aiInSec = section.questions.some((q) =>
     answers.find((a) => a.questionId === q.id && a.aiSuggested),
@@ -334,18 +660,20 @@ function SectionCard({
 
       <div className="space-y-4">
         {section.questions.map((q) => (
-          <QuestionField
-            key={q.id}
-            question={q}
-            answer={answers.find((a) => a.questionId === q.id)}
-            onChange={(v) => setAnswer(q.id, v)}
-            readonly={readonly}
-          />
+          <div key={q.id} id={`q-${q.id}`} className={missingIds.includes(q.id) ? "rounded-lg ring-2 ring-icm-red/40 p-2 -m-2" : ""}>
+            <QuestionField
+              question={q}
+              answer={answers.find((a) => a.questionId === q.id)}
+              onChange={(v) => setAnswer(q.id, v)}
+              readonly={readonly}
+            />
+          </div>
         ))}
       </div>
     </section>
   );
 }
+
 
 function QuestionField({
   question,

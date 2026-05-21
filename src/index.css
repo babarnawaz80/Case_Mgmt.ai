@@ -16,16 +16,16 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 20%;
 
-    --primary: 200 80% 44%;
+    --primary: 270 70% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 95%;
-    --secondary-foreground: 220 20% 25%;
+    --secondary: 270 20% 96%;
+    --secondary-foreground: 270 20% 25%;
 
-    --muted: 210 18% 93%;
-    --muted-foreground: 215 14% 50%;
+    --muted: 270 18% 94%;
+    --muted-foreground: 270 10% 50%;
 
-    --accent: 200 70% 48%;
+    --accent: 300 65% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 65% 54%;
@@ -37,24 +37,24 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 210 70% 52%;
+    --info: 230 75% 60%;
     --info-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 200 80% 44%;
+    --border: 270 20% 91%;
+    --input: 270 20% 91%;
+    --ring: 270 70% 55%;
 
     --radius: 0.75rem;
 
-    --glow-primary: 0 0 15px hsl(200 80% 44% / 0.15);
-    --glow-accent: 0 0 20px hsl(200 70% 48% / 0.1);
-    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(210 33% 97%) 100%);
-    --gradient-primary: linear-gradient(135deg, hsl(200 80% 44%) 0%, hsl(210 70% 52%) 100%);
-    --gradient-surface: linear-gradient(180deg, hsl(210 33% 98%) 0%, hsl(210 25% 96%) 100%);
+    --glow-primary: 0 0 15px hsl(270 70% 55% / 0.18);
+    --glow-accent: 0 0 20px hsl(300 65% 58% / 0.15);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(280 33% 98%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(310 75% 60%) 0%, hsl(270 70% 55%) 50%, hsl(225 80% 60%) 100%);
+    --gradient-surface: linear-gradient(180deg, hsl(280 33% 99%) 0%, hsl(270 25% 97%) 100%);
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 14% 50%;
-    --sidebar-primary: 200 80% 44%;
+    --sidebar-foreground: 270 10% 50%;
+    --sidebar-primary: 270 70% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 20% 96%;
     --sidebar-accent-foreground: 220 20% 20%;

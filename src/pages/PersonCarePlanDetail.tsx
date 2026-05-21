@@ -650,7 +650,7 @@ function GoalCard({ goal, readOnly }: { goal: PlanGoal; readOnly?: boolean }) {
           ))}
         </ul>
         {!readOnly && (
-          <button className="mt-2 text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
+          <button onClick={() => toast("Add objective", { description: "Opening objective editor…" })} className="mt-2 text-[11.5px] text-icm-accent hover:underline inline-flex items-center gap-1">
             <Plus className="w-3 h-3" /> Add objective
           </button>
         )}

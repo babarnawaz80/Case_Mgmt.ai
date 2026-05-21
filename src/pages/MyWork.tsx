@@ -108,7 +108,7 @@ const MyWork = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("tab") as TopView | null) ?? "my_work";
   const [view, setViewRaw] = useState<TopView>(
-    initialView === "alerts" || initialView === "mentions" || initialView === "completed"
+    initialView === "alerts" || initialView === "mentions" || initialView === "completed" || initialView === "ai_checkins"
       ? initialView
       : "my_work"
   );

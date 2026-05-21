@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, Send, FileText, Loader2, ClipboardList } from "lucide-react";
+import { Sparkles, Send, FileText, Loader2, ClipboardList, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AISuggestion, Person } from "@/data/people";
 import { demoToast, demoSuccess } from "@/lib/demoToast";

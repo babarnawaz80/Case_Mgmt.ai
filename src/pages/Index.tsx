@@ -204,18 +204,40 @@ const Index = () => {
     if (!p) return;
     setSnapshotPickerOpen(false);
     setSnapshotQuery("");
+    setActiveIndividualId(p.id);
     setThread((prev) => [
       ...prev,
       { role: "user", text: `Individual Snapshot for ${p.firstName} ${p.lastName}` },
-      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything — or convert it into a note below.` },
+      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. Ask me anything about ${p.firstName} — or convert it into a note below.` },
     ]);
   }
 
   function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
+    const t = text.toLowerCase();
+    const active = activeIndividualId ? getPerson(activeIndividualId) : null;
+
+    if (active) {
+      const name = `${active.firstName} ${active.lastName}`;
+      if (t.includes("med") || t.includes("allerg"))
+        return { reply: `**${name}** — Allergies on file: ${active.allergies ?? "None known"}. ${active.specialInstructions ?? ""}`.trim() };
+      if (t.includes("isp") || t.includes("pcp") || t.includes("compliance"))
+        return active.aiFlag
+          ? { reply: `**${name}** — ${active.aiFlag.detail ?? active.aiFlag.label}`, cta: { label: "Open eChart", href: `/people/${active.id}/echart` } }
+          : { reply: `**${name}** is currently in compliance. Last review on file ${active.updatedOn}.` };
+      if (t.includes("note") || t.includes("contact"))
+        return { reply: `**${name}** has 2 unsigned contact notes from last week and 1 progress note pending.`, cta: { label: "Open Contact Note", href: `/people/${active.id}/contact-note` } };
+      if (t.includes("incident"))
+        return { reply: `**${name}** — 1 low-severity incident (medication error) logged Apr 09; follow-up assigned.`, cta: { label: "Open Incidents", href: `/people/${active.id}/incident-reporting` } };
+      if (t.includes("risk"))
+        return { reply: `**${name}** — Current risk score: ${active.riskScore ?? "not scored"}.` };
+      if (t.includes("monitor") || t.includes("form"))
+        return { reply: `**${name}** — Monthly monitoring form due in 7 days.`, cta: { label: "Open Monitoring", href: `/people/${active.id}/monitoring-form` } };
+      // Default in-context answer
+      return { reply: `Looking at **${name}**'s record — could you be more specific? You can ask about ISP/PCP status, notes, incidents, allergies, monitoring forms, or risk.` };
+    }
+
     const match = suggestedPrompts.find((p) => p.text.toLowerCase() === text.trim().toLowerCase());
     if (match) return { reply: match.reply, cta: match.cta };
-    // Fuzzy keyword routing
-    const t = text.toLowerCase();
     if (t.includes("incident")) return { reply: suggestedPrompts[0].reply, cta: suggestedPrompts[0].cta };
     if (t.includes("health") || t.includes("assessment")) return { reply: suggestedPrompts[1].reply, cta: suggestedPrompts[1].cta };
     if (t.includes("pcp") || t.includes("compliance")) return { reply: suggestedPrompts[2].reply, cta: suggestedPrompts[2].cta };
@@ -225,8 +247,7 @@ const Index = () => {
     if (t.includes("note") || t.includes("sign")) return { reply: suggestedPrompts[6].reply, cta: suggestedPrompts[6].cta };
     if (t.includes("risk")) return { reply: suggestedPrompts[7].reply, cta: suggestedPrompts[7].cta };
     return {
-      reply:
-        "I can help with compliance reviews, ISP/PCP status, incidents, schedules, and unsigned documentation. Try one of the suggested prompts below.",
+      reply: "I can help with compliance reviews, ISP/PCP status, incidents, schedules, and unsigned documentation. Try one of the suggested prompts below.",
     };
   }
 
@@ -236,6 +257,12 @@ const Index = () => {
     const { reply, cta } = findReply(content);
     setThread((prev) => [...prev, { role: "user", text: content }, { role: "ai", text: reply, cta }]);
     setMessage("");
+  }
+
+  function startNewChat() {
+    setThread([]);
+    setMessage("");
+    setActiveIndividualId(null);
   }
 
   const ambientOverlay = ambientOpen ? (

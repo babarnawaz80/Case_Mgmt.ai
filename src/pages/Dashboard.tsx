@@ -432,22 +432,18 @@ const ACTIONS: ActionTile[] = [
   { label: "Progress Note", icon: PenTool, to: "/documentation/progress-notes", category: "Documentation", count: 14 },
   { label: "Visit Summary", icon: CalendarCheck, to: "/documentation/visit-summaries", category: "Documentation", count: 6 },
   { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-forms", category: "Documentation", count: 4 },
-  { label: "Assessments", icon: ClipboardCheck, to: "/documentation/assessments", category: "Documentation" },
-  { label: "Workflow Manager", icon: Briefcase, to: "/workflows", category: "Documentation", count: 2 },
 
   // Operations (orange)
   { label: "Plan of Correction", icon: Shield, to: "/documentation", category: "Operations", count: 1 },
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
   { label: "On Call Log", icon: PhoneCall, to: "/documentation", category: "Operations", count: 3 },
   { label: "Training", icon: GraduationCap, to: "/settings", category: "Operations", count: 4 },
-  { label: "Outreach", icon: Phone, to: "/documentation", category: "Operations" },
 
   // Care (purple)
   { label: "Care Tracker", icon: Heart, to: "/documentation", category: "Care" },
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },
   { label: "e-Signature", icon: CheckSquare, to: "/documentation", category: "Care", count: 3 },
   { label: "Referrals", icon: Phone, to: "/documentation", category: "Care" },
-
 ];
 
 function ActionTileBtn({ tile }: { tile: ActionTile }) {
@@ -457,9 +453,9 @@ function ActionTileBtn({ tile }: { tile: ActionTile }) {
   return (
     <button
       onClick={() => navigate(tile.to)}
-      className={`relative w-full text-left rounded-xl ${tone.bg} ${tone.hover} ring-1 ${tone.ring} px-3.5 py-3 flex items-center gap-3 text-white shadow-sm hover:shadow-elevated hover:-translate-y-0.5 transition-all overflow-hidden`}
+      className={`relative w-full text-left rounded-xl ${tone.bg} ${tone.hover} ring-1 ${tone.ring} px-3 py-2.5 flex items-center gap-2.5 text-white shadow-sm hover:shadow-elevated hover:-translate-y-0.5 transition-all overflow-hidden`}
     >
-      <div className={`w-9 h-9 rounded-lg ${tone.iconBg} flex items-center justify-center shrink-0`}>
+      <div className={`w-8 h-8 rounded-lg ${tone.iconBg} flex items-center justify-center shrink-0`}>
         <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
@@ -475,6 +471,7 @@ function ActionTileBtn({ tile }: { tile: ActionTile }) {
 }
 
 function QuickActions() {
+  const categories: ActionCategory[] = ["Documentation", "Operations", "Care"];
   return (
     <div className="rounded-2xl border border-icm-border bg-icm-panel p-5">
       <div className="flex items-center gap-3 mb-4">
@@ -486,23 +483,13 @@ function QuickActions() {
           {ACTIONS.length} modules
         </span>
       </div>
-      <div className="space-y-2.5">
-        {(["Documentation", "Operations", "Care"] as ActionCategory[]).map((cat) => {
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {categories.map((cat) => {
           const items = ACTIONS.filter((a) => a.category === cat);
-          if (items.length === 0) return null;
-          // Distribute items into rows of up to 4, then stretch each row to fill width
-          const rows: typeof items[] = [];
-          for (let i = 0; i < items.length; i += 4) rows.push(items.slice(i, i + 4));
           return (
             <div key={cat} className="space-y-2.5">
-              {rows.map((row, ri) => (
-                <div key={ri} className="flex gap-2.5">
-                  {row.map((a) => (
-                    <div key={a.label} className="flex-1 min-w-0">
-                      <ActionTileBtn tile={a} />
-                    </div>
-                  ))}
-                </div>
+              {items.map((a) => (
+                <ActionTileBtn key={a.label} tile={a} />
               ))}
             </div>
           );

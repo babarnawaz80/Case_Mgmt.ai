@@ -23,8 +23,17 @@ import {
   PanelLeftOpen,
   ArrowRight,
   User,
+  Home,
+  CheckSquare,
+  BarChart3,
+  Settings,
+  CreditCard,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, NavLink } from "react-router-dom";
+import { useRole, type UserRole } from "@/contexts/RoleContext";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useMessages } from "@/hooks/useMessages";
+import { cn } from "@/lib/utils";
 import { people } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
 

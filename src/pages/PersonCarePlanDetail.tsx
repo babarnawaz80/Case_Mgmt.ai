@@ -161,7 +161,7 @@ const PersonCarePlanDetail = () => {
           </div>
           <div className="mt-3 flex items-center justify-between text-[11.5px]">
             <span className="text-icm-text-faint">Pulled from face sheet. Last updated 01/15/2026.</span>
-            <button className="text-icm-accent hover:underline">Update in Face Sheet →</button>
+            <button onClick={() => navigate(`/people/${person.id}/face-sheet`)} className="text-icm-accent hover:underline">Update in Face Sheet →</button>
           </div>
         </PlanSection>
 

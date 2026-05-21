@@ -43,6 +43,14 @@ const navGroups = [
     ],
   },
   {
+    label: "Supervisor",
+    items: [
+      { title: "Supervisor Dashboard", url: "/supervisor", icon: ShieldCheck },
+      { title: "Compliance Exceptions", url: "/supervisor/compliance", icon: AlertTriangle },
+      { title: "Exception Queue", url: "/exceptions", icon: ListChecks },
+    ],
+  },
+  {
     label: "Operations",
     items: [
       { title: "Attendance", url: "", icon: Calendar },

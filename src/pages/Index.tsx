@@ -160,6 +160,7 @@ const Index = () => {
   const [historyOpen, setHistoryOpen] = useState(true);
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [plusSearch, setPlusSearch] = useState("");
   const [ambientOpen, setAmbientOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
   const [activeIndividualId, setActiveIndividualId] = useState<string | null>(null);
@@ -555,23 +556,55 @@ const Index = () => {
                       <Plus className="w-4 h-4" />
                     </button>
                     {plusMenuOpen && (
-                      <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
+                      <div className="absolute bottom-full left-0 mb-2 w-80 max-w-[92vw] rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
                         <div className="px-3 py-2 border-b border-border">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Individual</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pick an individual</p>
                         </div>
-                        <div className="max-h-56 overflow-y-auto">
-                          {individualOptions.map((ind) => (
-                            <button
-                              key={ind}
-                              onClick={() => { setSelectedIndividual(ind); setPlusMenuOpen(false); }}
-                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors ${selectedIndividual === ind ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
-                            >
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${selectedIndividual === ind ? 'bg-primary/20' : 'bg-muted/50'}`}>
-                                <User className={`w-3.5 h-3.5 ${selectedIndividual === ind ? 'text-primary' : 'text-muted-foreground'}`} />
-                              </div>
-                              {ind}
-                            </button>
-                          ))}
+                        <div className="p-2 border-b border-border">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                            <input
+                              type="text"
+                              value={plusSearch}
+                              onChange={(e) => setPlusSearch(e.target.value)}
+                              placeholder="Search…"
+                              className="w-full pl-8 pr-2 py-1.5 text-sm rounded-lg border border-primary/40 bg-background outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-72 overflow-y-auto">
+                          <button
+                            onClick={() => { setSelectedIndividual("Select Individual"); setPlusMenuOpen(false); setPlusSearch(""); }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${!selectedIndividual || selectedIndividual === "Select Individual" ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
+                          >
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-muted/50">
+                              <User className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                            <span>Select Individual</span>
+                          </button>
+                          {people
+                            .filter((p) => {
+                              const q = plusSearch.trim().toLowerCase();
+                              if (!q) return true;
+                              return `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) || (p.county || "").toLowerCase().includes(q);
+                            })
+                            .map((p) => {
+                              const name = `${p.firstName} ${p.lastName}`;
+                              const isSel = selectedIndividual === name;
+                              return (
+                                <button
+                                  key={p.id}
+                                  onClick={() => { setSelectedIndividual(name); setPlusMenuOpen(false); setPlusSearch(""); }}
+                                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${isSel ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
+                                >
+                                  <PersonAvatar person={p} size={36} shape="circle" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className={`font-medium truncate ${isSel ? 'text-primary' : 'text-foreground'}`}>{name}</div>
+                                    <div className="text-xs text-muted-foreground truncate">{p.county} County · {p.status}</div>
+                                  </div>
+                                </button>
+                              );
+                            })}
                         </div>
                       </div>
                     )}

@@ -615,7 +615,7 @@ function GoalCard({ goal, readOnly }: { goal: PlanGoal; readOnly?: boolean }) {
           </span>
         )}
         {!readOnly && (
-          <button className="text-icm-text-faint hover:text-icm-red p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => toast(`Remove G${goal.number}?`, { action: { label: "Remove", onClick: () => toast.success(`Goal G${goal.number} removed`) } })} className="text-icm-text-faint hover:text-icm-red p-1"><Trash2 className="w-3.5 h-3.5" /></button>
         )}
       </div>
       <textarea

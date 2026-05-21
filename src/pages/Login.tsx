@@ -39,7 +39,7 @@ export default function Login() {
           loggedInAt: new Date().toISOString(),
         }));
       } catch {}
-      navigate("/my-work");
+      navigate("/");
     }, 900);
   };
 

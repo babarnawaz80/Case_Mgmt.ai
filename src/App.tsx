@@ -87,6 +87,7 @@ import {
   PersonESignature,
 } from "./pages/PersonPlaceholders";
 import NotFound from "./pages/NotFound";
+import Companion from "./pages/Companion";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";

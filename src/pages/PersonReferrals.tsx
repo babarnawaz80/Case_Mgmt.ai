@@ -286,7 +286,7 @@ const PersonReferrals = () => {
                             <IconBtn icon={Eye} onClick={() => open(r.id)} />
                             <IconBtn icon={Pencil} onClick={() => open(r.id)} />
                             <IconBtn icon={Printer} onClick={() => window.print()} />
-                            <IconBtn icon={Trash2} onClick={() => { if (confirm(`Withdraw referral ${r.id}? This will be logged in the audit trail.`)) { (window as any).sonner?.toast?.success?.(`Referral ${r.id} withdrawn`); alert(`Referral ${r.id} withdrawn — audit entry created`); } }} />
+                            <IconBtn icon={Trash2} onClick={() => toast(`Withdraw referral ${r.id}?`, { action: { label: "Withdraw", onClick: () => toast.success(`Referral ${r.id} withdrawn — audit entry created`) } })} />
                           </div>
                         </td>
                       </tr>

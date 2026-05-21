@@ -637,11 +637,6 @@ const MyWork = () => {
             })}
           </div>
         )}
-
-        {/* Keyboard hint */}
-        <p className="text-[11px] text-icm-text-faint flex items-center gap-1.5 pt-2">
-          <Keyboard className="w-3 h-3" /> Tip: Use J/K to navigate tasks, Space to expand, Enter to act
-        </p>
       </div>
 
       {/* Modals */}

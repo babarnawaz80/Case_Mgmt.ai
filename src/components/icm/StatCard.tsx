@@ -94,9 +94,9 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden p-6 rounded-[1.75rem] border border-white/60",
-        "shadow-[0_15px_35px_-12px_rgba(15,23,42,0.08),0_4px_10px_-2px_rgba(15,23,42,0.03)]",
-        "transition-all duration-300 hover:shadow-[0_25px_50px_-12px_rgba(15,23,42,0.12)]",
+        "relative overflow-hidden p-4 rounded-[1.5rem] border border-white/60",
+        "shadow-[0_10px_25px_-12px_rgba(15,23,42,0.08),0_2px_6px_-2px_rgba(15,23,42,0.03)]",
+        "transition-all duration-300 hover:shadow-[0_18px_36px_-12px_rgba(15,23,42,0.12)]",
         t.gradient,
         className,
       )}
@@ -104,7 +104,7 @@ export function StatCard({
       {/* decorative circle */}
       <div
         className={cn(
-          "pointer-events-none absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-[2px]",
+          "pointer-events-none absolute -bottom-8 -right-8 w-28 h-28 rounded-full blur-[2px]",
           t.decoration,
         )}
         aria-hidden
@@ -114,11 +114,11 @@ export function StatCard({
         {Icon ? (
           <div
             className={cn(
-              "w-11 h-11 rounded-2xl bg-white/90 flex items-center justify-center shadow-sm",
+              "w-9 h-9 rounded-xl bg-white/90 flex items-center justify-center shadow-sm",
               t.iconText,
             )}
           >
-            <Icon className="w-5 h-5" />
+            <Icon className="w-4 h-4" />
           </div>
         ) : (
           <div />
@@ -126,8 +126,8 @@ export function StatCard({
         {delta && (
           <span
             className={cn(
-              "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/90 shadow-sm",
-              "text-[11px] font-bold",
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/90 shadow-sm",
+              "text-[10px] font-bold",
               t.deltaText,
             )}
           >
@@ -137,14 +137,14 @@ export function StatCard({
         )}
       </div>
 
-      <p className="relative mt-5 text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest">
+      <p className="relative mt-3 text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest">
         {label}
       </p>
 
-      <div className="relative mt-1.5">
+      <div className="relative mt-1">
         <span
           className={cn(
-            "font-manrope text-[44px] font-black leading-none tracking-tighter",
+            "font-manrope text-[32px] font-black leading-none tracking-tighter",
             t.valueText,
           )}
         >
@@ -153,7 +153,7 @@ export function StatCard({
       </div>
 
       {subtext && (
-        <p className="relative mt-2 text-sm text-icm-text-dim">{subtext}</p>
+        <p className="relative mt-1.5 text-xs text-icm-text-dim">{subtext}</p>
       )}
 
       {link && (
@@ -161,13 +161,13 @@ export function StatCard({
           href={link.href ?? "#"}
           onClick={handleLink}
           className={cn(
-            "relative mt-4 inline-flex items-center gap-1 text-sm font-bold",
+            "relative mt-2 inline-flex items-center gap-1 text-xs font-bold",
             "hover:gap-1.5 transition-all",
             t.linkText,
           )}
         >
           {link.label}
-          <ArrowUpRight className="w-4 h-4" />
+          <ArrowUpRight className="w-3.5 h-3.5" />
         </a>
       )}
     </div>

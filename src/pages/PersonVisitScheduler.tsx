@@ -127,7 +127,7 @@ const PersonVisitScheduler = () => {
           <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>{initials(person)}</div>
           <div className="flex-1">
             <div className="font-manrope font-extrabold text-[16px] text-icm-text">{person.lastName}, {person.firstName}</div>
-            <div className="text-[11.5px] text-icm-text-dim">{person.county} · {person.age}y · {person.program ?? "Program"}</div>
+            <div className="text-[11.5px] text-icm-text-dim">{person.county} · {person.age}y · {(person as any).program ?? "Program"}</div>
           </div>
           <div className={`inline-flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11.5px] font-medium border ${online ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-amber-300 bg-amber-50 text-amber-700"}`}>
             {online ? <><Wifi className="w-3.5 h-3.5" /> Online — auto-sync</> : <><WifiOff className="w-3.5 h-3.5" /> Offline — save locally</>}

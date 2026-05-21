@@ -19,7 +19,7 @@ export default {
         tight: ['"Inter Tight"', "Inter", "sans-serif"],
         geist: ["Geist", "Inter", "sans-serif"],
         manrope: ["Manrope", "Inter", "sans-serif"],
-        mono: ['"Geist Mono"', "ui-monospace", "monospace"],
+        mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",

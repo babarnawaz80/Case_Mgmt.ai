@@ -34,9 +34,10 @@ import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
 import { cn } from "@/lib/utils";
-import { people } from "@/data/people";
+import { people, getPerson } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
-import { IndividualSnapshotDialog } from "@/components/IndividualSnapshotDialog";
+import { InlineIndividualSnapshot } from "@/components/InlineIndividualSnapshot";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
 
 interface ChatHistoryItem {
   id: string;

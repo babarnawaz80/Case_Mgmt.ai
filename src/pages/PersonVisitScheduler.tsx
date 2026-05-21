@@ -68,7 +68,7 @@ const PersonVisitScheduler = () => {
   const [startTime, setStartTime] = useState("10:00");
   const [duration, setDuration] = useState("60");
   const [location, setLocation] = useState(LOCATIONS[0]);
-  const [address, setAddress] = useState(person?.address || "");
+  const [address, setAddress] = useState((person as any)?.address || "");
   const [staffIds, setStaffIds] = useState<string[]>(["u1"]);
   const [linkedGoalId, setLinkedGoalId] = useState("goal-1");
   const [linkedTaskId, setLinkedTaskId] = useState("task-monitoring");

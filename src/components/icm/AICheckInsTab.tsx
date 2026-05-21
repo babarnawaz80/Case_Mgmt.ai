@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { loadCheckIns, type AICheckInSession } from "@/lib/aiCheckIns";
 import { CheckInTranscriptDrawer } from "@/components/icm/CheckInTranscriptDrawer";
+import { StatCard } from "@/components/icm/StatCard";
 import { useRole } from "@/contexts/RoleContext";
 import { cn } from "@/lib/utils";
 
@@ -38,47 +39,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function StatTile({
-  label,
-  value,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  tone: "neutral" | "red" | "amber" | "accent" | "green";
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  const value$ = {
-    neutral: "text-icm-text",
-    red: "text-icm-red",
-    amber: "text-icm-amber",
-    accent: "text-icm-accent",
-    green: "text-icm-green",
-  }[tone];
-  const iconBg = {
-    neutral: "bg-icm-bg text-icm-text-dim",
-    red: "bg-icm-red-soft text-icm-red/70",
-    amber: "bg-icm-amber-soft text-icm-amber/70",
-    accent: "bg-icm-accent-soft text-icm-accent/70",
-    green: "bg-icm-green-soft text-icm-green/70",
-  }[tone];
-  return (
-    <div className="group bg-icm-panel border border-icm-border/70 p-6 rounded-[1.75rem] shadow-[0_15px_35px_-12px_rgba(15,23,42,0.06),0_4px_10px_-2px_rgba(15,23,42,0.02)] transition-all duration-300">
-      <p className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest">
-        {label}
-      </p>
-      <div className="flex items-end justify-between mt-3">
-        <span className={cn("font-manrope text-[44px] font-black leading-none tracking-tighter", value$)}>
-          {value}
-        </span>
-        <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm", iconBg)}>
-          <Icon className="w-5 h-5" />
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 export function AICheckInsTab() {
   const { role } = useRole();
@@ -120,10 +81,10 @@ export function AICheckInsTab() {
     <div className="space-y-5">
       {/* Stat strip — mirror My Work */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile label="Total check-ins" value={counts.total} tone="neutral" icon={Bot} />
-        <StatTile label="Urgent" value={counts.urgent} tone="red" icon={AlertCircle} />
-        <StatTile label="Pending review" value={counts.pending} tone="amber" icon={Clock} />
-        <StatTile label="Reviewed" value={counts.reviewed} tone="green" icon={CheckCircle2} />
+        <StatCard label="Total check-ins" value={counts.total} tone="neutral" icon={Bot} subtext="All sessions" />
+        <StatCard label="Urgent" value={counts.urgent} tone="red" icon={AlertCircle} subtext="Needs review" />
+        <StatCard label="Pending review" value={counts.pending} tone="amber" icon={Clock} subtext="Awaiting action" />
+        <StatCard label="Reviewed" value={counts.reviewed} tone="green" icon={CheckCircle2} subtext="Completed" />
       </div>
 
       {/* Toolbar — mirror My Work */}

@@ -99,6 +99,7 @@ export function PersonAIPanel({ person, suggestions: override, intro }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   function handleSummarize() {
     if (loading) return;

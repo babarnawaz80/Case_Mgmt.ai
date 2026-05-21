@@ -7,6 +7,7 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import PeopleSupported from "./pages/PeopleSupported";
+import NewParticipantIntake from "./pages/NewParticipantIntake";
 import LifePlanBoard from "./pages/LifePlanBoard";
 import LifePlanAgentDetail from "./pages/LifePlanAgentDetail";
 import RuleLibraryBuilder from "./pages/RuleLibraryBuilder";
@@ -124,6 +125,7 @@ const App = () => (
             <Route path="/companion/:token" element={<Companion />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/people" element={<PeopleSupported />} />
+            <Route path="/people/new" element={<NewParticipantIntake />} />
             <Route path="/people/:id/profile" element={<PersonProfile />} />
             <Route path="/people/:id/facesheet" element={<PersonFaceSheet />} />
             <Route path="/people/:id/echart" element={<EChart />} />

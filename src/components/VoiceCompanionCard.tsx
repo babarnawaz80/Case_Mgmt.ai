@@ -57,29 +57,29 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
   };
 
   return (
-    <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
+    <div className="rounded-[2rem] border border-icm-border/70 bg-icm-panel p-6 shadow-[0_25px_70px_-20px_rgba(15,23,42,0.08),0_4px_10px_-2px_rgba(15,23,42,0.02)]">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl ai-gradient flex items-center justify-center shrink-0 shadow-sm">
-            <Sparkles className="w-4 h-4 text-white" />
+        <div className="flex items-start gap-4 min-w-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-icm-accent-soft to-icm-accent-soft/60 ring-1 ring-icm-accent/15 flex items-center justify-center shrink-0 shadow-sm">
+            <Sparkles className="w-5 h-5 text-icm-accent" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-manrope font-bold text-[15px] text-icm-text">AI Case Companion</h2>
-              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
-                PRIVATE LINK
+              <h2 className="font-manrope font-bold text-[16px] text-icm-text tracking-tight">AI Case Companion</h2>
+              <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest bg-icm-accent-soft text-icm-accent border border-icm-accent/15">
+                Private Link
               </span>
             </div>
-            <p className="text-[12px] text-icm-text-dim mt-0.5 leading-snug">
-              A unique link for <span className="text-icm-text font-medium">{firstName}</span>. They tap it
-              from their phone to start a check-in with their Care Assistant. The transcript and any tasks
-              flow back to My Work and this individual's Communications Log.
+            <p className="text-[12.5px] text-icm-text-dim mt-1 leading-relaxed font-geist max-w-xl">
+              A unique link for <span className="text-icm-text font-semibold">{firstName}</span>. They tap it from
+              their phone to start a check-in with their Care Assistant. The transcript and any tasks flow
+              back to My Work and this individual's Communications Log.
             </p>
           </div>
         </div>
         <button
           onClick={() => setConfirmRotate(true)}
-          className="h-8 px-2.5 rounded-lg text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text border border-icm-border hover:border-icm-border-strong flex items-center gap-1.5"
+          className="h-9 px-3 rounded-xl text-[11.5px] font-geist font-semibold text-icm-text-dim hover:text-icm-text border border-icm-border bg-icm-panel hover:border-icm-border-strong shadow-sm flex items-center gap-1.5"
           title="Rotate link"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -87,20 +87,20 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
         </button>
       </div>
 
-      {/* Link row — clickable */}
-      <div className="mt-4 flex items-center gap-2 rounded-lg border border-icm-border bg-icm-bg/60 px-3 py-2">
+      {/* Link row */}
+      <div className="mt-5 flex items-center gap-2 rounded-2xl border border-icm-border bg-icm-bg/60 px-4 py-2.5">
         <a
           href={internalHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[11px] font-mono text-icm-accent hover:underline truncate flex-1"
+          className="text-[12px] font-mono text-icm-accent hover:underline truncate flex-1"
           title={publicLink}
         >
           {publicLink}
         </a>
         <button
           onClick={handleCopy}
-          className="h-7 px-2.5 rounded-md text-[11.5px] font-geist font-medium flex items-center gap-1.5 bg-icm-panel border border-icm-border text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
+          className="h-8 px-3 rounded-lg text-[11.5px] font-geist font-bold flex items-center gap-1.5 bg-icm-panel border border-icm-border text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong shadow-sm"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-icm-green" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? "Copied" : "Copy"}
@@ -108,8 +108,8 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
       </div>
 
       {/* Status indicator */}
-      <div className="mt-2 flex items-center gap-1.5 text-[11.5px]">
-        <span className={`w-1.5 h-1.5 rounded-full ${lastUsed ? "bg-icm-green" : "bg-icm-text-faint"}`} />
+      <div className="mt-3 flex items-center gap-2 text-[11.5px] font-geist">
+        <span className={`w-2 h-2 rounded-full ${lastUsed ? "bg-icm-green shadow-[0_0_8px_rgba(34,197,94,0.45)]" : "bg-icm-text-faint"}`} />
         <span className="text-icm-text-dim">
           {lastUsed
             ? `Link active — last used ${lastUsed.toLocaleDateString()} at ${lastUsed.toLocaleTimeString(
@@ -121,23 +121,23 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
       </div>
 
       {/* Actions */}
-      <div className="mt-3 flex items-center gap-2 flex-wrap">
+      <div className="mt-4 flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setSmsOpen(true)}
-          className="h-9 px-3 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 text-white gradient-primary shadow-sm hover:opacity-95"
+          className="h-10 px-5 rounded-2xl text-[12px] font-geist font-bold text-white bg-icm-accent hover:bg-icm-accent/90 shadow-[0_10px_25px_-5px_rgba(59,130,246,0.45)] hover:shadow-[0_15px_30px_-5px_rgba(59,130,246,0.55)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5"
         >
           <MessageSquare className="w-3.5 h-3.5" />
           Send via Text
         </button>
         <button
           onClick={handleOpen}
-          className="h-9 px-3 rounded-xl text-[12px] font-geist font-medium flex items-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
+          className="h-10 px-4 rounded-2xl text-[12px] font-geist font-black text-icm-text bg-white border border-icm-border shadow-sm hover:bg-icm-bg/60 active:scale-95 transition-all flex items-center gap-1.5"
         >
           <ExternalLink className="w-3.5 h-3.5" />
           Preview Care Assistant
         </button>
         {phone && (
-          <span className="text-[11.5px] text-icm-text-dim inline-flex items-center gap-1 ml-1">
+          <span className="text-[11.5px] text-icm-text-dim font-geist inline-flex items-center gap-1 ml-1">
             <Phone className="w-3 h-3" />
             On file: {phone}
           </span>

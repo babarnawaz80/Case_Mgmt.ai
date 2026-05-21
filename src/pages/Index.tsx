@@ -501,12 +501,33 @@ const Index = () => {
           )}
 
 
+          {/* Active context chip */}
+          {thread.length > 0 && (
+            <div className="w-full max-w-2xl flex items-center justify-between gap-2 mt-2 mb-2">
+              {activeIndividualId && (() => {
+                const ap = getPerson(activeIndividualId);
+                return ap ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 text-xs text-purple-800 dark:text-purple-200">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Chatting about <strong className="font-semibold">{ap.firstName} {ap.lastName}</strong>
+                  </div>
+                ) : null;
+              })()}
+              <button
+                onClick={startNewChat}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-secondary transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5" /> New chat
+              </button>
+            </div>
+          )}
+
           {/* Chat Input */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="w-full max-w-2xl mt-8"
+            className="w-full max-w-2xl mt-2"
           >
             <div className="glass rounded-2xl p-4">
               <textarea

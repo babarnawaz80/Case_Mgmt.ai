@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { getPerson, riskAvatarClass, initials } from "@/data/people";
 import { toast } from "sonner";

@@ -331,80 +331,87 @@ const MyWork = () => {
           </div>
         )}
 
-        {/* Daily brief */}
+        {/* Daily brief — calm, single line */}
         {!briefDismissed && !focused && (
-          <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft px-4 py-3 flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg ai-gradient flex items-center justify-center shrink-0">
+          <div className="rounded-2xl border border-icm-border bg-icm-panel px-5 py-4 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl ai-gradient flex items-center justify-center shrink-0 shadow-sm">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
-              <div>
-                <p className="text-[12.5px] font-geist text-icm-text font-semibold">
-                  Good morning, Kathy. Here's your day:
-                </p>
-                <p className="text-[12px] font-geist text-icm-text-dim leading-relaxed mt-0.5">
-                  You have {counts.total} open tasks — {counts.overdue} are past due, {counts.today} are
-                  due today. Most urgent: Joseph Brown's quarterly visit is 76 days overdue.
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-geist text-icm-text">
+                  <span className="font-semibold">Good morning, Kathy.</span>{" "}
+                  <span className="text-icm-text-dim">
+                    {counts.total} open tasks · {counts.overdue} past due · {counts.today} due today.
+                    Joseph Brown's quarterly visit is the most urgent.
+                  </span>
                 </p>
                 <button
                   onClick={() => {
                     setFilterIndividual("Joseph");
                     setTab("all");
                   }}
-                  className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline mt-1.5 flex items-center gap-1"
+                  className="text-[12px] font-geist font-medium text-icm-accent hover:underline mt-1 inline-flex items-center gap-1"
                 >
-                  Show me Joseph's tasks <ArrowRight className="w-3 h-3" />
+                  Show Joseph's tasks <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
             <button
               onClick={() => setBriefDismissed(true)}
-              className="text-icm-text-faint hover:text-icm-text"
+              className="text-icm-text-faint hover:text-icm-text shrink-0"
+              aria-label="Dismiss"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {/* Top-level tabs: My Work / Alerts / Mentions / Completed */}
-        <div className="flex items-center gap-1 border-b border-icm-border">
-          {(
-            [
-              { key: "my_work", label: "My Work", count: counts.overdue, tone: counts.overdue > 0 ? "red" : "neutral" },
-              { key: "alerts", label: "Alerts", count: notif.unreadAlerts, tone: notif.unreadAlerts > 0 ? "red" : "neutral" },
-              { key: "mentions", label: "Mentions", count: notif.unreadMentions, tone: notif.unreadMentions > 0 ? "red" : "neutral" },
-              { key: "completed", label: "Completed", count: counts.completed, tone: "neutral" },
-            ] as const
-          ).map((t) => {
-            const active = view === t.key;
-            const badgeCls =
-              t.tone === "red"
-                ? "bg-icm-red text-white"
-                : "bg-icm-bg text-icm-text-dim";
-            return (
-              <button
-                key={t.key}
-                onClick={() => setView(t.key)}
-                className={cn(
-                  "px-3 py-2 text-[12.5px] font-geist border-b-2 -mb-px flex items-center gap-1.5",
-                  active
-                    ? "border-icm-text text-icm-text font-semibold"
-                    : "border-transparent text-icm-text-dim hover:text-icm-text"
-                )}
-              >
-                {t.label}
-                {t.count > 0 && (
-                  <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-mono font-semibold", badgeCls)}>
-                    {t.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="inline-flex items-center p-1 rounded-xl bg-icm-bg border border-icm-border">
+            {(
+              [
+                { key: "my_work", label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
+                { key: "alerts", label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
+                { key: "mentions", label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
+                { key: "completed", label: "Completed", count: counts.completed, alert: false },
+              ] as const
+            ).map((t) => {
+              const active = view === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setView(t.key)}
+                  className={cn(
+                    "h-8 px-3 rounded-lg text-[12px] font-geist flex items-center gap-1.5 transition-colors",
+                    active
+                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
+                      : "text-icm-text-dim hover:text-icm-text"
+                  )}
+                >
+                  {t.label}
+                  {t.count > 0 && (
+                    <span
+                      className={cn(
+                        "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-semibold flex items-center justify-center",
+                        t.alert
+                          ? "bg-icm-red/10 text-icm-red"
+                          : "bg-icm-bg text-icm-text-faint",
+                        active && !t.alert && "bg-icm-bg"
+                      )}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
           {view === "my_work" && (
             <button
               onClick={() => setAddOpen(true)}
-              className="ml-auto text-[11.5px] font-geist text-icm-accent hover:underline flex items-center gap-1"
+              className="h-8 px-3 rounded-lg text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text border border-icm-border bg-icm-panel hover:border-icm-border-strong flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" /> Add task
             </button>
@@ -432,109 +439,106 @@ const MyWork = () => {
           />
         )}
 
-        {/* Inner tabs only show under the My Work top-level view */}
+        {/* Stat strip — quiet, minimal */}
         {view === "my_work" && (
-          <div className="flex items-center gap-1 border-b border-icm-border">
-            {innerTabs.map((t) => {
-              const active = tab === t.key;
-              const badge =
-                t.key === "today" ? counts.today : t.key === "week" ? counts.week : counts.total;
-              const badgeTone =
-                t.key === "today" && counts.overdue > 0
-                  ? "bg-icm-red-soft text-icm-red"
-                  : "bg-icm-bg text-icm-text-dim";
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "px-3 py-1.5 text-[11.5px] font-geist border-b-2 -mb-px flex items-center gap-1.5",
-                    active
-                      ? "border-icm-accent text-icm-accent font-semibold"
-                      : "border-transparent text-icm-text-dim hover:text-icm-text"
-                  )}
-                >
-                  {t.label}
-                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold", badgeTone)}>
-                    {badge}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatTile label="Open" value={counts.total} tone="neutral" />
+            <StatTile label="Past due" value={counts.overdue} tone="red" />
+            <StatTile label="Due today" value={counts.today} tone="amber" />
+            <StatTile label="This week" value={counts.week} tone="accent" />
           </div>
         )}
 
-        {/* Summary chips + view controls */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Chip tone="neutral" label="Total" value={counts.total} />
-            <Chip tone="red" label="Past Due" value={counts.overdue} />
-            <Chip tone="amber" label="Due Today" value={counts.today} />
-            <Chip tone="accent" label="Due This Week" value={counts.week} />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center rounded-lg border border-icm-border bg-icm-panel overflow-hidden">
+        {/* Unified toolbar: timeframe + sort/filter */}
+        {view === "my_work" && (
+          <div className="rounded-2xl border border-icm-border bg-icm-panel px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
+            <div className="inline-flex items-center p-0.5 rounded-lg bg-icm-bg">
+              {innerTabs.map((t) => {
+                const active = tab === t.key;
+                const badge =
+                  t.key === "today" ? counts.today : t.key === "week" ? counts.week : counts.total;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={cn(
+                      "h-7 px-3 rounded-md text-[11.5px] font-geist flex items-center gap-1.5 transition-colors",
+                      active
+                        ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
+                        : "text-icm-text-dim hover:text-icm-text"
+                    )}
+                  >
+                    {t.label}
+                    <span className="text-icm-text-faint font-mono text-[10px]">{badge}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="inline-flex items-center p-0.5 rounded-lg bg-icm-bg">
+                <button
+                  onClick={() => setGroupMode("individual")}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-[11px] font-geist flex items-center gap-1.5",
+                    groupMode === "individual"
+                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
+                      : "text-icm-text-dim hover:text-icm-text"
+                  )}
+                >
+                  <UsersIcon className="w-3.5 h-3.5" /> By person
+                </button>
+                <button
+                  onClick={() => setGroupMode("due")}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-[11px] font-geist flex items-center gap-1.5",
+                    groupMode === "due"
+                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
+                      : "text-icm-text-dim hover:text-icm-text"
+                  )}
+                >
+                  <CalendarIcon className="w-3.5 h-3.5" /> By date
+                </button>
+              </div>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                className="h-7 px-2 rounded-md border border-icm-border bg-icm-panel text-[11px] text-icm-text-dim hover:text-icm-text"
+              >
+                <option value="priority">Priority</option>
+                <option value="due">Due date</option>
+                <option value="name">Individual</option>
+                <option value="type">Task type</option>
+                <option value="created">Created</option>
+              </select>
               <button
-                onClick={() => setGroupMode("individual")}
+                onClick={() => setShowFilters((s) => !s)}
                 className={cn(
-                  "h-8 px-2.5 text-[11px] font-geist flex items-center gap-1.5",
-                  groupMode === "individual"
-                    ? "bg-icm-bg text-icm-text font-semibold"
-                    : "text-icm-text-dim hover:text-icm-text",
+                  "h-7 px-2.5 rounded-md text-[11px] font-geist flex items-center gap-1.5 border",
+                  showFilters
+                    ? "bg-icm-text text-icm-panel border-icm-text"
+                    : "border-icm-border text-icm-text-dim hover:text-icm-text"
                 )}
               >
-                <UsersIcon className="w-3.5 h-3.5" /> Individual
-              </button>
-              <button
-                onClick={() => setGroupMode("due")}
-                className={cn(
-                  "h-8 px-2.5 text-[11px] font-geist flex items-center gap-1.5 border-l border-icm-border",
-                  groupMode === "due"
-                    ? "bg-icm-bg text-icm-text font-semibold"
-                    : "text-icm-text-dim hover:text-icm-text",
-                )}
-              >
-                <CalendarIcon className="w-3.5 h-3.5" /> Due date
+                <FilterIcon className="w-3.5 h-3.5" /> Filter
               </button>
             </div>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as typeof sort)}
-              className="h-8 px-2 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] text-icm-text"
-            >
-              <option value="priority">Sort: Priority</option>
-              <option value="due">Sort: Due date</option>
-              <option value="name">Sort: Individual</option>
-              <option value="type">Sort: Task type</option>
-              <option value="created">Sort: Created</option>
-            </select>
-            <button
-              onClick={() => setShowFilters((s) => !s)}
-              className={cn(
-                "h-8 px-2.5 rounded-lg border text-[11.5px] font-geist flex items-center gap-1.5",
-                showFilters
-                  ? "bg-icm-text text-icm-panel border-icm-text"
-                  : "border-icm-border text-icm-text-dim hover:text-icm-text",
-              )}
-            >
-              <FilterIcon className="w-3.5 h-3.5" /> Filter
-            </button>
           </div>
-        </div>
+        )}
 
         {/* Filters panel */}
-        {showFilters && (
-          <div className="rounded-xl border border-icm-border bg-icm-panel p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+        {view === "my_work" && showFilters && (
+          <div className="rounded-2xl border border-icm-border bg-icm-panel p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
             <input
               value={filterIndividual}
               onChange={(e) => setFilterIndividual(e.target.value)}
               placeholder="Individual…"
-              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text"
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
             />
             <select
               value={filterSource}
               onChange={(e) => setFilterSource(e.target.value as typeof filterSource)}
-              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text"
+              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
             >
               <option value="All">All sources</option>
               <option value="Case Management">Case Management</option>
@@ -544,7 +548,7 @@ const MyWork = () => {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text"
+              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
             >
               <option value="All">All statuses</option>
               <option value="Open">Open</option>
@@ -565,39 +569,44 @@ const MyWork = () => {
               return (
                 <div
                   key={g.id}
-                  className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden"
+                  className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden"
                 >
                   {/* Group header */}
                   <button
                     onClick={() => toggleGroup(g.id)}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/50 transition-colors text-left"
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/60"
                   >
                     {groupMode === "individual" ? (
-                      <div className="w-8 h-8 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[10px] font-mono font-bold text-icm-accent shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-[11px] font-geist font-bold text-icm-text shrink-0">
                         {g.initials}
                       </div>
                     ) : (
-                      <CalendarIcon
-                        className={cn("w-4 h-4 shrink-0", (g as any).tone ?? "text-icm-text-dim")}
-                      />
+                      <div className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center shrink-0">
+                        <CalendarIcon
+                          className={cn("w-4 h-4", (g as any).tone ?? "text-icm-text-dim")}
+                        />
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={cn(
-                            "text-[13px] font-semibold font-geist",
-                            groupMode === "individual" ? "text-icm-text" : "tracking-wider",
+                            "text-[13.5px] font-semibold font-geist",
                             groupMode === "due" ? (g as any).tone : "text-icm-text",
+                            groupMode === "due" && "tracking-wide text-[11.5px] uppercase",
                           )}
                         >
                           {g.label}
                         </span>
-                        {g.sub && <span className="text-[11px] text-icm-text-faint">{g.sub}</span>}
-                        <span className="px-1.5 py-0.5 rounded bg-icm-bg text-icm-text-dim text-[10px] font-mono">
-                          {g.items.length}
+                        {g.sub && (
+                          <span className="text-[11.5px] text-icm-text-faint font-geist">{g.sub}</span>
+                        )}
+                        <span className="text-[11.5px] text-icm-text-faint font-geist">
+                          · {g.items.length} task{g.items.length === 1 ? "" : "s"}
                         </span>
                         {g.overdueCount > 0 && groupMode === "individual" && (
-                          <span className="px-1.5 py-0.5 rounded bg-icm-red-soft text-icm-red text-[10px] font-mono font-semibold">
+                          <span className="text-[11px] font-semibold text-icm-red inline-flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-icm-red" />
                             {g.overdueCount} overdue
                           </span>
                         )}
@@ -633,11 +642,6 @@ const MyWork = () => {
             })}
           </div>
         )}
-
-        {/* Keyboard hint */}
-        <p className="text-[11px] text-icm-text-faint flex items-center gap-1.5 pt-2">
-          <Keyboard className="w-3 h-3" /> Tip: Use J/K to navigate tasks, Space to expand, Enter to act
-        </p>
       </div>
 
       {/* Modals */}
@@ -689,68 +693,73 @@ function TaskRow({
   const isOver = diff !== null && diff < 0 && task.status !== "Completed";
 
   return (
-    <div className="px-4 py-3">
+    <div className={cn("px-4 py-3 transition-colors hover:bg-icm-bg/40", isOver && "bg-icm-red/[0.02]")}>
       <div className="flex items-start gap-3">
-        <div className="pt-0.5">
+        {/* Status rail */}
+        <div className="pt-1 flex flex-col items-center gap-1 shrink-0">
           <StatusIcon status={isOver ? "Overdue" : task.status} />
         </div>
+
+        {/* Body */}
         <div className="flex-1 min-w-0">
           <button onClick={onToggleExpand} className="text-left w-full">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[13px] font-semibold text-icm-text font-geist">{task.name}</span>
+              <span className="text-[13.5px] font-semibold text-icm-text font-geist leading-tight">
+                {task.name}
+              </span>
               {showIndividualName && (
-                <span className="text-[11px] text-icm-text-dim font-geist">
+                <span className="text-[11.5px] text-icm-text-dim font-geist">
                   · {task.individualName}
                 </span>
               )}
-              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold", tone.chip)}>
-                {isOver ? "Overdue" : task.status}
-              </span>
+              {isOver ? (
+                <span className="text-[10.5px] font-semibold text-icm-red bg-icm-red/10 px-1.5 py-0.5 rounded">
+                  {task.daysOverdue ? `${task.daysOverdue}d overdue` : "Overdue"}
+                </span>
+              ) : task.status === "In Progress" ? (
+                <span className="text-[10.5px] font-medium text-icm-amber">In progress</span>
+              ) : null}
               {task.priority === "Critical" && (
-                <span className="px-1.5 py-0.5 rounded bg-icm-red-soft text-icm-red text-[10px] font-mono font-semibold">
-                  Critical
+                <span className="text-[10.5px] font-semibold text-icm-red inline-flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-icm-red" /> Critical
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
+
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11.5px] text-icm-text-dim font-geist">
+              <span className={cn(isOver && "text-icm-red font-medium")}>Due {task.dueDate}</span>
+              <span className="text-icm-text-faint">·</span>
+              <span>{task.staffResponsible}</span>
+              <span className="text-icm-text-faint">·</span>
               <SourceLabel task={task} />
-              {task.startDate && (
-                <span className="text-[11px] font-mono text-icm-text-faint">
-                  Start {task.startDate}
-                </span>
-              )}
-              <span className={cn("text-[11px] font-mono", dueTone(task))}>
-                Due {task.dueDate}
-                {isOver && task.daysOverdue ? ` (${task.daysOverdue}d overdue)` : ""}
-              </span>
-              <span className="text-[11px] text-icm-text-faint font-geist">
-                · {task.staffResponsible}
-              </span>
             </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {task.linkedModule && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLinkedModule();
-                  }}
-                  className="px-2 py-0.5 rounded border border-icm-accent/30 text-icm-accent text-[10.5px] font-geist hover:bg-icm-accent-soft transition-colors"
-                >
-                  → {task.linkedModule.label}
-                </button>
-              )}
-              {task.aiDraftReady && (
-                <span className="px-2 py-0.5 rounded bg-icm-accent-soft text-icm-accent text-[10.5px] font-geist font-semibold flex items-center gap-1">
-                  <Sparkle className="w-3 h-3" /> AI draft ready
-                </span>
-              )}
-            </div>
+
+            {(task.linkedModule || task.aiDraftReady) && (
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {task.linkedModule && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLinkedModule();
+                    }}
+                    className="px-2 py-0.5 rounded-md text-icm-text-dim text-[11px] font-geist border border-icm-border hover:text-icm-text hover:border-icm-border-strong inline-flex items-center gap-1"
+                  >
+                    {task.linkedModule.label} <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+                {task.aiDraftReady && (
+                  <span className="px-2 py-0.5 rounded-md bg-icm-accent-soft text-icm-accent text-[11px] font-geist font-medium inline-flex items-center gap-1">
+                    <Sparkle className="w-3 h-3" /> AI draft ready
+                  </span>
+                )}
+              </div>
+            )}
           </button>
 
           {expanded && (
-            <div className="mt-3 rounded-lg border border-icm-border bg-icm-bg p-3 space-y-2">
+            <div className="mt-3 rounded-lg border border-icm-border bg-icm-bg/60 p-3 space-y-2">
               {task.description && (
-                <p className="text-[12px] text-icm-text font-geist leading-relaxed">
+                <p className="text-[12.5px] text-icm-text font-geist leading-relaxed">
                   {task.description}
                 </p>
               )}
@@ -760,11 +769,11 @@ function TaskRow({
               <div className="flex items-center gap-2">
                 <input
                   placeholder="Add a comment… use @ to mention"
-                  className="flex-1 h-8 px-2 rounded border border-icm-border bg-white text-[11.5px] text-icm-text"
+                  className="flex-1 h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
                 />
                 <button
                   onClick={() => demoSuccess("Comment posted")}
-                  className="text-[11px] text-icm-accent hover:underline"
+                  className="text-[11.5px] text-icm-accent hover:underline font-medium"
                 >
                   Post
                 </button>
@@ -773,17 +782,18 @@ function TaskRow({
           )}
         </div>
 
+        {/* Action */}
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           {task.status === "Completed" ? (
-            <span className="text-[11px] text-icm-green font-semibold flex items-center gap-1">
+            <span className="text-[11.5px] text-icm-green font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Done
             </span>
           ) : (
             <button
               onClick={onAdvance ?? onComplete}
-              className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold hover:opacity-90 flex items-center gap-1"
+              className="h-8 px-3 rounded-lg text-[11.5px] font-geist font-semibold text-icm-text border border-icm-border bg-icm-panel hover:border-icm-text hover:bg-icm-bg flex items-center gap-1 transition-colors"
             >
-              {task.status === "Pending Start" ? "Start" : "Complete"} <ArrowRight className="w-3 h-3" />
+              {task.status === "Pending Start" ? "Start" : "Complete"}
             </button>
           )}
         </div>
@@ -964,6 +974,29 @@ function FocusedSessionDone({ onClose }: { onClose: () => void }) {
 }
 
 // ---------- Reusable bits ----------
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "neutral" | "red" | "amber" | "accent";
+}) {
+  const accent = {
+    neutral: "text-icm-text",
+    red: "text-icm-red",
+    amber: "text-icm-amber",
+    accent: "text-icm-accent",
+  }[tone];
+  return (
+    <div className="rounded-2xl border border-icm-border bg-icm-panel px-4 py-3">
+      <p className="text-[11px] uppercase tracking-wider text-icm-text-faint font-geist">{label}</p>
+      <p className={cn("text-[22px] font-manrope font-bold mt-0.5 leading-none", accent)}>{value}</p>
+    </div>
+  );
+}
+
 function Chip({
   tone,
   label,

@@ -359,13 +359,6 @@ const Index = () => {
               transition={{ delay: 0.1 }}
               className="text-center max-w-2xl"
             >
-              <div className="flex justify-center mb-6">
-                <img
-                  src={brandLogo}
-                  alt="CaseManagement AI"
-                  className="h-14 w-auto object-contain animate-float"
-                />
-              </div>
               <h1 className="font-display text-3xl font-bold text-foreground mb-2">
                 Good evening, Kathy
               </h1>

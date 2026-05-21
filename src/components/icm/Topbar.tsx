@@ -40,7 +40,6 @@ const topNavItems: TopNavItem[] = [
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
   { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
-  { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
 ];
 
 const OVERDUE_TASK_COUNT = 3;

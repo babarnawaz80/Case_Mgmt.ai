@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { loadCheckIns, type AICheckInSession } from "@/lib/aiCheckIns";
 import { CheckInTranscriptDrawer } from "@/components/icm/CheckInTranscriptDrawer";
+import { StatCard } from "@/components/icm/StatCard";
 import { useRole } from "@/contexts/RoleContext";
 import { cn } from "@/lib/utils";
 

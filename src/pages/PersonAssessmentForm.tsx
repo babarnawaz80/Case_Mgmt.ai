@@ -50,6 +50,22 @@ export default function PersonAssessmentForm() {
   );
   const [submitted, setSubmitted] = useState(false);
 
+  // 7.1 — Signatures / attestation, attachments, validation errors
+  const [signCM, setSignCM] = useState("");
+  const [signCMDate, setSignCMDate] = useState(new Date().toISOString().slice(0, 10));
+  const [signParticipant, setSignParticipant] = useState("");
+  const [attest, setAttest] = useState(false);
+  const [attachments, setAttachments] = useState<{ name: string; size: number; type: string }[]>([]);
+  const [missingIds, setMissingIds] = useState<string[]>([]);
+  const [generatedTasks, setGeneratedTasks] = useState<{ title: string; due: string }[]>([]);
+  const [historyCount, setHistoryCount] = useState<number>(() => {
+    try {
+      const h = JSON.parse(localStorage.getItem(`icm.assessments.history.${id}`) ?? "[]");
+      return Array.isArray(h) ? h.length : 0;
+    } catch { return 0; }
+  });
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
   if (!person || !template) {
     return (
       <div className="p-10 text-center text-[13px] text-icm-text-dim">

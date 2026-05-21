@@ -196,9 +196,9 @@ export default function CareAssistant() {
           <SiriOrb
             size="160px"
             colors={{
-              c1: "oklch(78% 0.13 180)",
-              c2: "oklch(82% 0.10 200)",
-              c3: "oklch(75% 0.14 220)",
+              c1: "oklch(82% 0.14 195)",
+              c2: "oklch(78% 0.16 340)",
+              c3: "oklch(80% 0.10 260)",
             }}
             animationDuration={18}
           />

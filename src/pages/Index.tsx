@@ -247,7 +247,7 @@ const Index = () => {
   return (
     <>
     {ambientOverlay}
-    <IndividualSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
+    
     <div className="flex h-screen w-full bg-background">
       {/* Collapsible Chat History Sidebar */}
       <AnimatePresence initial={false}>

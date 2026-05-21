@@ -412,7 +412,7 @@ function QuickActions() {
 
       {/* Category legend */}
       <div className="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-icm-border">
-        {(["Documentation", "Operations", "Care", "Schedule"] as ActionCategory[]).map((cat) => (
+        {(["Documentation", "Operations", "Care"] as ActionCategory[]).map((cat) => (
           <div key={cat} className="flex items-center gap-1.5">
             <span className={`w-2.5 h-2.5 rounded-sm ${ACTION_TONES[cat].bg}`} />
             <span className="text-[11px] font-geist text-icm-text-dim">{cat}</span>

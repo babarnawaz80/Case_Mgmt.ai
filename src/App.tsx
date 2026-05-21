@@ -27,6 +27,7 @@ import PersonMonitoringForm from "./pages/PersonMonitoringForm";
 import PersonMonitoringFormDetail from "./pages/PersonMonitoringFormDetail";
 import PersonVisitSummary from "./pages/PersonVisitSummary";
 import PersonVisitSummaryDetail from "./pages/PersonVisitSummaryDetail";
+import PersonVisitScheduler from "./pages/PersonVisitScheduler";
 import PersonEligibilityVerification from "./pages/PersonEligibilityVerification";
 import PersonEligibilityVerificationDetail from "./pages/PersonEligibilityVerificationDetail";
 import PersonProgressNote from "./pages/PersonProgressNote";

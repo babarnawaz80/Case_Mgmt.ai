@@ -1,5 +1,5 @@
 import { ICMShell } from "@/components/icm/ICMShell";
-import { ScheduleCard } from "@/components/icm/ScheduleCard";
+
 import { WatchlistCard } from "@/components/icm/WatchlistCard";
 import { Donut, Sparkline } from "@/components/icm/charts";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -434,9 +434,8 @@ const Dashboard = () => {
         <HeroRow />
         <DonutRow />
 
-        {/* Schedule + Watchlist (kept from your version) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ScheduleCard />
+        {/* Watchlist */}
+        <div className="grid grid-cols-1 gap-4">
           <WatchlistCard />
         </div>
 

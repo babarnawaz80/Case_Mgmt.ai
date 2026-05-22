@@ -404,5 +404,87 @@ function ContactNoteCrumbs() {
   );
 }
 
+function PersonSearchSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const options = people
+    .map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}`, sub: p.county }))
+    .filter((o) => !q || o.name.toLowerCase().includes(q));
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls} flex items-center justify-between text-left`}
+      >
+        <span className={value ? "text-icm-text" : "text-icm-text-faint"}>
+          {value || "Search person…"}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-icm-border bg-icm-panel shadow-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-2.5 h-9 border-b border-icm-border">
+            <Search className="w-3.5 h-3.5 text-icm-text-faint" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search person…"
+              className="flex-1 bg-transparent text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none"
+            />
+          </div>
+          <div className="max-h-[220px] overflow-y-auto py-1">
+            {options.length === 0 ? (
+              <div className="px-3 py-2 text-[12px] text-icm-text-faint">No matches.</div>
+            ) : (
+              options.map((o) => {
+                const selected = o.name === value;
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(o.name);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left text-[12px] font-geist text-icm-text hover:bg-icm-bg"
+                  >
+                    <span className="truncate">
+                      {o.name}
+                      <span className="text-icm-text-faint"> · {o.sub}</span>
+                    </span>
+                    {selected && <Check className="w-3.5 h-3.5 text-teal-600 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default ContactNote;
+
 

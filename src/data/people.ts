@@ -245,7 +245,7 @@ export const people: Person[] = [
   { id: "43", firstName: "Owen",      lastName: "MacLeod",    gender: "M", dob: "07/11/1969", age: 56, admittedOn: "11/22/2012", county: "Pottawattamie",     status: "Discharged", riskScore: 0,  serviceContact: "Babar Nawaz CM",    updatedOn: "06/15/2025", aiFlag: { tone: "insight",   label: "Discharged 06/2025",   detail: "Transitioned to community supports — file retained for audit." } },
   { id: "44", firstName: "Beatrice",  lastName: "Holloway",   gender: "F", dob: "09/08/1959", age: 66, admittedOn: "06/18/2008", county: "Woodbury County",   status: "Active",     riskScore: 76, serviceContact: "Brenda Smith",       updatedOn: "08/07/2025", allergies: "Penicillin, Sulfa",      aiFlag: { tone: "urgent",    label: "Fall risk elevated",   detail: "2 falls in last 60d — PT consult recommended." } },
   { id: "45", firstName: "Jordan",    lastName: "Mitchell",   gender: "M", dob: "01/16/2007", age: 18, admittedOn: "07/25/2025", county: "Cerro Gordo",       status: "Pending",    riskScore: 15, serviceContact: "Jennie Thollander", updatedOn: "08/06/2025", aiFlag: { tone: "insight",   label: "New intake",           detail: "Recently turned 18 — transition from youth services in progress." } },
-].map((p) => ({ ...p, photoUrl: PHOTOS[p.id] })) as Person[];
+].map((p) => ({ ...p, photoUrl: photoFor(p.id, p.gender as "M" | "F") })) as Person[];
 
 
 export function getPerson(id: string): Person | undefined {

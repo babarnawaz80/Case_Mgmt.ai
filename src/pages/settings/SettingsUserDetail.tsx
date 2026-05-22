@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import {
   getUser,
+  orgUsers,
   roleLabel,
   roleAvatarTone,
   roleBadgeTone,
@@ -14,8 +15,16 @@ import {
   permTone,
   permLabel,
 } from "@/data/settings";
+import {
+  getStaffProvider,
+  daysUntil,
+  CREDENTIAL_TYPES,
+  type CredentialType,
+  type StaffStateEnrollment,
+} from "@/data/staffProvider";
+import { useRole } from "@/contexts/RoleContext";
 import { cn } from "@/lib/utils";
-import { Pencil, MoreHorizontal, Shield, Activity } from "lucide-react";
+import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 const SettingsUserDetail = () => {

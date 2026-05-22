@@ -6,7 +6,6 @@ import {
   Sparkles,
   Send,
   Plus,
-  Camera,
   Mic,
   MessageSquare,
   Copy,

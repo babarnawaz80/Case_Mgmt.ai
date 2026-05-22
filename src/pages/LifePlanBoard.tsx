@@ -292,7 +292,7 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone, active
                     </span>
                     <AgentMenu
                       isAdmin={isAdmin}
-                      onEdit={() => navigate("/lifeplan/agent/new", { state: { editAgent: agent } })}
+                      onEdit={() => navigate("/platform/agents/new", { state: { editAgent: agent } })}
                       onClone={() => onClone(agent)}
                       onDelete={() => onDelete(agent.id)}
                     />
@@ -336,14 +336,14 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone, active
                   </button>
                   {pendingDrafts > 0 && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/drafts`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/platform/agents/${agent.id}/drafts`); }}
                       className="h-9 px-3 gap-1.5 rounded-lg text-xs font-medium flex items-center justify-center bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 transition-all"
                     >
                       <AlertTriangle className="h-3 w-3" /> {pendingDrafts}
                     </button>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/monitoring`); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/platform/agents/${agent.id}/monitoring`); }}
                     className="h-9 px-3 gap-1.5 rounded-lg text-xs font-medium flex items-center justify-center bg-muted/50 text-muted-foreground border border-border/40 hover:bg-muted hover:text-foreground transition-all"
                   >
                     <Shield className="h-3 w-3" /> Settings

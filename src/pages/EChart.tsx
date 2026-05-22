@@ -69,8 +69,7 @@ interface ModuleTile {
 // Grouped tiles per the screenshot. Counts mirror the original demo data.
 const ALL_TILES: ModuleTile[] = [
   // Documentation (blue)
-  { slug: "contact-note", label: "Activity Note", icon: FileText, route: "contact-note", count: 24, category: "Documentation" },
-  { slug: "billable-activity", label: "Billable Activity Note", icon: FileText, route: "contact-note", count: 12, category: "Documentation" },
+  { slug: "contact-note", label: "Contact Notes", icon: FileText, route: "contact-note", count: 36, category: "Documentation" },
   { slug: "case-management", label: "Case Management", icon: Briefcase, route: "case-management", count: 8, category: "Documentation" },
   { slug: "eligibility-verification", label: "MA Status Verification", icon: ShieldCheck, route: "eligibility-verification", category: "Documentation" },
   { slug: "monitoring-form", label: "Monitoring Form", icon: ClipboardList, route: "monitoring-form", count: 4, category: "Documentation" },

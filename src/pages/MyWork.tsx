@@ -605,7 +605,7 @@ const MyWork = () => {
           <div className="space-y-5">
 
             {grouped.map((g) => {
-              const collapsed = collapsedGroups[g.id];
+              const collapsed = groupMode === "individual" ? (collapsedGroups[g.id] ?? true) : collapsedGroups[g.id];
               const hasOverdue = g.overdueCount > 0 && groupMode === "individual";
               return (
                 <div

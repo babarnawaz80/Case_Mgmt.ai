@@ -1,0 +1,116 @@
+import { ChevronDown, User, Settings, Clock, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useRole } from "@/contexts/RoleContext";
+import { cn } from "@/lib/utils";
+
+interface UserMenuProps {
+  variant?: "icm" | "plain";
+}
+
+export function UserMenu({ variant = "icm" }: UserMenuProps) {
+  const navigate = useNavigate();
+  const { isAdmin } = useRole();
+  const [clockedIn, setClockedIn] = useState<string | null>(() => localStorage.getItem("icm.clockedInAt"));
+
+  useEffect(() => {
+    if (clockedIn) localStorage.setItem("icm.clockedInAt", clockedIn);
+    else localStorage.removeItem("icm.clockedInAt");
+  }, [clockedIn]);
+
+  const handleClock = () => {
+    if (clockedIn) {
+      const mins = Math.round((Date.now() - new Date(clockedIn).getTime()) / 60000);
+      setClockedIn(null);
+      toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
+    } else {
+      const now = new Date().toISOString();
+      setClockedIn(now);
+      toast.success("Clocked in", { description: `Shift started at ${new Date(now).toLocaleTimeString()}` });
+    }
+  };
+
+  const handleSignOut = () => {
+    toast("Signed out", { description: "Returning to login." });
+    setTimeout(() => navigate("/login"), 400);
+  };
+
+  const isIcm = variant === "icm";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-xl transition-colors",
+            isIcm ? "hover:bg-icm-bg" : "hover:bg-secondary"
+          )}
+        >
+          {isIcm ? (
+            <div className="relative w-7 h-7 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[10px] font-mono font-bold text-icm-accent">
+              KA
+              {clockedIn && (
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-icm-green ring-2 ring-icm-panel" />
+              )}
+            </div>
+          ) : (
+            <div className="relative w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
+              <User className="w-5 h-5 text-muted-foreground" />
+              {clockedIn && (
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-background" />
+              )}
+            </div>
+          )}
+          <ChevronDown className={cn("w-3 h-3 hidden sm:inline", isIcm ? "text-icm-text-faint" : "text-muted-foreground")} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
+          <div className="w-9 h-9 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[11px] font-mono font-bold text-icm-accent">
+            KA
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold leading-tight">Kathy Adams</p>
+            <p className="text-[11px] text-muted-foreground truncate">kathy@icaremanager.com</p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/settings/users/u-002")} className="gap-2 text-[12.5px]">
+          <User className="w-4 h-4 text-muted-foreground" /> My profile
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => navigate("/settings")} className="gap-2 text-[12.5px]">
+            <Settings className="w-4 h-4 text-muted-foreground" /> Settings
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleClock} className="gap-2 text-[12.5px]">
+          <Clock className={cn("w-4 h-4", clockedIn ? "text-green-600" : "text-muted-foreground")} />
+          {clockedIn ? (
+            <span className="flex-1 flex items-center justify-between gap-2">
+              <span>Clock out</span>
+              <span className="text-[10.5px] text-muted-foreground font-mono">
+                since {new Date(clockedIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </span>
+          ) : (
+            "Clock in"
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-[12.5px] text-destructive focus:text-destructive">
+          <LogOut className="w-4 h-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

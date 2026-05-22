@@ -1,6 +1,7 @@
-import { Bell, Mail, Sparkles, User, BrainCircuit } from "lucide-react";
+import { Bell, Mail, Sparkles, BrainCircuit } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { UserMenu } from "@/components/icm/UserMenu";
 
 export function AppHeader() {
   const navigate = useNavigate();
@@ -47,9 +48,7 @@ export function AppHeader() {
             <p className="text-sm font-medium text-foreground">Case Manager</p>
             <p className="text-xs text-muted-foreground">Admin</p>
           </div>
-          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
-            <User className="w-5 h-5 text-muted-foreground" />
-          </div>
+          <UserMenu variant="plain" />
         </div>
       </div>
     </header>

@@ -38,6 +38,7 @@ import { people, getPerson } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
 import { InlineIndividualSnapshot } from "@/components/InlineIndividualSnapshot";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
+import { UserMenu } from "@/components/icm/UserMenu";
 
 interface ChatHistoryItem {
   id: string;
@@ -400,13 +401,7 @@ const Index = () => {
           </nav>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/settings")}
-              title="Profile / Settings"
-              className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
-            >
-              <User className="w-5 h-5 text-muted-foreground" />
-            </button>
+            <UserMenu variant="plain" />
           </div>
         </header>
 

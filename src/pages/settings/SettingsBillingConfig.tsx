@@ -279,7 +279,8 @@ function PayersTab() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
+
               );
             })}
           </tbody>

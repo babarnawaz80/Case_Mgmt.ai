@@ -24,16 +24,18 @@ export function UserMenu() {
     else localStorage.removeItem("icm.clockedInAt");
   }, [clockedIn]);
 
-  const handleClock = () => {
-    if (clockedIn) {
-      const mins = Math.round((Date.now() - new Date(clockedIn).getTime()) / 60000);
-      setClockedIn(null);
-      toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
-    } else {
-      const now = new Date().toISOString();
-      setClockedIn(now);
-      toast.success("Clocked in", { description: `Shift started at ${new Date(now).toLocaleTimeString()}` });
-    }
+  const handleClockIn = () => {
+    if (clockedIn) return;
+    const now = new Date().toISOString();
+    setClockedIn(now);
+    toast.success("Clocked in", { description: `Shift started at ${new Date(now).toLocaleTimeString()}` });
+  };
+
+  const handleClockOut = () => {
+    if (!clockedIn) return;
+    const mins = Math.round((Date.now() - new Date(clockedIn).getTime()) / 60000);
+    setClockedIn(null);
+    toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
   };
 
   const handleSignOut = () => {

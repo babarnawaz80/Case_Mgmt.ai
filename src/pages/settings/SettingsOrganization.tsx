@@ -1,5 +1,32 @@
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { demoSuccess } from "@/lib/demoToast";
+
+interface StateEnrollment {
+  id: string;
+  state: string;
+  providerId: string;
+  status: "Active" | "Pending" | "Expired";
+  effective: string; // MM/DD/YYYY
+  expiration: string; // MM/DD/YYYY
+}
+
+const INITIAL_ENROLLMENTS: StateEnrollment[] = [
+  { id: "se-1", state: "Indiana",    providerId: "IN-2024-CM-00412", status: "Active", effective: "01/01/2024", expiration: "12/31/2026" },
+  { id: "se-2", state: "New Jersey", providerId: "NJ-2025-CM-00089", status: "Active", effective: "06/01/2025", expiration: "05/31/2027" },
+];
+
+function parseMDY(s: string): Date | null {
+  const [m, d, y] = s.split("/").map((n) => parseInt(n, 10));
+  if (!m || !d || !y) return null;
+  return new Date(y, m - 1, d);
+}
+function daysUntil(s: string): number | null {
+  const dt = parseMDY(s);
+  if (!dt) return null;
+  return Math.ceil((dt.getTime() - Date.now()) / 86_400_000);
+}
 
 const SettingsOrganization = () => {
   return (

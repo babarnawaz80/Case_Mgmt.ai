@@ -25,6 +25,7 @@ import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import EChart from "./pages/EChart";
 import PersonMonitorsBaselines from "./pages/PersonMonitorsBaselines";
 import ContactNote from "./pages/ContactNote";
+import DocumentationStart from "./pages/DocumentationStart";
 import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";
 import PersonCarePlan from "./pages/PersonCarePlan";

@@ -353,7 +353,7 @@ const ContactNote = () => {
               </button>
               <button
                 onClick={handleSave}
-                className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90"
+                className="h-9 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-medium hover:bg-teal-700"
               >
                 Save Contact Note
               </button>

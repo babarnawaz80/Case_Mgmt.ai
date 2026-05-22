@@ -93,6 +93,14 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
   }
+
+  /* Stronger contrast for form labels — they were too faint to read
+     in dialogs and side panels. */
+  label {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
 }
 
 @layer utilities {

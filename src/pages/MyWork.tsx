@@ -225,7 +225,7 @@ const MyWork = () => {
       const groups = Array.from(map.entries()).map(([id, items]) => ({
         id,
         label: items[0].individualName,
-        sub: items[0].individualCounty,
+        sub: "",
         initials: items[0].individualInitials,
         items,
         overdueCount: items.filter((i) => bucketForTask(i) === "overdue").length,

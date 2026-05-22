@@ -184,7 +184,7 @@ const App = () => (
             <Route path="/messages" element={<Messages />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
-            <Route path="/lifeplan" element={<LifePlanBoard />} />
+            <Route path="/lifeplan" element={<Navigate to="/platform" replace />} />
             <Route path="/lifeplan/guidelines-engines" element={<ComplianceEngineDashboard />} />
             <Route path="/lifeplan/guidelines-library/new" element={<RuleLibraryBuilder />} />
             <Route path="/lifeplan/agent/new" element={<RuntimeAgentBuilder />} />
@@ -235,7 +235,7 @@ const App = () => (
             <Route path="/reports/builder" element={<ReportBuilder />} />
             <Route path="/reports/audit-evidence" element={<AuditEvidence />} />
             <Route path="/reports/:reportId" element={<ReportRunner />} />
-            <Route path="/platform" element={<LifePlanBoard />} />
+            <Route path="/platform" element={<PlatformHub />} />
             <Route path="/platform/guidelines-engines" element={<GuidelinesEnginesList />} />
             <Route path="/platform/guidelines-engines/new" element={<NewEngineWizard />} />
             <Route path="/platform/guidelines-engines/:engineId" element={<EngineDetail />} />
@@ -265,7 +265,7 @@ const App = () => (
             <Route path="/billing" element={<BillingHub />} />
 
             {/* Legacy /lifeplan redirects → /platform/agents (Fix 4) */}
-            <Route path="/lifeplan" element={<Navigate to="/platform/agents" replace />} />
+            {/* duplicate removed - handled at line 187 */}
             <Route path="/lifeplan/agent/new/layer2" element={<Navigate to="/platform/agents" replace />} />
 
             <Route path="/admin/multi-state" element={<MultiStateConfig />} />

@@ -142,7 +142,8 @@ const App = () => (
         <SmartNoteAttacher />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Login />} />
+            <Route path="/home" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="/companion/:token" element={<Companion />} />

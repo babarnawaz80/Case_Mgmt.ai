@@ -9,11 +9,12 @@ import {
   MoreVertical, Pencil, Copy, Trash2, AlertTriangle, Lock,
   UserCog,
 } from "lucide-react";
-import { mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent } from "@/types/agent";
+import { mockDraftRuns, mockRuntimeAgents, runtimeAgentTypeLabels, RuntimeAgent } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { toast } from "@/hooks/use-toast";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { people } from "@/data/people";
 
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -27,7 +28,16 @@ export default function LifePlanBoard() {
     agent.engineName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalDraftsPending = agents.reduce((s, a) => s + a.draftsPending, 0);
+  const activePeopleCount = people.filter((p) => p.status === "Active").length;
+  const pendingDraftStatuses = new Set(["draft_pending_review", "draft_updated"]);
+  const pendingDraftsByAgent = mockDraftRuns.reduce((acc, draft) => {
+    if (pendingDraftStatuses.has(draft.status)) acc[draft.agentId] = (acc[draft.agentId] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const totalDraftsPending = Object.values(pendingDraftsByAgent).reduce((s, count) => s + count, 0);
+  const averageCompliance = Math.round(
+    agents.reduce((s, a) => s + a.complianceRate, 0) / (agents.length || 1),
+  );
 
   const handleDelete = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
@@ -62,8 +72,8 @@ export default function LifePlanBoard() {
 
   const overviewStats = [
     { label: "Active Agents", value: agents.filter(a => a.status === 'active').length.toString(), icon: Bot, trend: "Running compliance" },
-    { label: "Individuals Served", value: agents.reduce((s, a) => s + a.individualsServed, 0).toString(), icon: Users, trend: "Across all agents" },
-    { label: "Avg Compliance", value: Math.round(agents.reduce((s, a) => s + a.complianceRate, 0) / (agents.length || 1)) + "%", icon: TrendingUp, trend: "Denial prevention" },
+    { label: "Individuals Served", value: activePeopleCount.toString(), icon: Users, trend: "Active people supported" },
+    { label: "Avg Compliance", value: averageCompliance + "%", icon: TrendingUp, trend: "Across active agents" },
     { label: "Drafts Pending", value: totalDraftsPending.toString(), icon: FileText, trend: "Auto-monitor drafts" },
   ];
 
@@ -150,7 +160,7 @@ export default function LifePlanBoard() {
           </div>
         </div>
 
-        <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} onDelete={(id) => setDeleteConfirm(id)} onClone={handleClone} />
+        <RuntimeAgentsTab agents={filteredAgents} navigate={navigate} isAdmin={isAdmin} onDelete={(id) => setDeleteConfirm(id)} onClone={handleClone} activePeopleCount={activePeopleCount} pendingDraftsByAgent={pendingDraftsByAgent} />
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -235,7 +245,7 @@ const agentTypeAccents: Record<string, { border: string; bg: string; text: strin
   ambient_meeting: { border: "border-l-[hsl(190,55%,48%)]", bg: "bg-[hsl(190,55%,48%)]/10", text: "text-[hsl(190,55%,48%)]", icon: "bg-[hsl(190,55%,48%)]" },
 };
 
-function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate>; isAdmin: boolean; onDelete: (id: string) => void; onClone: (agent: RuntimeAgent) => void }) {
+function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone, activePeopleCount, pendingDraftsByAgent }: { agents: RuntimeAgent[]; navigate: ReturnType<typeof useNavigate>; isAdmin: boolean; onDelete: (id: string) => void; onClone: (agent: RuntimeAgent) => void; activePeopleCount: number; pendingDraftsByAgent: Record<string, number> }) {
   if (agents.length === 0) {
     return (
       <div className="text-center py-16">
@@ -250,6 +260,8 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { ag
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
       {agents.map((agent, i) => {
         const accent = agentTypeAccents[agent.type] || agentTypeAccents.compliance_copilot;
+        const pendingDrafts = pendingDraftsByAgent[agent.id] || 0;
+        const coveredIndividuals = agent.status === "active" ? activePeopleCount : 0;
         return (
           <motion.div key={agent.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}>
             <div className={cn("group relative rounded-xl bg-card border border-border/50 border-l-4 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer", accent.border)}
@@ -302,11 +314,11 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { ag
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Compliance</p>
                   </div>
                   <div className="text-center p-2.5 rounded-lg bg-muted/30">
-                    <div className="text-lg font-bold text-foreground leading-none">{agent.individualsServed}</div>
+                    <div className="text-lg font-bold text-foreground leading-none">{coveredIndividuals}</div>
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Individuals</p>
                   </div>
                   <div className="text-center p-2.5 rounded-lg bg-muted/30">
-                    <div className={cn("text-lg font-bold leading-none", agent.draftsPending > 0 ? "text-warning" : "text-foreground")}>{agent.draftsPending}</div>
+                    <div className={cn("text-lg font-bold leading-none", pendingDrafts > 0 ? "text-warning" : "text-foreground")}>{pendingDrafts}</div>
                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">Drafts</p>
                   </div>
                 </div>
@@ -322,12 +334,12 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone }: { ag
                   <button className={cn("flex-1 h-9 gap-2 rounded-lg text-xs font-medium flex items-center justify-center text-white shadow-sm hover:shadow-md transition-all", accent.icon)}>
                     <Play className="h-3 w-3 fill-current" /> Run Agent
                   </button>
-                  {agent.draftsPending > 0 && (
+                  {pendingDrafts > 0 && (
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/lifeplan/agent/${agent.id}/drafts`); }}
                       className="h-9 px-3 gap-1.5 rounded-lg text-xs font-medium flex items-center justify-center bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 transition-all"
                     >
-                      <AlertTriangle className="h-3 w-3" /> {agent.draftsPending}
+                      <AlertTriangle className="h-3 w-3" /> {pendingDrafts}
                     </button>
                   )}
                   <button

@@ -81,7 +81,7 @@ export default function AgentDraftRuns() {
     <div className="flex flex-col min-h-screen w-full bg-background">
       <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/lifeplan")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => navigate("/platform/agents")} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2.5">
@@ -95,7 +95,7 @@ export default function AgentDraftRuns() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/lifeplan/agent/${agentId}/monitoring`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs border border-border transition-all">
+          <button onClick={() => navigate(`/platform/agents/${agentId}/monitoring`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs border border-border transition-all">
             <Shield className="h-3.5 w-3.5" /> Monitoring Settings
           </button>
           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">

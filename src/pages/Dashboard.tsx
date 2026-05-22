@@ -405,6 +405,8 @@ interface ActionTile {
   to: string;
   category: ActionCategory;
   count?: number;
+  /** When set, clicking the tile opens an individual picker, then routes to formRoute(personId). */
+  formRoute?: (personId: string) => string;
 }
 
 const ACTION_TONES: Record<

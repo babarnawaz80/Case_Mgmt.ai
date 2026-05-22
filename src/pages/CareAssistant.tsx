@@ -37,10 +37,7 @@ export default function CareAssistant() {
     );
   }
 
-  const greeting = `Hi ${person.firstName}! I'm your Case Companion. I'm here whenever you need support. How are you doing today?`;
-  const [messages, setMessages] = useState<CheckInMessage[]>(() => [
-    { id: "m0", role: "bot", text: greeting, ts: Date.now() },
-  ]);
+  const [messages, setMessages] = useState<CheckInMessage[]>([]);
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
   const [topics, setTopics] = useState<Set<TopicKey>>(new Set());
@@ -48,32 +45,11 @@ export default function CareAssistant() {
   const [ended, setEnded] = useState(false);
   const [startedAt] = useState(Date.now());
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const spokenRef = useRef(false);
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, ended]);
 
-  // Speak the greeting once on mount via browser TTS
-  useEffect(() => {
-    if (spokenRef.current) return;
-    spokenRef.current = true;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    try {
-      const utter = new SpeechSynthesisUtterance(greeting);
-      utter.rate = 1;
-      utter.pitch = 1;
-      utter.volume = 1;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    } catch {
-      // ignore — voice is enhancement only
-    }
-    return () => {
-      try { window.speechSynthesis.cancel(); } catch { /* noop */ }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const exchangeCount = useMemo(
     () => messages.filter((m) => m.role === "individual").length,

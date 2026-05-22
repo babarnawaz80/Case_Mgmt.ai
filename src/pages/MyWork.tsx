@@ -123,8 +123,9 @@ const MyWork = () => {
   const [tab, setTab] = useState<Exclude<TabKey, "completed">>("today");
   const [groupMode, setGroupMode] = useState<GroupMode>("individual");
   const [sort, setSort] = useState<"priority" | "due" | "name" | "type" | "created">("priority");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filterIndividual, setFilterIndividual] = useState("");
+  const [filterCounty, setFilterCounty] = useState<string>("All");
   const [filterSource, setFilterSource] = useState<"All" | MyWorkTask["source"]>("All");
   const [filterStatus, setFilterStatus] = useState<"All" | TaskStatus>("All");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});

@@ -51,6 +51,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState<"microsoft" | "google" | "email" | null>(null);
 
+  // If already signed in (demo session persisted), skip the login screen.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("cm_ai_demo_user")) {
+        navigate("/home", { replace: true });
+      }
+    } catch {}
+  }, [navigate]);
+
   const finishSignIn = (provider: "microsoft" | "google" | "email") => {
     setLoading(provider);
     toast.success(

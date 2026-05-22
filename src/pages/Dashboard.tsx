@@ -440,11 +440,12 @@ const ACTION_TONES: Record<
 };
 
 const ACTIONS: ActionTile[] = [
-  // Documentation (blue)
-  { label: "Activity Note", icon: FileText, to: "/documentation/contact-notes", category: "Documentation", count: 24 },
-  { label: "Progress Note", icon: PenTool, to: "/documentation/progress-notes", category: "Documentation", count: 14 },
-  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation/visit-summaries", category: "Documentation", count: 6 },
-  { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-forms", category: "Documentation", count: 4 },
+  // Documentation (blue) — these open an individual picker first, then load the
+  // exact same form used inside each person's eChart.
+  { label: "Activity Note", icon: FileText, to: "/documentation/contact-notes", category: "Documentation", count: 24, formRoute: (id) => `/people/${id}/contact-note` },
+  { label: "Progress Note", icon: PenTool, to: "/documentation/progress-notes", category: "Documentation", count: 14, formRoute: (id) => `/people/${id}/progress-note/new` },
+  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation/visit-summaries", category: "Documentation", count: 6, formRoute: (id) => `/people/${id}/visit-summary/new` },
+  { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-forms", category: "Documentation", count: 4, formRoute: (id) => `/people/${id}/monitoring-form/new` },
 
   // Operations (orange)
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },

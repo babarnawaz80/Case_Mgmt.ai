@@ -601,54 +601,52 @@ const MyWork = () => {
                   {/* Group header */}
                   <button
                     onClick={() => toggleGroup(g.id)}
-                    className="w-full px-6 py-5 flex items-center gap-4 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/40 bg-gradient-to-r from-icm-bg/30 to-transparent"
+                    className="w-full px-4 py-2 flex items-center gap-3 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/40 bg-icm-bg/20"
                   >
                     {groupMode === "individual" ? (
                       <div className={cn(
-                        "w-12 h-12 rounded-2xl flex items-center justify-center text-[13px] font-manrope font-black shrink-0 shadow-sm",
+                        "w-7 h-7 rounded-lg flex items-center justify-center text-[10.5px] font-manrope font-black shrink-0",
                         hasOverdue
-                          ? "bg-gradient-to-br from-icm-red-soft to-icm-red-soft/60 text-icm-red ring-1 ring-icm-red/15"
-                          : "bg-gradient-to-br from-icm-accent-soft to-icm-accent-soft/60 text-icm-accent ring-1 ring-icm-accent/15"
+                          ? "bg-icm-red-soft text-icm-red ring-1 ring-icm-red/15"
+                          : "bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/15"
                       )}>
                         {g.initials}
                       </div>
                     ) : (
-                      <div className="w-12 h-12 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-7 h-7 rounded-lg bg-icm-bg border border-icm-border flex items-center justify-center shrink-0">
                         <CalendarIcon
-                          className={cn("w-5 h-5", (g as any).tone ?? "text-icm-text-dim")}
+                          className={cn("w-3.5 h-3.5", (g as any).tone ?? "text-icm-text-dim")}
                         />
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span
-                          className={cn(
-                            "font-manrope font-bold text-[16px] tracking-tight",
-                            groupMode === "due" ? (g as any).tone : "text-icm-text",
-                            groupMode === "due" && "tracking-widest text-[12px] uppercase font-extrabold",
-                          )}
-                        >
-                          {g.label}
-                        </span>
-                        {g.sub && (
-                          <span className="text-[10px] font-extrabold text-icm-text-faint uppercase tracking-widest font-geist">{g.sub}</span>
+                    <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                      <span
+                        className={cn(
+                          "font-manrope font-bold text-[13px] tracking-tight",
+                          groupMode === "due" ? (g as any).tone : "text-icm-text",
+                          groupMode === "due" && "tracking-widest text-[11px] uppercase font-extrabold",
                         )}
-                      </div>
-                      <p className="text-[12px] text-icm-text-dim font-geist font-medium mt-0.5">
-                        {g.items.length} task{g.items.length === 1 ? "" : "s"}
+                      >
+                        {g.label}
+                      </span>
+                      {g.sub && (
+                        <span className="text-[9.5px] font-extrabold text-icm-text-faint uppercase tracking-widest font-geist">{g.sub}</span>
+                      )}
+                      <span className="text-[11px] text-icm-text-dim font-geist">
+                        · {g.items.length} task{g.items.length === 1 ? "" : "s"}
                         {hasOverdue && (
                           <>
-                            <span className="mx-1.5 text-icm-text-faint">•</span>
+                            <span className="mx-1 text-icm-text-faint">•</span>
                             <span className="text-icm-red font-bold">{g.overdueCount} overdue</span>
                           </>
                         )}
-                      </p>
+                      </span>
                     </div>
-                    <div className="p-2.5 text-icm-text-faint hover:text-icm-text-dim bg-icm-panel rounded-xl shadow-sm border border-icm-border/60 transition-colors">
+                    <div className="p-1 text-icm-text-faint hover:text-icm-text-dim transition-colors">
                       {collapsed ? (
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-3.5 h-3.5" />
                       ) : (
-                        <ChevronDown className="w-4 h-4" />
+                        <ChevronDown className="w-3.5 h-3.5" />
                       )}
                     </div>
                   </button>

@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { getPerson, initials, riskAvatarClass, riskScoreClass } from "@/data/people";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
+import { demoToast } from "@/lib/demoToast";
 
 import {
   getProfile,

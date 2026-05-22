@@ -15,6 +15,7 @@ const IncidentsGlobal = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | "All">("All");
+  const [startOpen, setStartOpen] = useState(false);
 
   const all = getAllIncidents();
   const filtered = useMemo(() => all.filter((i) => {

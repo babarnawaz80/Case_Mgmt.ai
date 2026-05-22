@@ -34,7 +34,7 @@ export default function PersonCommunicationsLog() {
           </div>
           <h1 className="text-xl font-semibold text-icm-text mt-1">Communications Log</h1>
           <p className="text-[12.5px] text-icm-text-dim">
-            All recorded contacts with this individual, including AI Care Assistant check-ins.
+            All recorded contacts with this individual, including Case Companion check-ins.
           </p>
         </header>
 
@@ -65,7 +65,7 @@ export default function PersonCommunicationsLog() {
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 ring-1 ring-teal-200 text-[11px] font-semibold">
-                      <Bot className="w-3 h-3" /> AI Care Assistant Check-In
+                      <Bot className="w-3 h-3" /> Case Companion Check-In
                     </span>
                   </td>
                   <td className="px-4 py-3 text-icm-text max-w-md">{c.summary}</td>

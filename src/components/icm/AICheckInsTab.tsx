@@ -91,7 +91,7 @@ export function AICheckInsTab() {
       <div className="rounded-2xl border border-icm-border bg-icm-panel px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 text-[12px] text-icm-text-dim font-geist">
           <Sparkles className="w-3.5 h-3.5 text-icm-accent" />
-          <span className="font-semibold text-icm-text">AI Care Assistant Check-Ins</span>
+          <span className="font-semibold text-icm-text">Case Companion Check-Ins</span>
           <span className="text-icm-text-faint">— transcripts & detected topics from individual sessions</span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -152,7 +152,7 @@ export function AICheckInsTab() {
           </div>
           <h3 className="text-[15px] font-manrope font-bold text-icm-text">No AI check-ins yet</h3>
           <p className="text-[12.5px] text-icm-text-dim mt-1 max-w-[380px]">
-            When an individual completes a Care Assistant session, the transcript and auto-created tasks
+            When an individual completes a Case Companion session, the transcript and auto-created tasks
             will appear here for your review.
           </p>
         </div>
@@ -199,7 +199,7 @@ export function AICheckInsTab() {
                     </div>
                     <p className="text-[12px] text-icm-text-dim font-geist font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
                       <Bot className="w-3.5 h-3.5 text-icm-accent" />
-                      AI Care Assistant Check-In · {new Date(c.startedAt).toLocaleDateString()} · {c.durationLabel}
+                      Case Companion Check-In · {new Date(c.startedAt).toLocaleDateString()} · {c.durationLabel}
                       {isSupervisor && (
                         <>
                           <span className="mx-1 text-icm-text-faint">•</span>

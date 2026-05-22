@@ -37,7 +37,7 @@ export default function CareAssistant() {
     );
   }
 
-  const greeting = `Hey ${person.firstName}, I am your AI case manager assistant. How can I help you?`;
+  const greeting = `Hi ${person.firstName}! I'm your Case Companion. I'm here whenever you need support. How are you doing today?`;
   const [messages, setMessages] = useState<CheckInMessage[]>(() => [
     { id: "m0", role: "bot", text: greeting, ts: Date.now() },
   ]);
@@ -97,7 +97,7 @@ export default function CareAssistant() {
       startedAt,
       endedAt,
       durationLabel,
-      contactType: "AI Care Assistant Check-In",
+      contactType: "Case Companion Check-In",
       transcript: allMessages,
       summary: buildSummary(person.firstName, topicList),
       detectedTopics: topicList.map((k) => ({ key: k, label: topicLabel(k) })),
@@ -213,7 +213,7 @@ export default function CareAssistant() {
         </h1>
         <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 text-emerald-300 text-[12px]">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Your Care Assistant is ready
+          Your Case Companion is ready
         </div>
       </header>
 

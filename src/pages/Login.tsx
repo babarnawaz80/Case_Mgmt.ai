@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -50,6 +50,15 @@ export default function Login() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState<"microsoft" | "google" | "email" | null>(null);
+
+  // If already signed in (demo session persisted), skip the login screen.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("cm_ai_demo_user")) {
+        navigate("/home", { replace: true });
+      }
+    } catch {}
+  }, [navigate]);
 
   const finishSignIn = (provider: "microsoft" | "google" | "email") => {
     setLoading(provider);

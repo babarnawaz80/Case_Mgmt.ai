@@ -40,9 +40,17 @@ const IncidentsGlobal = () => {
             { label: "Incidents" },
           ]}
         />
-        <div>
-          <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">Incident Reporting Center</h1>
-          <p className="text-[13px] text-icm-text-dim mt-1 font-geist">All incidents across your caseload</p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">Incident Reporting Center</h1>
+            <p className="text-[13px] text-icm-text-dim mt-1 font-geist">All incidents across your caseload</p>
+          </div>
+          <button
+            onClick={() => setStartOpen(true)}
+            className="h-9 px-3 rounded-xl bg-icm-red text-white text-[12px] font-geist font-semibold hover:opacity-90 inline-flex items-center gap-1.5 shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" /> Report Incident
+          </button>
         </div>
 
         {/* Summary chips */}

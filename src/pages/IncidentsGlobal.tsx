@@ -156,6 +156,15 @@ const IncidentsGlobal = () => {
           </div>
         </div>
       </div>
+      {startOpen && (
+        <StartIncidentModal
+          onClose={() => setStartOpen(false)}
+          onSelect={(personId) => {
+            setStartOpen(false);
+            navigate(`/people/${personId}/incident-reporting/new`);
+          }}
+        />
+      )}
     </ICMShell>
   );
 };

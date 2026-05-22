@@ -207,9 +207,13 @@ const MyWork = () => {
     });
 
     return list;
-  }, [tasks, view, tab, filterIndividual, filterSource, filterStatus, sort, focused]);
+  }, [tasks, view, tab, filterIndividual, filterCounty, filterSource, filterStatus, sort, focused]);
 
-  // ---- grouping ----
+  // unique counties for filter dropdown
+  const counties = useMemo(
+    () => Array.from(new Set(tasks.map((t) => t.individualCounty).filter(Boolean))).sort(),
+    [tasks],
+  );
   const grouped = useMemo(() => {
     if (groupMode === "individual") {
       const map = new Map<string, MyWorkTask[]>();

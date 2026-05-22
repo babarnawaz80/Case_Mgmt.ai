@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { getPerson } from "@/data/people";
-import { Plus, Eye, Printer, Trash2, X } from "lucide-react";
+import { people } from "@/data/people";
+import { Plus, Eye, Printer, Trash2, X, Search, Check, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
+
 
 
 interface ContactNote {

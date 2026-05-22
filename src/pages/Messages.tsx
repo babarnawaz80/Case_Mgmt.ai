@@ -1034,7 +1034,6 @@ function NewMessageModal({
   const [recipients, setRecipients] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [groupName, setGroupName] = useState("");
-  const [firstMessage, setFirstMessage] = useState("");
 
   const matches = allStaff.filter(
     (s) =>

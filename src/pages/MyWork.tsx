@@ -181,6 +181,8 @@ const MyWork = () => {
       list = list.filter((t) =>
         t.individualName.toLowerCase().includes(filterIndividual.toLowerCase()),
       );
+    if (filterCounty !== "All")
+      list = list.filter((t) => t.individualCounty === filterCounty);
     if (filterSource !== "All") list = list.filter((t) => t.source === filterSource);
     if (filterStatus !== "All") list = list.filter((t) => t.status === filterStatus);
 

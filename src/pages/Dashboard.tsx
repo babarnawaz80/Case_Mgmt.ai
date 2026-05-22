@@ -1,6 +1,8 @@
 import { ICMShell } from "@/components/icm/ICMShell";
 
 import { Donut } from "@/components/icm/charts";
+import { people } from "@/data/people";
+import { globalIncidentSummary } from "@/data/incidents";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Sun,
@@ -212,21 +214,26 @@ function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
 }
 
 function HeroRow() {
+  const census = people.length;
+  const activeCensus = people.filter((p) => p.status === "Active").length;
+  const highRisk = people.filter((p) => (p.riskScore ?? 0) >= 60).length;
+  const reviewRisk = people.filter((p) => (p.riskScore ?? 0) >= 35 && (p.riskScore ?? 0) < 60).length;
+  const attentionCount = highRisk + reviewRisk;
+  const incidentSummary = globalIncidentSummary();
   const kpis: HeroKpi[] = [
     {
       label: "Census",
-      value: "48",
-      sub: "Current Individuals",
+      value: census.toString(),
+      sub: `${activeCensus} active · ${census - activeCensus} inactive/pending`,
       icon: Users,
       to: "/people",
       cta: "Open People",
       tone: "blue",
-      trend: { value: "+3", positive: true },
     },
     {
       label: "Incidents",
-      value: "03",
-      sub: "Apr 20 — May 20",
+      value: incidentSummary.totalOpen.toString().padStart(2, "0"),
+      sub: `${incidentSummary.overdue} overdue · ${incidentSummary.closedThisMonth} closed`,
       icon: AlertTriangle,
       to: "/incidents",
       cta: "View All",
@@ -245,9 +252,9 @@ function HeroRow() {
   ];
   const attention: HeroMeter = {
     label: "People Needing Attention",
-    value: (4 / 48) * 100,
-    centerLabel: "4/48",
-    sub: "2 high-risk · 2 review",
+    value: (attentionCount / census) * 100,
+    centerLabel: `${attentionCount}/${census}`,
+    sub: `${highRisk} high-risk · ${reviewRisk} review`,
     icon: AlertTriangle,
     to: "/people",
     cta: "View Watchlist",

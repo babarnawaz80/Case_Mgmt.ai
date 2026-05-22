@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Clock, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { people } from "@/data/people";
 
 const stats = [
   {
     label: "People Supported",
-    value: "48",
+    value: people.length.toString(),
     change: "+3 this month",
     trend: "up" as const,
     icon: Users,

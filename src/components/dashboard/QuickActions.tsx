@@ -15,31 +15,31 @@ type FormRoute = (personId: string) => string;
 const quickActions: Array<{
   title: string;
   icon: typeof FileText;
-  bg: string;
+  category: "documentation" | "operations" | "care";
   route?: FormRoute;
 }> = [
-  { title: "Activity Note", icon: FileText, bg: "bg-primary", route: (id) => `/people/${id}/contact-note` },
-  { title: "Billable Note", icon: DollarSign, bg: "bg-success" },
-  { title: "Assessment", icon: ClipboardList, bg: "bg-info" },
-  { title: "Monitoring", icon: Search, bg: "bg-warning", route: (id) => `/people/${id}/monitoring-form/new` },
-  { title: "Progress Note", icon: StickyNote, bg: "bg-primary", route: (id) => `/people/${id}/progress-note/new` },
-  { title: "Visit Summary", icon: FileCheck, bg: "bg-success", route: (id) => `/people/${id}/visit-summary/new` },
-  { title: "Workflow", icon: Workflow, bg: "bg-info" },
+  { title: "Activity Note", icon: FileText, category: "documentation", route: (id) => `/people/${id}/contact-note` },
+  { title: "Billable Note", icon: DollarSign, category: "operations" },
+  { title: "Assessment", icon: ClipboardList, category: "documentation" },
+  { title: "Monitoring", icon: Search, category: "operations", route: (id) => `/people/${id}/monitoring-form/new` },
+  { title: "Progress Note", icon: StickyNote, category: "documentation", route: (id) => `/people/${id}/progress-note/new` },
+  { title: "Visit Summary", icon: FileCheck, category: "operations", route: (id) => `/people/${id}/visit-summary/new` },
+  { title: "Workflow", icon: Workflow, category: "documentation" },
 ];
 
 const modules = [
-  { title: "Announcements", icon: Bell, url: "", bg: "bg-primary" },
-  { title: "Attendance", icon: Calendar, url: "", bg: "bg-success" },
-  { title: "Documents", icon: FolderOpen, url: "", bg: "bg-warning" },
-  { title: "Care Tracker", icon: Heart, url: "", bg: "bg-destructive" },
-  { title: "Custom Forms", icon: ClipboardList, url: "", bg: "bg-primary" },
-  { title: "Incidents", icon: AlertTriangle, url: "", bg: "bg-warning" },
-  { title: "My Sites", icon: Building2, url: "", bg: "bg-success" },
-  { title: "People Supported", icon: Users, url: "/people", bg: "bg-info" },
-  { title: "Leads", icon: Send, url: "/leads", bg: "bg-primary" },
-  { title: "Training", icon: GraduationCap, url: "", bg: "bg-warning" },
-  { title: "Plan of Correction", icon: Shield, url: "", bg: "bg-destructive" },
-  { title: "SnapTag", icon: Tag, url: "", bg: "bg-success" },
+  { title: "Announcements", icon: Bell, url: "", category: "care" },
+  { title: "Attendance", icon: Calendar, url: "", category: "operations" },
+  { title: "Documents", icon: FolderOpen, url: "", category: "documentation" },
+  { title: "Care Tracker", icon: Heart, url: "", category: "care" },
+  { title: "Custom Forms", icon: ClipboardList, url: "", category: "documentation" },
+  { title: "Incidents", icon: AlertTriangle, url: "", category: "operations" },
+  { title: "My Sites", icon: Building2, url: "", category: "operations" },
+  { title: "People Supported", icon: Users, url: "/people", category: "care" },
+  { title: "Authorizations", icon: Send, url: "/billing", category: "operations" },
+  { title: "Training", icon: GraduationCap, url: "", category: "operations" },
+  { title: "Plan of Correction", icon: Shield, url: "", category: "operations" },
+  { title: "SnapTag", icon: Tag, url: "", category: "care" },
 ];
 
 export function QuickActions() {

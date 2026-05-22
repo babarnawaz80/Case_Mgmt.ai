@@ -71,7 +71,7 @@ export default function Login() {
           })
         );
       } catch {}
-      navigate("/");
+      navigate("/home");
     }, 900);
   };
 

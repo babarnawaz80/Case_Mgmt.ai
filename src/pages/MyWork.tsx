@@ -339,7 +339,7 @@ const MyWork = () => {
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-icm-accent to-indigo-500 rounded-[2.2rem] blur-xl opacity-10 group-hover:opacity-20 transition duration-700 pointer-events-none" />
             <div className="relative bg-white/80 backdrop-blur-2xl border border-white/60 ring-1 ring-icm-border/50 p-6 md:p-7 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.02)] flex items-start gap-5">
-              <div className="ai-gradient p-3.5 rounded-2xl shadow-[0_10px_20px_-5px_rgba(59,130,246,0.45)] shrink-0">
+              <div className="p-3.5 rounded-2xl shadow-[0_10px_20px_-5px_rgba(0,194,178,0.45)] shrink-0" style={{ backgroundColor: '#00C2B2' }}>
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1 min-w-0">

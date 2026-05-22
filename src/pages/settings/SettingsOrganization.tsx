@@ -29,6 +29,33 @@ function daysUntil(s: string): number | null {
 }
 
 const SettingsOrganization = () => {
+  const [enrollments, setEnrollments] = useState<StateEnrollment[]>(INITIAL_ENROLLMENTS);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [sameAsBilling, setSameAsBilling] = useState(true);
+
+  const expiringSoon = useMemo(
+    () =>
+      enrollments
+        .map((e) => ({ e, days: daysUntil(e.expiration) }))
+        .filter((x) => x.days !== null && x.days >= 0 && x.days <= 90),
+    [enrollments]
+  );
+
+  const addEnrollment = () => {
+    const id = `se-${Date.now()}`;
+    setEnrollments((rows) => [
+      ...rows,
+      { id, state: "", providerId: "", status: "Pending", effective: "", expiration: "" },
+    ]);
+    setEditingId(id);
+  };
+  const updateEnrollment = (id: string, patch: Partial<StateEnrollment>) =>
+    setEnrollments((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const removeEnrollment = (id: string) => {
+    setEnrollments((rows) => rows.filter((r) => r.id !== id));
+    demoSuccess("State enrollment removed");
+  };
+
   return (
     <SettingsLayout
       title="Organization Profile"

@@ -278,7 +278,7 @@ function StartIncidentModal({ onClose, onSelect }: { onClose: () => void; onSele
                 {initials(p)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] font-geist font-medium text-icm-text truncate">{p.name}</p>
+                <p className="text-[12.5px] font-geist font-medium text-icm-text truncate">{p.firstName} {p.lastName}</p>
                 <p className="text-[10.5px] font-mono text-icm-text-dim truncate">{p.id}</p>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-icm-accent shrink-0" />

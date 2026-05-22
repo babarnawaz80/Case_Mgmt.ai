@@ -157,7 +157,7 @@ interface ChatTurn {
 
 const Index = () => {
   const [message, setMessage] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [plusSearch, setPlusSearch] = useState("");

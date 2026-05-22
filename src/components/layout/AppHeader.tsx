@@ -1,6 +1,7 @@
-import { Bell, Mail, Sparkles, User, BrainCircuit } from "lucide-react";
+import { Bell, Mail, Sparkles, BrainCircuit } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { UserMenu } from "@/components/icm/UserMenu";
 
 export function AppHeader() {
   const navigate = useNavigate();

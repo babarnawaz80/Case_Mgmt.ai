@@ -21,9 +21,9 @@ const quickActions: Array<{
   { title: "Activity Note", icon: FileText, bg: "bg-primary", route: (id) => `/people/${id}/contact-note` },
   { title: "Billable Note", icon: DollarSign, bg: "bg-success" },
   { title: "Assessment", icon: ClipboardList, bg: "bg-info" },
-  { title: "Monitoring", icon: Search, bg: "bg-warning", route: (id) => `/people/${id}/monitoring-form` },
-  { title: "Progress Note", icon: StickyNote, bg: "bg-primary", route: (id) => `/people/${id}/progress-note` },
-  { title: "Visit Summary", icon: FileCheck, bg: "bg-success", route: (id) => `/people/${id}/visit-summary` },
+  { title: "Monitoring", icon: Search, bg: "bg-warning", route: (id) => `/people/${id}/monitoring-form/new` },
+  { title: "Progress Note", icon: StickyNote, bg: "bg-primary", route: (id) => `/people/${id}/progress-note/new` },
+  { title: "Visit Summary", icon: FileCheck, bg: "bg-success", route: (id) => `/people/${id}/visit-summary/new` },
   { title: "Workflow", icon: Workflow, bg: "bg-info" },
 ];
 

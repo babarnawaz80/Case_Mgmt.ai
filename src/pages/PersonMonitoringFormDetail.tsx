@@ -107,8 +107,8 @@ const PersonMonitoringFormDetail = () => {
     <ICMShell title="Monitoring Form" rightPanel={<PersonAIPanel person={person} suggestions={formSuggestions} intro={`I'm tracking ${formSuggestions.length} items on this review.`} />}>
       <div className="space-y-5">
         {/* Back */}
-        <button onClick={() => navigate(`/people/${person.id}/monitoring-form`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
-          <ChevronLeft className="w-3.5 h-3.5" /> Monitoring Forms
+        <button onClick={() => navigate(`/people/${person.id}/monitoring-form`)} className="inline-flex items-center gap-1.5 text-[14px] font-geist font-bold text-icm-text hover:text-icm-accent">
+          <ChevronLeft className="w-4 h-4" /> Monitoring Forms
         </button>
 
         {/* Form header */}

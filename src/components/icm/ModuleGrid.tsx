@@ -33,7 +33,7 @@ const tiles: Tile[] = [
   { label: "Care Tracker", icon: Heart, to: "/documentation" },
   { label: "Sites", icon: Building2, count: 4, to: "/settings/organization" },
   { label: "Plan of Correction", icon: Shield, count: 1, to: "/documentation" },
-  { label: "Outreach", icon: Phone, to: "/documentation" },
+  { label: "Leads", icon: Phone, to: "/leads" },
   { label: "Training", icon: GraduationCap, to: "/settings" },
   { label: "All Modules", icon: LayoutGrid, to: "/documentation" },
 ];

@@ -444,7 +444,7 @@ const ACTIONS: ActionTile[] = [
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
   { label: "On Call Log", icon: PhoneCall, to: "/documentation", category: "Operations", count: 3 },
   { label: "Training", icon: GraduationCap, to: "/settings", category: "Operations", count: 4 },
-  { label: "Outreach", icon: Phone, to: "/documentation", category: "Operations" },
+  { label: "Leads", icon: Phone, to: "/leads", category: "Operations" },
 
   // Care (purple)
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },

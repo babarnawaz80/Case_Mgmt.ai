@@ -63,7 +63,7 @@ const SettingsOrganization = () => {
       actions={
         <button
           onClick={() => demoSuccess("Organization profile saved", "Changes propagated to all users.")}
-          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+          className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700"
         >
           Save profile
         </button>
@@ -377,7 +377,7 @@ const SettingsOrganization = () => {
         </div>
         <button
           onClick={addEnrollment}
-          className="mt-2 h-8 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text inline-flex items-center gap-1.5 hover:bg-icm-bg"
+          className="mt-2 h-8 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
         >
           <Plus className="w-3.5 h-3.5" /> Add State Enrollment
         </button>

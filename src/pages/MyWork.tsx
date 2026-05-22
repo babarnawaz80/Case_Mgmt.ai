@@ -123,8 +123,9 @@ const MyWork = () => {
   const [tab, setTab] = useState<Exclude<TabKey, "completed">>("today");
   const [groupMode, setGroupMode] = useState<GroupMode>("individual");
   const [sort, setSort] = useState<"priority" | "due" | "name" | "type" | "created">("priority");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filterIndividual, setFilterIndividual] = useState("");
+  const [filterCounty, setFilterCounty] = useState<string>("All");
   const [filterSource, setFilterSource] = useState<"All" | MyWorkTask["source"]>("All");
   const [filterStatus, setFilterStatus] = useState<"All" | TaskStatus>("All");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -180,6 +181,8 @@ const MyWork = () => {
       list = list.filter((t) =>
         t.individualName.toLowerCase().includes(filterIndividual.toLowerCase()),
       );
+    if (filterCounty !== "All")
+      list = list.filter((t) => t.individualCounty === filterCounty);
     if (filterSource !== "All") list = list.filter((t) => t.source === filterSource);
     if (filterStatus !== "All") list = list.filter((t) => t.status === filterStatus);
 
@@ -204,9 +207,13 @@ const MyWork = () => {
     });
 
     return list;
-  }, [tasks, view, tab, filterIndividual, filterSource, filterStatus, sort, focused]);
+  }, [tasks, view, tab, filterIndividual, filterCounty, filterSource, filterStatus, sort, focused]);
 
-  // ---- grouping ----
+  // unique counties for filter dropdown
+  const counties = useMemo(
+    () => Array.from(new Set(tasks.map((t) => t.individualCounty).filter(Boolean))).sort(),
+    [tasks],
+  );
   const grouped = useMemo(() => {
     if (groupMode === "individual") {
       const map = new Map<string, MyWorkTask[]>();
@@ -218,7 +225,7 @@ const MyWork = () => {
       const groups = Array.from(map.entries()).map(([id, items]) => ({
         id,
         label: items[0].individualName,
-        sub: items[0].individualCounty,
+        sub: "",
         initials: items[0].individualInitials,
         items,
         overdueCount: items.filter((i) => bucketForTask(i) === "overdue").length,
@@ -550,13 +557,23 @@ const MyWork = () => {
 
         {/* Filters panel */}
         {view === "my_work" && showFilters && (
-          <div className="rounded-2xl border border-icm-border bg-icm-panel p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div className="rounded-2xl border border-icm-border bg-icm-panel p-3 grid grid-cols-1 md:grid-cols-4 gap-2">
             <input
               value={filterIndividual}
               onChange={(e) => setFilterIndividual(e.target.value)}
-              placeholder="Individual…"
+              placeholder="Search individual…"
               className="h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
             />
+            <select
+              value={filterCounty}
+              onChange={(e) => setFilterCounty(e.target.value)}
+              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
+            >
+              <option value="All">All counties</option>
+              {counties.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
             <select
               value={filterSource}
               onChange={(e) => setFilterSource(e.target.value as typeof filterSource)}

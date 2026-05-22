@@ -38,6 +38,7 @@ import { people, getPerson } from "@/data/people";
 import { demoToast } from "@/lib/demoToast";
 import { InlineIndividualSnapshot } from "@/components/InlineIndividualSnapshot";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
+import { UserMenu } from "@/components/icm/UserMenu";
 
 interface ChatHistoryItem {
   id: string;

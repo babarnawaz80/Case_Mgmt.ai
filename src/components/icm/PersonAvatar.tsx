@@ -19,8 +19,9 @@ export function PersonAvatar({
   className = "",
 }: PersonAvatarProps) {
   const [errored, setErrored] = useState(false);
-  const radius =
-    shape === "circle" ? "rounded-full" : shape === "square" ? "rounded-lg" : "rounded-xl";
+  // Unified: all person avatars are slightly-rounded squares for visual consistency.
+  const radius = "rounded-lg";
+
   const style = { width: size, height: size };
   const showPhoto = person.photoUrl && !errored;
 

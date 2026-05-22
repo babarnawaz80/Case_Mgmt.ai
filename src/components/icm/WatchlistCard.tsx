@@ -49,7 +49,7 @@ export function WatchlistCard() {
             onClick={() => navigate("/people")}
             className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-icm-bg/40 -mx-2 px-2 rounded-lg transition-colors"
           >
-            <div className={cn("w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-mono font-semibold shrink-0", avatarBg(p.level))}>
+            <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-mono font-semibold shrink-0", avatarBg(p.level))}>
               {p.initials}
             </div>
             <div className="flex-1 min-w-0">

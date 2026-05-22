@@ -315,7 +315,7 @@ function PersonHeader({ person, navigate }: { person: ReturnType<typeof getPerso
       </button>
       <div className="flex items-center gap-3">
         <div
-          className={`w-10 h-10 rounded-full ring-2 flex items-center justify-center font-semibold text-[13px] ${riskAvatarClass(person.riskScore)}`}
+          className={`w-10 h-10 rounded-lg ring-2 flex items-center justify-center font-semibold text-[13px] ${riskAvatarClass(person.riskScore)}`}
         >
           {initials(person)}
         </div>

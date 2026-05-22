@@ -89,7 +89,7 @@ const SettingsUserDetail = () => {
       <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4">
         <span
           className={cn(
-            "w-16 h-16 rounded-full ring-1 flex items-center justify-center text-[18px] font-manrope font-bold",
+            "w-16 h-16 rounded-lg ring-1 flex items-center justify-center text-[18px] font-manrope font-bold",
             roleAvatarTone(user.role)
           )}
         >

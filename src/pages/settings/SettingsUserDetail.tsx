@@ -698,7 +698,7 @@ function SubHeading({ children }: { children: React.ReactNode }) {
     </p>
   );
 }
-  );
-}
+
+export default SettingsUserDetail;
 
 export default SettingsUserDetail;

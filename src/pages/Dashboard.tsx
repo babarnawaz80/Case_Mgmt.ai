@@ -1,9 +1,11 @@
 import { ICMShell } from "@/components/icm/ICMShell";
 
 import { Donut } from "@/components/icm/charts";
-import { people } from "@/data/people";
+import { people, initials, riskAvatarClass, type Person } from "@/data/people";
 import { globalIncidentSummary } from "@/data/incidents";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   Sun,
   Users,
@@ -28,6 +30,8 @@ import {
   BarChart3,
   Receipt,
   ArrowRight,
+  Search,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -401,6 +405,8 @@ interface ActionTile {
   to: string;
   category: ActionCategory;
   count?: number;
+  /** When set, clicking the tile opens an individual picker, then routes to formRoute(personId). */
+  formRoute?: (personId: string) => string;
 }
 
 const ACTION_TONES: Record<
@@ -434,11 +440,12 @@ const ACTION_TONES: Record<
 };
 
 const ACTIONS: ActionTile[] = [
-  // Documentation (blue)
-  { label: "Activity Note", icon: FileText, to: "/documentation/contact-notes", category: "Documentation", count: 24 },
-  { label: "Progress Note", icon: PenTool, to: "/documentation/progress-notes", category: "Documentation", count: 14 },
-  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation/visit-summaries", category: "Documentation", count: 6 },
-  { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-forms", category: "Documentation", count: 4 },
+  // Documentation (blue) — these open an individual picker first, then load the
+  // exact same form used inside each person's eChart.
+  { label: "Activity Note", icon: FileText, to: "/documentation/contact-notes", category: "Documentation", count: 24, formRoute: (id) => `/people/${id}/contact-note` },
+  { label: "Progress Note", icon: PenTool, to: "/documentation/progress-notes", category: "Documentation", count: 14, formRoute: (id) => `/people/${id}/progress-note/new` },
+  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation/visit-summaries", category: "Documentation", count: 6, formRoute: (id) => `/people/${id}/visit-summary/new` },
+  { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-forms", category: "Documentation", count: 4, formRoute: (id) => `/people/${id}/monitoring-form/new` },
 
   // Operations (orange)
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
@@ -453,13 +460,12 @@ const ACTIONS: ActionTile[] = [
   { label: "Communications", icon: PhoneCall, to: "/documentation", category: "Care", count: 5 },
 ];
 
-function ActionTileBtn({ tile }: { tile: ActionTile }) {
-  const navigate = useNavigate();
+function ActionTileBtn({ tile, onClick }: { tile: ActionTile; onClick: () => void }) {
   const tone = ACTION_TONES[tile.category];
   const Icon = tile.icon;
   return (
     <button
-      onClick={() => navigate(tile.to)}
+      onClick={onClick}
       className={`relative w-full text-left rounded-xl ${tone.bg} ${tone.hover} ring-1 ${tone.ring} px-3 py-2.5 flex items-center gap-2.5 text-white shadow-sm hover:shadow-elevated hover:-translate-y-0.5 transition-all overflow-hidden`}
     >
       <div className={`w-8 h-8 rounded-lg ${tone.iconBg} flex items-center justify-center shrink-0`}>
@@ -478,7 +484,18 @@ function ActionTileBtn({ tile }: { tile: ActionTile }) {
 }
 
 function QuickActions() {
+  const navigate = useNavigate();
   const categories: ActionCategory[] = ["Documentation", "Operations", "Care"];
+  const [picker, setPicker] = useState<{ label: string; formRoute: (id: string) => string } | null>(null);
+
+  const handleTileClick = (tile: ActionTile) => {
+    if (tile.formRoute) {
+      setPicker({ label: tile.label, formRoute: tile.formRoute });
+    } else {
+      navigate(tile.to);
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-icm-border bg-icm-panel p-5">
       <div className="flex items-center gap-3 mb-4">
@@ -496,7 +513,7 @@ function QuickActions() {
           return (
             <div key={cat} className="space-y-2.5">
               {items.map((a) => (
-                <ActionTileBtn key={a.label} tile={a} />
+                <ActionTileBtn key={a.label} tile={a} onClick={() => handleTileClick(a)} />
               ))}
             </div>
           );
@@ -511,6 +528,109 @@ function QuickActions() {
             <span className="text-[11px] font-geist text-icm-text-dim">{cat}</span>
           </div>
         ))}
+      </div>
+
+      {picker && (
+        <IndividualPickerModal
+          title={picker.label}
+          onClose={() => setPicker(null)}
+          onSelect={(personId) => {
+            const target = picker.formRoute(personId);
+            setPicker(null);
+            navigate(target);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function IndividualPickerModal({
+  title,
+  onClose,
+  onSelect,
+}: {
+  title: string;
+  onClose: () => void;
+  onSelect: (personId: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const list = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const active = people.filter((p) => p.status === "Active");
+    const fullName = (p: Person) => `${p.firstName} ${p.lastName}`;
+    if (!term) return active.slice(0, 60);
+    return active
+      .filter((p) => fullName(p).toLowerCase().includes(term) || p.id.toLowerCase().includes(term))
+      .slice(0, 60);
+  }, [q]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl bg-card border border-border shadow-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div>
+            <h2 className="font-display font-bold text-[15px] text-foreground">Start {title}</h2>
+            <p className="text-[11.5px] text-muted-foreground mt-0.5">
+              Select the individual this {title.toLowerCase()} is for
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-3 border-b border-border">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search individuals…"
+              className="w-full h-9 pl-8 pr-2 rounded-lg border border-border bg-background text-[12px] text-foreground"
+            />
+          </div>
+        </div>
+        <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
+          {list.length === 0 && (
+            <div className="px-4 py-6 text-center text-[12px] text-muted-foreground">
+              No individuals found
+            </div>
+          )}
+          {list.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onSelect(p.id)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/60 transition-colors"
+            >
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold",
+                  riskAvatarClass(p.riskScore)
+                )}
+              >
+                {initials(p)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12.5px] font-medium text-foreground truncate">
+                  {p.firstName} {p.lastName}
+                </p>
+                <p className="text-[10.5px] font-mono text-muted-foreground truncate">{p.id}</p>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-primary shrink-0" />
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

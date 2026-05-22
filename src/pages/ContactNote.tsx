@@ -253,13 +253,12 @@ const ContactNote = () => {
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Person Supported" required>
-                  <input
+                  <PersonSearchSelect
                     value={form.person || ""}
-                    onChange={(e) => set("person", e.target.value)}
-                    placeholder="Search person…"
-                    className={inputCls}
+                    onChange={(name) => set("person", name)}
                   />
                 </Field>
+
                 <Field label="Activity Type" required>
                   <select value={form.activityType || ""} onChange={(e) => set("activityType", e.target.value)} className={inputCls}>
                     <option value="">Select…</option>

@@ -184,7 +184,7 @@ const App = () => (
             <Route path="/messages" element={<Messages />} />
             <Route path="/people/:id/module/:slug" element={<PersonModule />} />
             <Route path="/modules/contact-note" element={<ContactNote />} />
-            <Route path="/lifeplan" element={<LifePlanBoard />} />
+            <Route path="/lifeplan" element={<Navigate to="/platform" replace />} />
             <Route path="/lifeplan/guidelines-engines" element={<ComplianceEngineDashboard />} />
             <Route path="/lifeplan/guidelines-library/new" element={<RuleLibraryBuilder />} />
             <Route path="/lifeplan/agent/new" element={<RuntimeAgentBuilder />} />

@@ -190,11 +190,8 @@ const EChart = () => {
             { label: "eChart" },
           ]}
         />
-        {/* Person header card with gradient accent */}
-        <div className="relative rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
-          {/* Top gradient stripe */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-icm-accent via-purple-400 to-icm-red" />
-
+        {/* Person header card */}
+        <div className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
           <div className="p-5 pt-6">
             {/* Top row: identity (left) · alerts (center, flexible) · actions (right) */}
             <div className="flex items-start gap-5">

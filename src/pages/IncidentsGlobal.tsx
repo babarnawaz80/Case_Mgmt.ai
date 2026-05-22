@@ -235,9 +235,10 @@ function StartIncidentModal({ onClose, onSelect }: { onClose: () => void; onSele
   const list = useMemo(() => {
     const term = q.trim().toLowerCase();
     const active = people.filter((p) => p.status === "Active");
+    const fullName = (p: typeof people[number]) => `${p.firstName} ${p.lastName}`;
     if (!term) return active.slice(0, 50);
     return active.filter((p) =>
-      p.name.toLowerCase().includes(term) || p.id.toLowerCase().includes(term)
+      fullName(p).toLowerCase().includes(term) || p.id.toLowerCase().includes(term)
     ).slice(0, 50);
   }, [q]);
 

@@ -99,8 +99,8 @@ const PersonProgressNoteDetail = () => {
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <button onClick={() => navigate(`/people/${person.id}/progress-note`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text mb-2">
-              <ChevronLeft className="w-3.5 h-3.5" />
+            <button onClick={() => navigate(`/people/${person.id}/progress-note`)} className="inline-flex items-center gap-1.5 text-[14px] font-geist font-bold text-icm-text hover:text-icm-accent mb-2">
+              <ChevronLeft className="w-4 h-4" />
               Progress Notes
             </button>
             <div className="flex items-center gap-2 flex-wrap">

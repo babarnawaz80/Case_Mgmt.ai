@@ -77,7 +77,7 @@ const chatHistory: ChatHistoryItem[] = [
 ];
 
 const quickStats = [
-  { label: "People Supported", value: "48", icon: Users, route: "/people" },
+  { label: "People Supported", value: people.length.toString(), icon: Users, route: "/people" },
   { label: "Pending Tasks", value: "5", icon: ClipboardList, route: "/my-work" },
   { label: "Unsigned Notes", value: "3", icon: FileText, route: "/documentation" },
   { label: "Critical Alerts", value: "2", icon: AlertTriangle, route: "/my-work?view=alerts", highlight: true },

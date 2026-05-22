@@ -25,6 +25,7 @@ import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import EChart from "./pages/EChart";
 import PersonMonitorsBaselines from "./pages/PersonMonitorsBaselines";
 import ContactNote from "./pages/ContactNote";
+import DocumentationStart from "./pages/DocumentationStart";
 import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";
 import PersonCarePlan from "./pages/PersonCarePlan";
@@ -214,6 +215,10 @@ const App = () => (
             <Route path="/documentation/progress-notes" element={<Documentation />} />
             <Route path="/documentation/visit-summaries" element={<Documentation />} />
             <Route path="/documentation/monitoring-forms" element={<Documentation />} />
+            <Route path="/documentation/contact-note/new" element={<DocumentationStart kind="contact-note" />} />
+            <Route path="/documentation/progress-note/new" element={<DocumentationStart kind="progress-note" />} />
+            <Route path="/documentation/visit-summary/new" element={<DocumentationStart kind="visit-summary" />} />
+            <Route path="/documentation/monitoring-form/new" element={<DocumentationStart kind="monitoring-form" />} />
             <Route path="/documentation/assessments" element={<Documentation />} />
             <Route path="/documentation/care-plans" element={<Documentation />} />
             <Route path="/documentation/referrals" element={<Documentation />} />

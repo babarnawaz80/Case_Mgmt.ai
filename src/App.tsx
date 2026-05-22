@@ -47,6 +47,7 @@ import PersonProgressNoteDetail from "./pages/PersonProgressNoteDetail";
 import ProgressNoteNew from "./pages/ProgressNoteNew";
 import ProgressNoteLog from "./pages/ProgressNoteLog";
 import VisitSummaryNew from "./pages/VisitSummaryNew";
+import VisitSummaryLog from "./pages/VisitSummaryLog";
 import PersonWorkflowManager from "./pages/PersonWorkflowManager";
 import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
 import WorkflowsGlobal from "./pages/WorkflowsGlobal";

@@ -93,7 +93,6 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "managed-documents", label: "Managed Documents", icon: Folder, route: "managed-documents", count: 8, category: "Operations" },
   { slug: "oncall", label: "On Call Log", icon: PhoneCall, route: "oncall", count: 3, category: "Operations" },
   { slug: "trainings", label: "Person Supported Trainings", icon: BookOpen, route: "trainings", count: 4, category: "Operations" },
-  { slug: "progress-notes-ops", label: "Progress Notes", icon: MessageSquare, route: "progress-note", count: 14, category: "Operations" },
   { slug: "services", label: "Services", icon: Briefcase, route: "services", category: "Operations" },
   { slug: "service-plan", label: "Service Plan", icon: LayoutIcon, route: "service-plan", count: 1, category: "Operations" },
   { slug: "billing", label: "General Ledger", icon: CreditCard, route: "billing", category: "Operations", roles: ["billing", "admin"] },

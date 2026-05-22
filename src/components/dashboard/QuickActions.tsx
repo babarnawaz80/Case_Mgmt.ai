@@ -10,6 +10,12 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { people, initials, riskAvatarClass, type Person } from "@/data/people";
 
+const categoryStyles = {
+  documentation: { bg: "#EBF4FD", text: "#1a5f8a", iconBg: "rgba(26, 95, 138, 0.12)" },
+  operations: { bg: "#FEF4EC", text: "#b85c00", iconBg: "rgba(184, 92, 0, 0.12)" },
+  care: { bg: "#F0EEFF", text: "#5b3fa6", iconBg: "rgba(91, 63, 166, 0.12)" },
+};
+
 type FormRoute = (personId: string) => string;
 
 const quickActions: Array<{

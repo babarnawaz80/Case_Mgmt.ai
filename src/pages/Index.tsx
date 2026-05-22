@@ -608,12 +608,6 @@ const Index = () => {
                       {selectedIndividual}
                     </span>
                   )}
-                  <button
-                    onClick={() => demoToast("Camera capture coming soon")}
-                    className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </button>
                 </div>
                 <div className="flex items-center gap-1">
                   {(() => {

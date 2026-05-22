@@ -168,6 +168,18 @@ const SettingsUsers = () => {
                         <span className="text-icm-text font-medium">
                           {u.firstName} {u.lastName}
                         </span>
+                        {(() => {
+                          const cb = credentialBadge(u.id);
+                          if (!cb) return null;
+                          const tone = cb.tone === "red"
+                            ? "bg-icm-red-soft text-icm-red ring-icm-red/20"
+                            : "bg-icm-amber-soft text-icm-amber ring-icm-amber/20";
+                          return (
+                            <span className={cn("ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 whitespace-nowrap", tone)}>
+                              {cb.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-icm-text-dim">{u.email}</td>

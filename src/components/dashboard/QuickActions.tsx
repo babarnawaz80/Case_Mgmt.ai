@@ -10,36 +10,42 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { people, initials, riskAvatarClass, type Person } from "@/data/people";
 
+const categoryStyles = {
+  documentation: { bg: "#EBF4FD", text: "#1a5f8a", iconBg: "rgba(26, 95, 138, 0.12)" },
+  operations: { bg: "#FEF4EC", text: "#b85c00", iconBg: "rgba(184, 92, 0, 0.12)" },
+  care: { bg: "#F0EEFF", text: "#5b3fa6", iconBg: "rgba(91, 63, 166, 0.12)" },
+};
+
 type FormRoute = (personId: string) => string;
 
 const quickActions: Array<{
   title: string;
   icon: typeof FileText;
-  bg: string;
+  category: "documentation" | "operations" | "care";
   route?: FormRoute;
 }> = [
-  { title: "Activity Note", icon: FileText, bg: "bg-primary", route: (id) => `/people/${id}/contact-note` },
-  { title: "Billable Note", icon: DollarSign, bg: "bg-success" },
-  { title: "Assessment", icon: ClipboardList, bg: "bg-info" },
-  { title: "Monitoring", icon: Search, bg: "bg-warning", route: (id) => `/people/${id}/monitoring-form/new` },
-  { title: "Progress Note", icon: StickyNote, bg: "bg-primary", route: (id) => `/people/${id}/progress-note/new` },
-  { title: "Visit Summary", icon: FileCheck, bg: "bg-success", route: (id) => `/people/${id}/visit-summary/new` },
-  { title: "Workflow", icon: Workflow, bg: "bg-info" },
+  { title: "Activity Note", icon: FileText, category: "documentation", route: (id) => `/people/${id}/contact-note` },
+  { title: "Billable Note", icon: DollarSign, category: "operations" },
+  { title: "Assessment", icon: ClipboardList, category: "documentation" },
+  { title: "Monitoring", icon: Search, category: "operations", route: (id) => `/people/${id}/monitoring-form/new` },
+  { title: "Progress Note", icon: StickyNote, category: "documentation", route: (id) => `/people/${id}/progress-note/new` },
+  { title: "Visit Summary", icon: FileCheck, category: "operations", route: (id) => `/people/${id}/visit-summary/new` },
+  { title: "Workflow", icon: Workflow, category: "documentation" },
 ];
 
 const modules = [
-  { title: "Announcements", icon: Bell, url: "", bg: "bg-primary" },
-  { title: "Attendance", icon: Calendar, url: "", bg: "bg-success" },
-  { title: "Documents", icon: FolderOpen, url: "", bg: "bg-warning" },
-  { title: "Care Tracker", icon: Heart, url: "", bg: "bg-destructive" },
-  { title: "Custom Forms", icon: ClipboardList, url: "", bg: "bg-primary" },
-  { title: "Incidents", icon: AlertTriangle, url: "", bg: "bg-warning" },
-  { title: "My Sites", icon: Building2, url: "", bg: "bg-success" },
-  { title: "People Supported", icon: Users, url: "/people", bg: "bg-info" },
-  { title: "Leads", icon: Send, url: "/leads", bg: "bg-primary" },
-  { title: "Training", icon: GraduationCap, url: "", bg: "bg-warning" },
-  { title: "Plan of Correction", icon: Shield, url: "", bg: "bg-destructive" },
-  { title: "SnapTag", icon: Tag, url: "", bg: "bg-success" },
+  { title: "Announcements", icon: Bell, url: "", category: "care" },
+  { title: "Attendance", icon: Calendar, url: "", category: "operations" },
+  { title: "Documents", icon: FolderOpen, url: "", category: "documentation" },
+  { title: "Care Tracker", icon: Heart, url: "", category: "care" },
+  { title: "Custom Forms", icon: ClipboardList, url: "", category: "documentation" },
+  { title: "Incidents", icon: AlertTriangle, url: "", category: "operations" },
+  { title: "My Sites", icon: Building2, url: "", category: "operations" },
+  { title: "People Supported", icon: Users, url: "/people", category: "care" },
+  { title: "Authorizations", icon: Send, url: "/billing", category: "operations" },
+  { title: "Training", icon: GraduationCap, url: "", category: "operations" },
+  { title: "Plan of Correction", icon: Shield, url: "", category: "operations" },
+  { title: "SnapTag", icon: Tag, url: "", category: "care" },
 ];
 
 export function QuickActions() {
@@ -86,12 +92,12 @@ export function QuickActions() {
               whileTap={{ scale: 0.97 }}
               onClick={() => handleQuickAction(action)}
               className={cn(
-                "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 text-white shadow-sm hover:shadow-lg transition-all duration-300",
-                action.bg
+                "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm hover:shadow-lg transition-all duration-300",
               )}
+              style={{ backgroundColor: categoryStyles[action.category].bg, color: categoryStyles[action.category].text }}
             >
-              <div className="p-2.5 rounded-xl bg-white/20">
-                <action.icon className="w-4 h-4 text-white" />
+              <div className="p-2.5 rounded-xl" style={{ backgroundColor: categoryStyles[action.category].iconBg }}>
+                <action.icon className="w-4 h-4" style={{ color: categoryStyles[action.category].text }} />
               </div>
               <span className="text-[11px] font-semibold text-center leading-tight">{action.title}</span>
             </motion.button>
@@ -121,9 +127,9 @@ export function QuickActions() {
               whileTap={{ scale: 0.97 }}
               onClick={() => handleModuleClick(mod)}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-4 py-3.5 text-white font-semibold text-xs shadow-sm hover:shadow-lg transition-all duration-300",
-                mod.bg
+                "flex items-center gap-3 rounded-xl px-4 py-3.5 font-semibold text-xs shadow-sm hover:shadow-lg transition-all duration-300",
               )}
+              style={{ backgroundColor: categoryStyles[mod.category as keyof typeof categoryStyles].bg, color: categoryStyles[mod.category as keyof typeof categoryStyles].text }}
             >
               <mod.icon className="w-4 h-4 shrink-0 opacity-90" />
               <span className="leading-tight text-left">{mod.title}</span>

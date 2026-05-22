@@ -442,10 +442,10 @@ const ACTION_TONES: Record<
 const ACTIONS: ActionTile[] = [
   // Documentation (blue) — these open an individual picker first, then load the
   // exact same form used inside each person's eChart.
-  { label: "Contact Note", icon: FileText, to: "/documentation/contact-note/new", category: "Documentation", count: 24 },
-  { label: "Progress Note", icon: PenTool, to: "/documentation/progress-note/new", category: "Documentation", count: 14 },
-  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation/visit-summary/new", category: "Documentation", count: 6 },
-  { label: "Monitoring Form", icon: ClipboardList, to: "/documentation/monitoring-form/new", category: "Documentation", count: 4 },
+  { label: "Contact Note", icon: FileText, to: "/documentation", category: "Documentation", count: 24 },
+  { label: "Progress Note", icon: PenTool, to: "/documentation", category: "Documentation", count: 14 },
+  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation", category: "Documentation", count: 6 },
+  { label: "Monitoring Form", icon: ClipboardList, to: "/documentation", category: "Documentation", count: 4 },
 
   // Operations (orange)
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },

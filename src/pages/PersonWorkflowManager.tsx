@@ -70,7 +70,7 @@ const PersonWorkflowManager = () => {
             <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">Workflow Manager</h1>
             <p className="text-[13px] text-icm-text-dim mt-1 font-geist">Event-driven compliance workflows</p>
           </div>
-          <button onClick={() => setShowStart(true)} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+          <button onClick={() => setShowStart(true)} className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Start Workflow
           </button>
         </div>

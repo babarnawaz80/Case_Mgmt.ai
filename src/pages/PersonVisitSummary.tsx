@@ -57,7 +57,7 @@ const PersonVisitSummary = () => {
             <button onClick={newVisit} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
               + Start blank summary
             </button>
-            <button onClick={newVisit} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={newVisit} className="h-10 px-4 rounded-xl bg-teal-600 text-white text-[13px] font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> Draft from ambient session
             </button>
           </div>
@@ -110,7 +110,7 @@ const PersonVisitSummary = () => {
             <button onClick={() => navigate(`/people/${person.id}/visit-summary/document`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Smartphone className="w-3.5 h-3.5" /> Document visit (mobile)
             </button>
-            <button onClick={newVisit} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={newVisit} className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" /> Add Visit Summary
             </button>
           </div>

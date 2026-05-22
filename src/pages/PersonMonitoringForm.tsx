@@ -112,7 +112,7 @@ const PersonMonitoringForm = () => {
               Structured compliance review · configurable per organization
             </p>
           </div>
-          <button onClick={newForm} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+          <button onClick={newForm} className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Add Review
           </button>
         </div>

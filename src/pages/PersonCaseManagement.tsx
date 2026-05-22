@@ -674,7 +674,7 @@ function TaskRow({
             ? "border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text"
             : isPending
             ? "border border-icm-border bg-icm-panel text-icm-text hover:border-icm-border-strong"
-            : "bg-icm-text text-icm-panel hover:opacity-90"
+            : "bg-teal-600 text-white hover:bg-teal-700"
         }`}
       >
         {isCompleted ? "View" : isPending ? "Start" : "Complete"}

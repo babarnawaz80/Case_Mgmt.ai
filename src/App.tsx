@@ -84,6 +84,9 @@ import ReportBuilder from "./pages/ReportBuilder";
 import AuditEvidence from "./pages/AuditEvidence";
 import PersonDocuments from "./pages/PersonDocuments";
 import Documents from "./pages/Documents";
+import Leads from "./pages/Leads";
+import LeadForm from "./pages/LeadForm";
+import LeadDetail from "./pages/LeadDetail";
 import Messages from "./pages/Messages";
 import VirtualVisit from "./pages/VirtualVisit";
 import BillingHub from "./pages/BillingHub";
@@ -201,6 +204,10 @@ const App = () => (
             <Route path="/people/:id/referrals/:referralId" element={<PersonReferralDetail />} />
             <Route path="/people/:id/documents" element={<PersonDocuments />} />
             <Route path="/documents" element={<Documents />} />
+            <Route path="/leads" element={<Leads />} />
+            <Route path="/leads/new" element={<LeadForm />} />
+            <Route path="/leads/:id" element={<LeadDetail />} />
+            <Route path="/leads/:id/edit" element={<LeadForm />} />
             <Route path="/documentation" element={<Documentation />} />
             <Route path="/documentation/contact-notes" element={<Documentation />} />
             <Route path="/documentation/progress-notes" element={<Documentation />} />

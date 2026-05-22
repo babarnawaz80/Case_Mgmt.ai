@@ -27,7 +27,7 @@ const modules = [
   { title: "Incidents", icon: AlertTriangle, url: "", bg: "bg-warning" },
   { title: "My Sites", icon: Building2, url: "", bg: "bg-success" },
   { title: "People Supported", icon: Users, url: "/people", bg: "bg-info" },
-  { title: "Outreach", icon: Send, url: "", bg: "bg-primary" },
+  { title: "Leads", icon: Send, url: "/leads", bg: "bg-primary" },
   { title: "Training", icon: GraduationCap, url: "", bg: "bg-warning" },
   { title: "Plan of Correction", icon: Shield, url: "", bg: "bg-destructive" },
   { title: "SnapTag", icon: Tag, url: "", bg: "bg-success" },

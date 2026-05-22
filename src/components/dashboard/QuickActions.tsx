@@ -92,12 +92,12 @@ export function QuickActions() {
               whileTap={{ scale: 0.97 }}
               onClick={() => handleQuickAction(action)}
               className={cn(
-                "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 text-white shadow-sm hover:shadow-lg transition-all duration-300",
-                action.bg
+                "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm hover:shadow-lg transition-all duration-300",
               )}
+              style={{ backgroundColor: categoryStyles[action.category].bg, color: categoryStyles[action.category].text }}
             >
-              <div className="p-2.5 rounded-xl bg-white/20">
-                <action.icon className="w-4 h-4 text-white" />
+              <div className="p-2.5 rounded-xl" style={{ backgroundColor: categoryStyles[action.category].iconBg }}>
+                <action.icon className="w-4 h-4" style={{ color: categoryStyles[action.category].text }} />
               </div>
               <span className="text-[11px] font-semibold text-center leading-tight">{action.title}</span>
             </motion.button>
@@ -127,9 +127,9 @@ export function QuickActions() {
               whileTap={{ scale: 0.97 }}
               onClick={() => handleModuleClick(mod)}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-4 py-3.5 text-white font-semibold text-xs shadow-sm hover:shadow-lg transition-all duration-300",
-                mod.bg
+                "flex items-center gap-3 rounded-xl px-4 py-3.5 font-semibold text-xs shadow-sm hover:shadow-lg transition-all duration-300",
               )}
+              style={{ backgroundColor: categoryStyles[mod.category as keyof typeof categoryStyles].bg, color: categoryStyles[mod.category as keyof typeof categoryStyles].text }}
             >
               <mod.icon className="w-4 h-4 shrink-0 opacity-90" />
               <span className="leading-tight text-left">{mod.title}</span>

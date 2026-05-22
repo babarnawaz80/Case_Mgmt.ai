@@ -30,6 +30,8 @@ import {
   BarChart3,
   Receipt,
   ArrowRight,
+  Search,
+  X,
   type LucideIcon,
 } from "lucide-react";
 

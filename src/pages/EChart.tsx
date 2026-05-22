@@ -202,7 +202,16 @@ const EChart = () => {
             <div className="flex items-start gap-5">
               {/* LEFT — avatar + identity (fixed width so it never truncates) */}
               <div className="flex items-start gap-4 shrink-0 w-[280px]">
-                <PersonAvatar person={person} size={64} shape="circle" className="text-[18px]" />
+                <div className="flex flex-col items-center gap-2 shrink-0">
+                  <PersonAvatar person={person} size={64} shape="circle" className="text-[18px]" />
+                  <button
+                    onClick={() => navigate(`/people/${person.id}/profile`)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-icm-border bg-icm-bg hover:bg-icm-panel hover:border-icm-accent/40 text-[10.5px] font-geist font-semibold text-icm-text transition-colors"
+                  >
+                    <User className="w-3 h-3 text-icm-accent" />
+                    Profile
+                  </button>
+                </div>
 
                 <div className="min-w-0">
                   <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">

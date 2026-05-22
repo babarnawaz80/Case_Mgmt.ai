@@ -624,6 +624,267 @@ function ProgramTab({ profile }: { profile: ProfileData }) {
   );
 }
 
+// ---------- Funding Streams (expanded) ----------
+type FundingCard = {
+  name: string;
+  payer: string;
+  authNumber: string;
+  effective: string;
+  expires: string;
+  codes: string[];
+  rate: string;
+  rateUnit: string;
+  used: number;
+  authorized: number;
+};
+
+function FundingStreamsSection({ profile }: { profile: ProfileData }) {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const first = profile.funding[0];
+  const cards: FundingCard[] = [
+    {
+      name: "Medicaid Waiver",
+      payer: "IHCP",
+      authNumber: first?.authorizationNumber ?? "SA-2026-001",
+      effective: "01/01/2026",
+      expires: "04/30/2026",
+      codes: ["T2022", "T2023"],
+      rate: "$28.50",
+      rateUnit: "15-min increments",
+      used: first?.usedUnits ?? 0,
+      authorized: first?.authorizedUnits ?? 40,
+    },
+    {
+      name: "Indiana Managed Care — Anthem",
+      payer: "Anthem Indiana",
+      authNumber: "SA-2026-002",
+      effective: "01/01/2026",
+      expires: "06/30/2026",
+      codes: ["T2022"],
+      rate: "$29.10",
+      rateUnit: "15-min increments",
+      used: 12,
+      authorized: 30,
+    },
+  ];
+
+  return (
+    <section className="rounded-xl border border-icm-border bg-icm-panel p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">Funding Streams</h3>
+        <button
+          onClick={() => setModalOpen(true)}
+          className="h-7 px-2.5 rounded-lg border border-icm-border text-[11px] font-geist font-semibold text-icm-text inline-flex items-center gap-1 hover:bg-icm-bg"
+        >
+          <Plus className="w-3 h-3" /> Add Authorization
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {cards.map((c) => (
+          <FundingStreamCard key={c.authNumber} card={c} />
+        ))}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-icm-border flex items-center justify-between flex-wrap gap-2">
+        <p className="text-[11px] text-icm-text-dim font-geist">
+          Last billing record: Progress Note 04/27/2026 · 3 units · T2022 · Pending scrub
+        </p>
+        <button
+          onClick={() => (id ? navigate(`/people/${id}?tab=billing`) : demoToast("View all billing records"))}
+          className="text-[11px] font-geist font-semibold text-icm-accent hover:underline inline-flex items-center gap-1"
+        >
+          View all billing records <ArrowRight className="w-3 h-3" />
+        </button>
+      </div>
+
+      {modalOpen && <AddAuthorizationModal onClose={() => setModalOpen(false)} />}
+    </section>
+  );
+}
+
+function FundingStreamCard({ card }: { card: FundingCard }) {
+  const pct = card.authorized === 0 ? 0 : Math.min(100, (card.used / card.authorized) * 100);
+  const capped = card.used >= card.authorized && card.authorized > 0;
+  const approaching = !capped && pct >= 85;
+  const tone = capped ? "bg-icm-red" : approaching ? "bg-icm-amber" : "bg-icm-accent";
+  const remaining = Math.max(0, card.authorized - card.used);
+
+  return (
+    <div className="rounded-lg border border-icm-border bg-icm-bg p-3">
+      {/* Line 1 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-[13px] font-semibold text-icm-text">{card.name}</p>
+        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
+          Active
+        </span>
+        <span className="text-[11.5px] text-icm-text-dim">· {card.payer}</span>
+      </div>
+      {/* Line 2 */}
+      <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">
+        Auth #{card.authNumber} · Effective {card.effective} · Expires {card.expires}
+      </p>
+      {/* Line 3 */}
+      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+        <span className="text-[11px] text-icm-text-dim font-geist">Service codes:</span>
+        {card.codes.map((code) => (
+          <span
+            key={code}
+            className="px-1.5 py-0.5 rounded-md text-[10.5px] font-mono font-semibold bg-icm-border/60 text-icm-text"
+          >
+            {code}
+          </span>
+        ))}
+      </div>
+      {/* Line 4 */}
+      <p className="text-[11.5px] text-icm-text mt-1.5 font-geist">
+        Rate: <span className="font-semibold">{card.rate}</span> per unit ({card.rateUnit})
+      </p>
+      {/* Line 5 */}
+      <div className="h-2 rounded-full bg-icm-border mt-2 overflow-hidden">
+        <div className={cn("h-full", tone)} style={{ width: `${pct}%` }} />
+      </div>
+      <p
+        className={cn(
+          "text-[11.5px] mt-1.5 font-geist",
+          capped ? "text-icm-red font-semibold" : approaching ? "text-icm-amber font-semibold" : "text-icm-text-dim"
+        )}
+      >
+        {capped
+          ? "Authorization cap reached — billing blocked"
+          : approaching
+            ? `Approaching cap — ${remaining} units remaining`
+            : `${card.used} of ${card.authorized} units used this authorization period`}
+      </p>
+    </div>
+  );
+}
+
+function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
+  const STREAMS = [
+    { name: "Indiana HCBS — CIH Waiver", payer: "IHCP" },
+    { name: "Indiana HCBS — Family Supports", payer: "IHCP" },
+    { name: "Indiana Managed Care — Anthem", payer: "Anthem Indiana" },
+    { name: "NJ DDD Community Care", payer: "NJ DDD" },
+  ];
+  const CODES = ["T2022", "T2023", "T1019", "T1016"];
+  const [stream, setStream] = useState(STREAMS[0].name);
+  const [codes, setCodes] = useState<string[]>(["T2022"]);
+  const payer = STREAMS.find((s) => s.name === stream)?.payer ?? "";
+
+  const toggleCode = (c: string) =>
+    setCodes((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-icm-panel rounded-xl border border-icm-border w-full max-w-lg p-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-manrope font-bold text-[14px] text-icm-text">Add Authorization</h3>
+          <button onClick={onClose} className="text-icm-text-dim hover:text-icm-text">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <ModalField label="Funding stream">
+            <select className="modal-input" value={stream} onChange={(e) => setStream(e.target.value)}>
+              {STREAMS.map((s) => (
+                <option key={s.name} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+          </ModalField>
+
+          <ModalField label="Payer (auto)">
+            <input className="modal-input" value={payer} readOnly />
+          </ModalField>
+
+          <ModalField label="Authorization number">
+            <input className="modal-input" placeholder="SA-2026-003" />
+          </ModalField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <ModalField label="Effective date">
+              <input className="modal-input" type="date" />
+            </ModalField>
+            <ModalField label="Expiration date">
+              <input className="modal-input" type="date" />
+            </ModalField>
+          </div>
+
+          <ModalField label="Authorized units">
+            <input className="modal-input" type="number" placeholder="40" />
+          </ModalField>
+
+          <ModalField label="Service codes">
+            <div className="flex flex-wrap gap-1.5">
+              {CODES.map((c) => {
+                const on = codes.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleCode(c)}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[11px] font-mono font-semibold border",
+                      on
+                        ? "bg-icm-accent text-white border-icm-accent"
+                        : "bg-icm-bg text-icm-text border-icm-border"
+                    )}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          </ModalField>
+
+          <ModalField label="Notes">
+            <textarea className="modal-input" rows={2} />
+          </ModalField>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="h-8 px-3 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { demoToast("Authorization saved"); onClose(); }}
+            className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+          >
+            Save
+          </button>
+        </div>
+        <style>{`.modal-input { width:100%; height:32px; padding:0 8px; border-radius:8px; border:1px solid hsl(var(--icm-border)); background:white; font-size:12px; color:hsl(var(--icm-text)); font-family: inherit; }
+        textarea.modal-input { padding:8px; height:auto; }`}</style>
+      </div>
+    </div>
+  );
+}
+
+function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+        {label}
+      </label>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+
 // =============================================================
 // TAB 6 — Contacts
 // =============================================================

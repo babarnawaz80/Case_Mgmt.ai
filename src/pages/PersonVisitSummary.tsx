@@ -57,7 +57,7 @@ const PersonVisitSummary = () => {
             <button onClick={newVisit} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
               + Start blank summary
             </button>
-            <button onClick={newVisit} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={newVisit} className="h-10 px-4 rounded-xl bg-teal-600 text-white text-[13px] font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> Draft from ambient session
             </button>
           </div>

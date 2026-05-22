@@ -24,7 +24,7 @@ const ProgressNoteLog = () => {
   return (
     <ICMShell title="Progress Note" showAIPanel={false}>
       <div className="space-y-5">
-        <Breadcrumbs items={[{ label: "People Supported", to: "/people" }, { label: "Progress Note" }]} />
+        <Breadcrumbs items={[{ label: "Dashboard", to: "/dashboard" }, { label: "Progress Note" }]} />
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-tight text-[24px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">

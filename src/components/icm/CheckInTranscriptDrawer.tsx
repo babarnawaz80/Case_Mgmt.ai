@@ -78,7 +78,7 @@ export function CheckInTranscriptDrawer({ session, onClose, showCaseManager, onM
                   )}
                 </div>
                 <div className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">
-                  AI Care Assistant Check-In
+                  Case Companion Check-In
                   {showCaseManager && <> · CM: {session.caseManager}</>}
                 </div>
                 <div className="text-[11px] text-icm-text-faint font-geist mt-0.5">

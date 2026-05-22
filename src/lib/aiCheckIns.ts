@@ -1,4 +1,4 @@
-// AI Care Assistant — demo data layer
+// Case Companion — demo data layer
 // Stores check-in sessions in localStorage so the bot page (public route)
 // and the staff My Work / Communications Log views share state.
 
@@ -37,7 +37,7 @@ export interface AICheckInSession {
   startedAt: number;
   endedAt: number;
   durationLabel: string;
-  contactType: "AI Care Assistant Check-In";
+  contactType: "Case Companion Check-In";
   transcript: CheckInMessage[];
   summary: string;
   detectedTopics: { key: TopicKey; label: string }[];
@@ -94,12 +94,12 @@ export function tokenForIndividual(id: string): string {
 
 export function openingMessage(firstName: string): string {
   if (firstName === "Joseph")
-    return "Hi Joseph! I'm your Care Assistant. I'm here to check in with you and make sure you have everything you need. You can talk to me or type — whatever feels easier. How are you doing today?";
+    return "Hi Joseph! I'm your Case Companion. I'm here to check in with you and make sure you have everything you need. You can talk to me or type — whatever feels easier. How are you doing today?";
   if (firstName === "Travis")
-    return "Hi Travis! I'm your Care Assistant. I'm here to check in with you today. How are you feeling?";
+    return "Hi Travis! I'm your Case Companion. I'm here to check in with you today. How are you feeling?";
   if (firstName === "Ashley")
-    return "Hi Ashley! I'm your Care Assistant. It's good to hear from you. How are you doing today?";
-  return `Hi ${firstName}! I'm your Care Assistant. How are you doing today?`;
+    return "Hi Ashley! I'm your Case Companion. It's good to hear from you. How are you doing today?";
+  return `Hi ${firstName}! I'm your Case Companion. How are you doing today?`;
 }
 
 const KEYWORDS: Record<TopicKey, string[]> = {
@@ -308,7 +308,7 @@ function seedCheckIns(): AICheckInSession[] {
     startedAt: yesterday,
     endedAt: yesterday + 240000,
     durationLabel: "4 min 00 sec",
-    contactType: "AI Care Assistant Check-In",
+    contactType: "Case Companion Check-In",
     transcript: [
       { id: "m1", role: "bot", text: openingMessage("Travis"), ts: yesterday },
       { id: "m2", role: "individual", text: "I'd like to change my day program — it doesn't fit my schedule anymore.", ts: yesterday + 30000 },

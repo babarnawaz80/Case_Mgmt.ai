@@ -72,7 +72,7 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
             </div>
             <p className="text-[12.5px] text-icm-text-dim mt-1 leading-relaxed font-geist max-w-xl">
               A unique link for <span className="text-icm-text font-semibold">{firstName}</span>. They tap it from
-              their phone to start a check-in with their Care Assistant. The transcript and any tasks flow
+              their phone to start a check-in with their Case Companion. The transcript and any tasks flow
               back to My Work and this individual's Communications Log.
             </p>
           </div>
@@ -134,7 +134,7 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
           className="h-10 px-4 rounded-2xl text-[12px] font-geist font-black text-icm-text bg-white border border-icm-border shadow-sm hover:bg-icm-bg/60 active:scale-95 transition-all flex items-center gap-1.5"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          Preview Care Assistant
+          Preview Case Companion
         </button>
         {phone && (
           <span className="text-[11.5px] text-icm-text-dim font-geist inline-flex items-center gap-1 ml-1">
@@ -151,7 +151,7 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
             <h3 className="font-semibold text-icm-text text-[15px]">Regenerate link?</h3>
             <p className="mt-2 text-[13px] text-icm-text-dim leading-relaxed">
               Regenerating this link will deactivate the old one. {firstName} will need the new link to access
-              their Care Assistant. Continue?
+              their Case Companion. Continue?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -181,7 +181,7 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
       {smsOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5">
-            <h3 className="font-semibold text-icm-text text-[15px]">Send Care Assistant link via text</h3>
+            <h3 className="font-semibold text-icm-text text-[15px]">Send Case Companion link via text</h3>
             <label className="block mt-3 text-[11.5px] text-icm-text-dim">Phone number</label>
             <input
               value={smsPhone}
@@ -190,7 +190,7 @@ export function VoiceCompanionCard({ personId, firstName, phone }: VoiceCompanio
             />
             <label className="block mt-3 text-[11.5px] text-icm-text-dim">Message preview</label>
             <div className="mt-1 rounded-lg border border-icm-border bg-icm-bg/60 p-3 text-[12.5px] text-icm-text leading-relaxed">
-              Hi {firstName}, here is your Care Assistant link from your agency: {publicLink} — Click anytime
+              Hi {firstName}, here is your Case Companion link from your agency: {publicLink} — Click anytime
               you need support or want to check in with your care team.
             </div>
             <div className="mt-4 flex justify-end gap-2">

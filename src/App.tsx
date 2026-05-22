@@ -181,6 +181,7 @@ const App = () => (
             <Route path="/people/:id/progress-note/:noteId" element={<PersonProgressNoteDetail />} />
             <Route path="/progress-note" element={<ProgressNoteLog />} />
             <Route path="/progress-note/new" element={<ProgressNoteNew />} />
+            <Route path="/visit-summary" element={<VisitSummaryLog />} />
             <Route path="/visit-summary/new" element={<VisitSummaryNew />} />
             <Route path="/people/:id/workflow-manager" element={<PersonWorkflowManager />} />
             <Route path="/people/:id/workflow-manager/:workflowId" element={<PersonWorkflowDetail />} />

@@ -37,7 +37,7 @@ export default function CareAssistant() {
     );
   }
 
-  const greeting = `Hey ${person.firstName}, I am your Case Companion. How can I help you?`;
+  const greeting = `Hi ${person.firstName}! I'm your Case Companion. I'm here whenever you need support. How are you doing today?`;
   const [messages, setMessages] = useState<CheckInMessage[]>(() => [
     { id: "m0", role: "bot", text: greeting, ts: Date.now() },
   ]);

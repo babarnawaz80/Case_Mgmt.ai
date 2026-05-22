@@ -48,7 +48,7 @@ export function AppHeader() {
             <p className="text-sm font-medium text-foreground">Case Manager</p>
             <p className="text-xs text-muted-foreground">Admin</p>
           </div>
-          <UserMenu variant="plain" />
+          <UserMenu />
         </div>
       </div>
     </header>

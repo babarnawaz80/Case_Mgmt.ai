@@ -401,7 +401,7 @@ const Index = () => {
           </nav>
 
           <div className="flex items-center gap-3">
-            <UserMenu variant="plain" />
+            <UserMenu />
           </div>
         </header>
 

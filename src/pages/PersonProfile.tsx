@@ -618,42 +618,8 @@ function ProgramTab({ profile }: { profile: ProfileData }) {
         ))}
       </Section>
 
-      <Section title="Funding Streams">
-        <div className="space-y-2">
-          {profile.funding.map((f) => {
-            const pct = f.authorizedUnits === 0 ? 0 : (f.usedUnits / f.authorizedUnits) * 100;
-            const tone = pct >= 90 ? "bg-icm-red" : pct >= 75 ? "bg-icm-amber" : "bg-icm-green";
-            return (
-              <div
-                key={f.authorizationNumber}
-                className="rounded-lg border border-icm-border bg-icm-bg p-3"
-              >
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <p className="text-[13px] font-semibold text-icm-text">{f.type}</p>
-                    <p className="text-[11px] font-mono text-icm-text-dim">
-                      Auth #{f.authorizationNumber} · {f.period}
-                    </p>
-                  </div>
-                  <span className="text-[11.5px] font-mono text-icm-text">
-                    {f.usedUnits} / {f.authorizedUnits} units used
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-icm-border mt-2 overflow-hidden">
-                  <div className={cn("h-full", tone)} style={{ width: `${pct}%` }} />
-                </div>
-                {pct >= 85 && (
-                  <p className="text-[11.5px] text-icm-amber mt-2 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    {Math.round(pct)}% used. Consider requesting an authorization increase.
-                  </p>
-                )}
-              </div>
-            );
-          })}
-          {profile.funding.length === 0 && <Empty text="No funding streams configured." />}
-        </div>
-      </Section>
+      <FundingStreamsSection profile={profile} />
+
     </div>
   );
 }

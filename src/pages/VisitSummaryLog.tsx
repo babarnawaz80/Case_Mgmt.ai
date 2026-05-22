@@ -24,7 +24,7 @@ const VisitSummaryLog = () => {
   return (
     <ICMShell title="Visit Summary" showAIPanel={false}>
       <div className="space-y-5">
-        <Breadcrumbs items={[{ label: "People Supported", to: "/people" }, { label: "Visit Summary" }]} />
+        <Breadcrumbs items={[{ label: "Dashboard", to: "/dashboard" }, { label: "Visit Summary" }]} />
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-tight text-[24px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">

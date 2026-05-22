@@ -388,7 +388,7 @@ function ContactNoteCrumbs() {
   const person = id ? getPerson(id) : undefined;
   if (!person) {
     return (
-      <Breadcrumbs items={[{ label: "People Supported", to: "/people" }, { label: "Contact Note" }]} />
+      <Breadcrumbs items={[{ label: "Dashboard", to: "/dashboard" }, { label: "Contact Note" }]} />
     );
   }
   return (

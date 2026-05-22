@@ -1135,18 +1135,6 @@ function NewMessageModal({
             </div>
           )}
 
-          <div>
-            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
-              Message
-            </label>
-            <textarea
-              value={firstMessage}
-              onChange={(e) => setFirstMessage(e.target.value)}
-              placeholder="Write your first message..."
-              rows={4}
-              className="mt-1 w-full px-2.5 py-2 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent resize-none"
-            />
-          </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-icm-border">
           <button
@@ -1158,12 +1146,12 @@ function NewMessageModal({
           <button
             onClick={() => {
               if (recipients.length === 0) return;
-              onCreate(recipients, groupName.trim() || undefined, firstMessage);
+              onCreate(recipients, groupName.trim() || undefined, "");
             }}
             disabled={recipients.length === 0}
-            className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[12px] font-geist font-semibold disabled:opacity-40 hover:opacity-90"
+            className="h-8 px-3 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold disabled:opacity-40 hover:bg-teal-700"
           >
-            Send
+            Start conversation
           </button>
         </div>
       </div>

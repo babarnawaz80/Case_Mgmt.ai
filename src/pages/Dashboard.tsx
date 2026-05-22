@@ -5,7 +5,7 @@ import { people, initials, riskAvatarClass, type Person } from "@/data/people";
 import { globalIncidentSummary } from "@/data/incidents";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Sun,
   Users,

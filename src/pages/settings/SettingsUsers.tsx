@@ -159,7 +159,7 @@ const SettingsUsers = () => {
                       <div className="flex items-center gap-2">
                         <span
                           className={cn(
-                            "w-8 h-8 rounded-full ring-1 flex items-center justify-center text-[11px] font-geist font-bold",
+                            "w-8 h-8 rounded-lg ring-1 flex items-center justify-center text-[11px] font-geist font-bold",
                             roleAvatarTone(u.role)
                           )}
                         >

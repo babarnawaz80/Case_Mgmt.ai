@@ -255,7 +255,7 @@ export default function Login() {
                 }`}
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={t.avatarSrc} alt={t.name} className="w-9 h-9 rounded-full object-cover" />
+                  <img src={t.avatarSrc} alt={t.name} className="w-9 h-9 rounded-lg object-cover" />
                   <div className="leading-tight">
                     <p className="text-[13px] font-semibold">{t.name}</p>
                     <p className="text-[11px] text-white/60">{t.handle}</p>

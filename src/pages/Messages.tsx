@@ -313,7 +313,7 @@ function ConversationRow({
         <div className="relative shrink-0">
           <span
             className={cn(
-              "w-8 h-8 rounded-full ring-1 flex items-center justify-center text-[11px] font-geist font-bold",
+              "w-8 h-8 rounded-lg ring-1 flex items-center justify-center text-[11px] font-geist font-bold",
               other ? roleAvatarTone(other.role) : "bg-icm-bg text-icm-text-dim"
             )}
           >
@@ -467,7 +467,7 @@ function ActiveConversation({
                   <span
                     key={id}
                     className={cn(
-                      "absolute w-7 h-7 rounded-full ring-2 ring-icm-panel flex items-center justify-center text-[10px] font-geist font-bold",
+                      "absolute w-7 h-7 rounded-lg ring-2 ring-icm-panel flex items-center justify-center text-[10px] font-geist font-bold",
                       roleAvatarTone(m.role)
                     )}
                     style={{ left: i * 10, top: i * 5, zIndex: 3 - i }}
@@ -481,7 +481,7 @@ function ActiveConversation({
           <div className="relative shrink-0">
             <span
               className={cn(
-                "w-10 h-10 rounded-full ring-1 flex items-center justify-center text-[12px] font-geist font-bold",
+                "w-10 h-10 rounded-lg ring-1 flex items-center justify-center text-[12px] font-geist font-bold",
                 other ? roleAvatarTone(other.role) : ""
               )}
             >
@@ -660,7 +660,7 @@ function ActiveConversation({
             <button
               onClick={onSend}
               disabled={!draft.trim() && !draftLinked}
-              className="w-8 h-8 rounded-full bg-icm-accent text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:opacity-90"
+              className="w-8 h-8 rounded-lg bg-icm-accent text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:opacity-90"
               title="Send"
             >
               <Send className="w-3.5 h-3.5" />
@@ -739,7 +739,7 @@ function MessageBubble({
       {!isMe && (
         <span
           className={cn(
-            "w-7 h-7 rounded-full ring-1 flex items-center justify-center text-[10px] font-geist font-bold shrink-0",
+            "w-7 h-7 rounded-lg ring-1 flex items-center justify-center text-[10px] font-geist font-bold shrink-0",
             roleAvatarTone(author.role)
           )}
         >

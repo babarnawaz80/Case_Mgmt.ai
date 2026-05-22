@@ -214,7 +214,7 @@ function CompactMentionRow({
     >
       <span
         className={cn(
-          "w-7 h-7 rounded-full ring-1 flex items-center justify-center text-[10px] font-geist font-bold shrink-0",
+          "w-7 h-7 rounded-lg ring-1 flex items-center justify-center text-[10px] font-geist font-bold shrink-0",
           roleAvatarTone(mention.authorRole)
         )}
       >

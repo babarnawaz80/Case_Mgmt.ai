@@ -47,7 +47,7 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors">
-          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-icm-accent/20 bg-icm-accent-soft">
+          <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft">
             <img
               src={employeePhoto}
               alt="Kathy Adams"
@@ -65,7 +65,7 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
-          <div className="w-10 h-10 rounded-full overflow-hidden border border-icm-accent/20">
+          <div className="w-10 h-10 rounded-lg overflow-hidden border border-icm-accent/20">
             <img src={employeePhoto} alt="Kathy Adams" width={40} height={40} className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">

@@ -217,7 +217,7 @@ function IndividualPickerModal({
             >
               <div
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold",
+                  "w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold",
                   riskAvatarClass(p.riskScore)
                 )}
               >

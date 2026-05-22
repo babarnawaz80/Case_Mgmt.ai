@@ -274,7 +274,7 @@ function StartIncidentModal({ onClose, onSelect }: { onClose: () => void; onSele
               onClick={() => onSelect(p.id)}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-icm-bg/60 transition-colors"
             >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold font-geist ${riskAvatarClass(p.riskScore)}`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold font-geist ${riskAvatarClass(p.riskScore)}`}>
                 {initials(p)}
               </div>
               <div className="flex-1 min-w-0">

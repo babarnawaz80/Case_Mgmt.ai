@@ -342,7 +342,7 @@ const PersonCareTeam = () => {
               className="rounded-xl border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong transition-colors"
             >
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-icm-bg ring-1 ring-icm-border flex items-center justify-center text-[11.5px] font-medium text-icm-text-dim shrink-0">
+                <div className="w-10 h-10 rounded-lg bg-icm-bg ring-1 ring-icm-border flex items-center justify-center text-[11.5px] font-medium text-icm-text-dim shrink-0">
                   {nameInitials(m.name)}
                 </div>
                 <div className="flex-1 min-w-0">

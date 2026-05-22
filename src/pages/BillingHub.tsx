@@ -128,7 +128,7 @@ const BillingHub = () => {
               </label>
               <button
                 onClick={() => toast.success("Full scrub started · 18 claims in queue")}
-                className="h-8 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist font-semibold text-icm-text hover:bg-icm-bg"
+                className="h-8 px-3 rounded-lg border border-teal-600 bg-white text-[11.5px] font-geist font-semibold text-teal-600 inline-flex items-center gap-1.5 hover:bg-teal-50"
               >
                 Run full scrub now
               </button>

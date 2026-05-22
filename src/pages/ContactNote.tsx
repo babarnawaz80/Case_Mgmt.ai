@@ -144,7 +144,7 @@ const ContactNote = () => {
           </div>
           <button
             onClick={() => setOpen(true)}
-            className="h-9 px-3.5 rounded-lg bg-icm-text text-icm-panel text-[12px] font-geist font-medium flex items-center gap-1.5 hover:opacity-90"
+            className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700"
           >
             <Plus className="w-3.5 h-3.5" /> New Contact Note
           </button>

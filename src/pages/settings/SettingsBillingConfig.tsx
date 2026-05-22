@@ -94,7 +94,7 @@ function GeneralTab() {
           <p className="font-manrope font-bold text-[14px] text-icm-text">Service codes</p>
           <button
             onClick={() => demoToast("Add service code")}
-            className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
+            className="h-8 px-2.5 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
           >
             <Plus className="w-3.5 h-3.5" />
             Add code
@@ -201,7 +201,7 @@ function PayersTab() {
         </div>
         <button
           onClick={() => demoToast("Add payer")}
-          className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
+          className="h-8 px-2.5 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Payer
@@ -311,7 +311,7 @@ function FundingTab() {
         </div>
         <button
           onClick={() => demoToast("Add funding stream")}
-          className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
+          className="h-8 px-2.5 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Funding Stream
@@ -381,7 +381,7 @@ function RatesTab() {
         </div>
         <button
           onClick={() => demoToast("Add rate")}
-          className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
+          className="h-8 px-2.5 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Rate

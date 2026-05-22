@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowRight, Siren, Filter } from "lucide-react";
+import { Sparkles, ArrowRight, Siren, Filter, Plus, Search, X } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   getAllIncidents, globalIncidentSummary, typeBreakdown, stageBreakdown,
   type IncidentRecord, type IncidentStatus, type IncidentStageId, STAGE_LABELS,
 } from "@/data/incidents";
+import { people, initials, riskAvatarClass } from "@/data/people";
 
 const IncidentsGlobal = () => {
   const navigate = useNavigate();

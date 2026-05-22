@@ -666,18 +666,38 @@ function Label({ children }: { children: React.ReactNode }) {
 function Field({
   label,
   defaultValue,
+  placeholder,
+  value,
+  onChange,
 }: {
   label: string;
   defaultValue?: string;
+  placeholder?: string;
+  value?: string;
+  onChange?: (v: string) => void;
 }) {
+  const controlled = value !== undefined && onChange !== undefined;
   return (
     <div>
       <Label>{label}</Label>
       <input
-        defaultValue={defaultValue}
+        {...(controlled
+          ? { value, onChange: (e) => onChange!(e.target.value) }
+          : { defaultValue })}
+        placeholder={placeholder}
         className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong"
       />
     </div>
+  );
+}
+
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">
+      {children}
+    </p>
+  );
+}
   );
 }
 

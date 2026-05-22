@@ -409,15 +409,40 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function Field({ label, defaultValue }: { label: string; defaultValue?: string }) {
+function Field({ label, defaultValue, placeholder }: { label: string; defaultValue?: string; placeholder?: string }) {
   return (
     <div>
       <Label>{label}</Label>
       <input
         defaultValue={defaultValue}
+        placeholder={placeholder}
         className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong"
       />
     </div>
+  );
+}
+
+const cellInput =
+  "w-full h-7 px-2 rounded-md border border-icm-border bg-icm-panel text-[11.5px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong";
+
+function SubHeading({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p className={`text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2 ${className}`}>
+      {children}
+    </p>
+  );
+}
+
+function StatusBadge({ status }: { status: StateEnrollment["status"] }) {
+  const map = {
+    Active: "bg-icm-green-soft text-icm-green ring-icm-green/20",
+    Pending: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
+    Expired: "bg-icm-red-soft text-icm-red ring-icm-red/20",
+  } as const;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${map[status]}`}>
+      {status}
+    </span>
   );
 }
 

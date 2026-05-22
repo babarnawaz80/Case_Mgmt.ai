@@ -170,9 +170,17 @@ export default function CareAssistant() {
           className="h-7 sm:h-8 w-auto select-none brightness-0 invert"
           draggable={false}
         />
-        {/* Orb — centered, larger, responsive */}
+        {/* Orb — centered, clickable to start speaking */}
         <div className="mt-8 sm:mt-12 flex justify-center w-full">
-          <div className="w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px]">
+          <button
+            type="button"
+            onClick={toggleMic}
+            aria-label={recording ? "Stop listening" : "Tap to talk"}
+            className="relative w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px] rounded-full transition hover:scale-[1.02] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5eead4]/60"
+          >
+            {recording && (
+              <span className="absolute inset-0 rounded-full ring-2 ring-[#5eead4]/40 animate-ping" />
+            )}
             <SiriOrb
               size="100%"
               colors={{
@@ -180,17 +188,18 @@ export default function CareAssistant() {
                 c2: "oklch(78% 0.22 330)",
                 c3: "oklch(70% 0.18 280)",
               }}
-              animationDuration={18}
+              animationDuration={recording ? 8 : 18}
             />
-          </div>
+          </button>
         </div>
         <h1 className="mt-6 sm:mt-8 text-[22px] sm:text-[26px] font-semibold text-white">
           Hi {person.firstName} <span>👋</span>
         </h1>
         <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 text-emerald-300 text-[12px]">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Your Case Companion is ready
+          {recording ? "Listening…" : "Tap the orb to talk"}
         </div>
+
       </header>
 
       {/* Conversation */}

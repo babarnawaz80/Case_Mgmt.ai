@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { UserMenu } from "@/components/icm/UserMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.png";
 import { demoToast } from "@/lib/demoToast";

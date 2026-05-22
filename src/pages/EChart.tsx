@@ -298,11 +298,10 @@ const EChart = () => {
         {grouped.map(({ cat, tiles }) => (
           <section key={cat} className="space-y-2.5">
             <div className="flex items-center gap-2 border-t border-icm-border pt-3">
-              <span className={`w-2 h-2 rounded-full ${CATEGORY_META[cat].dot}`} />
-              <h2 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">
+              <span className="font-manrope font-normal text-[14px] text-icm-text-dim">
                 {cat}
-              </h2>
-              <span className="text-[11px] font-geist text-icm-text-dim">
+              </span>
+              <span className="text-[11px] font-geist text-icm-text-faint">
                 {tiles.length} modules
               </span>
             </div>

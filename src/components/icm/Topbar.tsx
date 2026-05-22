@@ -141,15 +141,14 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
           <Search className="w-[18px] h-[18px]" />
         </button>
 
-        {/* Gradient AI button (borrowed from IDDBilling) */}
+        {/* Gradient AI button (icon only) */}
         <button
           onClick={toggleAI}
           aria-pressed={aiOpen}
-          className="h-9 px-2.5 sm:px-3.5 rounded-xl text-white text-[12px] font-manrope font-bold flex items-center gap-1.5 ai-gradient shadow-elevated hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
+          title="Ask AI"
+          className="h-9 w-9 flex items-center justify-center rounded-xl text-white ai-gradient shadow-elevated hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Ask AI</span>
-          <ChevronDown className={`w-3 h-3 opacity-70 hidden sm:inline transition-transform ${aiOpen ? "rotate-180" : ""}`} />
+          <Sparkles className="w-[18px] h-[18px]" />
         </button>
 
         {isAdmin && (

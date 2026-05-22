@@ -444,7 +444,7 @@ const ACTIONS: ActionTile[] = [
   // exact same form used inside each person's eChart.
   { label: "Contact Note", icon: FileText, to: "/modules/contact-note", category: "Documentation", count: 24 },
   { label: "Progress Note", icon: PenTool, to: "/progress-note/new", category: "Documentation", count: 14 },
-  { label: "Visit Summary", icon: CalendarCheck, to: "/documentation", category: "Documentation", count: 6, formRoute: (id) => `/people/${id}/visit-summary` },
+  { label: "Visit Summary", icon: CalendarCheck, to: "/visit-summary/new", category: "Documentation", count: 6 },
   { label: "Monitoring Form", icon: ClipboardList, to: "/documentation", category: "Documentation", count: 4, formRoute: (id) => `/people/${id}/monitoring-form` },
 
   // Operations (orange)

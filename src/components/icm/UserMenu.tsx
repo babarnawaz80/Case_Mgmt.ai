@@ -24,16 +24,18 @@ export function UserMenu() {
     else localStorage.removeItem("icm.clockedInAt");
   }, [clockedIn]);
 
-  const handleClock = () => {
-    if (clockedIn) {
-      const mins = Math.round((Date.now() - new Date(clockedIn).getTime()) / 60000);
-      setClockedIn(null);
-      toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
-    } else {
-      const now = new Date().toISOString();
-      setClockedIn(now);
-      toast.success("Clocked in", { description: `Shift started at ${new Date(now).toLocaleTimeString()}` });
-    }
+  const handleClockIn = () => {
+    if (clockedIn) return;
+    const now = new Date().toISOString();
+    setClockedIn(now);
+    toast.success("Clocked in", { description: `Shift started at ${new Date(now).toLocaleTimeString()}` });
+  };
+
+  const handleClockOut = () => {
+    if (!clockedIn) return;
+    const mins = Math.round((Date.now() - new Date(clockedIn).getTime()) / 60000);
+    setClockedIn(null);
+    toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
   };
 
   const handleSignOut = () => {
@@ -81,18 +83,32 @@ export function UserMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleClock} className="gap-2 text-[12.5px]">
-          <Clock className={cn("w-4 h-4", clockedIn ? "text-green-600" : "text-muted-foreground")} />
-          {clockedIn ? (
-            <span className="flex-1 flex items-center justify-between gap-2">
-              <span>Clock out</span>
-              <span className="text-[10.5px] text-muted-foreground font-mono">
-                since {new Date(clockedIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </span>
-          ) : (
-            "Clock in"
+        <DropdownMenuItem
+          onClick={handleClockIn}
+          disabled={!!clockedIn}
+          className={cn(
+            "gap-2 text-[12.5px]",
+            !clockedIn && "bg-icm-accent-soft text-icm-accent focus:bg-icm-accent-soft focus:text-icm-accent font-medium"
           )}
+        >
+          <Clock className={cn("w-4 h-4", !clockedIn ? "text-icm-accent" : "text-muted-foreground")} />
+          <span className="flex-1">Clock in</span>
+          {clockedIn && (
+            <span className="text-[10.5px] text-muted-foreground font-mono">
+              {new Date(clockedIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={handleClockOut}
+          disabled={!clockedIn}
+          className={cn(
+            "gap-2 text-[12.5px]",
+            clockedIn && "bg-icm-green/10 text-icm-green focus:bg-icm-green/10 focus:text-icm-green font-medium"
+          )}
+        >
+          <Clock className={cn("w-4 h-4", clockedIn ? "text-icm-green" : "text-muted-foreground")} />
+          <span className="flex-1">Clock out</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-[12.5px] text-destructive focus:text-destructive">

@@ -229,7 +229,90 @@ export const myWorkTasks: MyWorkTask[] = [
     createdOn: "04/26/2026",
     createdBy: "AI · Compliance Agent",
   },
+  // ===== Additional dummy individuals for scale demo =====
+  ...generateDummyTasks(),
 ];
+
+function generateDummyTasks(): MyWorkTask[] {
+  const people: Array<{ id: string; name: string; initials: string; county: string }> = [
+    { id: "5",  name: "Emily Carter",      initials: "EC", county: "Polk County" },
+    { id: "6",  name: "Marcus Reed",       initials: "MR", county: "Linn County" },
+    { id: "7",  name: "Sofia Martinez",    initials: "SM", county: "Story County" },
+    { id: "8",  name: "Jamal Wright",      initials: "JW", county: "Carroll County" },
+    { id: "9",  name: "Hannah Olsen",      initials: "HO", county: "Bremer County" },
+    { id: "10", name: "Liam Thompson",     initials: "LT", county: "Polk County" },
+    { id: "11", name: "Priya Patel",       initials: "PP", county: "Johnson County" },
+    { id: "12", name: "Devon Brooks",      initials: "DB", county: "Linn County" },
+    { id: "13", name: "Aisha Khan",        initials: "AK", county: "Johnson County" },
+    { id: "14", name: "Carlos Rivera",     initials: "CR", county: "Story County" },
+    { id: "15", name: "Grace Nguyen",      initials: "GN", county: "Polk County" },
+    { id: "16", name: "Ethan Hughes",      initials: "EH", county: "Carroll County" },
+    { id: "17", name: "Maya Goldberg",     initials: "MG", county: "Bremer County" },
+    { id: "18", name: "Noah Fischer",      initials: "NF", county: "Linn County" },
+    { id: "19", name: "Zara Ahmed",        initials: "ZA", county: "Johnson County" },
+    { id: "20", name: "Owen Bennett",      initials: "OB", county: "Story County" },
+  ];
+
+  const templates: Array<Partial<MyWorkTask> & { name: string; module?: MyWorkTask["linkedModule"] }> = [
+    { name: "Schedule quarterly visit",     source: "Case Management", sourceDetail: "Community Coordination", module: { label: "Visit Summary", slug: "visit-summary" }, priority: "High" },
+    { name: "Complete monitoring form",     source: "Case Management", sourceDetail: "Community Coordination", module: { label: "Monitoring Form", slug: "monitoring-form" }, priority: "High", aiDraftReady: true },
+    { name: "Verify MA status",             source: "AI", sourceDetail: "Generated from eligibility check", module: { label: "Eligibility Verification", slug: "eligibility-verification" }, priority: "Critical", aiDraftReady: true },
+    { name: "Sign progress note",           source: "Workflow", sourceDetail: "Pending signature", module: { label: "Progress Note", slug: "progress-note" }, priority: "Medium" },
+    { name: "Review care plan goals",       source: "Case Management", sourceDetail: "Annual review", module: { label: "Care Plan", slug: "care-plan" }, priority: "Medium" },
+    { name: "Contact guardian re: incident",source: "AI", sourceDetail: "Generated from incident report", module: { label: "Contact Note", slug: "contact-note" }, priority: "Critical", aiDraftReady: true },
+    { name: "Update emergency contacts",    source: "Case Management", sourceDetail: "Annual refresh", module: { label: "Face Sheet", slug: "facesheet" }, priority: "Low" },
+    { name: "Schedule annual assessment",   source: "Workflow", sourceDetail: "Due window", module: { label: "Assessments", slug: "assessments" }, priority: "Medium" },
+    { name: "File incident report",         source: "Case Management", sourceDetail: "Required within 24h", module: { label: "Incident Reporting", slug: "incident-reporting" }, priority: "Critical" },
+    { name: "Submit referral",              source: "Workflow", sourceDetail: "Provider intake", module: { label: "Referrals", slug: "referrals" }, priority: "Medium" },
+  ];
+
+  const dueOptions = [
+    { d: "04/20/2026", status: "Overdue" as const, days: 7 },
+    { d: "04/24/2026", status: "Overdue" as const, days: 3 },
+    { d: "04/27/2026", status: "Open" as const },
+    { d: "04/28/2026", status: "Open" as const },
+    { d: "04/30/2026", status: "Open" as const },
+    { d: "05/04/2026", status: "Open" as const },
+    { d: "05/12/2026", status: "Pending Start" as const },
+    { d: "05/20/2026", status: "Pending Start" as const },
+    { d: "06/03/2026", status: "In Progress" as const },
+  ];
+
+  const staff = ["Kathy Adams", "Marcus Lee", "Priya Shah", "Devon Brooks"];
+  const out: MyWorkTask[] = [];
+  let counter = 2000;
+
+  people.forEach((p, pi) => {
+    const taskCount = 2 + (pi % 4); // 2-5 tasks each
+    for (let i = 0; i < taskCount; i++) {
+      const tpl = templates[(pi * 3 + i) % templates.length];
+      const due = dueOptions[(pi + i) % dueOptions.length];
+      out.push({
+        id: `T-${counter++}`,
+        name: tpl.name,
+        description: `${tpl.name} for ${p.name}. ${tpl.sourceDetail ?? ""}`.trim(),
+        source: tpl.source!,
+        sourceDetail: tpl.sourceDetail!,
+        individualId: p.id,
+        individualName: p.name,
+        individualCounty: p.county,
+        individualInitials: p.initials,
+        startDate: due.d,
+        dueDate: due.d,
+        status: due.status,
+        daysOverdue: (due as any).days,
+        staffResponsible: staff[(pi + i) % staff.length],
+        linkedModule: tpl.module,
+        aiDraftReady: tpl.aiDraftReady,
+        priority: tpl.priority!,
+        createdOn: "04/01/2026",
+        createdBy: tpl.source === "AI" ? "AI · Compliance Agent" : "Case Management template",
+      });
+    }
+  });
+
+  return out;
+}
 
 // AI-recommended focused-session order for the day.
 export const focusedSessionTaskIds = ["T-1001", "T-1003", "T-1006", "T-1007"];

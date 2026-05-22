@@ -44,6 +44,7 @@ import PersonEligibilityVerification from "./pages/PersonEligibilityVerification
 import PersonEligibilityVerificationDetail from "./pages/PersonEligibilityVerificationDetail";
 import PersonProgressNote from "./pages/PersonProgressNote";
 import PersonProgressNoteDetail from "./pages/PersonProgressNoteDetail";
+import ProgressNoteNew from "./pages/ProgressNoteNew";
 import PersonWorkflowManager from "./pages/PersonWorkflowManager";
 import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
 import WorkflowsGlobal from "./pages/WorkflowsGlobal";
@@ -175,6 +176,7 @@ const App = () => (
             <Route path="/people/:id/eligibility-verification/:verificationId" element={<PersonEligibilityVerificationDetail />} />
             <Route path="/people/:id/progress-note" element={<PersonProgressNote />} />
             <Route path="/people/:id/progress-note/:noteId" element={<PersonProgressNoteDetail />} />
+            <Route path="/progress-note/new" element={<ProgressNoteNew />} />
             <Route path="/people/:id/workflow-manager" element={<PersonWorkflowManager />} />
             <Route path="/people/:id/workflow-manager/:workflowId" element={<PersonWorkflowDetail />} />
             <Route path="/workflows" element={<WorkflowsGlobal />} />

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { UserMenu } from "@/components/icm/UserMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import brandLogo from "@/assets/casemanagement-ai-logo.png";
 import { demoToast } from "@/lib/demoToast";
@@ -179,84 +180,3 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   );
 }
 
-function UserMenu() {
-  const navigate = useNavigate();
-  const { isAdmin } = useRole();
-  const [clockedIn, setClockedIn] = useState<string | null>(() => localStorage.getItem("icm.clockedInAt"));
-
-  useEffect(() => {
-    if (clockedIn) localStorage.setItem("icm.clockedInAt", clockedIn);
-    else localStorage.removeItem("icm.clockedInAt");
-  }, [clockedIn]);
-
-  const handleClock = () => {
-    if (clockedIn) {
-      const mins = Math.round((Date.now() - new Date(clockedIn).getTime()) / 60000);
-      setClockedIn(null);
-      toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
-    } else {
-      const now = new Date().toISOString();
-      setClockedIn(now);
-      toast.success("Clocked in", { description: `Shift started at ${new Date(now).toLocaleTimeString()}` });
-    }
-  };
-
-  const handleSignOut = () => {
-    toast("Signed out", { description: "Returning to login." });
-    setTimeout(() => navigate("/login"), 400);
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors">
-          <div className="relative w-7 h-7 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[10px] font-mono font-bold text-icm-accent">
-            KA
-            {clockedIn && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-icm-green ring-2 ring-icm-panel" />
-            )}
-          </div>
-          <ChevronDown className="w-3 h-3 text-icm-text-faint hidden sm:inline" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
-          <div className="w-9 h-9 rounded-full bg-icm-accent-soft border border-icm-accent/20 flex items-center justify-center text-[11px] font-mono font-bold text-icm-accent">
-            KA
-          </div>
-          <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-icm-text leading-tight">Kathy Adams</p>
-            <p className="text-[11px] text-icm-text-dim truncate">kathy@icaremanager.com</p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate("/settings/users/u-002")} className="gap-2 text-[12.5px]">
-          <User className="w-4 h-4 text-icm-text-dim" /> My profile
-        </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem onClick={() => navigate("/settings")} className="gap-2 text-[12.5px]">
-            <Settings className="w-4 h-4 text-icm-text-dim" /> Settings
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleClock} className="gap-2 text-[12.5px]">
-          <Clock className={cn("w-4 h-4", clockedIn ? "text-icm-green" : "text-icm-text-dim")} />
-          {clockedIn ? (
-            <span className="flex-1 flex items-center justify-between gap-2">
-              <span>Clock out</span>
-              <span className="text-[10.5px] text-icm-text-dim font-mono">
-                since {new Date(clockedIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </span>
-          ) : (
-            "Clock in"
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-[12.5px] text-icm-red focus:text-icm-red">
-          <LogOut className="w-4 h-4" /> Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}

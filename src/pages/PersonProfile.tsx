@@ -1146,20 +1146,54 @@ function AdminTab({ profile }: { profile: ProfileData }) {
 // Reusable bits
 // =============================================================
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const [editing, setEditing] = useState(false);
   return (
-    <section className="rounded-xl border border-icm-border bg-icm-panel p-4">
+    <section className={cn(
+      "rounded-xl border bg-icm-panel p-4 transition-colors",
+      editing ? "border-icm-accent ring-1 ring-icm-accent/30" : "border-icm-border"
+    )}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">{title}</h3>
-        <button className="text-[11px] font-geist text-icm-accent hover:underline flex items-center gap-1">
-          <Pencil className="w-3 h-3" /> Edit
-        </button>
+        <h3 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">
+          {title}
+          {editing && <span className="ml-2 text-[10px] font-geist font-medium uppercase tracking-wide text-icm-accent">Editing</span>}
+        </h3>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-[11px] font-geist text-icm-text-dim hover:text-icm-text px-2 py-1 rounded-md hover:bg-icm-bg"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEditing(false); demoToast(`${title} saved`); }}
+              className="text-[11px] font-geist font-medium text-white bg-icm-accent hover:opacity-90 px-2.5 py-1 rounded-md"
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-[11px] font-geist text-icm-accent hover:underline flex items-center gap-1"
+          >
+            <Pencil className="w-3 h-3" /> Edit
+          </button>
+        )}
       </div>
-      {children}
+      <fieldset disabled={!editing} className={cn(!editing && "pointer-events-none select-text")}>
+        {children}
+      </fieldset>
       <style>{`.modal-input { width:100%; height:32px; padding:0 8px; border-radius:8px; border:1px solid hsl(var(--icm-border)); background:white; font-size:12px; color:hsl(var(--icm-text)); font-family: inherit; }
-      textarea.modal-input { padding:8px; height:auto; }`}</style>
+      textarea.modal-input { padding:8px; height:auto; }
+      fieldset:disabled .modal-input { background: hsl(var(--icm-bg)); color: hsl(var(--icm-text)); cursor: default; }`}</style>
     </section>
   );
 }
+
 
 function KvGrid({ rows }: { rows: [string, React.ReactNode, boolean?][] }) {
   return (

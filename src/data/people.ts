@@ -47,16 +47,36 @@ import p4 from "@/assets/people/p4.jpg";
 import p5 from "@/assets/people/p5.jpg";
 import p6 from "@/assets/people/p6.jpg";
 import p7 from "@/assets/people/p7.jpg";
+import p8 from "@/assets/people/p8.jpg";
+import p9 from "@/assets/people/p9.jpg";
+import p10 from "@/assets/people/p10.jpg";
+import p11 from "@/assets/people/p11.jpg";
+import p12 from "@/assets/people/p12.jpg";
+import p13 from "@/assets/people/p13.jpg";
+import p14 from "@/assets/people/p14.jpg";
+import p15 from "@/assets/people/p15.jpg";
+import p16 from "@/assets/people/p16.jpg";
+import p17 from "@/assets/people/p17.jpg";
+import p18 from "@/assets/people/p18.jpg";
+import p19 from "@/assets/people/p19.jpg";
 
+// Direct photo assignments for ids 1-7 (existing curated mapping)
 const PHOTOS: Record<string, string> = {
-  "1": p1,
-  "2": p2,
-  "3": p3,
-  "4": p4,
-  "5": p5,
-  "6": p6,
-  "7": p7,
+  "1": p1, "2": p2, "3": p3, "4": p4, "5": p5, "6": p6, "7": p7,
 };
+
+// Gendered portrait pools used to assign photos to the rest of the roster
+// so every individual on People Supported has a face.
+const MALE_POOL = [p8, p10, p12, p15, p17, p19];
+const FEMALE_POOL = [p9, p11, p13, p14, p16, p18];
+
+function photoFor(id: string, gender: "M" | "F"): string {
+  if (PHOTOS[id]) return PHOTOS[id];
+  const pool = gender === "F" ? FEMALE_POOL : MALE_POOL;
+  const n = parseInt(id, 10) || 0;
+  return pool[n % pool.length];
+}
+
 
 
 export const people: Person[] = [
@@ -225,7 +245,7 @@ export const people: Person[] = [
   { id: "43", firstName: "Owen",      lastName: "MacLeod",    gender: "M", dob: "07/11/1969", age: 56, admittedOn: "11/22/2012", county: "Pottawattamie",     status: "Discharged", riskScore: 0,  serviceContact: "Babar Nawaz CM",    updatedOn: "06/15/2025", aiFlag: { tone: "insight",   label: "Discharged 06/2025",   detail: "Transitioned to community supports — file retained for audit." } },
   { id: "44", firstName: "Beatrice",  lastName: "Holloway",   gender: "F", dob: "09/08/1959", age: 66, admittedOn: "06/18/2008", county: "Woodbury County",   status: "Active",     riskScore: 76, serviceContact: "Brenda Smith",       updatedOn: "08/07/2025", allergies: "Penicillin, Sulfa",      aiFlag: { tone: "urgent",    label: "Fall risk elevated",   detail: "2 falls in last 60d — PT consult recommended." } },
   { id: "45", firstName: "Jordan",    lastName: "Mitchell",   gender: "M", dob: "01/16/2007", age: 18, admittedOn: "07/25/2025", county: "Cerro Gordo",       status: "Pending",    riskScore: 15, serviceContact: "Jennie Thollander", updatedOn: "08/06/2025", aiFlag: { tone: "insight",   label: "New intake",           detail: "Recently turned 18 — transition from youth services in progress." } },
-].map((p) => ({ ...p, photoUrl: PHOTOS[p.id] })) as Person[];
+].map((p) => ({ ...p, photoUrl: photoFor(p.id, p.gender as "M" | "F") })) as Person[];
 
 
 export function getPerson(id: string): Person | undefined {

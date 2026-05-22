@@ -83,18 +83,32 @@ export function UserMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleClock} className="gap-2 text-[12.5px]">
-          <Clock className={cn("w-4 h-4", clockedIn ? "text-green-600" : "text-muted-foreground")} />
-          {clockedIn ? (
-            <span className="flex-1 flex items-center justify-between gap-2">
-              <span>Clock out</span>
-              <span className="text-[10.5px] text-muted-foreground font-mono">
-                since {new Date(clockedIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </span>
-          ) : (
-            "Clock in"
+        <DropdownMenuItem
+          onClick={handleClockIn}
+          disabled={!!clockedIn}
+          className={cn(
+            "gap-2 text-[12.5px]",
+            !clockedIn && "bg-icm-accent-soft text-icm-accent focus:bg-icm-accent-soft focus:text-icm-accent font-medium"
           )}
+        >
+          <Clock className={cn("w-4 h-4", !clockedIn ? "text-icm-accent" : "text-muted-foreground")} />
+          <span className="flex-1">Clock in</span>
+          {clockedIn && (
+            <span className="text-[10.5px] text-muted-foreground font-mono">
+              {new Date(clockedIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={handleClockOut}
+          disabled={!clockedIn}
+          className={cn(
+            "gap-2 text-[12.5px]",
+            clockedIn && "bg-icm-green/10 text-icm-green focus:bg-icm-green/10 focus:text-icm-green font-medium"
+          )}
+        >
+          <Clock className={cn("w-4 h-4", clockedIn ? "text-icm-green" : "text-muted-foreground")} />
+          <span className="flex-1">Clock out</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-[12.5px] text-destructive focus:text-destructive">

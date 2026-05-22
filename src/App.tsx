@@ -265,7 +265,7 @@ const App = () => (
             <Route path="/billing" element={<BillingHub />} />
 
             {/* Legacy /lifeplan redirects → /platform/agents (Fix 4) */}
-            <Route path="/lifeplan" element={<Navigate to="/platform/agents" replace />} />
+            {/* duplicate removed - handled at line 187 */}
             <Route path="/lifeplan/agent/new/layer2" element={<Navigate to="/platform/agents" replace />} />
 
             <Route path="/admin/multi-state" element={<MultiStateConfig />} />

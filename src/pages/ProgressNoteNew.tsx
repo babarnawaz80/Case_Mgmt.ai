@@ -2,20 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Save, FileSignature, Printer, FileText,
-  Search, Check, ChevronDown,
+  Search, Check, ChevronDown, ListChecks, Target,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { people } from "@/data/people";
 
 /**
- * Universal "New Progress Note" entry shown when a user clicks Progress Note
- * from the global dashboard. Visually mirrors PersonProgressNoteDetail so the
- * flow feels continuous. As soon as the user picks an individual from the
- * Person Supported dropdown we navigate to the real person-scoped form.
+ * Universal "New Progress Note" entry. Visually mirrors PersonProgressNoteDetail
+ * so the flow feels continuous. The Person Supported field is a searchable
+ * dropdown — selecting an individual navigates to the real person-scoped form.
  */
 const ProgressNoteNew = () => {
   const navigate = useNavigate();
   const today = new Date().toLocaleDateString("en-US");
+
+  const inputCls = "w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg/40 text-[12.5px] text-icm-text-faint italic font-geist";
 
   return (
     <ICMShell title="Progress Note" showAIPanel={false}>
@@ -69,43 +70,83 @@ const ProgressNoteNew = () => {
         </div>
 
         {/* Note Details */}
-        <section className="rounded-xl border border-icm-border bg-icm-panel p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-icm-text-dim" />
-            <h2 className="font-manrope font-bold text-[15px] text-icm-text tracking-tight">Note Details</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Section title="Note Details" titleIcon={<FileText className="w-4 h-4 text-icm-text-dim" />}>
+          <Grid2>
             <Field label="Person Supported" required>
               <PersonSearchSelect
                 onSelect={(id) => navigate(`/people/${id}/progress-note/new`)}
               />
             </Field>
             <Field label="Activity Type" required>
-              <DisabledPlaceholder>—</DisabledPlaceholder>
+              <div className={inputCls + " flex items-center"}>—</div>
             </Field>
             <Field label="Progress Date" required>
-              <DisabledPlaceholder>MM/DD/YYYY</DisabledPlaceholder>
+              <div className={inputCls + " flex items-center"}>MM/DD/YYYY</div>
             </Field>
             <Field label="Contact Type" required>
-              <DisabledPlaceholder>—</DisabledPlaceholder>
+              <div className={inputCls + " flex items-center"}>—</div>
             </Field>
             <Field label="Start Time" required>
-              <DisabledPlaceholder>--:-- --</DisabledPlaceholder>
+              <div className={inputCls + " flex items-center"}>--:-- --</div>
             </Field>
             <Field label="End Time" required>
-              <DisabledPlaceholder>--:-- --</DisabledPlaceholder>
+              <div className={inputCls + " flex items-center"}>--:-- --</div>
             </Field>
-          </div>
+            <Field label="Is Billable" required>
+              <div className={inputCls + " flex items-center"}>—</div>
+            </Field>
+          </Grid2>
+        </Section>
 
-          <p className="text-[11.5px] text-icm-text-faint font-geist">
-            Other fields will populate after you pick an individual.
-          </p>
-        </section>
+        {/* Activity Documentation */}
+        <Section title="Activity Documentation">
+          <Field label="Purpose of Activity" required>
+            <div className="w-full min-h-[88px] px-3 py-2 rounded-lg border border-icm-border bg-icm-bg/40 text-[12.5px] text-icm-text-faint italic font-geist">
+              Describe the purpose and context of this activity
+            </div>
+          </Field>
+        </Section>
+
+        {/* Goals */}
+        <Section title="Progress Toward Goals" titleIcon={<Target className="w-4 h-4 text-icm-accent" />}>
+          <div className="rounded-lg border border-dashed border-icm-border bg-icm-bg/40 px-4 py-6 text-center text-[12px] text-icm-text-faint italic font-geist">
+            Goals will load after an individual is selected.
+          </div>
+        </Section>
+
+        {/* Additional */}
+        <Section title="Additional Documentation" titleIcon={<ListChecks className="w-4 h-4 text-icm-text-dim" />}>
+          <Field label="Additional observations">
+            <div className="w-full min-h-[72px] px-3 py-2 rounded-lg border border-icm-border bg-icm-bg/40 text-[12.5px] text-icm-text-faint italic font-geist">
+              Any additional observations, concerns, or context not captured above
+            </div>
+          </Field>
+          <Field label="Next steps">
+            <div className="w-full min-h-[72px] px-3 py-2 rounded-lg border border-icm-border bg-icm-bg/40 text-[12.5px] text-icm-text-faint italic font-geist">
+              What follow-up actions are planned?
+            </div>
+          </Field>
+        </Section>
       </div>
     </ICMShell>
   );
 };
+
+function Section({ title, titleIcon, children }: { title: string; titleIcon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border border-icm-border bg-icm-panel p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        {titleIcon}
+        <h2 className="font-manrope font-bold text-[15px] text-icm-text tracking-tight">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Grid2({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{children}</div>;
+}
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -113,14 +154,6 @@ function Field({ label, required, children }: { label: string; required?: boolea
       <label className="block text-[11px] uppercase tracking-wide font-semibold text-icm-text-faint font-geist mb-1">
         {label}{required && <span className="text-icm-red">*</span>}
       </label>
-      {children}
-    </div>
-  );
-}
-
-function DisabledPlaceholder({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="w-full h-9 px-3 rounded-lg border border-dashed border-icm-border bg-icm-bg/40 text-[12.5px] text-icm-text-faint italic font-geist flex items-center">
       {children}
     </div>
   );

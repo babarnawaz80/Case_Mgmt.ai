@@ -442,7 +442,7 @@ const ACTIONS: ActionTile[] = [
   // Care (purple)
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },
   { label: "Referrals", icon: Phone, to: "/documentation", category: "Care" },
-  { label: "Care Team", icon: Heart, to: "/documentation", category: "Care" },
+  { label: "Team", icon: Heart, to: "/settings/users", category: "Care" },
   { label: "Communications", icon: PhoneCall, to: "/documentation", category: "Care", count: 5 },
 ];
 

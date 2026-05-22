@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { demoToast } from "@/lib/demoToast";
+import { demoToast, demoSuccess } from "@/lib/demoToast";
 
-type TabKey = "general" | "payers" | "funding" | "rates";
+type TabKey = "providerSetup" | "general" | "payers" | "funding" | "rates";
 
 const TABS: { key: TabKey; label: string }[] = [
+  { key: "providerSetup", label: "Provider Setup" },
   { key: "general", label: "General" },
   { key: "payers", label: "Payers" },
   { key: "funding", label: "Funding Streams" },
@@ -14,12 +15,12 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 const SettingsBillingConfig = () => {
-  const [tab, setTab] = useState<TabKey>("general");
+  const [tab, setTab] = useState<TabKey>("providerSetup");
 
   return (
     <SettingsLayout
       title="Billing Configuration"
-      subtitle="Configure billing rules, supervisor approval, service codes, and clearinghouse settings"
+      subtitle="Configure provider enrollment, billing rules, payers, and rate schedules."
     >
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-icm-border">
@@ -39,6 +40,7 @@ const SettingsBillingConfig = () => {
         ))}
       </div>
 
+      {tab === "providerSetup" && <ProviderSetupTab />}
       {tab === "general" && <GeneralTab />}
       {tab === "payers" && <PayersTab />}
       {tab === "funding" && <FundingTab />}
@@ -46,6 +48,308 @@ const SettingsBillingConfig = () => {
     </SettingsLayout>
   );
 };
+
+/* ---------------- PROVIDER SETUP ---------------- */
+
+interface StateEnrollment {
+  id: string;
+  state: string;
+  providerId: string;
+  status: "Active" | "Pending" | "Expired";
+  effective: string;
+  expiration: string;
+}
+
+const INITIAL_ENROLLMENTS: StateEnrollment[] = [
+  { id: "se-1", state: "Indiana",    providerId: "IN-2024-CM-00412", status: "Active", effective: "01/01/2024", expiration: "12/31/2026" },
+  { id: "se-2", state: "New Jersey", providerId: "NJ-2025-CM-00089", status: "Active", effective: "06/01/2025", expiration: "05/31/2027" },
+];
+
+function parseMDY(s: string): Date | null {
+  const [m, d, y] = s.split("/").map((n) => parseInt(n, 10));
+  if (!m || !d || !y) return null;
+  return new Date(y, m - 1, d);
+}
+function daysUntil(s: string): number | null {
+  const dt = parseMDY(s);
+  if (!dt) return null;
+  return Math.ceil((dt.getTime() - Date.now()) / 86_400_000);
+}
+
+function ProviderSetupTab() {
+  const [enrollments, setEnrollments] = useState<StateEnrollment[]>(INITIAL_ENROLLMENTS);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [sameAsOrg, setSameAsOrg] = useState(true);
+
+  const expiringSoon = useMemo(
+    () =>
+      enrollments
+        .map((e) => ({ e, days: daysUntil(e.expiration) }))
+        .filter((x) => x.days !== null && x.days >= 0 && x.days <= 90),
+    [enrollments]
+  );
+
+  const addEnrollment = () => {
+    const id = `se-${Date.now()}`;
+    setEnrollments((rows) => [
+      ...rows,
+      { id, state: "", providerId: "", status: "Pending", effective: "", expiration: "" },
+    ]);
+    setEditingId(id);
+  };
+  const updateEnrollment = (id: string, patch: Partial<StateEnrollment>) =>
+    setEnrollments((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const removeEnrollment = (id: string) => {
+    setEnrollments((rows) => rows.filter((r) => r.id !== id));
+    demoSuccess("State enrollment removed");
+  };
+
+  return (
+    <div className="space-y-3 max-w-[1100px]">
+      {/* Section 1: Provider Identity */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+        <p className="font-manrope font-bold text-[14px] text-icm-text mb-1">Provider Identity</p>
+        <p className="text-[11.5px] font-geist text-icm-text-dim mb-3">
+          Identifiers that appear on every claim your organization submits.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <PField
+            label="Organization NPI (Type 2)"
+            placeholder="Enter 10-digit NPI"
+            helper="Your organization's 10-digit NPI for billing purposes."
+          />
+          <PField
+            label="Tax ID / EIN"
+            placeholder="XX-XXXXXXX"
+            helper="Federal Employer Identification Number as it appears on claims."
+          />
+          <PField
+            label="Medicaid Provider Number"
+            placeholder="MD-PROV-1234"
+            helper="Your primary state Medicaid provider ID."
+          />
+        </div>
+      </div>
+
+      {/* Section 2: Billing Contact & Address */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+        <p className="font-manrope font-bold text-[14px] text-icm-text mb-1">Billing Contact & Address</p>
+        <p className="text-[11.5px] font-geist text-icm-text-dim mb-3">
+          Where payers and clearinghouses send remittances and billing inquiries.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <PField label="Billing Contact Name" placeholder="Babar Nawaz" />
+          <PField label="Billing Contact Phone" placeholder="(555) 555-5555" />
+          <PField label="Billing Contact Email" placeholder="billing@example.com" />
+        </div>
+
+        <div className="mt-4">
+          <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">Pay-to Address</p>
+          <label className="flex items-center gap-2 text-[12px] font-geist text-icm-text mb-2">
+            <input
+              type="checkbox"
+              checked={sameAsOrg}
+              onChange={(e) => setSameAsOrg(e.target.checked)}
+              className="accent-icm-accent"
+            />
+            Same as organization address
+          </label>
+          {!sameAsOrg && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <PField label="Street" placeholder="100 Main Street" />
+                <PField label="City" placeholder="Westminster" />
+              </div>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <PField label="State" placeholder="MD" />
+                <PField label="ZIP" placeholder="21157" />
+                <div />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Section 3: Medicaid Provider Enrollment by State */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+        <p className="font-manrope font-bold text-[14px] text-icm-text mb-1">Medicaid Provider Enrollment by State</p>
+        <p className="text-[11.5px] font-geist text-icm-text-dim mb-3">
+          Each state where you bill Medicaid requires a separate provider enrollment. Add one row per state.
+        </p>
+
+        {expiringSoon.length > 0 && (
+          <div className="mb-3 rounded-xl border border-icm-amber/20 bg-icm-amber-soft px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0 mt-0.5" />
+            <p className="text-[12px] font-geist text-icm-text leading-snug">
+              <span className="font-semibold">{expiringSoon.length} state enrollment{expiringSoon.length > 1 ? "s" : ""} expiring soon</span>
+              {" — "}
+              {expiringSoon.map((x, i) => (
+                <span key={x.e.id}>
+                  {i > 0 ? "; " : ""}
+                  {x.e.state} expires in {x.days} days
+                </span>
+              ))}
+              . Renew before expiration to avoid claim rejections.
+            </p>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px] font-geist">
+              <thead className="bg-icm-bg/60">
+                <tr>
+                  {["State", "Medicaid Provider ID", "Status", "Effective", "Expiration", ""].map((h) => (
+                    <th key={h} className="text-left px-3 py-2 text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-icm-border">
+                {enrollments.map((row) => {
+                  const isEditing = editingId === row.id;
+                  return (
+                    <tr key={row.id} className="hover:bg-icm-bg/40">
+                      <td className="px-3 py-2">
+                        {isEditing ? (
+                          <input value={row.state} onChange={(e) => updateEnrollment(row.id, { state: e.target.value })} className={cellInput} placeholder="State" />
+                        ) : (
+                          <span className="font-medium text-icm-text">{row.state || "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono">
+                        {isEditing ? (
+                          <input value={row.providerId} onChange={(e) => updateEnrollment(row.id, { providerId: e.target.value })} className={cellInput} placeholder="Provider ID" />
+                        ) : (
+                          <span className="text-icm-text-dim">{row.providerId || "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {isEditing ? (
+                          <select
+                            value={row.status}
+                            onChange={(e) => updateEnrollment(row.id, { status: e.target.value as StateEnrollment["status"] })}
+                            className={cellInput}
+                          >
+                            <option>Active</option>
+                            <option>Pending</option>
+                            <option>Expired</option>
+                          </select>
+                        ) : (
+                          <EnrollmentStatusBadge status={row.status} />
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-icm-text-dim">
+                        {isEditing ? (
+                          <input value={row.effective} onChange={(e) => updateEnrollment(row.id, { effective: e.target.value })} className={cellInput} placeholder="MM/DD/YYYY" />
+                        ) : (
+                          row.effective || "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-icm-text-dim">
+                        {isEditing ? (
+                          <input value={row.expiration} onChange={(e) => updateEnrollment(row.id, { expiration: e.target.value })} className={cellInput} placeholder="MM/DD/YYYY" />
+                        ) : (
+                          row.expiration || "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {isEditing ? (
+                          <button
+                            onClick={() => { setEditingId(null); demoSuccess("Enrollment saved"); }}
+                            className="h-7 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11px] font-geist font-semibold"
+                          >
+                            Save
+                          </button>
+                        ) : (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => setEditingId(row.id)}
+                              className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-icm-border hover:bg-icm-bg text-icm-text-dim"
+                              aria-label="Edit"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => removeEnrollment(row.id)}
+                              className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-icm-border hover:bg-icm-red-soft text-icm-red"
+                              aria-label="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {enrollments.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-center text-icm-text-dim text-[12px]">
+                      No state enrollments yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <button
+          onClick={addEnrollment}
+          className="mt-2 h-8 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
+        >
+          <Plus className="w-3.5 h-3.5" /> Add State Enrollment
+        </button>
+      </div>
+
+      {/* Section 4: Clearinghouse & Submission */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+        <p className="font-manrope font-bold text-[14px] text-icm-text mb-1">Clearinghouse & Submission</p>
+        <p className="text-[11.5px] font-geist text-icm-text-dim mb-3">
+          EDI identifiers and routing used when claims are transmitted to payers.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <PField label="Submitter ID" placeholder="e.g. SUB123456" />
+          <PField label="ISA Sender ID" placeholder="e.g. 1234567890" />
+          <SelectField label="Submission Format" options={["837P", "837I", "Both"]} defaultValue="837P" />
+          <PField label="Default Payer ID Routing" placeholder="e.g. SKMD0" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PField({ label, placeholder, helper, defaultValue }: { label: string; placeholder?: string; helper?: string; defaultValue?: string }) {
+  return (
+    <div>
+      <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">{label}</label>
+      <input
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong"
+      />
+      {helper && <p className="mt-1 text-[10.5px] text-icm-text-faint font-geist">{helper}</p>}
+    </div>
+  );
+}
+
+const cellInput =
+  "w-full h-7 px-2 rounded-md border border-icm-border bg-icm-panel text-[11.5px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong";
+
+function EnrollmentStatusBadge({ status }: { status: StateEnrollment["status"] }) {
+  const map = {
+    Active: "bg-icm-green-soft text-icm-green ring-icm-green/20",
+    Pending: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
+    Expired: "bg-icm-red-soft text-icm-red ring-icm-red/20",
+  } as const;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${map[status]}`}>
+      {status}
+    </span>
+  );
+}
+
 
 function GeneralTab() {
   return (

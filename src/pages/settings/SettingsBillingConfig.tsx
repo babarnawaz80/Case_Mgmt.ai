@@ -226,7 +226,8 @@ function PayersTab() {
             {INITIAL_PAYERS.map((p) => {
               const isOpen = expanded === p.id;
               return (
-                <>
+                <React.Fragment key={p.id}>
+
                   <tr
                     key={p.id}
                     className="border-t border-icm-border cursor-pointer hover:bg-icm-bg/40"

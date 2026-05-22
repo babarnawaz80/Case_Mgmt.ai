@@ -24,6 +24,7 @@ import {
   type RoleKey,
   type UserStatus,
 } from "@/data/settings";
+import { credentialBadge } from "@/data/staffProvider";
 import { cn } from "@/lib/utils";
 import { demoToast, demoSuccess } from "@/lib/demoToast";
 

@@ -726,122 +726,101 @@ function TaskRow({
   const isOver = diff !== null && diff < 0 && task.status !== "Completed";
 
   return (
-    <div className={cn("px-6 py-5 transition-all duration-300 hover:bg-icm-bg/40 group/row", isOver && "bg-icm-red/[0.015]")}>
-      <div className="flex items-start gap-5">
-        {/* Status rail — squircle indicator */}
-        <div className="mt-1.5 shrink-0">
+    <div className={cn("px-4 py-2 transition-colors hover:bg-icm-bg/40 group/row", isOver && "bg-icm-red/[0.015]")}>
+      <div className="flex items-center gap-3">
+        {/* Status rail */}
+        <div className="shrink-0">
           {isOver ? (
-            <div className="w-6 h-6 rounded-xl border-[2.5px] border-icm-red/25 bg-white flex items-center justify-center shadow-sm">
-              <div className="w-2.5 h-2.5 bg-icm-red rounded-[3px] shadow-[0_0_8px_rgba(239,68,68,0.45)]" />
+            <div className="w-4 h-4 rounded-md border-[2px] border-icm-red/30 bg-white flex items-center justify-center">
+              <div className="w-1.5 h-1.5 bg-icm-red rounded-[2px]" />
             </div>
           ) : task.status === "Completed" ? (
-            <div className="w-6 h-6 rounded-xl bg-icm-green-soft flex items-center justify-center">
-              <CheckCircle2 className="w-3.5 h-3.5 text-icm-green" />
+            <div className="w-4 h-4 rounded-md bg-icm-green-soft flex items-center justify-center">
+              <CheckCircle2 className="w-2.5 h-2.5 text-icm-green" />
             </div>
           ) : task.status === "In Progress" ? (
-            <div className="w-6 h-6 rounded-xl border-[2.5px] border-icm-amber/30 bg-white flex items-center justify-center shadow-sm">
-              <div className="w-2.5 h-2.5 bg-icm-amber rounded-[3px]" />
+            <div className="w-4 h-4 rounded-md border-[2px] border-icm-amber/35 bg-white flex items-center justify-center">
+              <div className="w-1.5 h-1.5 bg-icm-amber rounded-[2px]" />
             </div>
           ) : (
-            <div className="w-6 h-6 rounded-xl border-[2.5px] border-icm-border bg-white" />
+            <div className="w-4 h-4 rounded-md border-[2px] border-icm-border bg-white" />
           )}
         </div>
 
-        {/* Body */}
-        <div className="flex-1 min-w-0">
-          <button onClick={onToggleExpand} className="text-left w-full">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-[15.5px] font-manrope font-bold text-icm-text leading-tight tracking-tight">
-                {task.name}
-              </span>
-              {showIndividualName && (
-                <span className="text-[11.5px] text-icm-text-dim font-geist font-medium">
-                  · {task.individualName}
-                </span>
-              )}
-              {task.priority === "Critical" && (
-                <span className="px-2.5 py-0.5 bg-icm-red-soft text-icm-red text-[10px] font-black rounded-lg uppercase tracking-widest shadow-sm">
-                  Critical
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-5 mt-2 flex-wrap text-[12.5px] font-semibold font-geist">
-              <span className={cn("inline-flex items-center gap-1.5", isOver ? "text-icm-red" : "text-icm-text-dim")}>
-                {isOver && <Clock className="w-3.5 h-3.5" />}
-                Due {task.dueDate}{isOver && task.daysOverdue ? ` (${task.daysOverdue}d overdue)` : ""}
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-icm-text-faint">
-                <span className="w-1.5 h-1.5 rounded-full bg-icm-text-faint/60" />
-                {task.staffResponsible}
-              </span>
-              <SourceLabel task={task} />
-            </div>
-
-            {(task.linkedModule || task.aiDraftReady) && (
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
-                {task.linkedModule && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onLinkedModule();
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl text-icm-accent text-[10.5px] font-extrabold uppercase tracking-tight bg-icm-accent-soft/80 border border-icm-accent/15 shadow-sm hover:bg-icm-accent hover:text-white hover:shadow-md transition-all inline-flex items-center gap-1.5"
-                  >
-                    {task.linkedModule.label} <ArrowRight className="w-3 h-3" />
-                  </button>
-                )}
-                {task.aiDraftReady && (
-                  <span className="px-3.5 py-1.5 rounded-xl bg-white text-indigo-600 text-[10.5px] font-extrabold uppercase tracking-tight border border-indigo-100 shadow-[0_4px_12px_-2px_rgba(79,70,229,0.12)] inline-flex items-center gap-1.5">
-                    <Sparkle className="w-3 h-3 fill-indigo-500 text-indigo-500" /> AI Draft Ready
-                  </span>
-                )}
-              </div>
-            )}
-          </button>
-
-          {expanded && (
-            <div className="mt-4 rounded-2xl border border-icm-border bg-icm-bg/60 p-4 space-y-2.5">
-              {task.description && (
-                <p className="text-[12.5px] text-icm-text font-geist leading-relaxed">
-                  {task.description}
-                </p>
-              )}
-              <div className="text-[11px] text-icm-text-dim font-geist">
-                Created by {task.createdBy} on {task.createdOn}
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  placeholder="Add a comment… use @ to mention"
-                  className="flex-1 h-9 px-3 rounded-xl border border-icm-border bg-white text-[12.5px] text-icm-text focus:border-icm-accent focus:ring-2 focus:ring-icm-accent/15 outline-none transition-all"
-                />
-                <button
-                  onClick={() => demoSuccess("Comment posted")}
-                  className="text-[11.5px] text-icm-accent hover:underline font-bold"
-                >
-                  Post
-                </button>
-              </div>
-            </div>
+        {/* Body — single line */}
+        <button onClick={onToggleExpand} className="text-left flex-1 min-w-0 flex items-center gap-2.5 flex-wrap">
+          <span className="text-[13px] font-manrope font-semibold text-icm-text leading-tight tracking-tight truncate max-w-[260px]">
+            {task.name}
+          </span>
+          {showIndividualName && (
+            <span className="text-[11px] text-icm-text-dim font-geist">· {task.individualName}</span>
           )}
-        </div>
+          {task.priority === "Critical" && (
+            <span className="px-1.5 py-0 bg-icm-red-soft text-icm-red text-[9px] font-black rounded uppercase tracking-wider">
+              Critical
+            </span>
+          )}
+          <span className={cn("inline-flex items-center gap-1 text-[11.5px] font-geist font-medium", isOver ? "text-icm-red font-semibold" : "text-icm-text-dim")}>
+            {isOver && <Clock className="w-3 h-3" />}
+            Due {task.dueDate}{isOver && task.daysOverdue ? ` (${task.daysOverdue}d)` : ""}
+          </span>
+          <span className="text-[11px] text-icm-text-faint font-geist">· {task.staffResponsible}</span>
+          {task.linkedModule && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onLinkedModule(); }}
+              className="px-1.5 py-0.5 rounded text-icm-accent text-[9.5px] font-bold uppercase tracking-tight bg-icm-accent-soft/70 border border-icm-accent/15 hover:bg-icm-accent hover:text-white transition-colors inline-flex items-center gap-1"
+            >
+              {task.linkedModule.label} <ArrowRight className="w-2.5 h-2.5" />
+            </button>
+          )}
+          {task.aiDraftReady && (
+            <span className="px-1.5 py-0.5 rounded bg-white text-indigo-600 text-[9.5px] font-bold uppercase tracking-tight border border-indigo-100 inline-flex items-center gap-1">
+              <Sparkle className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500" /> AI Draft
+            </span>
+          )}
+        </button>
 
         {/* Action */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
+        <div className="shrink-0">
           {task.status === "Completed" ? (
-            <span className="text-[11.5px] text-icm-green font-bold flex items-center gap-1.5 px-3 py-2">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Done
+            <span className="text-[11px] text-icm-green font-bold flex items-center gap-1 px-2">
+              <CheckCircle2 className="w-3 h-3" /> Done
             </span>
           ) : (
             <button
               onClick={onAdvance ?? onComplete}
-              className="h-10 px-5 rounded-2xl text-[12px] font-geist font-black text-icm-text bg-white border border-icm-border shadow-sm hover:bg-icm-text hover:text-white hover:border-icm-text hover:shadow-[0_15px_30px_-10px_rgba(15,23,42,0.3)] active:scale-95 transition-all"
+              className="h-7 px-3 rounded-lg text-[11px] font-geist font-bold text-icm-text bg-white border border-icm-border hover:bg-icm-text hover:text-white hover:border-icm-text transition-colors"
             >
               {task.status === "Pending Start" ? "Start" : "Complete"}
             </button>
           )}
         </div>
       </div>
+
+      {expanded && (
+        <div className="mt-2 ml-7 rounded-lg border border-icm-border bg-icm-bg/60 p-3 space-y-2">
+          {task.description && (
+            <p className="text-[12px] text-icm-text font-geist leading-relaxed">
+              {task.description}
+            </p>
+          )}
+          <div className="text-[10.5px] text-icm-text-dim font-geist">
+            Created by {task.createdBy} on {task.createdOn} · Source: {task.source}{task.sourceDetail ? ` · ${task.sourceDetail}` : ""}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              placeholder="Add a comment… use @ to mention"
+              className="flex-1 h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text focus:border-icm-accent focus:ring-2 focus:ring-icm-accent/15 outline-none transition-all"
+            />
+            <button
+              onClick={() => demoSuccess("Comment posted")}
+              className="text-[11px] text-icm-accent hover:underline font-bold"
+            >
+              Post
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

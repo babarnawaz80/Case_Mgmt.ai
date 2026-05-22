@@ -34,6 +34,41 @@ const SettingsUserDetail = () => {
   const [tab, setTab] = useState<"profile" | "access" | "activity" | "permissions">(
     "profile"
   );
+  const { isAdmin } = useRole();
+  const initialProvider = useMemo(() => getStaffProvider(userId), [userId]);
+  const [provider, setProvider] = useState(initialProvider);
+  const [enrollments, setEnrollments] = useState<StaffStateEnrollment[]>(initialProvider.enrollments);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const supervisors = useMemo(
+    () => orgUsers.filter((u) => u.role === "supervisor" || u.role === "admin"),
+    []
+  );
+  const licenseDays = daysUntil(provider.licenseExpiration);
+  const licenseWarning =
+    licenseDays === null
+      ? null
+      : licenseDays < 0
+      ? { tone: "red" as const, label: `License expired ${Math.abs(licenseDays)} day${Math.abs(licenseDays) === 1 ? "" : "s"} ago — billing blocked` }
+      : licenseDays <= 90
+      ? { tone: "amber" as const, label: `License expires in ${licenseDays} day${licenseDays === 1 ? "" : "s"}` }
+      : null;
+
+  const addEnrollment = () => {
+    const id = `se-${Date.now()}`;
+    setEnrollments((rows) => [
+      ...rows,
+      { id, state: "", providerId: "", status: "Pending", effective: "", expiration: "" },
+    ]);
+    setEditingId(id);
+  };
+  const updateEnrollment = (id: string, patch: Partial<StaffStateEnrollment>) =>
+    setEnrollments((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const removeEnrollment = (id: string) => {
+    setEnrollments((rows) => rows.filter((r) => r.id !== id));
+    demoSuccess("State enrollment removed");
+  };
+  const updateProvider = <K extends keyof typeof provider>(key: K, value: (typeof provider)[K]) =>
+    setProvider((p) => ({ ...p, [key]: value }));
 
   if (!user) {
     return (

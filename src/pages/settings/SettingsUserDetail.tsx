@@ -378,6 +378,215 @@ const SettingsUserDetail = () => {
           </button>
         </div>
       )}
+
+      {isAdmin && (
+        <div className="rounded-xl border border-icm-border bg-icm-panel p-4 max-w-[900px] space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Provider & Billing Information
+            </p>
+            {licenseWarning && (
+              <span className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1",
+                licenseWarning.tone === "red"
+                  ? "bg-icm-red-soft text-icm-red ring-icm-red/20"
+                  : "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+              )}>
+                <AlertTriangle className="w-3 h-3" />
+                {licenseWarning.label}
+              </span>
+            )}
+          </div>
+
+          {/* Provider identifiers */}
+          <div>
+            <SubHeading>Provider identifiers</SubHeading>
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Individual NPI (Type 1)"
+                placeholder="Enter 10-digit NPI"
+                value={provider.npi ?? ""}
+                onChange={(v) => updateProvider("npi", v)}
+              />
+              <Field
+                label="Taxonomy code"
+                placeholder="e.g. 251T00000X"
+                value={provider.taxonomy ?? ""}
+                onChange={(v) => updateProvider("taxonomy", v)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <Label>Credential type</Label>
+                <select
+                  value={provider.credentialType ?? ""}
+                  onChange={(e) => updateProvider("credentialType", (e.target.value || undefined) as CredentialType | undefined)}
+                  className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text"
+                >
+                  <option value="">Select credential…</option>
+                  {CREDENTIAL_TYPES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <Field
+                label="License number"
+                value={provider.licenseNumber ?? ""}
+                onChange={(v) => updateProvider("licenseNumber", v)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <Field
+                label="License expiration date"
+                placeholder="MM/DD/YYYY"
+                value={provider.licenseExpiration ?? ""}
+                onChange={(v) => updateProvider("licenseExpiration", v)}
+              />
+              <div>
+                <Label>Supervising provider</Label>
+                <select
+                  value={provider.supervisingProviderUserId ?? ""}
+                  onChange={(e) => updateProvider("supervisingProviderUserId", e.target.value || undefined)}
+                  className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text"
+                >
+                  <option value="">None</option>
+                  {supervisors.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.firstName} {s.lastName} — {roleLabel(s.role)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* State enrollment */}
+          <div>
+            <SubHeading>Individual Provider Enrollment by State</SubHeading>
+            <p className="text-[11.5px] text-icm-text-dim font-geist mb-2">
+              Each state where this user bills Medicaid requires a separate provider enrollment.
+            </p>
+            <div className="rounded-xl border border-icm-border overflow-hidden">
+              <table className="w-full text-[12px] font-geist">
+                <thead className="bg-icm-bg/60">
+                  <tr>
+                    {["State", "Provider ID", "Status", "Effective", "Expiration", ""].map((h) => (
+                      <th key={h} className="text-left px-3 py-2 text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-icm-border">
+                  {enrollments.map((row) => {
+                    const isEditing = editingId === row.id;
+                    const cellInput = "w-full h-7 px-2 rounded-md border border-icm-border bg-icm-panel text-[11.5px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong";
+                    return (
+                      <tr key={row.id} className="hover:bg-icm-bg/40">
+                        <td className="px-3 py-2">
+                          {isEditing ? (
+                            <input value={row.state} onChange={(e) => updateEnrollment(row.id, { state: e.target.value })} className={cellInput} placeholder="State" />
+                          ) : (
+                            <span className="font-medium text-icm-text">{row.state || "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-mono">
+                          {isEditing ? (
+                            <input value={row.providerId} onChange={(e) => updateEnrollment(row.id, { providerId: e.target.value })} className={cellInput} placeholder="Provider ID" />
+                          ) : (
+                            <span className="text-icm-text-dim">{row.providerId || "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {isEditing ? (
+                            <select
+                              value={row.status}
+                              onChange={(e) => updateEnrollment(row.id, { status: e.target.value as StaffStateEnrollment["status"] })}
+                              className={cellInput}
+                            >
+                              <option>Active</option>
+                              <option>Pending</option>
+                              <option>Expired</option>
+                            </select>
+                          ) : (
+                            <span className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1",
+                              row.status === "Active" ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+                                : row.status === "Pending" ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+                                : "bg-icm-red-soft text-icm-red ring-icm-red/20"
+                            )}>
+                              {row.status}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-icm-text-dim">
+                          {isEditing ? (
+                            <input value={row.effective} onChange={(e) => updateEnrollment(row.id, { effective: e.target.value })} className={cellInput} placeholder="MM/DD/YYYY" />
+                          ) : (row.effective || "—")}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-icm-text-dim">
+                          {isEditing ? (
+                            <input value={row.expiration} onChange={(e) => updateEnrollment(row.id, { expiration: e.target.value })} className={cellInput} placeholder="MM/DD/YYYY" />
+                          ) : (row.expiration || "—")}
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          {isEditing ? (
+                            <button
+                              onClick={() => { setEditingId(null); demoSuccess("Enrollment saved"); }}
+                              className="h-7 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11px] font-geist font-semibold"
+                            >
+                              Save
+                            </button>
+                          ) : (
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                onClick={() => setEditingId(row.id)}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-icm-border hover:bg-icm-bg text-icm-text-dim"
+                                aria-label="Edit"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => removeEnrollment(row.id)}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-icm-border hover:bg-icm-red-soft text-icm-red"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {enrollments.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-center text-icm-text-dim text-[12px]">
+                        No state enrollments yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <button
+              onClick={addEnrollment}
+              className="mt-2 h-8 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text inline-flex items-center gap-1.5 hover:bg-icm-bg"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add State Enrollment
+            </button>
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={() => demoSuccess("Provider & billing info saved")}
+              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+            >
+              Save provider info
+            </button>
+          </div>
+        </div>
+      )}
     </SettingsLayout>
   );
 };

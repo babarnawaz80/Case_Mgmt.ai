@@ -123,6 +123,13 @@ const PersonReferralForm = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Attachments
+  const [attachments, setAttachments] = useState<ReferralAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Email modal
+  const [showEmail, setShowEmail] = useState(false);
+
   if (!person) {
     return (
       <ICMShell title="New Referral" showAIPanel={false}>

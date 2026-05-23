@@ -248,6 +248,7 @@ const App = () => (
             <Route path="/settings/security" element={<SettingsSecurity />} />
             <Route path="/settings/notifications" element={<SettingsNotifications />} />
             <Route path="/settings/billing-config" element={<SettingsBillingConfig />} />
+            <Route path="/settings/ai-usage" element={<SettingsAIUsage />} />
             <Route path="/ai-roadmap" element={<AIRoadmap />} />
             <Route path="/admin/provider-directory" element={<ProviderDirectory />} />
             <Route path="/reports" element={<Reports />} />

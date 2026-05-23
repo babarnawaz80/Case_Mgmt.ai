@@ -908,7 +908,7 @@ const PersonReferralForm = () => {
         <EmailProviderModal
           onClose={() => setShowEmail(false)}
           personName={`${person.firstName} ${person.lastName}`}
-          personDob={person.dateOfBirth ?? "01/01/1990"}
+          personDob={person.dob}
           referralType={type}
           priority={priority}
           reason={reason}

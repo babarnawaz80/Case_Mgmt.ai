@@ -216,6 +216,8 @@ const App = () => (
             <Route path="/people/:id/assessments/new" element={<PersonAssessmentForm />} />
             <Route path="/people/:id/assessments/:assessmentId" element={<PersonAssessmentForm />} />
             <Route path="/people/:id/referrals" element={<PersonReferrals />} />
+            <Route path="/referrals" element={<AllReferrals />} />
+            <Route path="/people/:id/referrals" element={<PersonReferrals />} />
             <Route path="/people/:id/referrals/new" element={<PersonReferralForm />} />
             <Route path="/people/:id/referrals/:referralId" element={<PersonReferralDetail />} />
             <Route path="/people/:id/documents" element={<PersonDocuments />} />

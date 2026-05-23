@@ -397,4 +397,23 @@ function IconBtn({ icon: Icon, onClick }: { icon: any; onClick: () => void }) {
   );
 }
 
+function timeAgo(dateStr: string): string {
+  // Accepts "MM/DD/YYYY" or "MM/DD/YYYY h:mm AM/PM"
+  const datePart = dateStr.split(" ")[0];
+  const [m, d, y] = datePart.split("/").map((n) => parseInt(n, 10));
+  if (!m || !d || !y) return dateStr;
+  const then = new Date(y, m - 1, d).getTime();
+  const diffMs = Date.now() - then;
+  const day = 24 * 60 * 60 * 1000;
+  const days = Math.floor(diffMs / day);
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day ago";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return months === 1 ? "1 month ago" : `${months} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "1 year ago" : `${years} years ago`;
+}
+
 export default PersonReferrals;
+

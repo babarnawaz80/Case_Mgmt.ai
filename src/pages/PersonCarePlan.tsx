@@ -61,6 +61,7 @@ const PersonCarePlan = () => {
   const [completedOpen, setCompletedOpen] = useState(false);
   const [newPlanOpen, setNewPlanOpen] = useState(false);
   const [draftingAI, setDraftingAI] = useState(false);
+  const [sharePlan, setSharePlan] = useState<CarePlan | null>(null);
 
   const inProgress = useMemo(() => allPlans.filter((p) => !p.isCompleted), [allPlans]);
   const completed = useMemo(() => allPlans.filter((p) => p.isCompleted), [allPlans]);

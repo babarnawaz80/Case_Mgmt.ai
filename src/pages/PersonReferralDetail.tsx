@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft,
-  Printer,
   X,
   Plus,
   Phone,
@@ -10,15 +10,22 @@ import {
   MapPin,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
+  Download,
+  Send,
+  Pencil,
+  FileText,
+  Paperclip,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { getPerson } from "@/data/people";
 import {
+  addConversationEntry,
   getReferral,
   REFERRAL_STATUSES,
   statusTone,
   updateReferralStatus,
+  type ConversationEntry,
+  type ConversationKind,
   type ReferralStatus,
   type TimelineEvent,
 } from "@/data/referrals";
@@ -31,17 +38,11 @@ const statusToneClass: Record<string, string> = {
   neutral: "bg-icm-bg text-icm-text-dim ring-icm-border",
 };
 
-const dotByType: Record<string, string> = {
-  created: "bg-icm-accent",
-  submitted: "bg-icm-accent",
-  responded: "bg-icm-green",
-  accepted: "bg-icm-green",
-  started: "bg-icm-green",
-  "follow-up": "bg-icm-amber",
-  "status-update": "bg-icm-amber",
-  declined: "bg-icm-red",
-  unavailable: "bg-icm-red",
-  closed: "bg-icm-text-faint",
+const convoBadge: Record<ConversationKind, { label: string; cls: string; icon: string }> = {
+  email: { label: "Email sent", cls: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20", icon: "📧" },
+  phone: { label: "Phone call", cls: "bg-icm-green-soft text-icm-green ring-icm-green/20", icon: "📞" },
+  note: { label: "Note", cls: "bg-icm-bg text-icm-text-dim ring-icm-border", icon: "💬" },
+  status: { label: "Status update", cls: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20", icon: "📋" },
 };
 
 const PersonReferralDetail = () => {
@@ -51,6 +52,7 @@ const PersonReferralDetail = () => {
   const referral = getReferral(referralId ?? "");
   const [tick, setTick] = useState(0);
   const [showUpdate, setShowUpdate] = useState(false);
+  const [logging, setLogging] = useState(false);
 
   if (!person || !referral) {
     return (
@@ -61,10 +63,43 @@ const PersonReferralDetail = () => {
   }
 
   const tone = statusTone(referral.status);
+  const isPending = referral.status === "Pending Response" || referral.status === "Submitted";
+
+  const markStatus = (status: ReferralStatus, label: string) => {
+    const today = new Date();
+    const fmt = `${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}/${today.getFullYear()}`;
+    updateReferralStatus(
+      referral.id,
+      status,
+      {
+        id: `t-${Date.now()}`,
+        date: fmt,
+        type: status === "Connected" ? "accepted" : "declined",
+        title: `Status updated to ${status}`,
+        by: "Kathy Adams",
+      },
+      {},
+    );
+    addConversationEntry(referral.id, {
+      id: `c-${Date.now()}`,
+      type: "status",
+      by: "Kathy Adams",
+      initials: "KA",
+      date: `${fmt}`,
+      message: `Referral marked as ${label}.`,
+    });
+    setTick((t) => t + 1);
+    toast.success(`Referral marked as ${label}`);
+  };
+
+  const downloadPdf = () =>
+    toast.success(
+      `Referral PDF downloaded — ${person.firstName} ${person.lastName} · ${referral.type} · ${referral.date}`,
+    );
 
   return (
     <ICMShell title="Referral" showAIPanel={false}>
-      <div className="space-y-5 max-w-[1000px] mx-auto">
+      <div className="space-y-4 max-w-[1200px] mx-auto">
         <button
           onClick={() => navigate(`/people/${id}/referrals`)}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
@@ -73,19 +108,17 @@ const PersonReferralDetail = () => {
           Referrals
         </button>
 
-        {/* Header */}
+        {/* Status bar */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-start gap-3 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex-1 min-w-[260px]">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-icm-bg text-icm-text-dim ring-1 ring-icm-border">
                 {referral.id}
               </span>
               <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-icm-bg text-icm-text-dim ring-1 ring-icm-border font-semibold">
                 {referral.type}
               </span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${statusToneClass[tone]}`}
-              >
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${statusToneClass[tone]}`}>
                 {referral.status}
               </span>
               <span className="text-[10.5px] text-icm-text-dim font-mono">
@@ -99,20 +132,44 @@ const PersonReferralDetail = () => {
               {person.firstName} {person.lastName} · Created {referral.date} · Assigned to {referral.assignedTo}
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => setShowUpdate(true)}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold hover:opacity-90"
-            >
-              Update status
-            </button>
-            <button
-              onClick={() => window.print()}
               className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5"
             >
-              <Printer className="w-3 h-3" />
-              Print
+              <Pencil className="w-3 h-3" />
+              Edit referral
             </button>
+            <button
+              onClick={downloadPdf}
+              className="h-9 px-3 rounded-xl border border-icm-accent text-icm-accent bg-icm-panel text-[12px] font-semibold hover:bg-icm-accent-soft inline-flex items-center gap-1.5"
+            >
+              <Download className="w-3 h-3" />
+              Download PDF
+            </button>
+            <button
+              onClick={() => toast(`Email composer — ${referral.providerName}`, { description: "Opens the email-to-provider flow from the form." })}
+              className="h-9 px-3 rounded-xl border border-icm-accent text-icm-accent bg-icm-panel text-[12px] font-semibold hover:bg-icm-accent-soft inline-flex items-center gap-1.5"
+            >
+              <Send className="w-3 h-3" />
+              Email Provider
+            </button>
+            {isPending && (
+              <>
+                <button
+                  onClick={() => markStatus("Connected", "Connected")}
+                  className="h-9 px-3 rounded-xl bg-icm-accent text-white text-[12px] font-semibold hover:opacity-90"
+                >
+                  Mark as Connected
+                </button>
+                <button
+                  onClick={() => markStatus("Closed — Unsuccessful", "Unsuccessful")}
+                  className="h-9 px-3 rounded-xl border border-icm-red text-icm-red bg-icm-panel text-[12px] font-semibold hover:bg-icm-red-soft"
+                >
+                  Mark as Unsuccessful
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -121,13 +178,9 @@ const PersonReferralDetail = () => {
           <div
             className={`rounded-xl border p-3 flex items-start gap-2 ${referral.daysOpen >= 30 ? "bg-icm-red-soft border-icm-red/20" : "bg-icm-amber-soft border-icm-amber/20"}`}
           >
-            <AlertTriangle
-              className={`w-3.5 h-3.5 mt-0.5 ${referral.daysOpen >= 30 ? "text-icm-red" : "text-icm-amber"}`}
-            />
+            <AlertTriangle className={`w-3.5 h-3.5 mt-0.5 ${referral.daysOpen >= 30 ? "text-icm-red" : "text-icm-amber"}`} />
             <p className="text-[12px] font-geist text-icm-text">
-              <span className="font-semibold">
-                Referral has had no activity in {referral.daysOpen} days.
-              </span>{" "}
+              <span className="font-semibold">Referral has had no activity in {referral.daysOpen} days.</span>{" "}
               <span className="text-icm-text-dim">
                 {referral.daysOpen >= 30
                   ? "Consider calling the provider or identifying an alternative."
@@ -137,47 +190,22 @@ const PersonReferralDetail = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-          {/* Timeline */}
-          <section className="rounded-xl border border-icm-border bg-icm-panel p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-manrope font-bold text-[14px] text-icm-text">Timeline</h2>
-              <button
-                onClick={() => setShowUpdate(true)}
-                className="h-7 px-2.5 rounded-lg border border-icm-border text-[11px] font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                Add update
-              </button>
-            </div>
-            <div className="relative pl-5">
-              <div className="absolute left-1.5 top-1 bottom-1 w-px bg-icm-border" />
-              <div className="space-y-4">
-                {referral.timeline.map((e) => (
-                  <div key={e.id} className="relative">
-                    <div
-                      className={`absolute -left-[18px] top-1 w-3 h-3 rounded-full ring-2 ring-icm-panel ${dotByType[e.type]}`}
-                    />
-                    <p className="text-[10.5px] font-mono text-icm-text-faint">{e.date}</p>
-                    <p className="text-[12.5px] font-geist font-semibold text-icm-text mt-0.5">
-                      {e.title}
-                    </p>
-                    {e.notes && (
-                      <p className="text-[11.5px] text-icm-text-dim mt-0.5">{e.notes}</p>
-                    )}
-                    <p className="text-[10.5px] text-icm-text-faint mt-0.5">— {e.by}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+        <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-4">
+          {/* LEFT — Referral details */}
+          <div className="space-y-3 min-w-0">
+            <InfoCard title="Individual">
+              <Row k="Name" v={`${person.firstName} ${person.lastName}`} />
+              <Row k="Date" v={referral.date} />
+              <Row k="Type" v={referral.type} />
+              <Row k="Priority" v={referral.priority} />
+            </InfoCard>
 
-          {/* Info side */}
-          <aside className="space-y-3">
+            <InfoCard title="Reason for referral">
+              <p className="text-[12px] text-icm-text-dim leading-relaxed">{referral.reason}</p>
+            </InfoCard>
+
             <InfoCard title="Provider">
-              <p className="font-manrope font-bold text-[12.5px] text-icm-text">
-                {referral.providerName}
-              </p>
+              <p className="font-manrope font-bold text-[12.5px] text-icm-text">{referral.providerName}</p>
               {referral.providerPhone && (
                 <p className="text-[11.5px] text-icm-text-dim mt-1 inline-flex items-center gap-1">
                   <Phone className="w-3 h-3" />
@@ -198,47 +226,73 @@ const PersonReferralDetail = () => {
               )}
             </InfoCard>
 
-            <InfoCard title="Reason">
-              <p className="text-[11.5px] text-icm-text-dim leading-relaxed">{referral.reason}</p>
-            </InfoCard>
-
-            <InfoCard title="Follow-up">
-              <Row k="Method" v={referral.referralMethod ?? "—"} />
-              <Row k="Reference" v={referral.referenceNumber ?? "—"} />
-              <Row k="Follow-up" v={referral.followUpDate ?? "—"} />
-              <Row k="Timeframe" v={referral.expectedTimeframe ?? "—"} />
-              <Row k="Priority" v={referral.priority} />
-            </InfoCard>
-
-            <InfoCard title="Consent">
-              <p className="text-[11.5px] inline-flex items-center gap-1.5">
+            <InfoCard title="Information shared">
+              <ul className="space-y-1">
+                {referral.infoShared.map((i) => (
+                  <li key={i} className="text-[12px] text-icm-text inline-flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3 h-3 text-icm-green" />
+                    {i}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-icm-text-faint mt-2 inline-flex items-center gap-1">
                 {referral.consentDocumented ? (
                   <>
                     <CheckCircle2 className="w-3 h-3 text-icm-green" />
-                    <span className="text-icm-text">
-                      Documented {referral.consentDate} ({referral.consentMethod})
-                    </span>
+                    Consent documented {referral.consentDate} ({referral.consentMethod})
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="w-3 h-3 text-icm-red" />
-                    <span className="text-icm-red">Not documented</span>
+                    <span className="text-icm-red">Consent not documented</span>
                   </>
                 )}
               </p>
             </InfoCard>
 
-            {referral.linkedGoalLabel && (
-              <InfoCard title="Linked goal">
-                <p className="text-[11.5px] text-icm-text">{referral.linkedGoalLabel}</p>
-              </InfoCard>
-            )}
+            <InfoCard title={`Attached documents${referral.attachments?.length ? ` (${referral.attachments.length})` : ""}`}>
+              {referral.attachments && referral.attachments.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {referral.attachments.map((a) => (
+                    <li
+                      key={a.id}
+                      className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 ${a.autoGenerated ? "bg-icm-accent-soft border-icm-accent/20" : "bg-icm-panel border-icm-border"}`}
+                    >
+                      <FileText className={`w-4 h-4 ${a.autoGenerated ? "text-icm-accent" : "text-icm-text-dim"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-icm-text truncate">
+                          {a.name}
+                          {a.autoGenerated && (
+                            <span className="ml-1.5 text-[10.5px] font-normal text-icm-accent">(auto-generated)</span>
+                          )}
+                        </p>
+                        <p className="text-[10.5px] font-mono text-icm-text-faint">{a.size}</p>
+                      </div>
+                      <button
+                        onClick={() => toast.success(`Downloading ${a.name}`)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-icm-text-dim hover:bg-icm-bg"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[11.5px] text-icm-text-faint">No documents attached.</p>
+              )}
+            </InfoCard>
+
+            <InfoCard title="Follow-up & tracking">
+              <Row k="Method" v={referral.referralMethod ?? "—"} />
+              <Row k="Reference" v={referral.referenceNumber ?? "—"} />
+              <Row k="Follow-up date" v={referral.followUpDate ?? "—"} />
+              <Row k="Timeframe" v={referral.expectedTimeframe ?? "—"} />
+              <Row k="Assigned to" v={referral.assignedTo} />
+            </InfoCard>
 
             {referral.outcomeNotes && (
               <InfoCard title="Outcome">
-                <p className="text-[11.5px] text-icm-text-dim leading-relaxed">
-                  {referral.outcomeNotes}
-                </p>
+                <p className="text-[11.5px] text-icm-text-dim leading-relaxed">{referral.outcomeNotes}</p>
                 {referral.serviceStartDate && (
                   <p className="text-[10.5px] text-icm-text-faint mt-1">
                     Service started {referral.serviceStartDate}
@@ -246,6 +300,84 @@ const PersonReferralDetail = () => {
                 )}
               </InfoCard>
             )}
+          </div>
+
+          {/* RIGHT — Conversation history */}
+          <aside className="space-y-3">
+            <div className="rounded-xl border border-icm-border bg-icm-panel p-4 sticky top-3">
+              <div className="mb-3">
+                <h2 className="font-manrope font-bold text-[14px] text-icm-text">Conversation History</h2>
+                <p className="text-[11.5px] text-icm-text-dim mt-0.5">
+                  Log all communication with this provider
+                </p>
+              </div>
+
+              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                {(referral.conversation ?? []).length === 0 && (
+                  <p className="text-[11.5px] text-icm-text-faint">No communication logged yet.</p>
+                )}
+                {(referral.conversation ?? []).map((e) => {
+                  const badge = convoBadge[e.type];
+                  return (
+                    <div key={e.id} className="flex gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-icm-accent text-white font-semibold text-[11px] flex items-center justify-center shrink-0">
+                        {e.initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[12px] font-semibold text-icm-text">{e.by}</span>
+                          <span className="text-[10.5px] font-mono text-icm-text-faint">{e.date}</span>
+                        </div>
+                        <span
+                          className={`mt-1 inline-flex items-center gap-1 text-[10.5px] px-1.5 py-0.5 rounded-full font-semibold ring-1 ${badge.cls}`}
+                        >
+                          {badge.icon} {badge.label}
+                        </span>
+                        <p className="text-[12px] text-icm-text mt-1.5 leading-relaxed">{e.message}</p>
+                        {e.status && (
+                          <p className="text-[10.5px] text-icm-text-faint mt-0.5">Status: {e.status}</p>
+                        )}
+                        {e.attachments && e.attachments.length > 0 && (
+                          <ul className="mt-1 space-y-0.5">
+                            {e.attachments.map((f) => (
+                              <li
+                                key={f}
+                                className="text-[10.5px] text-icm-text-dim inline-flex items-center gap-1 mr-2"
+                              >
+                                <Paperclip className="w-2.5 h-2.5" />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-icm-border">
+                {!logging ? (
+                  <button
+                    onClick={() => setLogging(true)}
+                    className="w-full h-9 rounded-xl border border-icm-accent text-icm-accent text-[12px] font-semibold hover:bg-icm-accent-soft inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Log communication
+                  </button>
+                ) : (
+                  <LogCommunicationForm
+                    onCancel={() => setLogging(false)}
+                    onSave={(entry) => {
+                      addConversationEntry(referral.id, entry);
+                      setLogging(false);
+                      setTick((t) => t + 1);
+                      toast.success("Communication logged");
+                    }}
+                  />
+                )}
+              </div>
+            </div>
           </aside>
         </div>
       </div>
@@ -267,8 +399,8 @@ const PersonReferralDetail = () => {
 
 function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-icm-border bg-icm-panel p-3">
-      <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-1.5">
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+      <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-2">
         {title}
       </p>
       {children}
@@ -278,9 +410,73 @@ function InfoCard({ title, children }: { title: string; children: React.ReactNod
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex items-center justify-between text-[11.5px] py-0.5">
+    <div className="flex items-center justify-between text-[12px] py-0.5">
       <span className="text-icm-text-faint">{k}</span>
-      <span className="text-icm-text font-medium">{v}</span>
+      <span className="text-icm-text font-medium text-right">{v}</span>
+    </div>
+  );
+}
+
+function LogCommunicationForm({
+  onCancel,
+  onSave,
+}: {
+  onCancel: () => void;
+  onSave: (e: ConversationEntry) => void;
+}) {
+  const [type, setType] = useState<ConversationKind>("note");
+  const [message, setMessage] = useState("");
+
+  const save = () => {
+    if (!message.trim()) {
+      toast.error("Please describe what happened");
+      return;
+    }
+    const now = new Date();
+    const fmt = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}/${now.getFullYear()} ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    onSave({
+      id: `c-${Date.now()}`,
+      type,
+      by: "Kathy Adams",
+      initials: "KA",
+      date: fmt,
+      message: message.trim(),
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <select
+        value={type}
+        onChange={(e) => setType(e.target.value as ConversationKind)}
+        className="h-8 w-full px-2 rounded-lg border border-icm-border bg-icm-panel text-[12px] text-icm-text focus:outline-none focus:border-icm-accent"
+      >
+        <option value="email">Email sent</option>
+        <option value="phone">Phone call</option>
+        <option value="note">Note</option>
+        <option value="status">Status update</option>
+      </select>
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        rows={3}
+        placeholder="What happened?"
+        className="w-full px-2 py-1.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] text-icm-text focus:outline-none focus:border-icm-accent min-h-[70px]"
+      />
+      <div className="flex justify-end items-center gap-2">
+        <button
+          onClick={onCancel}
+          className="text-[11.5px] font-semibold text-icm-text-dim hover:text-icm-text"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={save}
+          className="h-8 px-3 rounded-lg bg-icm-accent text-white text-[11.5px] font-semibold hover:opacity-90"
+        >
+          Save
+        </button>
+      </div>
     </div>
   );
 }
@@ -333,7 +529,7 @@ function UpdateStatusModal({
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
       <div className="bg-icm-panel rounded-2xl shadow-elevated max-w-lg w-full p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-manrope font-bold text-[15px] text-icm-text">Update Referral Status</h3>
+          <h3 className="font-manrope font-bold text-[15px] text-icm-text">Edit Referral Status</h3>
           <button onClick={onClose} className="w-6 h-6 rounded text-icm-text-faint hover:text-icm-text">
             <X className="w-4 h-4" />
           </button>

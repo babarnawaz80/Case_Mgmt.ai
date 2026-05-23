@@ -70,6 +70,7 @@ import AssessmentBuilderEdit from "./pages/admin/AssessmentBuilderEdit";
 import PersonAssessments from "./pages/PersonAssessments";
 import PersonAssessmentForm from "./pages/PersonAssessmentForm";
 import PersonReferrals from "./pages/PersonReferrals";
+import AllReferrals from "./pages/AllReferrals";
 import PersonReferralForm from "./pages/PersonReferralForm";
 import PersonReferralDetail from "./pages/PersonReferralDetail";
 import Documentation from "./pages/Documentation";

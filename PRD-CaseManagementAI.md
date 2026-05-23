@@ -1191,6 +1191,101 @@ The Engine History page shows:
 
 ---
 
+### 17.5 IPMG / Indiana BDDS Conformance Testing
+
+This section defines mandatory test coverage for engines deployed against the **Indiana Professional Management Group (IPMG)** and **Bureau of Developmental Disabilities Services (BDDS)** rule sets. Every Guidelines Engine tagged with state code `IN` MUST ship with passing tests for the following categories before it can be published.
+
+#### 17.5.1 Required IPMG Rule Categories
+
+| # | Category | BDDS / IPMG Reference | What Engines Must Validate |
+|---|---|---|---|
+| 1 | **PCISP — Person-Centered Individualized Support Plan** | 460 IAC 6-12; BDDS Service Definitions Manual | Annual PCISP exists, signed, dated within 365 days; all required sections present (Risk Plan, Health/Safety, Outcomes, Services); team signatures captured |
+| 2 | **Risk Plans** | 460 IAC 6-12-9 | Every identified risk has a written mitigation plan; risk plan updated when new incident category appears |
+| 3 | **Behavior Support Plans (BSP)** | 460 IAC 9; IPMG BSP Standards | BSP exists for individuals with behavioral targets; restrictive interventions reviewed by HRC; data collection cadence documented |
+| 4 | **Monthly Case Management Notes** | IPMG CM Standards §3.2 | At least one face-to-face contact note per calendar month; documentation entered within 7 calendar days of contact |
+| 5 | **Quarterly Reviews** | 460 IAC 6-12-7 | Quarterly progress note exists every 90 days; reviews outcomes from current PCISP |
+| 6 | **Incident Reporting (ANE)** | 460 IAC 6-9; BDDS Incident Reporting Manual | Abuse / Neglect / Exploitation reported within **24 hours**; all reportable incidents entered in BDDS Incident Reporting & Management System (IRMS) within required timeframe |
+| 7 | **Waiver Eligibility (CIH / FSW)** | 405 IAC 1.1; BDDS Waiver Manual | Level of Care (LOC) reassessed annually; Medicaid eligibility verified monthly; ICAP / HRST scores current |
+| 8 | **Service Authorization** | IPMG Notice of Action workflow | Services rendered fall within authorized units, dates, and codes on the current Cost Comparison Budget (CCB) |
+| 9 | **Self-Direction Documentation** | 460 IAC 6-10 | Self-directed service budgets reconciled monthly; Common Payroll Agent (CPA) timesheets present for SDLW staff |
+| 10 | **Health & Safety Monitoring** | 460 IAC 6-12-8 | Medication administration records (MAR) reconciled; HRST score ≥ 3 triggers enhanced monitoring; required trainings current for support staff |
+
+#### 17.5.2 IPMG Test Case Structure
+
+Every IPMG-tagged rule MUST include the following test fixtures stored alongside the rule:
+
+```yaml
+rule_id: ipmg.pcisp.annual_signature
+citation:
+  source: "460 IAC 6-12-6"
+  page: 14
+  quote: "The individualized support plan shall be reviewed and revised at least annually..."
+test_cases:
+  - name: "passes when PCISP signed within 365 days"
+    fixture: pcisp_signed_30_days_ago
+    expected: PASS
+  - name: "fails when PCISP signed 400 days ago"
+    fixture: pcisp_signed_400_days_ago
+    expected: FAIL
+    expected_severity: HARD_STOP
+  - name: "warns when PCISP signed 350 days ago (approaching expiry)"
+    fixture: pcisp_signed_350_days_ago
+    expected: WARNING
+```
+
+#### 17.5.3 Required IPMG Fixtures (Sample Individuals)
+
+The IPMG test harness ships with the following pre-built test individuals. Engines MUST run cleanly against all of them.
+
+| Fixture | Profile | Used To Test |
+|---|---|---|
+| `ipmg.individual.compliant_cih` | CIH waiver, current PCISP, no incidents, MAR current | Baseline pass — no findings should fire |
+| `ipmg.individual.expired_pcisp` | CIH waiver, PCISP 400 days old | PCISP annual rule fires HARD_STOP |
+| `ipmg.individual.late_monthly_note` | FSW waiver, last contact note 45 days ago | Monthly CM note rule fires HARD_STOP |
+| `ipmg.individual.unreported_ane` | CIH waiver, ANE incident logged 48 hrs ago, no IRMS entry | Incident 24-hr rule fires HARD_STOP |
+| `ipmg.individual.elevated_hrst` | HRST score = 4, no enhanced monitoring | Health & Safety rule fires WARNING |
+| `ipmg.individual.expired_loc` | CIH waiver, LOC reassessed 380 days ago | Waiver eligibility rule fires HARD_STOP |
+| `ipmg.individual.over_authorization` | Service units rendered exceed CCB | Service authorization rule fires HARD_STOP |
+| `ipmg.individual.bsp_no_hrc_review` | Restrictive BSP, no HRC review in 90 days | BSP rule fires HARD_STOP |
+
+#### 17.5.4 IPMG Coverage Matrix Requirement
+
+On every engine publish targeting state `IN`, the system MUST render a **Coverage Matrix** showing:
+
+| Column | Detail |
+|---|---|
+| **IPMG Category** | All 10 categories from §17.5.1 |
+| **# of Rules** | Count of published rules mapped to this category |
+| **# of Test Cases** | Count of test cases per category |
+| **Pass Rate** | % of test cases passing |
+| **Last Run** | Timestamp of last test execution |
+| **Gap Flag** | Red if a category has zero rules; amber if a category has rules but no tests |
+
+Publish is **blocked** if any IPMG category shows a red gap flag.
+
+#### 17.5.5 IPMG Audit Export
+
+The system MUST be able to export an **IPMG Audit Packet** on demand, containing:
+
+1. Engine version, publish date, and SHA hash
+2. Full rule list with citations (page + quote from BDDS source documents)
+3. Coverage Matrix (§17.5.4) at time of audit
+4. All compliance runs for the audit period with: individual ID (de-identified), rule outcomes, overrides applied with justification, case manager who reviewed
+5. All overrides with written justification, supervisor sign-off, and timestamp
+
+Export format: ZIP containing PDF summary + CSV detail + JSON manifest. Audit packet generation is itself logged as an audit event.
+
+#### 17.5.6 IPMG Regression Protection
+
+When a new engine version is published targeting state `IN`:
+
+- All test fixtures from §17.5.3 must run against the new version
+- Any test that previously PASSED and now FAILS blocks publish unless admin attaches a written justification
+- The Coverage Matrix diff (added rules, removed rules, severity changes) is appended to the engine version history
+- Pinned runtime agents continue running the previous version until manually upgraded (per §15.2)
+
+
+
 ## 18. Non-Functional Requirements
 
 ### 18.1 Performance Targets

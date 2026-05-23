@@ -197,13 +197,13 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
   const flagStyle = flag ? flagStyles[flag.tone] : null;
 
   return (
-    <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
       {/* Avatar */}
       <PersonAvatar person={person} size={48} shape="rounded" />
 
 
       {/* Identity */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-tight font-semibold text-[14px] text-icm-text truncate">
             {person.lastName}, {person.firstName}
@@ -221,12 +221,12 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[11.5px] text-icm-text-dim font-geist mt-1 flex-wrap">
+        <div className="flex items-center gap-2 text-[11.5px] text-icm-text-dim font-geist mt-1 flex-wrap">
           <span className="font-mono">
             {person.gender} · {person.age}y · {person.dob}
           </span>
-          <span className="text-icm-text-faint">·</span>
-          <span>Adm {person.admittedOn}</span>
+          <span className="text-icm-text-faint hidden sm:inline">·</span>
+          <span className="hidden sm:inline">Adm {person.admittedOn}</span>
           <span className="text-icm-text-faint">·</span>
           <span className="inline-flex items-center gap-1">
             <MapPin className="w-3 h-3" />
@@ -271,7 +271,7 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto flex-wrap">
         <button
           onClick={onOpen}
           className="h-8 px-3 rounded-lg bg-icm-accent text-white text-[11.5px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90"

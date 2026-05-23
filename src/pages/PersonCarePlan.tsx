@@ -11,6 +11,14 @@ import {
   CalendarDays,
   FileText,
   CheckCircle2,
+  Download,
+  Printer,
+  Send,
+  Link as LinkIcon,
+  Copy,
+  Mail,
+  Lock,
+  MoreHorizontal,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { PersonAIPanel } from "@/components/icm/PersonAIPanel";

@@ -586,7 +586,7 @@ function ActiveConversation({
       </header>
 
       {/* Thread */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-5">
         {grouped.map((g) => (
           <div key={g.label} className="space-y-3">
             <div className="flex items-center justify-center">

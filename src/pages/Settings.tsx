@@ -13,6 +13,7 @@ import {
   Shield,
   CreditCard,
   Bell,
+  Zap,
   ArrowRight,
   Settings as SettingsIcon,
   type LucideIcon,
@@ -26,6 +27,7 @@ interface CategoryCard {
   to: string;
   tone: "accent" | "green" | "purple" | "amber" | "teal" | "red";
   stat?: string;
+  badge?: { label: string; tone: "amber" | "green" };
 }
 
 const Settings = () => {

@@ -84,6 +84,7 @@ import SettingsIntegrations from "./pages/settings/SettingsIntegrations";
 import SettingsSecurity from "./pages/settings/SettingsSecurity";
 import SettingsNotifications from "./pages/settings/SettingsNotifications";
 import SettingsBillingConfig from "./pages/settings/SettingsBillingConfig";
+import SettingsAIUsage from "./pages/settings/SettingsAIUsage";
 import AIRoadmap from "./pages/AIRoadmap";
 import ProviderDirectory from "./pages/admin/ProviderDirectory";
 import Reports from "./pages/Reports";

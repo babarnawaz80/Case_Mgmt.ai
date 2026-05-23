@@ -373,9 +373,36 @@ function PlanTable({ plans, onOpen, variant, onShare }: { plans: CarePlan[]; onO
                 <div className="font-mono text-[11px] text-icm-text-faint">{p.updatedOn}</div>
               </td>
               <td className="px-4 py-3 text-right">
-                <button onClick={() => toast(`Delete plan ${p.id}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${p.id} deleted`) } })} className="text-icm-text-faint hover:text-icm-red p-1 rounded">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="inline-flex items-center gap-1">
+                  {variant === "completed" && (
+                    <>
+                      <button
+                        onClick={() => onShare?.(p)}
+                        title="Send secure link to provider"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] font-geist font-medium text-icm-accent hover:bg-icm-accent-soft"
+                      >
+                        <Send className="w-3.5 h-3.5" /> Send
+                      </button>
+                      <button
+                        onClick={() => toast.success(`Downloading PCP ${p.id}.pdf`)}
+                        title="Download PDF"
+                        className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => { toast("Opening print dialog…"); setTimeout(() => window.print(), 200); }}
+                        title="Print"
+                        className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => toast(`Delete plan ${p.id}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${p.id} deleted`) } })} className="text-icm-text-faint hover:text-icm-red p-1.5 rounded-md">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

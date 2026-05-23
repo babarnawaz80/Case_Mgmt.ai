@@ -158,6 +158,7 @@ function CategoryCardView({
   description,
   stat,
   tone,
+  badge,
   onClick,
 }: CategoryCard & { onClick: () => void }) {
   const toneMap: Record<CategoryCard["tone"], string> = {

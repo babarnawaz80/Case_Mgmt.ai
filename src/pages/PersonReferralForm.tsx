@@ -1038,3 +1038,184 @@ function formatDate(iso: string): string {
 }
 
 export default PersonReferralForm;
+
+function EmailProviderModal({
+  onClose,
+  personName,
+  personDob,
+  referralType,
+  priority,
+  reason,
+  providerName,
+  providerEmail,
+  attachments,
+  onSent,
+}: {
+  onClose: () => void;
+  personName: string;
+  personDob: string;
+  referralType: string;
+  priority: string;
+  reason: string;
+  providerName: string;
+  providerEmail: string;
+  attachments: ReferralAttachment[];
+  onSent: () => void;
+}) {
+  const [to, setTo] = useState(providerEmail);
+  const [cc, setCc] = useState("");
+  const [logIt, setLogIt] = useState(true);
+  const [followUp, setFollowUp] = useState(true);
+
+  const subject = `Referral for ${personName} — ${referralType} Services`;
+  const body = `Dear ${providerName || "[Provider Name]"},
+
+I am writing to refer ${personName} for ${referralType} services.
+
+Individual: ${personName}
+Date of Birth: ${personDob}
+Medicaid ID: [MA ID]
+Referral Type: ${referralType}
+Priority: ${priority}
+Reason: ${reason}
+
+Documents attached:
+- Referral Summary (attached)${attachments.map((a) => `\n- ${a.name}`).join("")}
+
+Please contact me at your earliest convenience to discuss next steps.
+
+Kathy Adams
+Case Manager · iCareManager Demo Agency
+kathy@agency.org · (555) 555-5555`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-icm-panel rounded-2xl shadow-elevated max-w-2xl w-full p-5 my-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-manrope font-bold text-[15px] text-icm-text">
+            Send Referral to Provider
+          </h3>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 rounded text-icm-text-faint hover:text-icm-text"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-2">
+              To
+            </p>
+            <label className="text-[11.5px] font-semibold text-icm-text-dim block mb-1">
+              Provider email
+            </label>
+            <input
+              type="email"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="Enter provider email address"
+              className="h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] text-icm-text focus:outline-none focus:border-icm-accent mb-2"
+            />
+            <label className="text-[11.5px] font-semibold text-icm-text-dim block mb-1">
+              CC (optional)
+            </label>
+            <input
+              type="email"
+              value={cc}
+              onChange={(e) => setCc(e.target.value)}
+              placeholder="Additional recipients"
+              className="h-9 w-full px-3 rounded-lg border border-icm-border bg-icm-panel text-[12.5px] text-icm-text focus:outline-none focus:border-icm-accent"
+            />
+          </div>
+
+          <div>
+            <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-2">
+              From
+            </p>
+            <p className="text-[12.5px] text-icm-text font-semibold">
+              Kathy Adams · kathy@agency.org
+            </p>
+            <p className="text-[11px] text-icm-text-faint mt-0.5">
+              Replies will go to your email address
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-2">
+              Email preview
+            </p>
+            <div className="rounded-lg border border-icm-border bg-icm-bg p-3 text-[12px] text-icm-text font-geist max-h-[260px] overflow-y-auto">
+              <p className="font-semibold mb-2">Subject: {subject}</p>
+              <pre className="whitespace-pre-wrap font-geist text-[12px] text-icm-text-dim leading-relaxed">
+                {body}
+              </pre>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-2">
+              Attachments
+            </p>
+            <ul className="space-y-1">
+              <li className="text-[12px] text-icm-text inline-flex items-center gap-1.5">
+                <Paperclip className="w-3 h-3 text-icm-text-faint" />
+                Referral Summary.pdf · <span className="text-icm-accent">auto-generated</span>
+              </li>
+              {attachments.map((a) => (
+                <li
+                  key={a.id}
+                  className="text-[12px] text-icm-text inline-flex items-center gap-1.5"
+                >
+                  <Paperclip className="w-3 h-3 text-icm-text-faint" />
+                  {a.name}
+                  {a.autoGenerated && (
+                    <span className="text-icm-accent">· auto-generated</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="flex items-start gap-2 text-[12px] text-icm-text">
+              <input
+                type="checkbox"
+                checked={logIt}
+                onChange={() => setLogIt((v) => !v)}
+                className="mt-0.5"
+              />
+              Log this email in the referral conversation history
+            </label>
+            <label className="flex items-start gap-2 text-[12px] text-icm-text">
+              <input
+                type="checkbox"
+                checked={followUp}
+                onChange={() => setFollowUp((v) => !v)}
+                className="mt-0.5"
+              />
+              Create a follow-up task if no response in 1 week
+            </label>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center mt-5">
+          <button
+            onClick={onClose}
+            className="text-[12px] font-semibold text-icm-text-dim hover:text-icm-text"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSent}
+            className="h-9 px-4 rounded-xl bg-icm-accent text-white text-[12px] font-semibold hover:opacity-90 inline-flex items-center gap-1.5"
+          >
+            <Send className="w-3.5 h-3.5" />
+            Send Email
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

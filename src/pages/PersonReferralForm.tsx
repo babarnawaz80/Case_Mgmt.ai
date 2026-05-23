@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft,
   Sparkles,
@@ -12,6 +13,13 @@ import {
   Mail,
   Globe,
   MapPin,
+  Download,
+  Send,
+  Upload,
+  FileText,
+  FileImage,
+  File as FileIcon,
+  Paperclip,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { getPerson } from "@/data/people";
@@ -23,6 +31,7 @@ import {
   type Priority,
   type Provider,
   type Referral,
+  type ReferralAttachment,
   type ReferralType,
   type SourceOfNeed,
 } from "@/data/referrals";

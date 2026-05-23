@@ -193,6 +193,9 @@ export interface Referral {
   aiPrefilled?: boolean;
   // Timeline
   timeline: TimelineEvent[];
+  // Attachments & communication log
+  attachments?: ReferralAttachment[];
+  conversation?: ConversationEntry[];
 }
 
 // ---------- Provider directory ----------

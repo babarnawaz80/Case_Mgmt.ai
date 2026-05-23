@@ -308,7 +308,21 @@ const PersonReferralForm = () => {
               {person.firstName} {person.lastName} · Status: Draft
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={downloadPdf}
+              className="h-9 px-3 rounded-xl border border-icm-accent text-icm-accent bg-icm-panel text-[12px] font-semibold hover:bg-icm-accent-soft inline-flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download PDF
+            </button>
+            <button
+              onClick={() => setShowEmail(true)}
+              className="h-9 px-3 rounded-xl border border-icm-accent text-icm-accent bg-icm-panel text-[12px] font-semibold hover:bg-icm-accent-soft inline-flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Email to Provider
+            </button>
             <button
               onClick={() => navigate(`/people/${id}/referrals`)}
               className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-semibold text-icm-text-dim hover:text-icm-text"
@@ -323,6 +337,7 @@ const PersonReferralForm = () => {
             </button>
           </div>
         </div>
+
 
         {aiBanner && (
           <div className="rounded-xl bg-icm-accent-soft border border-icm-accent/20 p-3 flex items-start gap-2">

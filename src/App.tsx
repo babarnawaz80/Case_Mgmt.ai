@@ -48,6 +48,8 @@ import ProgressNoteNew from "./pages/ProgressNoteNew";
 import ProgressNoteLog from "./pages/ProgressNoteLog";
 import VisitSummaryNew from "./pages/VisitSummaryNew";
 import VisitSummaryLog from "./pages/VisitSummaryLog";
+import OnCallLog from "./pages/OnCallLog";
+import OnCallLogNew from "./pages/OnCallLogNew";
 import PersonWorkflowManager from "./pages/PersonWorkflowManager";
 import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
 import WorkflowsGlobal from "./pages/WorkflowsGlobal";
@@ -183,6 +185,9 @@ const App = () => (
             <Route path="/progress-note/new" element={<ProgressNoteNew />} />
             <Route path="/visit-summary" element={<VisitSummaryLog />} />
             <Route path="/visit-summary/new" element={<VisitSummaryNew />} />
+            <Route path="/oncall-log" element={<OnCallLog />} />
+            <Route path="/oncall-log/new" element={<OnCallLogNew />} />
+            <Route path="/oncall-log/:id" element={<OnCallLog />} />
             <Route path="/people/:id/workflow-manager" element={<PersonWorkflowManager />} />
             <Route path="/people/:id/workflow-manager/:workflowId" element={<PersonWorkflowDetail />} />
             <Route path="/workflows" element={<WorkflowsGlobal />} />

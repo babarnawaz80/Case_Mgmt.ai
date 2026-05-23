@@ -586,6 +586,18 @@ export function updateReferralStatus(
   Object.assign(ref, extras);
 }
 
+export function addConversationEntry(id: string, entry: ConversationEntry) {
+  const ref = referrals.find((r) => r.id === id);
+  if (!ref) return;
+  ref.conversation = [...(ref.conversation ?? []), entry];
+}
+
+export function lastConversation(r: Referral): ConversationEntry | undefined {
+  if (!r.conversation || r.conversation.length === 0) return undefined;
+  return r.conversation[r.conversation.length - 1];
+}
+
+
 // ---------- Summary helpers ----------
 
 export interface ReferralSummary {

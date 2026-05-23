@@ -192,11 +192,11 @@ const EChart = () => {
         />
         {/* Person header card */}
         <div className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
-          <div className="p-5 pt-6">
+          <div className="p-4 sm:p-5 pt-5 sm:pt-6">
             {/* Top row: identity (left) · alerts (center, flexible) · actions (right) */}
-            <div className="flex items-start gap-5">
-              {/* LEFT — avatar + identity (fixed width so it never truncates) */}
-              <div className="flex items-start gap-4 shrink-0 w-[280px]">
+            <div className="flex flex-wrap items-start gap-4 sm:gap-5">
+              {/* LEFT — avatar + identity */}
+              <div className="flex items-start gap-3 sm:gap-4 shrink-0 w-full sm:w-[280px]">
                 <div className="flex flex-col items-center gap-2 shrink-0">
                   <PersonAvatar person={person} size={64} shape="circle" className="text-[18px]" />
                   <button
@@ -208,8 +208,8 @@ const EChart = () => {
                   </button>
                 </div>
 
-                <div className="min-w-0">
-                  <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">
+                <div className="min-w-0 flex-1">
+                  <h1 className="font-manrope font-extrabold text-[20px] sm:text-[22px] text-icm-text tracking-tight leading-tight break-words">
                     {person.lastName}, {person.firstName}
                     {person.nickname && (
                       <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
@@ -230,8 +230,8 @@ const EChart = () => {
                 </div>
               </div>
 
-              {/* CENTER — alert panels (flex grow, side by side) */}
-              <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0">
+              {/* CENTER — alert panels */}
+              <div className="flex-1 min-w-full sm:min-w-[260px] grid grid-cols-1 xl:grid-cols-2 gap-3">
                 <AlertPanel
                   tone="red"
                   icon={AlertTriangle}
@@ -247,8 +247,8 @@ const EChart = () => {
                 />
               </div>
 
-              {/* RIGHT — action stack (fixed width) */}
-              <div className="flex flex-col gap-2 shrink-0 w-[180px]">
+              {/* RIGHT — action stack */}
+              <div className="flex flex-col gap-2 shrink-0 w-full sm:w-[180px]">
                 <button
                   onClick={() => setShowPreVisit(true)}
                   className="h-9 px-3.5 rounded-xl text-[12px] font-geist font-semibold flex items-center justify-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong transition"
@@ -258,6 +258,7 @@ const EChart = () => {
                 </button>
               </div>
             </div>
+
 
             {/* Metric strip */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-5 pt-5 border-t border-icm-border">

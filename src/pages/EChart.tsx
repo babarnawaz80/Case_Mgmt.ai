@@ -86,6 +86,7 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "employment", label: "Employment & Education", icon: GraduationCap, route: "employment", category: "Care" },
   { slug: "facesheet", label: "Face Sheet", icon: User, route: "facesheet", count: 1, category: "Care" },
   { slug: "monitors-baselines", label: "Monitors & Baselines", icon: Activity, route: "monitors-baselines", category: "Care" },
+  { slug: "referrals", label: "Referrals", icon: Phone, route: "referrals", category: "Care", count: 3 },
 
   // Operations (amber)
   { slug: "incident-reporting", label: "Incident Reporting", icon: AlertTriangle, route: "incident-reporting", count: 2, category: "Operations" },

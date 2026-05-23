@@ -449,7 +449,7 @@ const ACTIONS: ActionTile[] = [
 
   // Operations (orange)
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
-  { label: "On Call Log", icon: PhoneCall, to: "/documentation", category: "Operations", count: 3 },
+  { label: "On Call Log", icon: PhoneCall, to: "/oncall-log", category: "Operations", count: 3 },
   { label: "Training", icon: GraduationCap, to: "/settings", category: "Operations", count: 4 },
   { label: "Leads", icon: Phone, to: "/leads", category: "Operations" },
 

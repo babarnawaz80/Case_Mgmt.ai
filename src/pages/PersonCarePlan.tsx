@@ -30,7 +30,7 @@ const carePlanSuggestions: AISuggestion[] = [
   {
     tone: "urgent",
     label: "Urgent",
-    body: "ISP review overdue 25 days. 3 required signatures still pending.",
+    body: "PCP review overdue 25 days. 3 required signatures still pending.",
     cta: "Request signatures",
   },
   {
@@ -68,7 +68,7 @@ const PersonCarePlan = () => {
 
   if (!person) {
     return (
-      <ICMShell title="Care Plan / ISP" showAIPanel={false}>
+      <ICMShell title="PCP" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
       </ICMShell>
     );
@@ -85,7 +85,7 @@ const PersonCarePlan = () => {
   if (allPlans.length === 0) {
     return (
       <ICMShell
-        title="Care Plan / ISP"
+        title="PCP"
         rightPanel={<PersonAIPanel person={person} suggestions={carePlanSuggestions} intro={`I'm tracking ${carePlanSuggestions.length} items on ${person.firstName}'s plan.`} />}
       >
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -111,7 +111,7 @@ const PersonCarePlan = () => {
 
   return (
     <ICMShell
-      title="Care Plan / ISP"
+      title="PCP"
       rightPanel={
         <PersonAIPanel
           person={person}
@@ -127,7 +127,7 @@ const PersonCarePlan = () => {
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Care Plan / ISP
+          People · {person.lastName}, {person.firstName} · PCP
         </button>
 
         {/* Sticky person header */}
@@ -154,10 +154,10 @@ const PersonCarePlan = () => {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
-              Care Plan / ISP
+              PCP
             </h1>
             <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
-              <span className="font-semibold text-icm-text">Person-Centered Plan (ISP)</span>
+              <span className="font-semibold text-icm-text">Person-Centered Plan (PCP)</span>
               <span className="text-icm-text-faint"> · </span>
               Annual renewal: <span className="font-mono text-icm-text">August 31</span>
               <button onClick={() => toast("Modify renewal date", { description: "Opening renewal scheduler…" })} className="ml-1.5 text-icm-accent hover:underline text-[12px]">Modify</button>
@@ -178,7 +178,7 @@ const PersonCarePlan = () => {
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-              <span className="font-semibold">ISP review is 25 days overdue.</span>{" "}
+              <span className="font-semibold">PCP review is 25 days overdue.</span>{" "}
               <span className="text-icm-text-dim">
                 I drafted updated goal language based on recent monitoring notes and {person.firstName}'s expressed interests.
               </span>
@@ -228,7 +228,7 @@ const PersonCarePlan = () => {
               <div className="space-y-3">
                 <Field label="Plan type">
                   <select className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text">
-                    <option>Person-Centered Plan (ISP)</option>
+                    <option>Person-Centered Plan (PCP)</option>
                     <option>Care Plan</option>
                     <option>Service Plan</option>
                   </select>

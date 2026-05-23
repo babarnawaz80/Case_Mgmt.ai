@@ -247,6 +247,7 @@ const PersonReferrals = () => {
                     <th className="text-left px-4 py-2 font-semibold">Referred To</th>
                     <th className="text-left px-4 py-2 font-semibold">Status</th>
                     <th className="text-left px-4 py-2 font-semibold">Last Activity</th>
+                    <th className="text-left px-4 py-2 font-semibold">Last Communication</th>
                     <th className="text-right px-4 py-2 font-semibold">Days Open</th>
                     <th className="text-left px-4 py-2 font-semibold">Assigned To</th>
                     <th className="text-right px-4 py-2 font-semibold">Actions</th>
@@ -257,6 +258,8 @@ const PersonReferrals = () => {
                     const tone = statusTone(r.status);
                     const dTone = daysOpenTone(r.daysOpen);
                     const isPending = r.status === "Pending Response";
+                    const last = lastConversation(r);
+                    const attCount = r.attachments?.length ?? 0;
                     return (
                       <tr
                         key={r.id}
@@ -266,18 +269,43 @@ const PersonReferrals = () => {
                         <td className="px-4 py-2.5 font-mono text-icm-text">{r.id}</td>
                         <td className="px-4 py-2.5 font-mono text-icm-text-dim">{r.date}</td>
                         <td className="px-4 py-2.5 text-icm-text">{r.type}</td>
-                        <td className="px-4 py-2.5 text-icm-text">{r.providerName}</td>
+                        <td className="px-4 py-2.5 text-icm-text">
+                          <div className="inline-flex items-center gap-1.5">
+                            <span>{r.providerName}</span>
+                            {attCount > 0 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-icm-bg text-icm-text-dim text-[10px] font-mono ring-1 ring-icm-border">
+                                📎 {attCount}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-2.5">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ring-1 ${statusToneClass[tone]} ${r.status === "Closed — Unsuccessful" || r.status === "Duplicate" ? "" : ""}`}
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ring-1 ${statusToneClass[tone]}`}
                           >
-                            {isPending && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-icm-amber animate-pulse" />
-                            )}
+                            {isPending && <span className="w-1.5 h-1.5 rounded-full bg-icm-amber animate-pulse" />}
                             {r.status}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 font-mono text-icm-text-dim">{r.lastActivity}</td>
+                        <td className="px-4 py-2.5 text-icm-text-dim">
+                          {last ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span>
+                                {last.type === "email"
+                                  ? "📧"
+                                  : last.type === "phone"
+                                    ? "📞"
+                                    : last.type === "status"
+                                      ? "📋"
+                                      : "💬"}
+                              </span>
+                              <span className="text-[11.5px]">{timeAgo(last.date)}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11.5px] text-icm-text-faint">No contact yet</span>
+                          )}
+                        </td>
                         <td className={`px-4 py-2.5 text-right font-mono ${daysToneClass[dTone]}`}>
                           {r.daysOpen}
                         </td>

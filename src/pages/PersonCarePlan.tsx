@@ -331,7 +331,7 @@ function Section({
   );
 }
 
-function PlanTable({ plans, onOpen, variant }: { plans: CarePlan[]; onOpen: (id: string) => void; variant: "inProgress" | "completed" }) {
+function PlanTable({ plans, onOpen, variant, onShare }: { plans: CarePlan[]; onOpen: (id: string) => void; variant: "inProgress" | "completed"; onShare?: (p: CarePlan) => void }) {
   if (plans.length === 0) {
     return (
       <div className="px-4 py-6 text-[12px] text-icm-text-faint font-geist">

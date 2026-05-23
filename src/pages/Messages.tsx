@@ -469,7 +469,17 @@ function ActiveConversation({
   return (
     <>
       {/* Header */}
-      <header className="px-4 py-2.5 border-b border-icm-border bg-icm-panel flex items-center gap-3 relative">
+      <header className="px-3 sm:px-4 py-2.5 border-b border-icm-border bg-icm-panel flex items-center gap-2 sm:gap-3 relative">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="md:hidden w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center shrink-0"
+            title="Back"
+            aria-label="Back to conversations"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+          </button>
+        )}
         {isGroup ? (
           <div className="relative w-10 h-10 shrink-0">
             {conversation.memberIds

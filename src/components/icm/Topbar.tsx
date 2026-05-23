@@ -83,8 +83,8 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         <span className="hidden lg:block w-px h-5 bg-icm-border" />
       </div>
 
-      {/* Center: horizontal nav */}
-      <nav className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto min-w-0">
+      {/* Center: horizontal nav (desktop) */}
+      <nav className="hidden md:flex flex-1 items-center justify-center gap-0.5 overflow-x-auto min-w-0">
         {topNavItems.map((item) => {
           if (item.roles && !item.roles.includes(role)) return null;
           const badge = badgeFor(item);
@@ -118,6 +118,54 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
           );
         })}
       </nav>
+
+      {/* Mobile spacer + nav dropdown */}
+      <div className="flex-1 md:hidden" />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="md:hidden h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors"
+            aria-label="Open navigation"
+          >
+            <Menu className="w-[18px] h-[18px]" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56 bg-icm-panel z-50">
+          <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {topNavItems.map((item) => {
+            if (item.roles && !item.roles.includes(role)) return null;
+            const badge = badgeFor(item);
+            const Icon = item.icon;
+            return (
+              <DropdownMenuItem key={item.title} onClick={() => navigate(item.url)} className="cursor-pointer">
+                <Icon className="w-4 h-4 mr-2" />
+                <span className="flex-1">{item.title}</span>
+                {badge && (
+                  <span className={cn("min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-mono font-bold flex items-center justify-center", badgeTone[badge.tone])}>
+                    {badge.count}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
+          {isAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/platform")} className="cursor-pointer">
+                <Bot className="w-4 h-4 mr-2" />
+                AI Agent
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => demoToast("Help & documentation")} className="cursor-pointer">
+            <HelpCircle className="w-4 h-4 mr-2" />
+            Help
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
 
       {/* Right: search + actions */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">

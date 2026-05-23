@@ -106,6 +106,14 @@ const Settings = () => {
       to: "/settings/notifications",
       tone: "amber",
     },
+    {
+      icon: Zap,
+      title: "AI Usage & Credits",
+      description: "Monitor token usage, manage credit balance, and set usage limits.",
+      to: "/settings/ai-usage",
+      tone: "teal",
+      badge: { label: "12,400 credits remaining", tone: "amber" },
+    },
   ];
 
   return (

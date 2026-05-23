@@ -444,6 +444,7 @@ function ActiveConversation({
   renameValue,
   setRenameValue,
   onRename,
+  onBack,
 }: ActiveConversationProps) {
   const isGroup = conversation.type === "group";
   const other = conversationOtherMember(conversation);

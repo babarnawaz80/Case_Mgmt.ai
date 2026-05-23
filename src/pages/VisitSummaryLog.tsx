@@ -25,8 +25,8 @@ const VisitSummaryLog = () => {
     <ICMShell title="Visit Summary" showAIPanel={false}>
       <div className="space-y-5">
         <Breadcrumbs items={[{ label: "Dashboard", to: "/dashboard" }, { label: "Visit Summary" }]} />
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="font-tight text-[24px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">
               Visit Summary
             </h1>
@@ -36,14 +36,14 @@ const VisitSummaryLog = () => {
           </div>
           <button
             onClick={() => navigate("/visit-summary/new")}
-            className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700"
+            className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700 shrink-0 whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" /> New Visit Summary
           </button>
         </div>
 
-        <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-hidden">
-          <table className="w-full text-[12px] font-geist">
+        <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-x-auto">
+          <table className="w-full min-w-[720px] text-[12px] font-geist">
             <thead className="bg-icm-bg text-icm-text-dim uppercase tracking-wide text-[10px]">
               <tr>
                 <th className="text-left px-4 py-2.5 font-medium">Date</th>

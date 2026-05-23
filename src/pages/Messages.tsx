@@ -137,9 +137,14 @@ const Messages = () => {
 
   return (
     <ICMShell title="Messages" showAIPanel={false}>
-      <div className="flex h-[calc(100vh-160px)] -m-3 sm:-m-6 bg-icm-bg">
-        {/* LEFT — conversation list */}
-        <aside className="w-[220px] sm:w-[280px] shrink-0 bg-icm-panel border-r border-icm-border flex flex-col">
+      <div className="flex h-[calc(100dvh-160px)] -m-3 sm:-m-6 bg-icm-bg">
+        {/* LEFT — conversation list (hidden on mobile when a conversation is active) */}
+        <aside
+          className={cn(
+            "w-full md:w-[280px] shrink-0 bg-icm-panel border-r border-icm-border flex-col",
+            active ? "hidden md:flex" : "flex"
+          )}
+        >
           <div className="p-3 border-b border-icm-border space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-manrope font-bold text-[15px] text-icm-text">
@@ -213,7 +218,12 @@ const Messages = () => {
         </aside>
 
         {/* RIGHT — active conversation */}
-        <section className="flex-1 flex flex-col min-w-0 bg-icm-bg">
+        <section
+          className={cn(
+            "flex-1 flex-col min-w-0 bg-icm-bg",
+            active ? "flex" : "hidden md:flex"
+          )}
+        >
           {!active ? (
             <EmptyConversation onNew={() => setNewOpen(true)} />
           ) : (
@@ -235,6 +245,7 @@ const Messages = () => {
               setRenameMode={setRenameMode}
               renameValue={renameValue}
               setRenameValue={setRenameValue}
+              onBack={() => setActiveId(null)}
               onRename={(val) => {
                 renameGroup(active.id, val);
                 setRenameMode(false);
@@ -242,6 +253,7 @@ const Messages = () => {
             />
           )}
         </section>
+
 
         {newOpen && (
           <NewMessageModal

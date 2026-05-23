@@ -422,6 +422,7 @@ interface ActiveConversationProps {
   renameValue: string;
   setRenameValue: (v: string) => void;
   onRename: (v: string) => void;
+  onBack?: () => void;
 }
 
 function ActiveConversation({

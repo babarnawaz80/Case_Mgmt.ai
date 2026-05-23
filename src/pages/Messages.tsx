@@ -137,9 +137,14 @@ const Messages = () => {
 
   return (
     <ICMShell title="Messages" showAIPanel={false}>
-      <div className="flex h-[calc(100vh-160px)] -m-3 sm:-m-6 bg-icm-bg">
-        {/* LEFT — conversation list */}
-        <aside className="w-[220px] sm:w-[280px] shrink-0 bg-icm-panel border-r border-icm-border flex flex-col">
+      <div className="flex h-[calc(100dvh-160px)] -m-3 sm:-m-6 bg-icm-bg">
+        {/* LEFT — conversation list (hidden on mobile when a conversation is active) */}
+        <aside
+          className={cn(
+            "w-full md:w-[280px] shrink-0 bg-icm-panel border-r border-icm-border flex-col",
+            active ? "hidden md:flex" : "flex"
+          )}
+        >
           <div className="p-3 border-b border-icm-border space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-manrope font-bold text-[15px] text-icm-text">
@@ -213,7 +218,12 @@ const Messages = () => {
         </aside>
 
         {/* RIGHT — active conversation */}
-        <section className="flex-1 flex flex-col min-w-0 bg-icm-bg">
+        <section
+          className={cn(
+            "flex-1 flex-col min-w-0 bg-icm-bg",
+            active ? "flex" : "hidden md:flex"
+          )}
+        >
           {!active ? (
             <EmptyConversation onNew={() => setNewOpen(true)} />
           ) : (
@@ -235,6 +245,7 @@ const Messages = () => {
               setRenameMode={setRenameMode}
               renameValue={renameValue}
               setRenameValue={setRenameValue}
+              onBack={() => setActiveId(null)}
               onRename={(val) => {
                 renameGroup(active.id, val);
                 setRenameMode(false);
@@ -242,6 +253,7 @@ const Messages = () => {
             />
           )}
         </section>
+
 
         {newOpen && (
           <NewMessageModal
@@ -410,6 +422,7 @@ interface ActiveConversationProps {
   renameValue: string;
   setRenameValue: (v: string) => void;
   onRename: (v: string) => void;
+  onBack?: () => void;
 }
 
 function ActiveConversation({
@@ -431,6 +444,7 @@ function ActiveConversation({
   renameValue,
   setRenameValue,
   onRename,
+  onBack,
 }: ActiveConversationProps) {
   const isGroup = conversation.type === "group";
   const other = conversationOtherMember(conversation);
@@ -455,7 +469,17 @@ function ActiveConversation({
   return (
     <>
       {/* Header */}
-      <header className="px-4 py-2.5 border-b border-icm-border bg-icm-panel flex items-center gap-3 relative">
+      <header className="px-3 sm:px-4 py-2.5 border-b border-icm-border bg-icm-panel flex items-center gap-2 sm:gap-3 relative">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="md:hidden w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center shrink-0"
+            title="Back"
+            aria-label="Back to conversations"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+          </button>
+        )}
         {isGroup ? (
           <div className="relative w-10 h-10 shrink-0">
             {conversation.memberIds
@@ -562,7 +586,7 @@ function ActiveConversation({
       </header>
 
       {/* Thread */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-5">
         {grouped.map((g) => (
           <div key={g.label} className="space-y-3">
             <div className="flex items-center justify-center">

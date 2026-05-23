@@ -84,6 +84,7 @@ import SettingsIntegrations from "./pages/settings/SettingsIntegrations";
 import SettingsSecurity from "./pages/settings/SettingsSecurity";
 import SettingsNotifications from "./pages/settings/SettingsNotifications";
 import SettingsBillingConfig from "./pages/settings/SettingsBillingConfig";
+import SettingsAIUsage from "./pages/settings/SettingsAIUsage";
 import AIRoadmap from "./pages/AIRoadmap";
 import ProviderDirectory from "./pages/admin/ProviderDirectory";
 import Reports from "./pages/Reports";
@@ -247,6 +248,7 @@ const App = () => (
             <Route path="/settings/security" element={<SettingsSecurity />} />
             <Route path="/settings/notifications" element={<SettingsNotifications />} />
             <Route path="/settings/billing-config" element={<SettingsBillingConfig />} />
+            <Route path="/settings/ai-usage" element={<SettingsAIUsage />} />
             <Route path="/ai-roadmap" element={<AIRoadmap />} />
             <Route path="/admin/provider-directory" element={<ProviderDirectory />} />
             <Route path="/reports" element={<Reports />} />

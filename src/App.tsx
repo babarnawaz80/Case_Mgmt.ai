@@ -70,6 +70,7 @@ import AssessmentBuilderEdit from "./pages/admin/AssessmentBuilderEdit";
 import PersonAssessments from "./pages/PersonAssessments";
 import PersonAssessmentForm from "./pages/PersonAssessmentForm";
 import PersonReferrals from "./pages/PersonReferrals";
+import AllReferrals from "./pages/AllReferrals";
 import PersonReferralForm from "./pages/PersonReferralForm";
 import PersonReferralDetail from "./pages/PersonReferralDetail";
 import Documentation from "./pages/Documentation";
@@ -214,6 +215,8 @@ const App = () => (
             <Route path="/people/:id/assessments" element={<PersonAssessments />} />
             <Route path="/people/:id/assessments/new" element={<PersonAssessmentForm />} />
             <Route path="/people/:id/assessments/:assessmentId" element={<PersonAssessmentForm />} />
+            <Route path="/people/:id/referrals" element={<PersonReferrals />} />
+            <Route path="/referrals" element={<AllReferrals />} />
             <Route path="/people/:id/referrals" element={<PersonReferrals />} />
             <Route path="/people/:id/referrals/new" element={<PersonReferralForm />} />
             <Route path="/people/:id/referrals/:referralId" element={<PersonReferralDetail />} />

@@ -135,9 +135,9 @@ const ContactNote = () => {
     <ICMShell title="Contact Note" showAIPanel={false}>
       <div className="space-y-5">
         <ContactNoteCrumbs />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
 
-          <div>
+          <div className="min-w-0">
             <h1 className="font-tight text-[24px] font-semibold text-icm-text leading-tight tracking-[-0.02em]">
               Contact Note
             </h1>
@@ -147,15 +147,15 @@ const ContactNote = () => {
           </div>
           <button
             onClick={() => setOpen(true)}
-            className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700"
+            className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700 shrink-0 whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" /> New Contact Note
           </button>
         </div>
 
         {/* List */}
-        <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-hidden">
-          <table className="w-full text-[12px] font-geist">
+        <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-x-auto">
+          <table className="w-full min-w-[720px] text-[12px] font-geist">
             <thead className="bg-icm-bg text-icm-text-dim uppercase tracking-wide text-[10px]">
               <tr>
                 <th className="text-left px-4 py-2.5 font-medium">Date</th>

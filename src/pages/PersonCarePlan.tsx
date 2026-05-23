@@ -216,9 +216,17 @@ const PersonCarePlan = () => {
 
         {/* Completed */}
         <Section title="Completed" count={completed.length} collapsible collapsed={!completedOpen} onToggle={() => setCompletedOpen((o) => !o)}>
-          <PlanTable plans={completed} onOpen={openPlan} variant="completed" />
+          <PlanTable plans={completed} onOpen={openPlan} variant="completed" onShare={(p) => setSharePlan(p)} />
         </Section>
       </div>
+
+      {sharePlan && (
+        <SharePlanModal
+          plan={sharePlan}
+          personName={`${person.lastName}, ${person.firstName}`}
+          onClose={() => setSharePlan(null)}
+        />
+      )}
 
       {/* New Plan Modal */}
       {newPlanOpen && (

@@ -442,4 +442,130 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personName: string; onClose: () => void }) {
+  const [step, setStep] = useState<"compose" | "sent">("compose");
+  const [providerName, setProviderName] = useState("");
+  const [providerOrg, setProviderOrg] = useState("");
+  const [providerEmail, setProviderEmail] = useState("");
+  const [expiresIn, setExpiresIn] = useState("7");
+  const [requirePasscode, setRequirePasscode] = useState(true);
+  const [notifyOnOpen, setNotifyOnOpen] = useState(true);
+  const [message, setMessage] = useState(
+    `Hello,\n\nPlease find the attached Person-Centered Plan (PCP) for ${personName}. Access it securely via the link below. This link is encrypted and expires automatically.\n\nThank you.`
+  );
+
+  const secureLink = useMemo(() => {
+    const token = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    return `https://share.casemgmt.ai/pcp/${plan.id.toLowerCase()}/${token}`;
+  }, [plan.id]);
+  const passcode = useMemo(() => Math.floor(100000 + Math.random() * 900000).toString(), [plan.id]);
+
+  const sendIt = () => {
+    if (!providerEmail) {
+      toast.error("Provider email is required");
+      return;
+    }
+    setStep("sent");
+    toast.success(`Secure PCP link sent to ${providerEmail}`);
+  };
+
+  return (
+    <Modal title={step === "compose" ? "Send PCP to External Provider" : "Secure link sent"} onClose={onClose}>
+      {step === "compose" ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-icm-border bg-icm-bg/50 p-3 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-icm-accent-soft flex items-center justify-center">
+              <FileText className="w-4 h-4 text-icm-accent" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12.5px] font-semibold text-icm-text truncate">PCP {plan.id} — {personName}</div>
+              <div className="text-[11px] text-icm-text-dim font-mono">Approved {plan.approvalDate ?? "—"}</div>
+            </div>
+            <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-icm-green bg-icm-green-soft px-1.5 py-0.5 rounded ring-1 ring-icm-green/20">
+              <Lock className="w-3 h-3" /> Encrypted
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Provider name">
+              <input value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="Dr. Jane Smith" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px]" />
+            </Field>
+            <Field label="Organization">
+              <input value={providerOrg} onChange={(e) => setProviderOrg(e.target.value)} placeholder="Acme IDD Services" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px]" />
+            </Field>
+          </div>
+          <Field label="Provider email">
+            <input type="email" value={providerEmail} onChange={(e) => setProviderEmail(e.target.value)} placeholder="provider@example.com" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px]" />
+          </Field>
+          <Field label="Message">
+            <textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist" />
+          </Field>
+
+          <div className="rounded-lg border border-icm-border p-3 space-y-2">
+            <div className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint">Security</div>
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-[12px] text-icm-text">Link expires in</label>
+              <select value={expiresIn} onChange={(e) => setExpiresIn(e.target.value)} className="h-8 px-2 rounded-md border border-icm-border bg-white text-[12px]">
+                <option value="1">1 day</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+              </select>
+            </div>
+            <label className="flex items-center justify-between gap-3 text-[12px] text-icm-text">
+              <span>Require 6-digit passcode</span>
+              <input type="checkbox" checked={requirePasscode} onChange={(e) => setRequirePasscode(e.target.checked)} />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-[12px] text-icm-text">
+              <span>Notify me when opened</span>
+              <input type="checkbox" checked={notifyOnOpen} onChange={(e) => setNotifyOnOpen(e.target.checked)} />
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button onClick={onClose} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">Cancel</button>
+            <button onClick={sendIt} className="h-9 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" /> Send secure link
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-icm-green">
+            <CheckCircle2 className="w-5 h-5" />
+            <div className="text-[13px] font-semibold text-icm-text">Email sent to {providerEmail}</div>
+          </div>
+          <p className="text-[12px] text-icm-text-dim">
+            The provider will receive an email with an encrypted link to view PCP {plan.id}. Link expires in {expiresIn} day{expiresIn === "1" ? "" : "s"}.
+          </p>
+          <div className="rounded-lg border border-icm-border bg-icm-bg/50 p-3 space-y-2">
+            <div className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint flex items-center gap-1"><LinkIcon className="w-3 h-3" /> Secure link</div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate text-[11.5px] font-mono text-icm-text bg-white border border-icm-border rounded px-2 py-1.5">{secureLink}</code>
+              <button onClick={() => { navigator.clipboard.writeText(secureLink); toast.success("Link copied"); }} className="p-1.5 rounded border border-icm-border hover:bg-white" title="Copy link">
+                <Copy className="w-3.5 h-3.5 text-icm-text-dim" />
+              </button>
+            </div>
+            {requirePasscode && (
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-icm-border">
+                <span className="text-[11.5px] text-icm-text-dim">Passcode (share separately)</span>
+                <div className="flex items-center gap-2">
+                  <code className="font-mono font-bold text-[13px] text-icm-text tracking-widest">{passcode}</code>
+                  <button onClick={() => { navigator.clipboard.writeText(passcode); toast.success("Passcode copied"); }} className="p-1 rounded hover:bg-white" title="Copy passcode">
+                    <Copy className="w-3 h-3 text-icm-text-dim" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-end pt-1">
+            <button onClick={onClose} className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90">Done</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export default PersonCarePlan;

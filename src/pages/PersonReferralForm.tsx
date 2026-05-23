@@ -903,6 +903,34 @@ const PersonReferralForm = () => {
           </div>
         </div>
       )}
+
+      {showEmail && (
+        <EmailProviderModal
+          onClose={() => setShowEmail(false)}
+          personName={`${person.firstName} ${person.lastName}`}
+          personDob={person.dateOfBirth ?? "01/01/1990"}
+          referralType={type}
+          priority={priority}
+          reason={reason}
+          providerName={
+            providerTab === "search" ? selectedProvider?.name ?? "" : manualProvider.name
+          }
+          providerEmail={
+            providerTab === "search"
+              ? selectedProvider?.email ?? ""
+              : manualProvider.email
+          }
+          attachments={attachments}
+          onSent={() => {
+            setShowEmail(false);
+            toast.success(
+              `Referral email sent to ${
+                providerTab === "search" ? selectedProvider?.name ?? "provider" : manualProvider.name || "provider"
+              }`,
+            );
+          }}
+        />
+      )}
     </ICMShell>
   );
 };

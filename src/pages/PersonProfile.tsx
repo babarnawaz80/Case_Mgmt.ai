@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { VoiceCompanionCard } from "@/components/VoiceCompanionCard";
+import { CompanionLinkCard } from "@/components/icm/CompanionLinkCard";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 import { useIndividual, updateIndividual, initials, riskAvatarClass, riskScoreClass, calcAge, type Individual } from "@/hooks/useIndividuals";
@@ -276,11 +276,7 @@ const PersonProfile = () => {
         {/* Tab content */}
         {tab === "basic" && (
           <>
-            <VoiceCompanionCard
-              personId={person.id}
-              firstName={person.first_name}
-              phone={(person as { phone?: string }).phone}
-            />
+            <CompanionLinkCard individual={person} />
             <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} />
           </>
         )}

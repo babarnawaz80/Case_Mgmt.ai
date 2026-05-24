@@ -1,0 +1,44 @@
+{
+  "pass1": {
+    "passed": 20,
+    "failed": 0,
+    "warned": 7
+  },
+  "pass2": {
+    "passed": 4,
+    "failed": 0,
+    "warned": 2,
+    "tests": [
+      {
+        "name": "Ambient button found on dashboard",
+        "status": "✅ PASS",
+        "note": "Text: \"Ambient\""
+      },
+      {
+        "name": "Ambient click result",
+        "status": "⚠️  WARN",
+        "note": "No consent screen: Dashboard\nPeople\nMy Work\n3\nMessages\n3\nBilling\nSettings\nGood evening, Kathy\n\nYour AI case manager is ready to assist you\n\n3\nPeople Supported\n5\nPending Tasks\n3\nUnsigned Notes\n2\nCritical Alerts\nAmbient\nS"
+      },
+      {
+        "name": "3-dots menu",
+        "status": "⚠️  WARN",
+        "note": "dotsResult: undefined, svgResult: undefined"
+      },
+      {
+        "name": "No console errors on Home/Dashboard",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "No console errors on People",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "No console errors on Settings Users",
+        "status": "✅ PASS",
+        "note": ""
+      }
+    ]
+  }
+}

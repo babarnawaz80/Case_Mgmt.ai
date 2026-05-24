@@ -1,0 +1,143 @@
+{
+  "passed": 20,
+  "failed": 0,
+  "warned": 7,
+  "tests": [
+    {
+      "name": "Login page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Login redirect unexpected",
+      "status": "⚠️ WARN",
+      "note": "URL: https://casemanagement-ai.web.app/home"
+    },
+    {
+      "name": "Dashboard loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Dashboard AI chat visible",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "People list shows individuals from Firestore",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "eChart hub loads with tiles",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Contact notes",
+      "status": "⚠️ WARN",
+      "note": "Skipped — no personId"
+    },
+    {
+      "name": "Progress notes",
+      "status": "⚠️ WARN",
+      "note": "Skipped — no personId"
+    },
+    {
+      "name": "Monitoring forms",
+      "status": "⚠️ WARN",
+      "note": "Skipped — no personId"
+    },
+    {
+      "name": "Care plan",
+      "status": "⚠️ WARN",
+      "note": "Skipped — no personId"
+    },
+    {
+      "name": "Global incidents page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Referrals page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "My Work page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "My Work shows task data from Firestore",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Messages page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "My Profile page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Photo upload UI visible",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Settings Users page loads with user data",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "3-dots menu",
+      "status": "⚠️ WARN",
+      "note": "Action menu not immediately visible in text"
+    },
+    {
+      "name": "AI Usage page loads with credit balance",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Add User modal opens",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Documentation hub loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Reports page loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Supervisor dashboard loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "Ambient button",
+      "status": "⚠️ WARN",
+      "note": "Not found on dashboard"
+    },
+    {
+      "name": "SuperAdmin portal loads",
+      "status": "✅ PASS",
+      "note": ""
+    },
+    {
+      "name": "No JS console errors on dashboard",
+      "status": "✅ PASS",
+      "note": ""
+    }
+  ],
+  "screenshotDir": "/Users/kamal/Documents/CaseManagement.ai/repo/qa_screenshots"
+}

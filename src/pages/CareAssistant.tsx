@@ -301,12 +301,13 @@ export default function CareAssistant() {
 
   const listenAfterSpeak = useCallback(() => {
     if (pausedRef.current) return;
-    if (dgKey) {
+    // Use ref — always current even in async callbacks
+    if (dgKeyRef.current) {
       startListening();
     } else {
       startBrowserListening();
     }
-  }, [dgKey, startListening, startBrowserListening]);
+  }, [startListening, startBrowserListening]); // removed dgKey dep — use ref instead
 
   // ── AI speaks, then auto-listens ──────────────────────────────────────────
   const aiSpeakAndListen = useCallback(

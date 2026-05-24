@@ -13,9 +13,9 @@ admin.initializeApp();
 // individual documents have optional fields that haven't been set yet.
 admin.firestore().settings({ ignoreUndefinedProperties: true });
 
-// Gemini Developer API key — preferred over Vertex AI
+// Gemini Developer API key — linked to casemanagement-ai project with billing enabled
 if (!process.env.GEMINI_API_KEY) {
-  process.env.GEMINI_API_KEY = "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
+  process.env.GEMINI_API_KEY = "AIzaSyBxHs_ajRUqk4oTD8XQKDEZcsbPEZKp1_k";
 }
 
 

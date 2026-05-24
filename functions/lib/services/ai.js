@@ -62,11 +62,11 @@ exports.streamCompletion = streamCompletion;
 const admin = __importStar(require("firebase-admin"));
 const genai_1 = require("@google/genai");
 const collections_1 = require("../config/collections");
-// Gemini model IDs — gemini-1.5-flash is stable and available to all billing accounts
+// Gemini model IDs — gemini-2.0-flash, fast and capable
 const MODELS = {
-    companion: "gemini-1.5-flash", // Care Companion bot
-    quality: "gemini-1.5-flash", // Documentation & quality checks
-    fast: "gemini-1.5-flash", // Form prefill, daily brief, scribe
+    companion: "gemini-2.0-flash", // Care Companion bot
+    quality: "gemini-2.0-flash", // Documentation & quality checks
+    fast: "gemini-2.0-flash", // Form prefill, daily brief, scribe
 };
 // Check org is allowed to use AI before making any call
 async function checkOrgAIAccess(organizationId) {

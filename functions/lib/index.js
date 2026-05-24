@@ -45,9 +45,9 @@ admin.initializeApp();
 // Silently drop undefined fields instead of throwing — prevents crashes when
 // individual documents have optional fields that haven't been set yet.
 admin.firestore().settings({ ignoreUndefinedProperties: true });
-// Gemini Developer API key — preferred over Vertex AI
+// Gemini Developer API key — linked to casemanagement-ai project with billing enabled
 if (!process.env.GEMINI_API_KEY) {
-    process.env.GEMINI_API_KEY = "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
+    process.env.GEMINI_API_KEY = "AIzaSyBxHs_ajRUqk4oTD8XQKDEZcsbPEZKp1_k";
 }
 // Set global options for all functions
 (0, v2_1.setGlobalOptions)({ region: "us-central1", memory: "512MiB", timeoutSeconds: 300 });

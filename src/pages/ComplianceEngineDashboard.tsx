@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ArrowLeft, BookOpen, Shield, Bot, Plus,
   MoreVertical, Eye, Pencil, Copy, History, Trash2,
-  FileText, Calendar, GitBranch, ChevronRight, Layers,
+  FileText, Calendar, GitBranch, ChevronRight, Layers, Loader2,
 } from "lucide-react";
 import { mockGuidelinesEngines, mockRuntimeAgents, GuidelinesEngine } from "@/types/agent";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useComplianceEngines, addComplianceEngine, deleteComplianceEngine } from "@/hooks/useFirestore";
 
 // State-themed accent colors for each engine (soft, calming palette)
 const stateAccents: Record<string, { bg: string; border: string; text: string; icon: string }> = {
@@ -60,8 +61,30 @@ function EngineMenu({ onView, onEdit, onClone, onHistory, onDelete, isDraft }: {
 
 export default function ComplianceEngineDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [engines, setEngines] = useState<GuidelinesEngine[]>([...mockGuidelinesEngines]);
+  const { data: dbEngines, loading } = useComplianceEngines();
+  const [seeding, setSeeding] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && dbEngines.length === 0 && !seeding) {
+      setSeeding(true);
+      const seed = async () => {
+        try {
+          for (const engine of mockGuidelinesEngines) {
+            const { id: _, ...cleanEngine } = engine;
+            await addComplianceEngine(cleanEngine as any);
+          }
+        } catch (e) {
+          console.error("Failed to seed compliance engines:", e);
+        } finally {
+          setSeeding(false);
+        }
+      };
+      seed();
+    }
+  }, [dbEngines, loading, seeding]);
+
+  const engines = dbEngines || [];
 
   const filteredEngines = engines.filter((e) =>
     e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -73,32 +96,48 @@ export default function ComplianceEngineDashboard() {
     return acc;
   }, {} as Record<string, number>);
 
-  const handleClone = (engine: GuidelinesEngine) => {
-    const cloned: GuidelinesEngine = {
-      ...engine,
-      id: `ce-clone-${Date.now()}`,
-      name: `${engine.name} (Copy)`,
-      version: "1.0",
-      status: "draft",
-      publishedAt: null,
-      lastUpdated: new Date().toISOString().split("T")[0],
-    };
-    setEngines(prev => [...prev, cloned]);
-    toast({
-      title: "Engine Cloned",
-      description: `"${cloned.name}" created as a draft. Open it to configure and publish.`,
-    });
+  const handleClone = async (engine: GuidelinesEngine) => {
+    try {
+      const cloned = {
+        name: `${engine.name} (Copy)`,
+        state: engine.state,
+        program: engine.program,
+        effectiveDate: engine.effectiveDate,
+        version: "1.0",
+        status: "draft" as const,
+        serviceCount: engine.serviceCount,
+        hardStopCount: engine.hardStopCount,
+        warningCount: engine.warningCount,
+        createdBy: "Kathy Martinez",
+        publishedAt: null,
+        lastUpdated: new Date().toISOString().split("T")[0],
+      };
+      await addComplianceEngine(cloned);
+      toast({
+        title: "Engine Cloned",
+        description: `"${cloned.name}" created as a draft. Open it to configure and publish.`,
+      });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Failed to clone", variant: "destructive" });
+    }
   };
 
-  const handleDelete = (engineId: string) => {
+  const handleDelete = async (engineId: string) => {
     const engine = engines.find(e => e.id === engineId);
     if (engine?.status !== "draft") {
       toast({ title: "Cannot Delete", description: "Only draft engines can be deleted. Published engines are immutable." });
       return;
     }
-    setEngines(prev => prev.filter(e => e.id !== engineId));
-    toast({ title: "Engine Deleted", description: `"${engine.name}" has been removed.` });
+    try {
+      await deleteComplianceEngine(engineId);
+      toast({ title: "Engine Deleted", description: `"${engine.name}" has been removed.` });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Failed to delete", variant: "destructive" });
+    }
   };
+
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
@@ -173,8 +212,12 @@ export default function ComplianceEngineDashboard() {
             />
           </div>
 
-          {/* Engine List */}
-          {filteredEngines.length === 0 ? (
+          {loading || seeding ? (
+            <div className="flex items-center justify-center py-24 gap-3 text-muted-foreground animate-pulse">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-[13px] font-geist">Loading engines…</span>
+            </div>
+          ) : filteredEngines.length === 0 ? (
             <div className="text-center py-16">
               <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 mb-4">
                 <Search className="h-8 w-8 text-muted-foreground" />

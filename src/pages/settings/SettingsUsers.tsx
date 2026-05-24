@@ -14,6 +14,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { writeAudit } from "@/lib/auditService";
 import {
   Search,
   UserPlus,
@@ -158,6 +159,7 @@ const SettingsUsers = () => {
     if (!orgId) return;
     try {
       await updateDoc(doc(db, "users", userId), { role: newRole, updatedAt: serverTimestamp() });
+      await writeAudit("role_changed", "user_management", userId, { newRole });
       toast.success("Role updated");
     } catch (err) {
       console.error(err);
@@ -180,6 +182,7 @@ const SettingsUsers = () => {
         isActive: newStatus === "active",
         updatedAt: serverTimestamp(),
       });
+      await writeAudit(`user_${action}ed`, "user_management", userId, { action, status: newStatus });
       toast.success(`User ${labelMap[action]} successfully`);
     } catch (err: any) {
       console.error(err);

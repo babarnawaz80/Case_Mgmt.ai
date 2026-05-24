@@ -25,6 +25,9 @@ import {
 import { useRole } from "@/contexts/RoleContext";
 import { cn } from "@/lib/utils";
 import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { toast } from "sonner";
 import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 const SettingsUserDetail = () => {
@@ -70,7 +73,7 @@ const SettingsUserDetail = () => {
     setEnrollments((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const removeEnrollment = (id: string) => {
     setEnrollments((rows) => rows.filter((r) => r.id !== id));
-    demoSuccess("State enrollment removed");
+    toast.success("State enrollment removed");
   };
   const updateProvider = <K extends keyof typeof provider>(key: K, value: (typeof provider)[K]) =>
     setProvider((p) => ({ ...p, [key]: value }));
@@ -167,9 +170,21 @@ const SettingsUserDetail = () => {
           {editMode ? (
             <>
               <button
-                onClick={() => {
-                  demoSuccess(`${editFirst} ${editLast} profile saved`);
-                  setEditMode(false);
+                onClick={async () => {
+                  try {
+                    await updateDoc(doc(db, 'users', userId), {
+                      first_name: editFirst,
+                      last_name: editLast,
+                      display_name: `${editFirst} ${editLast}`,
+                      email: editEmail,
+                      title: editTitle
+                    });
+                    toast.success("Profile saved successfully!");
+                    setEditMode(false);
+                  } catch (err) {
+                    console.error(err);
+                    toast.error("Failed to save profile changes");
+                  }
                 }}
                 className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
               >
@@ -269,7 +284,21 @@ const SettingsUserDetail = () => {
           </label>
           <div className="flex justify-end pt-2">
             <button
-              onClick={() => demoSuccess("User profile saved")}
+              onClick={async () => {
+                try {
+                  await updateDoc(doc(db, 'users', userId), {
+                    first_name: editFirst,
+                    last_name: editLast,
+                    display_name: `${editFirst} ${editLast}`,
+                    email: editEmail,
+                    title: editTitle
+                  });
+                  toast.success("User profile saved successfully!");
+                } catch (err) {
+                  console.error(err);
+                  toast.error("Failed to save profile changes");
+                }
+              }}
               className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
             >
               Save changes
@@ -435,7 +464,7 @@ const SettingsUserDetail = () => {
             </table>
           </div>
           <button
-            onClick={() => demoSuccess("Permission overrides reset to role defaults")}
+            onClick={() => toast.success("Permission overrides reset to role defaults")}
             className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
           >
             <Activity className="w-3.5 h-3.5" />
@@ -597,7 +626,7 @@ const SettingsUserDetail = () => {
                         <td className="px-3 py-2 text-right whitespace-nowrap">
                           {isEditing ? (
                             <button
-                              onClick={() => { setEditingId(null); demoSuccess("Enrollment saved"); }}
+                              onClick={() => { setEditingId(null); toast.success("Enrollment saved"); }}
                               className="h-7 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11px] font-geist font-semibold"
                             >
                               Save
@@ -644,7 +673,18 @@ const SettingsUserDetail = () => {
 
           <div className="flex justify-end pt-1">
             <button
-              onClick={() => demoSuccess("Provider & billing info saved")}
+              onClick={async () => {
+                try {
+                  await updateDoc(doc(db, 'users', userId), {
+                    providerInfo: provider,
+                    enrollments: enrollments
+                  });
+                  toast.success("Provider & billing info saved successfully!");
+                } catch (err) {
+                  console.error(err);
+                  toast.error("Failed to save provider info");
+                }
+              }}
               className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
             >
               Save provider info

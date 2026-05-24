@@ -528,6 +528,106 @@ export function useTrainings(individualId: string | undefined) {
   return useSubCollection<Training>(individualId, "trainings", "completion_date", "desc");
 }
 
+// ─── Assessments ──────────────────────────────────────────────────────────────
+
+export interface AssessmentRecord {
+  id: string;
+  individual_id: string;
+  templateId: string;
+  templateVersion: string;
+  date: string;
+  status: "Draft" | "In Progress" | "Completed";
+  completedBy?: string;
+  totalScore?: number;
+  loc?: "Low" | "Moderate" | "High" | "Critical";
+  answers: any[];
+  signatures?: any;
+  attachments?: any[];
+  riskFindings?: any[];
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useAssessments(individualId: string | undefined) {
+  return useSubCollection<AssessmentRecord>(individualId, "assessments", "created_at", "desc");
+}
+
+export async function addAssessment(data: Omit<AssessmentRecord, "id" | "created_at" | "updated_at">) {
+  return addDoc(collection(db, "assessments"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+// ─── Care Tracker ─────────────────────────────────────────────────────────────
+
+export interface CareTrackerRecord {
+  id: string;
+  individual_id: string;
+  activity: string;
+  detail: string;
+  provider: string;
+  date: string;
+  created_at?: unknown;
+}
+
+export function useCareTracker(individualId: string | undefined) {
+  return useSubCollection<CareTrackerRecord>(individualId, "care_tracker", "created_at", "desc");
+}
+
+export async function addCareTrackerEntry(data: Omit<CareTrackerRecord, "id" | "created_at">) {
+  return addDoc(collection(db, "care_tracker"), {
+    ...data,
+    created_at: serverTimestamp(),
+  });
+}
+
+// ─── Meeting Notes ────────────────────────────────────────────────────────────
+
+export interface MeetingNoteRecord {
+  id: string;
+  individual_id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  type: string;
+  attendees: string[];
+  facilitator: string;
+  agenda: string;
+  discussionNotes: string;
+  actionItems: any[];
+  linkedGoals: string[];
+  attachments: { name: string; size: string }[];
+  createdAt: string;
+  createdBy: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useMeetingNotes(individualId: string | undefined) {
+  return useSubCollection<MeetingNoteRecord>(individualId, "meeting_notes", "date", "desc");
+}
+
+export async function addMeetingNote(data: Omit<MeetingNoteRecord, "id" | "created_at" | "updated_at">) {
+  return addDoc(collection(db, "meeting_notes"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateMeetingNote(id: string, data: Partial<MeetingNoteRecord>) {
+  return updateDoc(doc(db, "meeting_notes", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function deleteMeetingNote(id: string) {
+  return deleteDoc(doc(db, "meeting_notes", id));
+}
+
 // ─── Eligibility Verifications ────────────────────────────────────────────────
 
 export interface FundingSource {
@@ -752,4 +852,48 @@ export async function updateAssignedStaff(id: string, data: any) {
     updated_at: serverTimestamp(),
   });
 }
+
+// ─── Compliance Engines ───────────────────────────────────────────────────────
+
+export interface ComplianceEngineRecord {
+  id: string;
+  name: string;
+  state: string;
+  program: string;
+  effectiveDate: string;
+  version: string;
+  status: "draft" | "published" | "archived";
+  serviceCount: number;
+  hardStopCount: number;
+  warningCount: number;
+  createdBy: string;
+  publishedAt: string | null;
+  lastUpdated: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useComplianceEngines() {
+  return useCollection<ComplianceEngineRecord>("compliance_engines", "lastUpdated", "desc");
+}
+
+export async function addComplianceEngine(data: Omit<ComplianceEngineRecord, "id" | "created_at" | "updated_at">) {
+  return addDoc(collection(db, "compliance_engines"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateComplianceEngine(id: string, data: Partial<ComplianceEngineRecord>) {
+  return updateDoc(doc(db, "compliance_engines", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function deleteComplianceEngine(id: string) {
+  return deleteDoc(doc(db, "compliance_engines", id));
+}
+
 

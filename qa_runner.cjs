@@ -60,10 +60,18 @@ async function navigate(cdp, url) {
 }
 
 async function screenshot(cdp, name) {
-  const { data } = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 80 });
-  const p = path.join(SCREENSHOT_DIR, `${name}.jpg`);
-  fs.writeFileSync(p, Buffer.from(data, 'base64'));
-  return p;
+  try {
+    const { data } = await Promise.race([
+      cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 80 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Screenshot capture timed out')), 5000))
+    ]);
+    const p = path.join(SCREENSHOT_DIR, `${name}.jpg`);
+    fs.writeFileSync(p, Buffer.from(data, 'base64'));
+    return p;
+  } catch (err) {
+    console.warn(`  ⚠️  Screenshot skipped (${name}): ${err.message}`);
+    return null;
+  }
 }
 
 async function evalJs(cdp, expr) {

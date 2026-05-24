@@ -8,6 +8,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { useMonitoringForms, addMonitoringForm, updateMonitoringForm } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 import { aiPrefilledDraft, type YesNoAnswer, type GoalProgress, type RecommendedAction } from "@/data/monitoringForms";
 import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
@@ -220,11 +221,19 @@ const PersonMonitoringFormDetail = () => {
 
       if (isNew) {
         const docRef = await addMonitoringForm(formData);
+        await writeAudit("monitoring_form_created", "monitoring_form", docRef.id, {
+          individualId: id,
+          status,
+        });
         toast.success("Monitoring form draft created!");
         navigate(`/people/${id}/monitoring-form/${docRef.id}`);
       } else {
         await updateMonitoringForm(formId, formData);
-        toast.success("Monitoring form draft saved!");
+        await writeAudit(status === "Submitted" ? "monitoring_form_submitted" : "monitoring_form_saved", "monitoring_form", formId, {
+          individualId: id,
+          status,
+        });
+        toast.success(status === "Submitted" ? "Monitoring form submitted successfully!" : "Monitoring form draft saved!");
       }
     } catch (err) {
       console.error(err);

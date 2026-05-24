@@ -1,12 +1,12 @@
 {
-  "passed": 20,
-  "failed": 0,
-  "warned": 7,
+  "passed": 18,
+  "failed": 1,
+  "warned": 8,
   "tests": [
     {
       "name": "Login page loads",
-      "status": "✅ PASS",
-      "note": ""
+      "status": "❌ FAIL",
+      "note": "Page content unexpected: Dashboard\nPeople\nMy Work\n3\nMessages\n3\nBilling\nSettings\nGood evening, Kathy\n\nYour AI case manager is "
     },
     {
       "name": "Login redirect unexpected",
@@ -24,9 +24,9 @@
       "note": ""
     },
     {
-      "name": "People list shows individuals from Firestore",
-      "status": "✅ PASS",
-      "note": ""
+      "name": "People list loads but no individuals visible",
+      "status": "⚠️ WARN",
+      "note": "Dashboard\nMy Work\n3\nMessages\n3\nReports\nBilling\n⌘K\nAI Agent\n7\nDashboard\nDashboard\nPeople Supported\nPeople Supported\n\n3 individuals · 1 need attention\n\nImport\nNew Participant\nStatus: All\nStatus: Active\n"
     },
     {
       "name": "eChart hub loads with tiles",

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { addVisitSummary } from "@/hooks/useFirestore";
+import { writeAudit as writeAuditFirebase } from "@/lib/auditService";
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
@@ -67,6 +68,11 @@ const writeAudit = (entry: any) => {
     const audit = JSON.parse(localStorage.getItem("icm.audit") || "[]");
     audit.push(entry);
     localStorage.setItem("icm.audit", JSON.stringify(audit));
+    
+    // Also write to real Firestore HIPAA audit log!
+    writeAuditFirebase(entry.action, "visit_document", entry.entity || "visit", entry).catch(err => {
+      console.warn("[PersonVisitDocument] Failed to write Firestore audit log:", err);
+    });
   } catch {}
 };
 

@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createIncident, INCIDENT_TYPES, INCIDENT_SEVERITIES } from "@/hooks/useIncidents";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { writeAudit } from "@/lib/auditService";
 
 const PersonIncidentReportNew = () => {
   const { id } = useParams<{ id: string }>();
@@ -89,6 +90,11 @@ const PersonIncidentReportNew = () => {
         reportedAt: incidentDate,
         reportedBy: authorId,
         reportedByName: authorName,
+      });
+      await writeAudit("incident_reported", "incident", incidentId, {
+        individualId: id,
+        severity,
+        incidentType,
       });
       toast.success("Incident report submitted", {
         description: `ID #${incidentId.slice(0, 8)} — Supervisor will be notified.`,

@@ -62,9 +62,9 @@ export default function PersonServicePlan() {
       count: services.length,
       weeklyHours: totalHours,
       utilization: 84, // mock utilization rate based on billing history
-      compliance: "Current",
+      compliance: individual?.isp_due_date ? `Due ${individual.isp_due_date}` : "Current",
     };
-  }, [services]);
+  }, [services, individual]);
 
   const loading = individualLoading || plansLoading;
 

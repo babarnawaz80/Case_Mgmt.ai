@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -16,7 +16,7 @@ import {
   Phone,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useIndividual, riskAvatarClass, initials, updateIndividual } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
 
 export default function PersonEmployment() {
@@ -25,35 +25,56 @@ export default function PersonEmployment() {
   const { individual, loading } = useIndividual(id);
   const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
-  // Mock data for vocational records
-  const [empStatus, setEmpStatus] = useState("Employed Part-Time");
-  const [jobTitle, setJobTitle] = useState("Supported Associate");
-  const [employer, setEmployer] = useState("Wegmans Food Markets");
-  const [startDate, setStartDate] = useState("09/15/2024");
-  const [hoursPerWeek, setHoursPerWeek] = useState(12);
-  const [supervisor, setSupervisor] = useState("Karen Miller");
-  const [supervisorPhone, setSupervisorPhone] = useState("(410) 555-0921");
-  const [jobCoach, setJobCoach] = useState("Sarah Chen, LCSW");
+  // Load from individual doc with fallback to default mock data
+  const employment = individual?.employment || {};
+  
+  const empStatus = employment.empStatus ?? "Employed Part-Time";
+  const jobTitle = employment.jobTitle ?? "Supported Associate";
+  const employer = employment.employer ?? "Wegmans Food Markets";
+  const startDate = employment.startDate ?? "09/15/2024";
+  const hoursPerWeek = employment.hoursPerWeek ?? 12;
+  const supervisor = employment.supervisor ?? "Karen Miller";
+  const supervisorPhone = employment.supervisorPhone ?? "(410) 555-0921";
+  const jobCoach = employment.jobCoach ?? "Sarah Chen, LCSW";
 
-  const [educationHistory] = useState([
+  const educationHistory = employment.educationHistory ?? [
     { degree: "High School Certificate of Completion", school: "Carroll County High School", date: "June 2023" },
     { degree: "Supported Vocational Training", school: "DDA Career Development Center", date: "April 2024" },
-  ]);
+  ];
 
-  const [accommodations, setAccommodations] = useState([
+  const accommodations = employment.accommodations ?? [
     "Frequent breaks during high-stimulus shifts.",
     "Job coach shadowing during new task integration.",
     "Written task checklist updated weekly.",
-  ]);
+  ];
 
   const [newAcc, setNewAcc] = useState("");
 
-  const handleAddAccommodation = (e: React.FormEvent) => {
+  const handleAddAccommodation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAcc.trim()) return;
-    setAccommodations([...accommodations, newAcc.trim()]);
-    setNewAcc("");
-    toast.success("Accommodation added to vocational profile");
+    if (!newAcc.trim() || !individual) return;
+    const nextAccs = [...accommodations, newAcc.trim()];
+    try {
+      await updateIndividual(individual.id, {
+        employment: {
+          empStatus,
+          jobTitle,
+          employer,
+          startDate,
+          hoursPerWeek,
+          supervisor,
+          supervisorPhone,
+          jobCoach,
+          educationHistory,
+          accommodations: nextAccs
+        }
+      });
+      setNewAcc("");
+      toast.success("Accommodation added to vocational profile");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to add accommodation");
+    }
   };
 
   if (loading) {

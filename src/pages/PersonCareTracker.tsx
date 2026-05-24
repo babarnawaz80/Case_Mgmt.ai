@@ -16,12 +16,14 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useCareTracker, addCareTrackerEntry } from "@/hooks/useFirestore";
 import { toast } from "sonner";
 
 export default function PersonCareTracker() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
+  const { data: historicalLogs = [], loading: logsLoading } = useCareTracker(id);
   const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
   // Daily checklists state
@@ -31,12 +33,6 @@ export default function PersonCareTracker() {
     { id: "t3", task: "Nutritional Intake (Meal Plan Review)", completed: false, time: "Pending", provider: "Mary Davis, CNA" },
     { id: "t4", task: "Community Activity (Walk in Park)", completed: false, time: "Pending", provider: "Sarah Chen, LCSW" },
     { id: "t5", task: "Medication Administration (Evening Dose)", completed: false, time: "Pending", provider: "Mary Davis, CNA" },
-  ]);
-
-  const [historicalLogs, setHistoricalLogs] = useState([
-    { date: "May 22, 2026", activity: "Medication Intake", detail: "Morning and Evening doses administered with zero refusal.", provider: "Mary Davis, CNA" },
-    { date: "May 22, 2026", activity: "Community Activity", detail: "Attended vocational workshop for 2 hours. Very cooperative.", provider: "Jordan Reyes" },
-    { date: "May 21, 2026", activity: "Physical Therapy", detail: "Completed full stretching routine; slight resistance in lower leg.", provider: "John Stark, PT" },
   ]);
 
   const [newActivity, setNewActivity] = useState("Community Activity");
@@ -60,16 +56,24 @@ export default function PersonCareTracker() {
     toast.success("Daily care status updated");
   };
 
-  const handleAddLog = (e: React.FormEvent) => {
+  const handleAddLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDetail.trim()) return;
     const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    setHistoricalLogs([
-      { date: dateStr, activity: newActivity, detail: newDetail.trim(), provider: newProvider },
-      ...historicalLogs,
-    ]);
-    setNewDetail("");
-    toast.success("Care tracking event recorded successfully!");
+    try {
+      await addCareTrackerEntry({
+        individual_id: id!,
+        activity: newActivity,
+        detail: newDetail.trim(),
+        provider: newProvider,
+        date: dateStr,
+      });
+      setNewDetail("");
+      toast.success("Care tracking event recorded successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to log care event.");
+    }
   };
 
   const stats = useMemo(() => {
@@ -79,7 +83,7 @@ export default function PersonCareTracker() {
     return { completed, total, pct };
   }, [dailyTasks]);
 
-  if (loading) {
+  if (loading || logsLoading) {
     return (
       <ICMShell title="Care Tracker" showAIPanel={false}>
         <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
@@ -249,18 +253,25 @@ export default function PersonCareTracker() {
             </h3>
 
             <div className="space-y-3.5 text-[12.5px] font-geist text-slate-600 overflow-y-auto max-h-[360px]">
-              {historicalLogs.map((log, idx) => (
-                <div key={idx} className="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <span className="font-mono text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded text-[11px]">{log.activity}</span>
-                    <span className="text-[11px] text-slate-400 inline-flex items-center gap-1">
-                      <CalendarDays className="w-3.5 h-3.5" /> {log.date}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-slate-700 leading-normal">{log.detail}</p>
-                  <p className="text-[11px] text-slate-400 mt-1">Logged by: <span className="font-semibold text-slate-500">{log.provider}</span></p>
+              {historicalLogs.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <CalendarDays className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p>No historical care events logged yet.</p>
                 </div>
-              ))}
+              ) : (
+                historicalLogs.map((log, idx) => (
+                  <div key={idx} className="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <span className="font-mono text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded text-[11px]">{log.activity}</span>
+                      <span className="text-[11px] text-slate-400 inline-flex items-center gap-1">
+                        <CalendarDays className="w-3.5 h-3.5" /> {log.date}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-slate-700 leading-normal">{log.detail}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Logged by: <span className="font-semibold text-slate-500">{log.provider}</span></p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -19,7 +19,9 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
-import { writeAudit } from "@/data/supervisor";
+import { useMeetingNotes, addMeetingNote, updateMeetingNote, deleteMeetingNote } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
+import { toast } from "sonner";
 
 interface ActionItem {
   id: string;
@@ -64,104 +66,6 @@ const TEAM_ROSTER = [
   "Aunt Linda Reyes (Natural support)",
 ];
 
-function seedNotes(personId: string): MeetingNote[] {
-  return [
-    {
-      id: crypto.randomUUID(),
-      date: "2026-05-12",
-      startTime: "10:00",
-      endTime: "11:15",
-      type: "Quarterly review",
-      facilitator: "Sarah Chen, LCSW",
-      attendees: [
-        "Margaret Thompson (Guardian)",
-        "Sarah Chen, LCSW (Coordinator)",
-        "David Park (Supervisor)",
-        "Riverside Day Program",
-      ],
-      agenda:
-        "1. Progress on employment goal\n2. Medication review\n3. Transportation training update\n4. Summer schedule changes",
-      discussionNotes:
-        "Joseph has made strong progress at Riverside. Mom raised concern about weekend isolation. Discussed expanding natural supports through Aunt Linda. Provider confirmed July break dates.",
-      actionItems: [
-        {
-          id: crypto.randomUUID(),
-          description: "Contact 3 employment providers re: 20hr/week placements",
-          assignee: "Sarah Chen, LCSW",
-          dueDate: "2026-05-26",
-          status: "In progress",
-          linkedGoalId: "g1",
-          reminder: "2026-05-23",
-        },
-        {
-          id: crypto.randomUUID(),
-          description: "Set up weekend respite arrangement with Aunt Linda",
-          assignee: "Margaret Thompson",
-          dueDate: "2026-06-01",
-          status: "Open",
-          linkedGoalId: "g3",
-        },
-        {
-          id: crypto.randomUUID(),
-          description: "Schedule transportation training assessment",
-          assignee: "Sarah Chen, LCSW",
-          dueDate: "2026-05-19",
-          status: "Done",
-          linkedGoalId: "g4",
-        },
-      ],
-      linkedGoals: ["g1", "g3", "g4"],
-      attachments: [
-        { name: "Q1-2026-progress-summary.pdf", size: "184 KB" },
-        { name: "med-list-current.pdf", size: "42 KB" },
-      ],
-      createdAt: "2026-05-12T11:20:00Z",
-      createdBy: "Sarah Chen, LCSW",
-    },
-    {
-      id: crypto.randomUUID(),
-      date: "2026-02-08",
-      startTime: "14:00",
-      endTime: "15:00",
-      type: "Annual planning",
-      facilitator: "Sarah Chen, LCSW",
-      attendees: TEAM_ROSTER,
-      agenda: "Annual person-centered plan review and goal setting for 2026.",
-      discussionNotes:
-        "Reviewed last year's goals (3 of 4 met). Established new goals around community employment and transportation. Guardian signed updated plan.",
-      actionItems: [
-        {
-          id: crypto.randomUUID(),
-          description: "Finalize signed PCP and distribute to team",
-          assignee: "Sarah Chen, LCSW",
-          dueDate: "2026-02-15",
-          status: "Done",
-          linkedGoalId: "g1",
-        },
-      ],
-      linkedGoals: ["g1", "g2", "g3", "g4"],
-      attachments: [{ name: "PCP-2026-signed.pdf", size: "612 KB" }],
-      createdAt: "2026-02-08T15:10:00Z",
-      createdBy: "Sarah Chen, LCSW",
-    },
-  ];
-}
-
-function loadNotes(personId: string): MeetingNote[] {
-  const key = `icm.meeting-notes.${personId}`;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  const s = seedNotes(personId);
-  localStorage.setItem(key, JSON.stringify(s));
-  return s;
-}
-
-function saveNotes(personId: string, list: MeetingNote[]) {
-  localStorage.setItem(`icm.meeting-notes.${personId}`, JSON.stringify(list));
-}
-
 const TYPE_TONE: Record<MeetingNote["type"], string> = {
   "Quarterly review": "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
   "Annual planning": "bg-icm-green-soft text-icm-green ring-icm-green/20",
@@ -174,15 +78,11 @@ const PersonMeetingNotesPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
+  const { data: notes = [], loading: notesLoading } = useMeetingNotes(id);
   const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
-  const [notes, setNotes] = useState<MeetingNote[]>(() => loadNotes(id ?? ""));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    saveNotes(id ?? "", notes);
-  }, [notes, id]);
 
   const sorted = useMemo(
     () => [...notes].sort((a, b) => b.date.localeCompare(a.date)),
@@ -207,57 +107,58 @@ const PersonMeetingNotesPage = () => {
     });
   }
 
-  function toggleActionStatus(noteId: string, actionId: string) {
-    setNotes((all) =>
-      all.map((n) =>
-        n.id !== noteId
-          ? n
-          : {
-              ...n,
-              actionItems: n.actionItems.map((a) =>
-                a.id !== actionId
-                  ? a
-                  : { ...a, status: a.status === "Done" ? "Open" : "Done" },
-              ),
-            },
-      ),
+  async function toggleActionStatus(noteId: string, actionId: string) {
+    const note = notes.find((n) => n.id === noteId);
+    if (!note) return;
+    const nextActionItems = note.actionItems.map((a) =>
+      a.id !== actionId
+        ? a
+        : { ...a, status: a.status === "Done" ? "Open" : "Done" }
     );
-    writeAudit({
-      ts: new Date().toISOString(),
-      actor: "Sarah Chen, LCSW",
-      action: "meeting_action.toggle",
-      personId: id,
-      noteId,
-      actionId,
-    });
+    try {
+      await updateMeetingNote(noteId, {
+        actionItems: nextActionItems
+      });
+      writeAudit("edit_note", "meeting_note", noteId, { actionId });
+      toast.success("Action item status updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update action item status");
+    }
   }
 
-  function removeNote(noteId: string) {
+  async function removeNote(noteId: string) {
     if (!confirm("Delete this meeting note? This cannot be undone.")) return;
-    setNotes((all) => all.filter((n) => n.id !== noteId));
-    writeAudit({
-      ts: new Date().toISOString(),
-      actor: "Sarah Chen, LCSW",
-      action: "meeting_note.delete",
-      personId: id,
-      noteId,
-    });
+    try {
+      await deleteMeetingNote(noteId);
+      writeAudit("settings_change", "meeting_note", noteId, { action: "delete" });
+      toast.success("Meeting note deleted");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete meeting note");
+    }
   }
 
-  function createNote(note: MeetingNote) {
-    setNotes((all) => [note, ...all]);
-    writeAudit({
-      ts: new Date().toISOString(),
-      actor: note.createdBy,
-      action: "meeting_note.create",
-      personId: id,
-      noteId: note.id,
-      attendees: note.attendees.length,
-      actionItems: note.actionItems.length,
-    });
+  async function createNote(noteData: MeetingNote) {
+    try {
+      const { id: _, ...cleanNote } = noteData;
+      const payload = {
+        ...cleanNote,
+        individual_id: id!
+      };
+      const docRef = await addMeetingNote(payload);
+      writeAudit("create_note", "meeting_note", docRef.id, {
+        individualId: id!,
+        attendees: noteData.attendees.length
+      });
+      toast.success("Meeting note documented successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save meeting note");
+    }
   }
 
-  if (loading) {
+  if (loading || notesLoading) {
     return (
       <ICMShell title="Team Meeting Notes" showAIPanel={false}>
         <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">

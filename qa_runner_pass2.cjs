@@ -57,11 +57,19 @@ async function navigate(cdp, url) {
 }
 
 async function screenshot(cdp, name) {
-  const { data } = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 85 });
-  const p = path.join(SCREENSHOT_DIR, `${name}.jpg`);
-  fs.writeFileSync(p, Buffer.from(data, 'base64'));
-  console.log(`  📸 Screenshot: ${name}.jpg`);
-  return p;
+  try {
+    const { data } = await Promise.race([
+      cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 85 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Screenshot capture timed out')), 5000))
+    ]);
+    const p = path.join(SCREENSHOT_DIR, `${name}.jpg`);
+    fs.writeFileSync(p, Buffer.from(data, 'base64'));
+    console.log(`  📸 Screenshot: ${name}.jpg`);
+    return p;
+  } catch (err) {
+    console.warn(`  ⚠️  Screenshot skipped (${name}): ${err.message}`);
+    return null;
+  }
 }
 
 async function evalJs(cdp, expr) {
@@ -128,46 +136,28 @@ async function runTests() {
   console.log('\n🔬 QA Pass 2 — Targeted Re-Test of Warnings\n' + '='.repeat(55));
 
   // ── STEP 0: Get real personId from people list ─────────────────────────────
+  console.log('\n🔐 Logging in as Kathy via demo tile...');
+  await navigate(cdp, `${BASE_URL}/login`);
+  await new Promise(r => setTimeout(r, 1500));
+  await click(cdp, '[data-testid="demo-kathy"], .demo-user, button[class*="demo"]');
+  await new Promise(r => setTimeout(r, 3000));
+
   console.log('\n🔍 Extracting personId from People list...');
   await navigate(cdp, `${BASE_URL}/people`);
   await injectErrorCapture(cdp);
   
-  // Extract first person's href
-  const firstHref = await evalJs(cdp, `
-    const links = [...document.querySelectorAll('a[href*="/people/"]')];
-    const link = links.find(l => l.href.match(/\\/people\\/[\\w-]+/));
-    link?.href || null
-  `);
-  
-  let personId = firstHref?.match(/\/people\/([\w-]+)/)?.[1];
-  
-  if (!personId) {
-    // Try clicking the first row
-    await click(cdp, '[class*="cursor-pointer"], tr:not(:first-child), [class*="row"]:not(:first-child)');
-    await new Promise(r => setTimeout(r, 2000));
-    const url = await evalJs(cdp, 'location.href');
-    personId = url?.match(/\/people\/([\w-]+)/)?.[1];
-    // Go back to people
-    await navigate(cdp, `${BASE_URL}/people`);
-  }
-  
-  if (!personId) {
-    // Try getting all links more aggressively
-    const allLinks = await evalJs(cdp, `JSON.stringify([...document.querySelectorAll('a')].map(a=>a.href).filter(h=>h.includes('/people/')).slice(0,5))`);
-    const parsed = JSON.parse(allLinks || '[]');
-    for (const link of parsed) {
-      const m = link.match(/\/people\/([\w-]+)/);
-      if (m?.[1] && m[1] !== 'new') { personId = m[1]; break; }
-    }
-  }
+  // Extract first person's ID by clicking their eChart button
+  console.log('  Attempting to click first person eChart button...');
+  const clicked = await clickText(cdp, 'eChart');
+  console.log('  eChart button click status:', clicked);
+  await new Promise(r => setTimeout(r, 3000));
+  const url = await evalJs(cdp, 'location.href');
+  let personId = url?.match(/\/people\/([\w-]+)/)?.[1];
 
   if (personId) {
     console.log(`  ✓ Got personId: ${personId}`);
   } else {
-    console.log('  ✗ Could not extract personId — will try hardcoded approach');
-    // Fetch from Firestore REST API using the app's firebase config
-    const firebaseConfig = await evalJs(cdp, `JSON.stringify(window.firebaseConfig || {})`);
-    console.log('  Firebase config available:', !!firebaseConfig);
+    console.log('  ✗ Click-based extraction failed.');
   }
 
   await screenshot(cdp, '00-people-list');

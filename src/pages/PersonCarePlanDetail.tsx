@@ -11,6 +11,7 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { type CarePlan, type PlanGoal } from "@/data/carePlans";
 import { useCarePlans, updateCarePlan } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -65,6 +66,10 @@ const PersonCarePlanDetail = () => {
         updatedOn: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
         updatedBy: "Kathy Martinez"
       });
+      await writeAudit("plan_saved", "care_plan", planId, {
+        individualId: id,
+        status: "Draft",
+      });
       toast.success("Draft saved successfully!");
     } catch (err) {
       console.error(err);
@@ -81,6 +86,10 @@ const PersonCarePlanDetail = () => {
         completedDate: new Date().toISOString().split("T")[0],
         updatedOn: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
         updatedBy: "Kathy Martinez"
+      });
+      await writeAudit("plan_submitted", "care_plan", planId, {
+        individualId: id,
+        status: "Completed",
       });
       toast.success("Care Plan marked completed!");
     } catch (err) {
@@ -270,6 +279,11 @@ const PersonCarePlanDetail = () => {
                     await updateCarePlan(planId!, {
                       goals: [...(plan?.goals ?? []), ...aiGoals],
                       aiDrafted: true,
+                    });
+                    await writeAudit("plan_saved", "care_plan", planId!, {
+                      individualId: id,
+                      aiDrafted: true,
+                      goalsCount: aiGoals.length,
                     });
                     toast.success(`AI drafted ${aiGoals.length} new goals`, {
                       description: `Based on ${data.draft.plan_year ?? "12 months"} of documentation. Review and edit before saving.`,

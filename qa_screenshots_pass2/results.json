@@ -5,10 +5,65 @@
     "warned": 7
   },
   "pass2": {
-    "passed": 4,
-    "failed": 0,
-    "warned": 2,
+    "passed": 12,
+    "failed": 3,
+    "warned": 4,
     "tests": [
+      {
+        "name": "Contact notes page loads",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "Contact notes data",
+        "status": "⚠️  WARN",
+        "note": "Page loads but no note entries visible"
+      },
+      {
+        "name": "New contact note form opens",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "Progress notes page loads",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "Progress notes shows Firestore data",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "Progress note AI prefill banner visible",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "Progress note form",
+        "status": "⚠️  WARN",
+        "note": "Fields not detected: Dashboard\nMy Work\n3\nMessages\n3\nReports\nBilling\n⌘K\nAI Agent\n7\nPeople · Castillo, Robert · Progress Note\nRC\nCastillo, Robert\n\nMale · 35y · Hamilton · Me"
+      },
+      {
+        "name": "Monitoring forms page",
+        "status": "❌ FAIL",
+        "note": "Dashboard\nMy Work\n3\nMessages\n3\nReports\nBilling\n⌘K\nAI Agent\n7\nNo monitoring forms yet\n\nStart Robert's first review or let AI pre-fill one based on existing records.\n\n+ Start blank review\nPre-fill with "
+      },
+      {
+        "name": "Care plan page",
+        "status": "❌ FAIL",
+        "note": "Dashboard\nMy Work\n3\nMessages\n3\nReports\nBilling\n⌘K\nAI Agent\n7\nNo care plans yet\n\nStart Robert's first plan or let AI draft one based on existing records.\n\n+ Start blank plan\nDraft with AI"
+      },
+      {
+        "name": "Care Companion link found on profile",
+        "status": "✅ PASS",
+        "note": "https://casemanagement-ai.web.app/care-assistant/person-j2cL"
+      },
+      {
+        "name": "Companion chat content",
+        "status": "❌ FAIL",
+        "note": "This link is not active\n\nPlease contact your case manager for a new link."
+      },
       {
         "name": "Ambient button found on dashboard",
         "status": "✅ PASS",
@@ -38,7 +93,18 @@
         "name": "No console errors on Settings Users",
         "status": "✅ PASS",
         "note": ""
+      },
+      {
+        "name": "No console errors on eChart",
+        "status": "✅ PASS",
+        "note": ""
+      },
+      {
+        "name": "No console errors on Progress Notes",
+        "status": "✅ PASS",
+        "note": ""
       }
-    ]
+    ],
+    "personId": "j2cLb3qW8GYy5XGacpdV"
   }
 }

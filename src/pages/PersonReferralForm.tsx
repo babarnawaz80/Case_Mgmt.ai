@@ -25,6 +25,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { addReferral } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 import {
   REFERRAL_TYPES,
   providers,
@@ -240,6 +241,11 @@ const PersonReferralForm = () => {
     };
     try {
       const docRef = await addReferral(newRef);
+      await writeAudit("referral_submitted", "referral", docRef.id, {
+        individualId: id,
+        referralType: type,
+        referredTo: providerName,
+      });
       toast.success("Referral submitted successfully!");
       navigate(`/people/${id}/referrals/${docRef.id}`);
     } catch (err) {

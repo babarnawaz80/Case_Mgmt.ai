@@ -46,6 +46,7 @@ export interface Individual {
   alerts?: string[];
   companion_link_active?: boolean;
   companion_token?: string | null;
+  employment?: any;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -83,6 +84,7 @@ function toIndividual(id: string, data: DocumentData): Individual {
     alerts: data.alerts ?? [],
     companion_link_active: data.companion_link_active ?? false,
     companion_token: data.companion_token ?? null,
+    employment: data.employment ?? null,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };

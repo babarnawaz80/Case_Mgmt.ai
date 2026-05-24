@@ -12,8 +12,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { useIndividual } from "@/hooks/useIndividuals";
+import { useAssessments } from "@/hooks/useFirestore";
 import {
-  listAssessments,
   listInstruments,
   templates,
   getTemplate,
@@ -26,10 +26,11 @@ export default function PersonAssessments() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
+  const { data: items = [], loading: loadingAssessments } = useAssessments(id);
   const [tab, setTab] = useState<Tab>("assessments");
   const [showSelector, setShowSelector] = useState(false);
 
-  if (loading) {
+  if (loading || loadingAssessments) {
     return (
       <ICMShell title="Assessments" showAIPanel={false}>
         <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
@@ -48,7 +49,6 @@ export default function PersonAssessments() {
     );
   }
 
-  const items = listAssessments(individual.id);
   const instruments = listInstruments(individual.id);
 
   return (

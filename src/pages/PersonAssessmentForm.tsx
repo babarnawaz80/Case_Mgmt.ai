@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useIndividual } from "@/hooks/useIndividuals";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { addAssessment, addWorkflowTask } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 import {
   AssessmentAnswer,
   AssessmentTemplate,
@@ -23,7 +27,6 @@ import {
   Question,
   aiPrefillFor,
   assessments,
-  getAssessment,
   getTemplate,
 } from "@/data/assessments";
 
@@ -33,8 +36,21 @@ export default function PersonAssessmentForm() {
   const [search] = useSearchParams();
   const { individual, loading } = useIndividual(id);
 
-  // Existing read-only assessment vs new draft.
-  const existing = assessmentId && assessmentId !== "new" ? getAssessment(assessmentId) : null;
+  const [existing, setExisting] = useState<any>(null);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+
+  useEffect(() => {
+    if (!assessmentId || assessmentId === "new") return;
+    setLoadingExisting(true);
+    const unsub = onSnapshot(doc(db, "assessments", assessmentId), (snap) => {
+      if (snap.exists()) {
+        setExisting({ id: snap.id, ...snap.data() });
+      }
+      setLoadingExisting(false);
+    });
+    return unsub;
+  }, [assessmentId]);
+
   const templateId = existing?.templateId ?? search.get("template") ?? "";
   const template = getTemplate(templateId);
   const usePrefill = search.get("prefill") === "1";
@@ -46,6 +62,12 @@ export default function PersonAssessmentForm() {
   }, [existing, template, usePrefill, id]);
 
   const [answers, setAnswers] = useState<AssessmentAnswer[]>(initialAnswers);
+
+  useEffect(() => {
+    if (initialAnswers.length > 0) {
+      setAnswers(initialAnswers);
+    }
+  }, [initialAnswers]);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(
     template?.sections[0]?.id ?? null,
   );
@@ -68,7 +90,7 @@ export default function PersonAssessmentForm() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   if (!individual || !template) {
-    if (loading) {
+    if (loading || loadingExisting) {
       return (
         <div className="p-10 text-center text-[13px] text-icm-text-dim flex items-center justify-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -207,7 +229,7 @@ export default function PersonAssessmentForm() {
     const newId = search.get("aid") ?? `A-${Date.now().toString().slice(-4)}`;
     const findings = detectRiskFindings();
     const record = {
-      id: newId,
+      individual_id: id!,
       individualId: id!,
       templateId: template!.id,
       templateVersion: template!.version,
@@ -221,81 +243,60 @@ export default function PersonAssessmentForm() {
       attachments,
       riskFindings: findings,
     };
-    assessments.push(record);
 
-    // Persist a versioned snapshot for historical retention (7.1)
-    const histKey = `icm.assessments.history.${id}`;
-    const hist = JSON.parse(localStorage.getItem(histKey) ?? "[]");
-    hist.unshift({
-      ...record,
-      capturedAt: new Date().toISOString(),
-      version: `v${hist.length + 1}.0`,
+    // Save to Firestore!
+    addAssessment(record).then((docRef) => {
+      // Audit entry
+      writeAudit("create_note", "assessment", docRef.id, {
+        individualId: id!,
+        details: `Score ${score} · LOC ${loc} · ${findings.length} risk finding(s)`
+      });
+
+      // Auto-generate downstream tasks from findings (links assessment → tasks/plan) in Firestore
+      const today = new Date();
+      const due = (n: number) => { const d = new Date(today); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+      
+      if (findings.some(f => f.severity === "critical")) {
+        addWorkflowTask({
+          individual_id: id!,
+          title: `Update person-centered plan: address critical risk findings`,
+          due_date: due(3),
+          assigned_to_name: signCM || "Care Manager",
+          status: "open",
+          category: "Planning",
+          description: `Assessment ${newId} ${template!.version}`
+        });
+      }
+      if (findings.length > 0) {
+        addWorkflowTask({
+          individual_id: id!,
+          title: `Supervisor review: assessment risk findings`,
+          due_date: due(2),
+          assigned_to_name: "Diane Carter (Supervisor)",
+          status: "open",
+          category: "Supervisor Review",
+          description: `Assessment ${newId} ${template!.version}`
+        });
+      }
+      if (loc === "High" || loc === "Critical") {
+        addWorkflowTask({
+          individual_id: id!,
+          title: `Increase monitoring frequency (LOC ${loc})`,
+          due_date: due(7),
+          assigned_to_name: signCM || "Care Manager",
+          status: "open",
+          category: "Monitoring",
+          description: `Assessment ${newId} ${template!.version}`
+        });
+      }
+
+      setHistoryCount((c) => c + 1);
+      setSubmitted(true);
+      toast.success("Assessment submitted successfully!");
+    }).catch((err) => {
+      console.error(err);
+      toast.error("Failed to submit assessment to Firestore.");
     });
-    localStorage.setItem(histKey, JSON.stringify(hist));
-
-    // Audit entries
-    const audit = JSON.parse(localStorage.getItem("icm.audit") ?? "[]");
-    audit.unshift({
-      id: `aud-${Date.now()}`,
-      ts: new Date().toISOString(),
-      actor: signCM || "Care Manager",
-      action: `Completed assessment: ${template!.name} ${template!.version}`,
-      target: `${individual!.first_name} ${individual!.last_name}`,
-      category: "assessment",
-      details: `Score ${score} · LOC ${loc} · ${findings.length} risk finding(s) · ${attachments.length} attachment(s)`,
-    });
-    if (findings.length > 0) {
-      audit.unshift({
-        id: `aud-${Date.now() + 1}`,
-        ts: new Date().toISOString(),
-        actor: "System",
-        action: `Risk findings flagged for review`,
-        target: `${individual!.first_name} ${individual!.last_name}`,
-        category: "ai",
-        details: findings.map(f => `[${f.severity}] ${f.label}`).join("; "),
-      });
-    }
-    localStorage.setItem("icm.audit", JSON.stringify(audit));
-
-    // Auto-generate downstream tasks from findings (links assessment → tasks/plan)
-    const newTasks: { id: string; title: string; dueDate: string; owner: string; supervisor: string; participantId: string; participantName: string; status: string; category: string; escalationDays: number; reminders: string[]; source: string }[] = [];
-    const today = new Date();
-    const due = (n: number) => { const d = new Date(today); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-    if (findings.some(f => f.severity === "critical")) {
-      newTasks.push({
-        id: `task-${Date.now()}-a1`, title: `Update person-centered plan: address critical risk findings`,
-        dueDate: due(3), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
-        participantId: id!, participantName: `${individual!.first_name} ${individual!.last_name}`,
-        status: "open", category: "Planning", escalationDays: 1, reminders: ["1 day before due"],
-        source: `Assessment ${newId} ${template!.version}`,
-      });
-    }
-    if (findings.length > 0) {
-      newTasks.push({
-        id: `task-${Date.now()}-a2`, title: `Supervisor review: assessment risk findings`,
-        dueDate: due(2), owner: "Diane Carter (Supervisor)", supervisor: "Diane Carter (Supervisor)",
-        participantId: id!, participantName: `${individual!.first_name} ${individual!.last_name}`,
-        status: "open", category: "Supervisor Review", escalationDays: 1, reminders: ["same day"],
-        source: `Assessment ${newId} ${template!.version}`,
-      });
-    }
-    if (loc === "High" || loc === "Critical") {
-      newTasks.push({
-        id: `task-${Date.now()}-a3`, title: `Increase monitoring frequency (LOC ${loc})`,
-        dueDate: due(7), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
-        participantId: id!, participantName: `${individual!.first_name} ${individual!.last_name}`,
-        status: "open", category: "Monitoring", escalationDays: 3, reminders: ["3 days before due"],
-        source: `Assessment ${newId} ${template!.version}`,
-      });
-    }
-    if (newTasks.length > 0) {
-      const existing = JSON.parse(localStorage.getItem("icm.tasks") ?? "[]");
-      localStorage.setItem("icm.tasks", JSON.stringify([...newTasks, ...existing]));
-      setGeneratedTasks(newTasks.map(t => ({ title: t.title, due: t.dueDate })));
-    }
-
-    setHistoryCount((c) => c + 1);
-    setSubmitted(true);
   }
 
   if (submitted) {

@@ -13,11 +13,20 @@ import { COLLECTIONS } from "../config/collections";
 const PROJECT_ID = process.env.GCLOUD_PROJECT || "casemanagement-ai";
 const LOCATION = "us-central1";
 
-// Gemini model IDs — gemini-2.0-flash is GA and valid for both Gemini Developer API and Vertex AI
+// Gemini model IDs
+// Gemini Developer API (via API key) uses the short name.
+// Vertex AI uses the full publisher model path format.
 const MODELS = {
-  companion: "gemini-2.0-flash",   // Care Companion bot
-  quality:   "gemini-2.0-flash",   // Documentation & quality checks
-  fast:      "gemini-2.0-flash",   // Form prefill, daily brief, scribe
+  companion: "gemini-1.5-flash",   // Care Companion bot
+  quality:   "gemini-1.5-flash",   // Documentation & quality checks
+  fast:      "gemini-1.5-flash",   // Form prefill, daily brief, scribe
+} as const;
+
+// Vertex AI model names (different naming convention from Gemini Developer API)
+const VERTEX_MODELS = {
+  companion: "gemini-1.5-flash-001",
+  quality:   "gemini-1.5-flash-001",
+  fast:      "gemini-1.5-flash-001",
 } as const;
 
 export type AITier = keyof typeof MODELS;
@@ -118,11 +127,12 @@ export async function generateCompletion(
     }
   }
 
-  // Fall back to Vertex AI (requires billing account with Vertex AI access)
+  // Fall back to Vertex AI (uses Cloud Run service account — no API key needed)
   try {
+    const vertexModelId = VERTEX_MODELS[tier];
     const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
     const model: GenerativeModel = vertexAI.getGenerativeModel({
-      model: modelId,
+      model: vertexModelId,
       generationConfig: { maxOutputTokens: maxTokens, temperature },
       systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
     });
@@ -180,16 +190,22 @@ export async function* streamCompletion(
   }
 
   // Fall back to Vertex AI streaming
-  const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
-  const model = vertexAI.getGenerativeModel({
-    model: modelId,
-    generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-    systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-  });
+  try {
+    const vertexModelId = VERTEX_MODELS[tier];
+    const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
+    const model = vertexAI.getGenerativeModel({
+      model: vertexModelId,
+      generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+      systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+    });
 
-  const stream = await model.generateContentStream(fullPrompt);
-  for await (const chunk of stream.stream) {
-    const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    if (text) yield text;
+    const stream = await model.generateContentStream(fullPrompt);
+    for await (const chunk of stream.stream) {
+      const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (text) yield text;
+    }
+  } catch (err: any) {
+    console.error("[AI] Vertex AI stream also failed:", err.message ?? err);
+    throw err;
   }
 }

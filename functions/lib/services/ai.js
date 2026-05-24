@@ -67,11 +67,19 @@ const genai_1 = require("@google/genai");
 const collections_1 = require("../config/collections");
 const PROJECT_ID = process.env.GCLOUD_PROJECT || "casemanagement-ai";
 const LOCATION = "us-central1";
-// Gemini model IDs — gemini-2.0-flash is GA and valid for both Gemini Developer API and Vertex AI
+// Gemini model IDs
+// Gemini Developer API (via API key) uses the short name.
+// Vertex AI uses the full publisher model path format.
 const MODELS = {
-    companion: "gemini-2.0-flash", // Care Companion bot
-    quality: "gemini-2.0-flash", // Documentation & quality checks
-    fast: "gemini-2.0-flash", // Form prefill, daily brief, scribe
+    companion: "gemini-1.5-flash", // Care Companion bot
+    quality: "gemini-1.5-flash", // Documentation & quality checks
+    fast: "gemini-1.5-flash", // Form prefill, daily brief, scribe
+};
+// Vertex AI model names (different naming convention from Gemini Developer API)
+const VERTEX_MODELS = {
+    companion: "gemini-1.5-flash-001",
+    quality: "gemini-1.5-flash-001",
+    fast: "gemini-1.5-flash-001",
 };
 // Check org is allowed to use AI before making any call
 async function checkOrgAIAccess(organizationId) {
@@ -145,11 +153,12 @@ async function generateCompletion(systemPrompt, userPrompt, context, tier, organ
             console.error("[AI] Gemini API error, trying Vertex AI:", err.message);
         }
     }
-    // Fall back to Vertex AI (requires billing account with Vertex AI access)
+    // Fall back to Vertex AI (uses Cloud Run service account — no API key needed)
     try {
+        const vertexModelId = VERTEX_MODELS[tier];
         const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
         const model = vertexAI.getGenerativeModel({
-            model: modelId,
+            model: vertexModelId,
             generationConfig: { maxOutputTokens: maxTokens, temperature },
             systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
         });
@@ -169,7 +178,7 @@ async function generateCompletion(systemPrompt, userPrompt, context, tier, organ
 function streamCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature) {
     return __asyncGenerator(this, arguments, function* streamCompletion_1() {
         var _a, e_1, _b, _c, _d, e_2, _e, _f;
-        var _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+        var _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
         yield __await(checkOrgAIAccess(organizationId));
         const modelId = MODELS[tier];
         const fullPrompt = context ? `${context}\n\n${userPrompt}` : userPrompt;
@@ -188,9 +197,9 @@ function streamCompletion(systemPrompt, userPrompt, context, tier, organizationI
                     },
                 }));
                 try {
-                    for (var _u = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield __await(stream_1.next()), _a = stream_1_1.done, !_a; _u = true) {
+                    for (var _v = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield __await(stream_1.next()), _a = stream_1_1.done, !_a; _v = true) {
                         _c = stream_1_1.value;
-                        _u = false;
+                        _v = false;
                         const chunk = _c;
                         const text = (_m = (_l = (_k = (_j = (_h = (_g = chunk.candidates) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.content) === null || _j === void 0 ? void 0 : _j.parts) === null || _k === void 0 ? void 0 : _k[0]) === null || _l === void 0 ? void 0 : _l.text) !== null && _m !== void 0 ? _m : "";
                         if (text)
@@ -200,7 +209,7 @@ function streamCompletion(systemPrompt, userPrompt, context, tier, organizationI
                 catch (e_1_1) { e_1 = { error: e_1_1 }; }
                 finally {
                     try {
-                        if (!_u && !_a && (_b = stream_1.return)) yield __await(_b.call(stream_1));
+                        if (!_v && !_a && (_b = stream_1.return)) yield __await(_b.call(stream_1));
                     }
                     finally { if (e_1) throw e_1.error; }
                 }
@@ -211,29 +220,36 @@ function streamCompletion(systemPrompt, userPrompt, context, tier, organizationI
             }
         }
         // Fall back to Vertex AI streaming
-        const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
-        const model = vertexAI.getGenerativeModel({
-            model: modelId,
-            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-            systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-        });
-        const stream = yield __await(model.generateContentStream(fullPrompt));
         try {
-            for (var _v = true, _w = __asyncValues(stream.stream), _x; _x = yield __await(_w.next()), _d = _x.done, !_d; _v = true) {
-                _f = _x.value;
-                _v = false;
-                const chunk = _f;
-                const text = (_t = (_s = (_r = (_q = (_p = (_o = chunk.candidates) === null || _o === void 0 ? void 0 : _o[0]) === null || _p === void 0 ? void 0 : _p.content) === null || _q === void 0 ? void 0 : _q.parts) === null || _r === void 0 ? void 0 : _r[0]) === null || _s === void 0 ? void 0 : _s.text) !== null && _t !== void 0 ? _t : "";
-                if (text)
-                    yield yield __await(text);
+            const vertexModelId = VERTEX_MODELS[tier];
+            const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
+            const model = vertexAI.getGenerativeModel({
+                model: vertexModelId,
+                generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+                systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+            });
+            const stream = yield __await(model.generateContentStream(fullPrompt));
+            try {
+                for (var _w = true, _x = __asyncValues(stream.stream), _y; _y = yield __await(_x.next()), _d = _y.done, !_d; _w = true) {
+                    _f = _y.value;
+                    _w = false;
+                    const chunk = _f;
+                    const text = (_t = (_s = (_r = (_q = (_p = (_o = chunk.candidates) === null || _o === void 0 ? void 0 : _o[0]) === null || _p === void 0 ? void 0 : _p.content) === null || _q === void 0 ? void 0 : _q.parts) === null || _r === void 0 ? void 0 : _r[0]) === null || _s === void 0 ? void 0 : _s.text) !== null && _t !== void 0 ? _t : "";
+                    if (text)
+                        yield yield __await(text);
+                }
+            }
+            catch (e_2_1) { e_2 = { error: e_2_1 }; }
+            finally {
+                try {
+                    if (!_w && !_d && (_e = _x.return)) yield __await(_e.call(_x));
+                }
+                finally { if (e_2) throw e_2.error; }
             }
         }
-        catch (e_2_1) { e_2 = { error: e_2_1 }; }
-        finally {
-            try {
-                if (!_v && !_d && (_e = _w.return)) yield __await(_e.call(_w));
-            }
-            finally { if (e_2) throw e_2.error; }
+        catch (err) {
+            console.error("[AI] Vertex AI stream also failed:", (_u = err.message) !== null && _u !== void 0 ? _u : err);
+            throw err;
         }
     });
 }

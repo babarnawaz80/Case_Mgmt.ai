@@ -45,8 +45,7 @@ admin.initializeApp();
 // Silently drop undefined fields instead of throwing — prevents crashes when
 // individual documents have optional fields that haven't been set yet.
 admin.firestore().settings({ ignoreUndefinedProperties: true });
-// Inject Gemini API key into process environment so ai.ts can read it
-// This ensures the Gemini Developer API is used instead of Vertex AI
+// Gemini Developer API key — preferred over Vertex AI
 if (!process.env.GEMINI_API_KEY) {
     process.env.GEMINI_API_KEY = "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
 }

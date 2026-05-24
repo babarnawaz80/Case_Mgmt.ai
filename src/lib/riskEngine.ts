@@ -10,7 +10,7 @@ import { getIncidentsForPerson } from "@/data/incidents";
 import { getFormsForPerson } from "@/data/monitoringForms";
 import { getVisitSummariesForPerson } from "@/data/visitSummaries";
 import { getCurrentEligibility } from "@/data/eligibility";
-import { getCarePlanForPerson } from "@/data/carePlans";
+import { getPlansForPerson } from "@/data/carePlans";
 
 // ─── ID normalisation ────────────────────────────────────────────────────────
 // Some mock modules key on "joseph-brown", some on "1".
@@ -332,30 +332,18 @@ function evaluateFactor(
 
   // ── isp_out_of_compliance ──────────────────────────────────────────────────
   if (cfg.factorId === "isp_out_of_compliance") {
-    // Check care plan: status "Expired" or annual renewal overdue
-    let plan = getCarePlanForPerson(personId);
-    if (!plan && personId !== tryIds[tryIds.length - 1]) {
-      plan = getCarePlanForPerson(tryIds[tryIds.length - 1]);
-    }
+    // Check care plans: any Expired plan = out of compliance
+    const allPlans = tryIds.flatMap((id) => getPlansForPerson(id));
+    const plan = allPlans[0];
     if (plan) {
-      if (plan.plan_status === "Expired") {
-        return {
-          ...base,
-          triggered: true,
-          detail: `ISP status: Expired`,
-        };
+      if ((plan as any).plan_status === "Expired" || (plan as any).status === "Expired") {
+        return { ...base, triggered: true, detail: "ISP status: Expired" };
       }
       // Check annual review date
-      if (plan.annual_review_date) {
-        const reviewDate = parseDate(plan.annual_review_date);
-        const overdueDays = daysSince(reviewDate);
-        if (overdueDays !== null && overdueDays > 0) {
-          return {
-            ...base,
-            triggered: true,
-            detail: `ISP renewal overdue by ${overdueDays} days`,
-          };
-        }
+      const reviewDate = parseDate((plan as any).annual_review_date);
+      const overdueDays = daysSince(reviewDate);
+      if (overdueDays !== null && overdueDays > 0) {
+        return { ...base, triggered: true, detail: `ISP renewal overdue by ${overdueDays} days` };
       }
     }
     // Fallback: for specific mock individuals, apply the known overdue status

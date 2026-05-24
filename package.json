@@ -54,6 +54,8 @@
     "firebase": "^12.13.0",
     "framer-motion": "^12.34.3",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",

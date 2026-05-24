@@ -27,6 +27,7 @@ import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
 import EChart from "./pages/EChart";
 import PersonMonitorsBaselines from "./pages/PersonMonitorsBaselines";
 import ContactNote from "./pages/ContactNote";
+import ContactNoteDetail from "./pages/ContactNoteDetail";
 
 import PersonModule from "./pages/PersonModule";
 import PersonCaseManagement from "./pages/PersonCaseManagement";
@@ -127,6 +128,9 @@ import MultiStateConfig from "./pages/MultiStateConfig";
 import CommunicationsHub from "./pages/CommunicationsHub";
 import AIGovernance from "./pages/AIGovernance";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import PersonAuthorizations from "./pages/PersonAuthorizations";
+import PersonAuthorizationNew from "./pages/PersonAuthorizationNew";
+import AuthorizationTracker from "./pages/AuthorizationTracker";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
@@ -189,6 +193,7 @@ const App = () => (
            <Route path="/people/:id/echart" element={<ProtectedRoute><EChart /></ProtectedRoute>} />
            <Route path="/people/:id/monitors-baselines" element={<ProtectedRoute><PersonMonitorsBaselines /></ProtectedRoute>} />
             <Route path="/people/:id/contact-note" element={<ProtectedRoute><ContactNote /></ProtectedRoute>} />
+            <Route path="/people/:id/contact-note/:noteId" element={<ProtectedRoute><ContactNoteDetail /></ProtectedRoute>} />
             <Route path="/people/:id/case-management" element={<ProtectedRoute><PersonCaseManagement /></ProtectedRoute>} />
             <Route path="/people/:id/care-plan" element={<ProtectedRoute><PersonCarePlan /></ProtectedRoute>} />
             <Route path="/people/:id/care-plan/:planId" element={<ProtectedRoute><PersonCarePlanDetail /></ProtectedRoute>} />
@@ -247,6 +252,10 @@ const App = () => (
             <Route path="/people/:id/referrals/new" element={<ProtectedRoute><PersonReferralForm /></ProtectedRoute>} />
             <Route path="/people/:id/referrals/:referralId" element={<ProtectedRoute><PersonReferralDetail /></ProtectedRoute>} />
             <Route path="/people/:id/documents" element={<ProtectedRoute><PersonDocuments /></ProtectedRoute>} />
+            {/* ── AUTHORIZATION ROUTES ────────────────────────────────── */}
+            <Route path="/people/:id/authorizations" element={<ProtectedRoute><PersonAuthorizations /></ProtectedRoute>} />
+            <Route path="/people/:id/authorizations/new" element={<ProtectedRoute><PersonAuthorizationNew /></ProtectedRoute>} />
+            <Route path="/authorizations" element={<ProtectedRoute><AuthorizationTracker /></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
             <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
             <Route path="/leads/new" element={<ProtectedRoute><LeadForm /></ProtectedRoute>} />
@@ -329,6 +338,13 @@ const App = () => (
             <Route path="/super-admin/ai-usage" element={<PlatformAdminGuard><SuperAdminAIUsage /></PlatformAdminGuard>} />
             <Route path="/super-admin/support" element={<PlatformAdminGuard><SuperAdminSupport /></PlatformAdminGuard>} />
             <Route path="/super-admin/health" element={<PlatformAdminGuard><SuperAdminHealth /></PlatformAdminGuard>} />
+
+            <Route path="/superadmin" element={<PlatformAdminGuard><SuperAdminOrganizations /></PlatformAdminGuard>} />
+            <Route path="/superadmin/users" element={<PlatformAdminGuard><SuperAdminUsers /></PlatformAdminGuard>} />
+            <Route path="/superadmin/billing" element={<PlatformAdminGuard><SuperAdminBilling /></PlatformAdminGuard>} />
+            <Route path="/superadmin/ai-usage" element={<PlatformAdminGuard><SuperAdminAIUsage /></PlatformAdminGuard>} />
+            <Route path="/superadmin/support" element={<PlatformAdminGuard><SuperAdminSupport /></PlatformAdminGuard>} />
+            <Route path="/superadmin/health" element={<PlatformAdminGuard><SuperAdminHealth /></PlatformAdminGuard>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

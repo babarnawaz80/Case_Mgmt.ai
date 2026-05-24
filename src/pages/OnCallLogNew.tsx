@@ -13,6 +13,9 @@ import type {
 } from "@/data/onCallLogs";
 import { addOnCallLog } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
+import { useAuth } from "@/contexts/AuthContext";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const categories: OnCallCategory[] = [
   "Medical",
@@ -186,6 +189,7 @@ function PersonSearchSelect({
 const OnCallLogNew = () => {
   const navigate = useNavigate();
   const { individuals } = useIndividuals();
+  const { currentUser, userProfile } = useAuth();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const nowTime = now.toTimeString().slice(0, 5);
@@ -231,7 +235,7 @@ const OnCallLogNew = () => {
     setSubmitting(true);
     try {
       const selectedPerson = individuals.find(p => p.id === form.personId);
-      const docRef = await addOnCallLog({
+      const docRef = await addDoc(collection(db, "oncall_log"), {
         individual_id: form.personId || "unspecified",
         individual_name: selectedPerson ? `${selectedPerson.first_name} ${selectedPerson.last_name}` : "Unspecified",
         date: form.callDate,
@@ -242,7 +246,7 @@ const OnCallLogNew = () => {
         action_taken: form.actionTaken,
         follow_up_required: form.followUpRequired,
         follow_up_notes: form.followUpDue ? `Due ${form.followUpDue} by ${form.followUpBy}` : "—",
-        author_name: "Kathy Adams",
+        author_name: userProfile?.displayName || userProfile?.email || "Kathy Adams",
         category: form.category,
         urgency: form.urgency,
         status: asDraft ? "Open" : "Resolved",
@@ -250,7 +254,10 @@ const OnCallLogNew = () => {
         notes: form.notes,
         supervisor_notified: form.supervisorNotified,
         supervisor_name: form.supervisorName,
-      } as any);
+        organizationId: userProfile?.organizationId || currentUser?.organizationId || "demo",
+        userId: currentUser?.uid || "unknown",
+        createdAt: serverTimestamp(),
+      });
 
       await writeAudit('create_note', 'oncall_log', docRef.id, {
         individualId: form.personId || "unspecified",

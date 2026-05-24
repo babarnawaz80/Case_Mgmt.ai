@@ -106,30 +106,207 @@ export async function companionGet(req: Request, res: Response): Promise<void> {
     .ts { font-size: 0.7rem; color: #94a3b8; margin-top: 0.25rem; text-align: center; }
     .input-bar { background: #fff; border-top: 1px solid #e2e8f0; padding: 1rem; display: flex; gap: 0.5rem; align-items: flex-end; }
     .input-bar textarea { flex: 1; border: 1px solid #e2e8f0; border-radius: 1.5rem; padding: 0.75rem 1rem; font-size: 0.95rem; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.15s; }
-    .input-bar textarea:focus { border-color: #0d9488; }
-    .send-btn { width: 44px; height: 44px; border-radius: 50%; background: #0d9488; border: none; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .mic-btn { width: 44px; height: 44px; border-radius: 50%; background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .mic-btn.recording { background: #fee2e2; border-color: #f87171; color: #ef4444; }
-    .typing { display: flex; gap: 4px; padding: 0.75rem 1rem; }
-    .typing span { width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; animation: bounce 1.2s ease-in-out infinite; }
-    .typing span:nth-child(2) { animation-delay: 0.2s; }
-    .typing span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+    html, body {
+      height: 100%; height: 100dvh;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+      color: #e8eaf6;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid rgba(108,99,255,0.2);
+      background: rgba(15,15,26,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 0.65rem; }
+    .h-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      box-shadow: 0 0 16px rgba(108,99,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0; position: relative;
+    }
+    .h-avatar::after {
+      content: '';
+      position: absolute; bottom: -1px; right: -1px;
+      width: 11px; height: 11px; border-radius: 50%;
+      background: #4caf50;
+      border: 2px solid #0f0f1a;
+    }
+    .h-title { font-size: 0.8125rem; font-weight: 600; color: #e8eaf6; line-height: 1.2; }
+    .h-sub { font-size: 0.6875rem; color: #9fa8da; display: flex; align-items: center; gap: 0.3rem; margin-top: 0.1rem; }
+    .h-dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .logo-text { font-size: 0.8rem; font-weight: 700; color: #6c63ff; letter-spacing: -0.01em; }
+    .end-btn {
+      height: 30px; padding: 0 0.75rem; border-radius: 0.5rem;
+      background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.2);
+      color: #f87171; font-size: 0.6875rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 0.35rem;
+      font-family: inherit; transition: opacity 0.15s;
+    }
+    .end-btn:hover { opacity: 0.8; }
+
+    /* ── Chat area ── */
+    .chat-area {
+      flex: 1; overflow-y: auto; padding: 1.25rem 1rem;
+      display: flex; flex-direction: column; gap: 1rem;
+      scroll-behavior: smooth;
+    }
+    .chat-area::-webkit-scrollbar { width: 4px; }
+    .chat-area::-webkit-scrollbar-track { background: transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.25); border-radius: 2px; }
+
+    .msg-row { display: flex; align-items: flex-end; gap: 0.5rem; }
+    .msg-row.user { flex-direction: row-reverse; }
+
+    .msg-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; flex-shrink: 0;
+    }
+
+    .bubble {
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem; line-height: 1.55;
+      max-width: 82%;
+    }
+    .bubble.bot {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: 1rem 1rem 1rem 0.25rem;
+      color: #e8eaf6;
+    }
+    .bubble.user {
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      border-radius: 1rem 1rem 0.25rem 1rem;
+      color: #fff;
+    }
+    .bubble.urgent {
+      border: 1.5px solid #f59e0b;
+      background: rgba(245,158,11,0.1);
+    }
+    .urgent-banner {
+      margin-left: 2.25rem;
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.35);
+      padding: 0.6rem 0.9rem;
+      border-radius: 0.6rem;
+      font-size: 0.78rem;
+      color: #fcd34d;
+    }
+    .ts {
+      font-size: 0.65rem; color: #5c6bc0;
+      text-align: center; margin-top: 0.1rem;
+      padding: 0 0.5rem;
+    }
+    .msg-col { display: flex; flex-direction: column; max-width: 82%; }
+    .msg-row.user .msg-col { align-items: flex-end; }
+
+    /* ── Typing indicator ── */
+    .typing-row { display: flex; align-items: flex-end; gap: 0.5rem; }
+    .typing-bubble {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: 1rem 1rem 1rem 0.25rem;
+      padding: 0.75rem 1rem;
+      display: flex; gap: 5px; align-items: center;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(108,99,255,0.65);
+      animation: dotBounce 1.2s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.15s; }
+    .dot:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes dotBounce { 0%,60%,100%{transform:translateY(0);opacity:0.5} 30%{transform:translateY(-5px);opacity:1} }
+
+    /* ── Input bar ── */
+    .input-bar {
+      padding: 0.75rem 1rem 1rem;
+      border-top: 1px solid rgba(108,99,255,0.15);
+      background: rgba(15,15,26,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+    .input-wrap {
+      display: flex; align-items: flex-end; gap: 0.5rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(108,99,255,0.2);
+      border-radius: 1rem;
+      padding: 0.6rem 0.65rem 0.6rem 1rem;
+      transition: border-color 0.15s;
+    }
+    .input-wrap:focus-within { border-color: rgba(108,99,255,0.5); }
+    .input-wrap textarea {
+      flex: 1; background: transparent; border: none; outline: none;
+      font-size: 0.875rem; font-family: inherit; color: #e8eaf6;
+      resize: none; max-height: 120px; line-height: 1.5;
+      overflow-y: auto; padding: 0;
+    }
+    .input-wrap textarea::placeholder { color: rgba(159,168,218,0.35); }
+    .mic-btn {
+      width: 36px; height: 36px; border-radius: 0.65rem;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(108,99,255,0.18);
+      color: #9fa8da; font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s; font-family: inherit;
+    }
+    .mic-btn.recording { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); color: #f87171; }
+    .mic-btn:hover { background: rgba(108,99,255,0.12); }
+    .send-btn {
+      width: 36px; height: 36px; border-radius: 0.65rem;
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      box-shadow: 0 2px 10px rgba(108,99,255,0.35);
+      border: none; color: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s; font-size: 0.9rem;
+    }
+    .send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+    .send-btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(108,99,255,0.5); }
+    .disclaimer {
+      text-align: center; font-size: 0.6rem; color: #5c6bc0;
+      margin-top: 0.5rem; letter-spacing: 0.01em;
+    }
   </style>
 </head>
 <body>
+
 <header>
-  <span class="logo">🤝 CaseManagement.AI</span>
-  <span class="user-name">${preferredName}'s Care Companion</span>
+  <div class="header-left">
+    <div class="h-avatar">💜</div>
+    <div>
+      <div class="h-title">AI Care Companion</div>
+      <div class="h-sub"><span class="h-dot"></span> Chatting with ${preferredName}</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <span class="logo-text">🤝 CaseManagement.AI</span>
+    <button class="end-btn" id="endBtn">📞 End</button>
+  </div>
 </header>
 
 <div class="chat-area" id="chat"></div>
 
 <div class="input-bar">
-  <button class="mic-btn" id="micBtn" title="Voice input" aria-label="Start voice input">🎙</button>
-  <textarea id="msgInput" rows="1" placeholder="Type your message…" aria-label="Message input"></textarea>
-  <button class="send-btn" id="sendBtn" aria-label="Send message">➤</button>
+  <div class="input-wrap">
+    <button class="mic-btn" id="micBtn" title="Voice input" aria-label="Start voice input">🎙</button>
+    <textarea id="msgInput" rows="1" placeholder="Type your message… (Enter to send)" aria-label="Message input"></textarea>
+    <button class="send-btn" id="sendBtn" aria-label="Send message">➤</button>
+  </div>
+  <p class="disclaimer">🔒 Private &amp; secure · For emergencies, call 911</p>
 </div>
 
 <script>
@@ -146,56 +323,64 @@ const chat = document.getElementById('chat');
 const input = document.getElementById('msgInput');
 const sendBtn = document.getElementById('sendBtn');
 const micBtn = document.getElementById('micBtn');
+const endBtn = document.getElementById('endBtn');
+
+function createAvatar() {
+  const a = document.createElement('div');
+  a.className = 'msg-avatar';
+  a.textContent = '💜';
+  return a;
+}
 
 function addMessage(role, text, isUrgent = false) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'msg ' + role;
-  
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar';
-  avatar.textContent = role === 'bot' ? '🤝' : '👤';
-  
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + role;
+
+  const col = document.createElement('div');
+  col.className = 'msg-col';
+
   const bubble = document.createElement('div');
-  bubble.className = 'bubble' + (isUrgent ? ' urgent' : '');
+  bubble.className = 'bubble ' + role + (isUrgent ? ' urgent' : '');
   bubble.textContent = text;
-  
+
   const ts = document.createElement('div');
   ts.className = 'ts';
-  ts.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  
-  wrapper.appendChild(avatar);
-  const col = document.createElement('div');
+  ts.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
   col.appendChild(bubble);
   col.appendChild(ts);
-  wrapper.appendChild(col);
-  
+
+  if (role === 'bot') {
+    row.appendChild(createAvatar());
+    row.appendChild(col);
+  } else {
+    row.appendChild(col);
+  }
+
+  chat.appendChild(row);
+
   if (isUrgent) {
     const banner = document.createElement('div');
     banner.className = 'urgent-banner';
-    banner.textContent = 'Your case manager has been notified. Call 911 for emergencies · Text or call 988 for mental health support.';
-    chat.appendChild(wrapper);
+    banner.textContent = '⚠️ Your case manager has been notified. Call 911 for emergencies · Text or call 988 for mental health support.';
     chat.appendChild(banner);
-  } else {
-    chat.appendChild(wrapper);
   }
+
   chat.scrollTop = chat.scrollHeight;
 }
 
 function showTyping() {
   if (isTyping) return;
   isTyping = true;
-  const wrapper = document.createElement('div');
-  wrapper.className = 'msg bot';
-  wrapper.id = 'typing-indicator';
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar';
-  avatar.textContent = '🤝';
-  const typing = document.createElement('div');
-  typing.className = 'typing';
-  typing.innerHTML = '<span></span><span></span><span></span>';
-  wrapper.appendChild(avatar);
-  wrapper.appendChild(typing);
-  chat.appendChild(wrapper);
+  const row = document.createElement('div');
+  row.className = 'typing-row';
+  row.id = 'typing-indicator';
+  row.appendChild(createAvatar());
+  const tb = document.createElement('div');
+  tb.className = 'typing-bubble';
+  tb.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  row.appendChild(tb);
+  chat.appendChild(row);
   chat.scrollTop = chat.scrollHeight;
 }
 
@@ -208,13 +393,11 @@ function hideTyping() {
 async function sendMessage() {
   const text = input.value.trim();
   if (!text || sendBtn.disabled) return;
-  
   input.value = '';
   input.style.height = 'auto';
   sendBtn.disabled = true;
   addMessage('user', text);
   resetInactivityTimer();
-  
   showTyping();
   try {
     const resp = await fetch(BASE_URL + '/care-assistant/' + TOKEN + '/message', {
@@ -224,16 +407,14 @@ async function sendMessage() {
     });
     const data = await resp.json();
     hideTyping();
-    
     let display = data.response || 'I appreciate you sharing that with me.';
     const isUrgent = display.startsWith('[URGENT]');
     if (isUrgent) display = display.replace('[URGENT]', '').trim();
-    
     addMessage('bot', display, isUrgent);
     if (data.sessionId) sessionId = data.sessionId;
   } catch {
     hideTyping();
-    addMessage('bot', 'I\\'m having a little trouble connecting. Please try again in a moment.');
+    addMessage('bot', "I'm having a little trouble connecting. Please try again in a moment.");
   }
   sendBtn.disabled = false;
   input.focus();
@@ -247,14 +428,13 @@ function resetInactivityTimer() {
 async function endSession() {
   try {
     await fetch(BASE_URL + '/care-assistant/' + TOKEN + '/end-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId }),
     });
   } catch {}
 }
 
-// Input auto-resize
+// Auto-resize textarea
 input.addEventListener('input', () => {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
@@ -263,29 +443,30 @@ input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 sendBtn.addEventListener('click', sendMessage);
+endBtn.addEventListener('click', () => { endSession(); location.reload(); });
 
-// Voice input (Web Speech API)
+// Voice input
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SpeechRecognition();
   recognition.continuous = false;
   recognition.interimResults = false;
-  recognition.onresult = (e) => { input.value = e.results[0][0].transcript; };
+  recognition.onresult = (e) => { input.value = e.results[0][0].transcript; input.dispatchEvent(new Event('input')); };
   recognition.onend = () => { isRecording = false; micBtn.classList.remove('recording'); };
   micBtn.addEventListener('click', () => {
-    if (isRecording) { recognition.stop(); } 
+    if (isRecording) { recognition.stop(); }
     else { recognition.start(); isRecording = true; micBtn.classList.add('recording'); }
   });
 } else {
   micBtn.style.display = 'none';
 }
 
-// End session on page close
 window.addEventListener('beforeunload', endSession);
 
-// Opening message
+// Opening welcome message
 addMessage('bot', 'Hi ' + PREFERRED_NAME + '! I\\'m your Care Companion. I\\'m here whenever you want to check in. How are you doing today?');
 resetInactivityTimer();
+input.focus();
 </script>
 </body>
 </html>`);

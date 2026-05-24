@@ -909,4 +909,106 @@ export async function deleteComplianceEngine(id: string) {
   return deleteDoc(doc(db, "compliance_engines", id));
 }
 
+// ─── Service Authorizations ───────────────────────────────────────────────────
 
+export type AuthBillingPeriod = "monthly" | "quarterly" | "annual" | "one_time";
+export type AuthStatus = "active" | "expired" | "pending" | "voided";
+
+export interface ServiceAuthorization {
+  id: string;
+  /** Matches the individual's Firestore doc id */
+  individualId: string;
+  /** Snake-case alias kept for query compat with useSubCollection */
+  individual_id: string;
+  individualName: string;
+  organizationId: string;
+  assigned_case_manager_id?: string;
+  assigned_case_manager_name?: string;
+  auth_number: string;
+  service_name: string;
+  procedure_code: string;
+  payer: string;
+  units_authorized: number;
+  units_used: number;
+  billing_period: AuthBillingPeriod;
+  start_date: string;   // YYYY-MM-DD
+  end_date: string;     // YYYY-MM-DD
+  status: AuthStatus;
+  notes?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+/** Individual-scoped: all auths for one person */
+export function useServiceAuthorizations(individualId: string | undefined) {
+  return useSubCollection<ServiceAuthorization>(
+    individualId,
+    "service_authorizations",
+    "end_date",
+    "asc"
+  );
+}
+
+/** Org-wide: all auths for a case manager's caseload */
+export function useAllAuthorizations(
+  organizationId: string | undefined,
+  caseManagerId: string | undefined
+) {
+  const [data, setData] = useState<ServiceAuthorization[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!organizationId || !caseManagerId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const q = query(
+      collection(db, "service_authorizations"),
+      where("organizationId", "==", organizationId),
+      where("assigned_case_manager_id", "==", caseManagerId),
+      orderBy("end_date", "asc")
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ServiceAuthorization)));
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error("[service_authorizations]", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [organizationId, caseManagerId]);
+
+  return { data, loading, error };
+}
+
+export async function addServiceAuthorization(
+  data: Omit<ServiceAuthorization, "id" | "created_at" | "updated_at">
+) {
+  return addDoc(collection(db, "service_authorizations"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateServiceAuthorization(
+  id: string,
+  data: Partial<ServiceAuthorization>
+) {
+  return updateDoc(doc(db, "service_authorizations", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function deleteServiceAuthorization(id: string) {
+  return deleteDoc(doc(db, "service_authorizations", id));
+}

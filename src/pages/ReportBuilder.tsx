@@ -21,8 +21,11 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { writeAudit } from "@/data/supervisor";
-import { auth } from "@/lib/firebase";
+import { writeAudit as mockWriteAudit } from "@/data/supervisor";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { writeAudit } from "@/lib/auditService";
 
 // ------------------ Field catalog ------------------
 
@@ -147,6 +150,8 @@ const DEFAULT_FILTERS: Filter[] = [
 
 const ReportBuilder = () => {
   const navigate = useNavigate();
+  const { currentUser, userProfile } = useAuth();
+  const orgId = userProfile?.organizationId || currentUser?.organizationId || "demo";
   const [prompt, setPrompt] = useState(PROMPT_EXAMPLE);
   const [interpreted, setInterpreted] = useState(true);
   const [interpreting, setInterpreting] = useState(false);
@@ -248,7 +253,7 @@ Return JSON:
     } finally {
       setInterpreting(false);
     }
-    writeAudit({
+    mockWriteAudit({
       ts: new Date().toISOString(),
       actor: "Admin (Jordan Reeves)",
       action: "report.builder.interpret_prompt",
@@ -366,7 +371,7 @@ Return JSON:
     a.download = `${reportName.replace(/\s+/g, "_")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    writeAudit({
+    mockWriteAudit({
       ts: new Date().toISOString(),
       actor: "Admin (Jordan Reeves)",
       action: "report.export",
@@ -391,7 +396,7 @@ Return JSON:
     a.download = `${reportName.replace(/\s+/g, "_")}.xls`;
     a.click();
     URL.revokeObjectURL(url);
-    writeAudit({
+    mockWriteAudit({
       ts: new Date().toISOString(),
       actor: "Admin (Jordan Reeves)",
       action: "report.export",
@@ -402,23 +407,52 @@ Return JSON:
     flash("Exported as Excel.");
   }
 
-  function saveReport() {
-    writeAudit({
-      ts: new Date().toISOString(),
-      actor: "Admin (Jordan Reeves)",
-      action: "report.save",
-      report: reportName,
-      fields: selectedFields.length,
-      filters: filters.length,
-      groupBy,
-      roleAccess,
-    });
-    flash("Report saved to My Reports.");
+  async function saveReport() {
+    if (!orgId) return;
+    try {
+      await addDoc(collection(db, "reports"), {
+        title: reportName,
+        name: reportName,
+        type: "ai",
+        content: JSON.stringify({
+          selectedFields,
+          filters,
+          groupBy,
+        }),
+        description: `Custom AI report with ${filters.length} filters and ${selectedFields.length} fields.`,
+        category: "Compliance",
+        lastRun: "Just now",
+        createdBy: currentUser?.email || "Admin",
+        generatedBy: currentUser?.uid || "unknown",
+        organizationId: orgId,
+        createdAt: serverTimestamp(),
+      });
+
+      await writeAudit("draft_saved", "report", "new_report", {
+        reportName,
+      });
+
+      mockWriteAudit({
+        ts: new Date().toISOString(),
+        actor: "Admin (Jordan Reeves)",
+        action: "report.save",
+        report: reportName,
+        fields: selectedFields.length,
+        filters: filters.length,
+        groupBy,
+        roleAccess,
+      });
+
+      flash("Report saved to My Reports.");
+    } catch (err: any) {
+      console.error("Failed to save report:", err);
+      flash("Failed to save report.");
+    }
   }
 
   function publish() {
     setPublished(true);
-    writeAudit({
+    mockWriteAudit({
       ts: new Date().toISOString(),
       actor: "Admin (Jordan Reeves)",
       action: "report.publish_to_dashboard",
@@ -431,7 +465,7 @@ Return JSON:
   function saveSchedule() {
     setSchedule((s) => ({ ...s, enabled: true }));
     setScheduleOpen(false);
-    writeAudit({
+    mockWriteAudit({
       ts: new Date().toISOString(),
       actor: "Admin (Jordan Reeves)",
       action: "report.schedule",

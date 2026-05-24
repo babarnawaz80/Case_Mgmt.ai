@@ -1,0 +1,87 @@
+{"users": [
+{
+  "localId": "7nG8y5dbrMdDQakWGbVue8B3oa92",
+  "email": "saima@icaremanager.com",
+  "emailVerified": false,
+  "passwordHash": "EQscj3DPidINhjquxDrFrlQLxaSD847oTL4h5i4Rl5WpuRRj9lfGr488nbLHTw9kqR3XbkSIefyhSCsU1oJNUA==",
+  "salt": "pUA+RY+6GisVVA==",
+  "lastSignedInAt": "1779594357075",
+  "createdAt": "1779594357075",
+  "providerUserInfo": []
+},
+{
+  "localId": "SyMfMQcIcAexWYB1xDQvc0ex0dm1",
+  "email": "kathy@demo.casemanagement.ai",
+  "emailVerified": true,
+  "passwordHash": "ImHjct77dM63fODXQTa4yO85H9QAKfhgu71CMXTZrg/HtlR9YZsWSfO0zuFvXrGflZuPdDBR+zdgySMAqGyWvQ==",
+  "salt": "Zyie/Og4kwc+mQ==",
+  "displayName": "Kathy Morrison",
+  "lastSignedInAt": "1779597330502",
+  "createdAt": "1779573003393",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1",
+  "email": "admin@demo.casemanagement.ai",
+  "emailVerified": true,
+  "passwordHash": "G4HFch5CCQsZsRcuFV96Qf0ecIdAvrYEzXZmsz8owF4sbeJ5i9JlQkFPHx4FEufZBbAlIQUeqwBRdjnr+bU9jw==",
+  "salt": "gfErE4g4nyhFow==",
+  "displayName": "Admin User",
+  "lastSignedInAt": "1779602194427",
+  "createdAt": "1779573005241",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "ZAvmcaowFQTAdAEfG1gzxDXQv4f2",
+  "email": "babar@icaremanager.com",
+  "emailVerified": true,
+  "displayName": "Babar Nawaz",
+  "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocJLaffULZVpgBYtiO_NxhStPmIZWR5Q2QTdFXUqizlZlQD-sj1x=s96-c",
+  "lastSignedInAt": "1779561863504",
+  "createdAt": "1779558449001",
+  "disabled": false,
+  "providerUserInfo": [
+    {
+      "providerId": "google.com",
+      "rawId": "115413164684454707586",
+      "email": "babar@icaremanager.com",
+      "displayName": "Babar Nawaz",
+      "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocJLaffULZVpgBYtiO_NxhStPmIZWR5Q2QTdFXUqizlZlQD-sj1x=s96-c"
+    }
+  ]
+},
+{
+  "localId": "tIqI6hoiVUd7T0JbJaklKyRRb212",
+  "email": "jennie@demo.casemanagement.ai",
+  "emailVerified": true,
+  "passwordHash": "v3zyS3sWlEHtliGdV8jEXGGolZ/6Jic0xilZFZyVJgjN1SyRfJ7j+tz/p5/75Gi1CJLoX62k/4wuQ9bglfWMzQ==",
+  "salt": "AmXps2HZRrZD5Q==",
+  "displayName": "Jennie Park",
+  "lastSignedInAt": "1779581842213",
+  "createdAt": "1779573004335",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "usbbiC3QDFVtvmzQlMjGRCGLBNJ2",
+  "email": "superadmin@casemanagement.ai",
+  "emailVerified": false,
+  "passwordHash": "oYAIsesEk7yGj4ZSNSsPMHlMSsShnerTwAGVZb+Uv8lKJCTgekwZnf9W+FdqtMY2CGIIXJFqF9eZtl8HZQbDCg==",
+  "salt": "wsXWrO0SZBOOPA==",
+  "lastSignedInAt": "1779586751107",
+  "createdAt": "1779578798930",
+  "providerUserInfo": []
+},
+{
+  "localId": "x76JNMWp4VZL0ZBPOHzac4RgBmB2",
+  "email": "test@icaremanager.com",
+  "emailVerified": false,
+  "passwordHash": "DPHJi4fra2GPSMslkPEpbHOxy7N0TlR0Osm4TeuBHiRUEcJ2oomUzo0re8AwTpZFvmX8xpW0d5DLNJdwQPNvnQ==",
+  "salt": "lGGYU3a8JN5YuQ==",
+  "displayName": "Babar Nawaz Test",
+  "lastSignedInAt": "1779582378316",
+  "createdAt": "1779582378316",
+  "providerUserInfo": []
+}]}

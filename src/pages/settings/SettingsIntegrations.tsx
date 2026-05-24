@@ -131,9 +131,13 @@ const SettingsIntegrations = () => {
   const handleSaveConfig = async (id: string, newState: IntegrationState) => {
     if (!orgId) return;
     const updated = { ...intStates, [id]: newState };
+    const idUnderscore = id.replace("-", "_");
+    const isConnected = newState.status === "connected";
     try {
       await updateDoc(doc(db, "organizations", orgId), {
         integrations: updated,
+        [`integrations.${id}`]: isConnected,
+        [`integrations.${idUnderscore}`]: isConnected,
         updatedAt: new Date(),
       });
       setIntStates(updated);
@@ -148,9 +152,12 @@ const SettingsIntegrations = () => {
   const handleDisconnect = async (id: string) => {
     if (!orgId) return;
     const updated = { ...intStates, [id]: { id, status: "not_connected" as const } };
+    const idUnderscore = id.replace("-", "_");
     try {
       await updateDoc(doc(db, "organizations", orgId), {
         integrations: updated,
+        [`integrations.${id}`]: false,
+        [`integrations.${idUnderscore}`]: false,
         updatedAt: new Date(),
       });
       setIntStates(updated);

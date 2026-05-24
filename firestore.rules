@@ -235,6 +235,15 @@ service cloud.firestore {
       allow delete: if isAdmin() && ownedByOrg();
     }
 
+    // Service Authorizations
+    match /service_authorizations/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
     // Assigned Staff
     match /assigned_staff/{id} {
       allow list: if isAuth();

@@ -46,6 +46,7 @@ import {
   type TabKey,
   type ProfileData,
 } from "@/data/profiles";
+import { useServiceAuthorizations } from "@/hooks/useFirestore";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "Basic Info" },
@@ -149,6 +150,8 @@ const PersonProfile = () => {
                 <p className="text-[12px] font-mono text-icm-text-dim mt-1">
                   {person.gender} · {person.age}y · {person.dob} · {person.county} · ID #{person.id}
                 </p>
+                {/* Authorization compliance summary — one minimal line */}
+                <AuthComplianceLine individualId={person.id} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                   <InlineField label="Allergies" value={person.allergies ?? "None recorded"} />
                   <InlineField
@@ -301,6 +304,47 @@ const PersonProfile = () => {
     </ICMShell>
   );
 };
+
+// =============================================================
+// AUTH COMPLIANCE LINE — shown in profile sticky header
+// =============================================================
+function AuthComplianceLine({ individualId }: { individualId: string }) {
+  const navigate = useNavigate();
+  const { data: auths } = useServiceAuthorizations(individualId);
+
+  if (auths.length === 0) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  function daysLeft(d: string) {
+    return Math.ceil((new Date(d + "T00:00:00").getTime() - today.getTime()) / 86400000);
+  }
+
+  const active = auths.filter((a) => a.status === "active" || a.status === "pending");
+  const critical = active.filter((a) => daysLeft(a.end_date) <= 7);
+  const expiringSoon = active.filter((a) => { const d = daysLeft(a.end_date); return d > 7 && d <= 30; });
+
+  return (
+    <button
+      onClick={() => navigate(`/people/${individualId}/authorizations`)}
+      className="flex items-center gap-2 mt-1 text-[11.5px] font-geist hover:underline"
+    >
+      <span className="text-icm-text-dim">
+        Authorizations: <span className="text-icm-text font-semibold">{active.length} active</span>
+      </span>
+      {expiringSoon.length > 0 && (
+        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-icm-amber-soft text-icm-amber ring-1 ring-icm-amber/20">
+          {expiringSoon.length} expiring
+        </span>
+      )}
+      {critical.length > 0 && (
+        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-icm-red-soft text-icm-red ring-1 ring-icm-red/20">
+          {critical.length} critical
+        </span>
+      )}
+    </button>
+  );
+}
 
 // =============================================================
 // TAB 1 — Basic Info

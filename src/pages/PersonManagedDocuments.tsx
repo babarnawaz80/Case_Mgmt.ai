@@ -8,10 +8,10 @@ import {
   File as FileIcon, Search, MoreVertical, Download, Trash2, Pencil, Star, ArrowLeft, Home,
   Eye, Calendar, User, X, FolderOpen, Archive, Loader2
 } from "lucide-react";
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useManagedDocuments } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Node = {
@@ -116,7 +116,34 @@ export default function PersonManagedDocuments() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading: individualLoading } = useIndividual(id);
-  const { data: dbDocs, loading: docsLoading } = useManagedDocuments(id);
+  const { currentUser, userProfile } = useAuth();
+  const orgId = userProfile?.organizationId || currentUser?.organizationId || "demo";
+
+  const [dbDocs, setDbDocs] = useState<any[]>([]);
+  const [docsLoading, setDocsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id || !orgId) return;
+    setDocsLoading(true);
+    const q = query(
+      collection(db, "managed_documents"),
+      where("individualId", "==", id),
+      where("organizationId", "==", orgId)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setDbDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setDocsLoading(false);
+      },
+      (err) => {
+        console.error("Error loading managed documents:", err);
+        setDocsLoading(false);
+      }
+    );
+    return unsub;
+  }, [id, orgId]);
+
   const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -154,6 +181,9 @@ export default function PersonManagedDocuments() {
         try {
           await addDoc(collection(db, "managed_documents"), {
             individual_id: id,
+            individualId: id,
+            organizationId: orgId,
+            organization_id: orgId,
             name: n.name,
             type: n.type,
             parent_id: n.parentId || "",
@@ -222,12 +252,15 @@ export default function PersonManagedDocuments() {
     try {
       await addDoc(collection(db, "managed_documents"), {
         individual_id: id,
+        individualId: id,
+        organizationId: orgId,
+        organization_id: orgId,
         name,
         type: "folder",
         parent_id: currentFolderId || "",
         created_at_iso: now,
         updated_at_iso: now,
-        created_by: "Kathy Martinez",
+        created_by: userProfile?.displayName || userProfile?.email || "Kathy Martinez",
         starred: false,
         size: 0,
         mime: "",
@@ -260,12 +293,15 @@ export default function PersonManagedDocuments() {
         try {
           await addDoc(collection(db, "managed_documents"), {
             individual_id: id,
+            individualId: id,
+            organizationId: orgId,
+            organization_id: orgId,
             name: file.name,
             type: "file",
             parent_id: currentFolderId || "",
             created_at_iso: now,
             updated_at_iso: now,
-            created_by: "Kathy Martinez",
+            created_by: userProfile?.displayName || userProfile?.email || "Kathy Martinez",
             starred: false,
             size: file.size,
             mime: file.type || "application/octet-stream",

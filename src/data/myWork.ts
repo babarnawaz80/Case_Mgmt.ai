@@ -317,8 +317,8 @@ function generateDummyTasks(): MyWorkTask[] {
 // AI-recommended focused-session order for the day.
 export const focusedSessionTaskIds = ["T-1001", "T-1003", "T-1006", "T-1007"];
 
-// Date helpers (treat 04/27/2026 as "today" for the demo).
-export const DEMO_TODAY = new Date(2026, 3, 27); // month is 0-indexed
+// Date helpers (treat current date as today dynamically)
+export const DEMO_TODAY = new Date();
 
 export function parseMDY(s?: string): Date | null {
   if (!s) return null;

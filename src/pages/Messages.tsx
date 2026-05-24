@@ -24,10 +24,14 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { cn } from "@/lib/utils";
 import { useMessages } from "@/hooks/useMessages";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   useFirestoreConversations,
   useConversationMessages,
   sendFSMessage,
+  createOrGetDirectConversation,
+  createGroupConversation,
 } from "@/hooks/useFirestoreMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -87,6 +91,41 @@ const Messages = () => {
     conversations: fsConversations,
     totalUnread: fsTotalUnread,
   } = useFirestoreConversations();
+
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!currentUser || !userProfile?.organizationId) return;
+    const fetchUsers = async () => {
+      try {
+        const q = query(
+          collection(db, "users"),
+          where("organizationId", "==", userProfile.organizationId)
+        );
+        const snap = await getDocs(q);
+        const list = snap.docs
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              firstName: data.firstName ?? "",
+              lastName: data.lastName ?? "",
+              name: `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim(),
+              displayName: data.displayName ?? "",
+              email: data.email ?? "",
+              role: data.role ?? "case_manager",
+              status: data.status ?? "active",
+              isActive: data.isActive ?? true,
+            };
+          })
+          .filter((u) => u.isActive !== false && u.status !== "suspended" && u.id !== currentUser.uid);
+        setAllUsers(list);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+      }
+    };
+    fetchUsers();
+  }, [currentUser, userProfile?.organizationId]);
 
   // Map live Firestore conversations into the unified Conversation interface
   const combinedConversations = useMemo(() => {
@@ -434,8 +473,60 @@ const Messages = () => {
 
         {newOpen && (
           <NewMessageModal
+            users={allUsers}
             onClose={() => setNewOpen(false)}
-            onCreate={(memberIds, groupName, firstMessage) => {
+            onCreate={async (memberIds, groupName, firstMessage) => {
+              if (currentUser && userProfile?.organizationId) {
+                try {
+                  let newId = "";
+                  const myName = userProfile.firstName && userProfile.lastName 
+                    ? `${userProfile.firstName} ${userProfile.lastName}` 
+                    : userProfile.displayName || "Me";
+                    
+                  if (memberIds.length === 1) {
+                    const recipientId = memberIds[0];
+                    const recipientUser = allUsers.find((u) => u.id === recipientId);
+                    const recipientName = recipientUser ? recipientUser.name : "Supervisor";
+                    
+                    newId = await createOrGetDirectConversation(
+                      currentUser.uid,
+                      myName,
+                      recipientId,
+                      recipientName,
+                      userProfile.organizationId
+                    );
+                  } else {
+                    const membersList = memberIds.map(id => {
+                      const u = allUsers.find((x) => x.id === id);
+                      return { uid: id, name: u ? u.name : "User" };
+                    });
+                    membersList.push({ uid: currentUser.uid, name: myName });
+                    
+                    newId = await createGroupConversation(
+                      membersList,
+                      groupName || "Group Conversation",
+                      currentUser.uid,
+                      userProfile.organizationId
+                    );
+                  }
+                  
+                  if (firstMessage.trim()) {
+                    await sendFSMessage(
+                      newId,
+                      currentUser.uid,
+                      myName,
+                      firstMessage
+                    );
+                  }
+                  
+                  setActiveId(newId);
+                  setNewOpen(false);
+                  return;
+                } catch (err) {
+                  console.error("Failed to create Firestore conversation:", err);
+                }
+              }
+
               const id = createConversation(memberIds, groupName);
               if (firstMessage.trim()) {
                 sendMessage(id, { kind: "text", text: firstMessage });
@@ -1297,21 +1388,67 @@ function LinkRecordPicker({
 // ----- New message modal --------------------------------------------------
 
 function NewMessageModal({
+  users,
   onClose,
   onCreate,
 }: {
+  users: any[];
   onClose: () => void;
   onCreate: (memberIds: string[], groupName: string | undefined, firstMessage: string) => void;
 }) {
   const [recipients, setRecipients] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [groupName, setGroupName] = useState("");
+  const [staffList, setStaffList] = useState<any[]>([]);
 
-  const matches = allStaff.filter(
-    (s) =>
-      !recipients.includes(s.id) &&
-      s.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const { currentUser, userProfile } = useAuth();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchStaff = async () => {
+      try {
+        const orgId = userProfile?.organizationId || (currentUser as any).organizationId;
+        const q = query(
+          collection(db, 'users'),
+          where('organizationId', '==', orgId),
+          where('isActive', '==', true)
+        );
+        const snapshot = await getDocs(q);
+        const staff = snapshot.docs
+          .map(d => {
+            const data = d.data();
+            return {
+              id: d.id,
+              uid: data.uid ?? d.id,
+              firstName: data.firstName ?? "",
+              lastName: data.lastName ?? "",
+              name: `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim(),
+              email: data.email ?? "",
+              role: data.role ?? "case_manager",
+              ...data
+            };
+          })
+          .filter(u => u.uid !== currentUser.uid && u.id !== currentUser.uid);
+        setStaffList(staff);
+      } catch (err) {
+        console.error("Error loading staff:", err);
+      }
+    };
+    fetchStaff();
+  }, [currentUser, userProfile]);
+
+  const matches = useMemo(() => {
+    const term = search.toLowerCase().trim();
+    if (!term) return staffList.filter((u) => !recipients.includes(u.id));
+    return staffList.filter((u) => {
+      if (recipients.includes(u.id)) return false;
+      const fullName = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
+      return (
+        fullName.includes(term) ||
+        (u.email || "").toLowerCase().includes(term)
+      );
+    });
+  }, [staffList, recipients, search]);
 
   const isGroup = recipients.length > 1;
 
@@ -1334,7 +1471,11 @@ function NewMessageModal({
             </label>
             <div className="mt-1 rounded-lg border border-icm-border bg-icm-bg px-2 py-1.5 flex flex-wrap gap-1.5 min-h-[40px]">
               {recipients.map((id) => {
-                const s = staffById[id];
+                const s = staffList.find((u) => u.id === id) || users.find((u) => u.id === id) || staffById[id] || {
+                  id,
+                  name: "Unknown",
+                  role: "case_manager" as const,
+                };
                 return (
                   <span
                     key={id}
@@ -1360,35 +1501,48 @@ function NewMessageModal({
                 className="flex-1 min-w-[120px] bg-transparent text-[12.5px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none"
               />
             </div>
-            {search && matches.length > 0 && (
+            {matches.length > 0 && (
               <div className="mt-1 rounded-lg border border-icm-border bg-icm-panel max-h-48 overflow-y-auto">
-                {matches.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setRecipients([...recipients, s.id]);
-                      setSearch("");
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-icm-bg text-left"
-                  >
-                    <span
-                      className={cn(
-                        "w-6 h-6 rounded-lg ring-1 flex items-center justify-center text-[9px] font-geist font-bold",
-                        roleAvatarTone(s.role)
-                      )}
+                {matches.map((s) => {
+                  const initials = `${s.firstName?.[0] ?? ""}${s.lastName?.[0] ?? ""}`.toUpperCase();
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setRecipients([...recipients, s.id]);
+                        setSearch("");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-icm-bg text-left border-b border-icm-border/40 last:border-b-0"
                     >
-                      {s.initials}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-geist font-semibold text-icm-text">
-                        {s.name}
-                      </p>
-                      <p className="text-[10.5px] font-geist text-icm-text-faint">
-                        {roleLabel(s.role)}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                      <span
+                        className={cn(
+                          "w-7 h-7 rounded-lg ring-1 flex items-center justify-center text-[10px] font-geist font-bold shrink-0",
+                          roleAvatarTone(s.role)
+                        )}
+                      >
+                        {initials || "??"}
+                      </span>
+                      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[12px] font-geist font-bold text-icm-text truncate">
+                            {s.name}
+                          </p>
+                          <p className="text-[10.5px] font-geist text-icm-text-faint truncate">
+                            {s.email}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[9px] font-geist font-bold ring-1 shrink-0 uppercase tracking-wider",
+                            roleAvatarTone(s.role)
+                          )}
+                        >
+                          {roleLabel(s.role)}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { writeAudit } from "@/lib/auditService";
 import { Save, Loader2 } from "lucide-react";
 
 interface OrgData {
@@ -107,9 +108,23 @@ const SettingsOrganization = () => {
     if (!orgId) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, "organizations", orgId), {
+      const payload = {
         ...form,
-        updatedAt: new Date(),
+        name: form.name,
+        address: {
+          street: form.street,
+          city: form.city,
+          state: form.state,
+          zip: form.zip,
+          county: form.county,
+        },
+        phone: form.phone,
+        states_of_operation: form.states,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(doc(db, "organizations", orgId), payload);
+      await writeAudit("update_organization", "organization", orgId, {
+        name: form.name,
       });
       toast.success("Organization profile saved", {
         description: "Changes propagated to all users.",

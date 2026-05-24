@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
+exports.dailyAuthRenewalCheck = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const v2_1 = require("firebase-functions/v2");
@@ -79,10 +79,16 @@ app.post("/care-assistant/:token/end-session", companion_1.companionEndSession);
 // ─── Compliance Agents API ────────────────────────────────────────────────
 const agents_1 = require("./api/agents");
 app.post("/api/agents/pcp-renewal/run", agents_1.runPcpRenewalAgent);
+// ─── Ambient / Deepgram Token API ─────────────────────────────────────────
+const ambient_1 = require("./api/ambient");
+app.post("/api/ambient/deepgram-token", ambient_1.deepgramToken);
 // ─── Export the Express app as a single Gen 2 Cloud Function ──────────────
 exports.api = (0, https_1.onRequest)({ cors: true }, app);
 // ─── Firestore Triggers ───────────────────────────────────────────────────
 var billing_claims_1 = require("./triggers/billing-claims");
 Object.defineProperty(exports, "onNewBillingClaim", { enumerable: true, get: function () { return billing_claims_1.onNewBillingClaim; } });
 Object.defineProperty(exports, "onWorkflowTaskDailyCheck", { enumerable: true, get: function () { return billing_claims_1.onWorkflowTaskDailyCheck; } });
+// ─── Scheduled Functions ──────────────────────────────────────────────────
+var authorizationRenewal_1 = require("./api/authorizationRenewal");
+Object.defineProperty(exports, "dailyAuthRenewalCheck", { enumerable: true, get: function () { return authorizationRenewal_1.dailyAuthRenewalCheck; } });
 //# sourceMappingURL=index.js.map

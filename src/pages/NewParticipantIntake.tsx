@@ -40,6 +40,7 @@ import {
   collection, addDoc, serverTimestamp, doc, getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { writeAudit } from "@/lib/auditService";
 
 const COUNTIES = [
   "Adams","Allen","Bartholomew","Benton","Blackford","Boone","Brown","Carroll","Cass","Clark",
@@ -512,6 +513,9 @@ export default function NewParticipantIntake() {
         program_region: data.programRegion,
         notes: data.notes,
         enrollment_status: "active",
+        status: "active",
+        companion_token: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + "-" + Math.random().toString(36).substring(2),
+        companion_link_active: true,
         risk_score: 5, // default — set by first assessment
         organizationId: orgId,
         createdBy: authorId,
@@ -544,6 +548,13 @@ export default function NewParticipantIntake() {
       await Promise.all(taskPromises);
 
       // Audit log entry
+      await writeAudit("create_individual", "individual", newId, {
+        name: `${data.firstName} ${data.lastName}`,
+        organizationId: orgId,
+        details: `Programs: ${data.programs.join(", ")} · Supervisor: ${data.supervisor} · ${initialTasks.length} tasks created`,
+      });
+
+      // Keep backup manual log entry for safety
       await addDoc(collection(db, "audit_log"), {
         actorId: authorId,
         actorName: authorName,

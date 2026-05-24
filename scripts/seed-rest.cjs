@@ -1,340 +1,273 @@
 #!/usr/bin/env node
-// Seed script using Firebase CLI's stored access token via REST API
-// Avoids needing service account key or gcloud ADC
+/**
+ * seed-rest.cjs  — Firestore seed via REST API (no service account needed)
+ * Run with: node scripts/seed-rest.cjs
+ */
 
 const https = require('https');
 const fs = require('fs');
-const os = require('os');
+const path = require('path');
+const { execSync } = require('child_process');
 
-const PROJECT_ID = 'casemanagement-ai';
-const ORG_ID = 'demo-org-001';
+const PROJECT = 'casemanagement-ai';
+const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
-// Read Firebase CLI stored access token
-const configPath = os.homedir() + '/.config/configstore/firebase-tools.json';
-const cliConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-const ACCESS_TOKEN = cliConfig.tokens.access_token;
+// Get a fresh access token via Firebase CLI
+function getAccessToken() {
+  const configPath = path.join(process.env.HOME, '.config/configstore/firebase-tools.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  return config.tokens?.access_token || config.tokens?.access_token;
+}
 
-if (!ACCESS_TOKEN) {
-  console.error('❌ No access token found in Firebase CLI config');
+const TOKEN = getAccessToken();
+
+if (!TOKEN) {
+  console.error('No access token found. Run: firebase login');
   process.exit(1);
 }
 
-// ── REST Helpers ──────────────────────────────────────────────────────────────
+// ── REST helpers ──────────────────────────────────────────────────────────────
+function request(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(BASE + path);
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method,
+      headers: {
+        'Authorization': `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+        } else {
+          resolve(data ? JSON.parse(data) : {});
+        }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
 
-function firestoreValue(val) {
+function toFS(val) {
   if (val === null || val === undefined) return { nullValue: null };
-  if (typeof val === 'string') return { stringValue: val };
-  if (typeof val === 'number') return { integerValue: String(Math.round(val)) };
   if (typeof val === 'boolean') return { booleanValue: val };
-  if (Array.isArray(val)) return { arrayValue: { values: val.map(firestoreValue) } };
-  if (val instanceof Date) return { timestampValue: val.toISOString() };
+  if (typeof val === 'number') return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) return { arrayValue: { values: val.map(toFS) } };
   if (typeof val === 'object') {
-    const fields = {};
-    for (const [k, v] of Object.entries(val)) {
-      if (v !== undefined) fields[k] = firestoreValue(v);
-    }
-    return { mapValue: { fields } };
+    return { mapValue: { fields: Object.fromEntries(Object.entries(val).map(([k, v]) => [k, toFS(v)])) } };
   }
   return { stringValue: String(val) };
 }
 
-function toFirestoreDoc(obj) {
+function toFSDoc(obj) {
   const fields = {};
   for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) fields[k] = firestoreValue(v);
+    fields[k] = toFS(v);
   }
   return { fields };
 }
 
-async function firestoreSet(collectionId, docId, data) {
-  return new Promise((resolve, reject) => {
-    const doc = toFirestoreDoc(data);
-    const body = JSON.stringify(doc);
-    const path = `/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collectionId}/${docId}`;
-    
-    const req = https.request({
-      hostname: 'firestore.googleapis.com',
-      path,
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      }
-    }, res => {
-      let responseData = '';
-      res.on('data', d => responseData += d);
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(JSON.parse(responseData));
-        } else {
-          reject(new Error(`Firestore error ${res.statusCode}: ${responseData}`));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-}
-
-async function identityToolkitRequest(path, body) {
-  return new Promise((resolve, reject) => {
-    const bodyStr = JSON.stringify(body);
-    const req = https.request({
-      hostname: 'identitytoolkit.googleapis.com',
-      path,
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(bodyStr),
-        'X-Goog-User-Project': PROJECT_ID,
-      }
-    }, res => {
-      let responseData = '';
-      res.on('data', d => responseData += d);
-      res.on('end', () => {
-        const parsed = JSON.parse(responseData);
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(parsed);
-        } else {
-          reject(new Error(`Identity API ${res.statusCode}: ${JSON.stringify(parsed)}`));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(bodyStr);
-    req.end();
-  });
-}
-
-async function lookupUserByEmail(email) {
-  try {
-    const res = await identityToolkitRequest(
-      `/v1/projects/${PROJECT_ID}/accounts:lookup`,
-      { email: [email] }
-    );
-    return res.users?.[0] || null;
-  } catch {
-    return null;
+function fromFS(fv) {
+  if (!fv) return null;
+  if ('stringValue' in fv) return fv.stringValue;
+  if ('integerValue' in fv) return parseInt(fv.integerValue);
+  if ('doubleValue' in fv) return fv.doubleValue;
+  if ('booleanValue' in fv) return fv.booleanValue;
+  if ('nullValue' in fv) return null;
+  if ('mapValue' in fv) {
+    const obj = {};
+    for (const [k, v] of Object.entries(fv.mapValue?.fields || {})) obj[k] = fromFS(v);
+    return obj;
   }
+  if ('arrayValue' in fv) return (fv.arrayValue?.values || []).map(fromFS);
+  return null;
 }
 
-async function deleteUser(localId) {
-  try {
-    await identityToolkitRequest(
-      `/v1/projects/${PROJECT_ID}/accounts:delete`,
-      { localId }
-    );
-  } catch (e) {
-    // Ignore
-  }
+function fromFSDoc(doc) {
+  const obj = { id: doc.name?.split('/').pop() };
+  for (const [k, v] of Object.entries(doc.fields || {})) obj[k] = fromFS(v);
+  return obj;
 }
 
-async function createUser({ email, password, displayName }) {
-  const res = await identityToolkitRequest(
-    `/v1/projects/${PROJECT_ID}/accounts`,
-    { email, password, displayName, emailVerified: true }
-  );
-  return res.localId;
+async function listDocs(collection) {
+  const result = await request('GET', `/${collection}?pageSize=300`);
+  return (result.documents || []).map(fromFSDoc);
 }
 
-// ── Seed Data ────────────────────────────────────────────────────────────────
+async function setDoc(collection, id, data) {
+  const url = `/${collection}/${id}`;
+  await request('PATCH', url, toFSDoc(data));
+}
 
-const USERS = [
-  {
-    email: 'kathy@demo.casemanagement.ai',
-    password: 'Demo1234!',
-    firstName: 'Kathy',
-    lastName: 'Morrison',
-    displayName: 'Kathy Morrison',
-    role: 'case_manager',
-  },
-  {
-    email: 'jennie@demo.casemanagement.ai',
-    password: 'Demo1234!',
-    firstName: 'Jennie',
-    lastName: 'Park',
-    displayName: 'Jennie Park',
-    role: 'supervisor',
-  },
-  {
-    email: 'admin@demo.casemanagement.ai',
-    password: 'Demo1234!',
-    firstName: 'Admin',
-    lastName: 'User',
-    displayName: 'Admin User',
-    role: 'admin',
-  },
-];
+async function deleteDoc(collection, id) {
+  await request('DELETE', `/${collection}/${id}`);
+}
 
-async function seed() {
-  console.log('🌱 Starting CaseManagement.AI demo seed (REST API)...\n');
-
-  // 1. Create Organization
-  console.log('📁 Creating organization...');
-  await firestoreSet('organizations', ORG_ID, {
-    id: ORG_ID,
-    name: 'iCareManager Demo Agency',
-    short_name: 'iCareManager',
-    active: true,
-    ai_features_enabled: true,
-    credit_balance: 47240,
-    state: 'TX',
-    createdAt: new Date().toISOString(),
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
-  console.log('   ✅ Organization created: demo-org-001\n');
+}
 
-  // 2. Create Auth users + Firestore user docs
-  console.log('👥 Creating demo users...');
-  const userUids = {};
+function log(msg) { console.log(`  ${msg}`); }
 
-  for (const user of USERS) {
-    try {
-      // Check if user exists, delete if so
-      const existing = await lookupUserByEmail(user.email);
-      if (existing) {
-        await deleteUser(existing.localId);
-        console.log(`   ♻️  Deleted existing: ${user.email}`);
-      }
+// ── TASK 2A — Clean organizations ─────────────────────────────────────────────
+async function cleanOrganizations() {
+  console.log('\n[TASK 2A] Cleaning organizations collection…');
+  const orgs = await listDocs('organizations');
+  log(`Found ${orgs.length} org(s)`);
 
-      const uid = await createUser({
-        email: user.email,
-        password: user.password,
-        displayName: user.displayName,
-      });
-      userUids[user.email] = uid;
+  for (const org of orgs) {
+    const name = org.name || org.displayName || '';
+    const credits = org.credits || org.ai_credits || 0;
+    log(`org: ${org.id} | "${name}" | credits: ${credits}`);
 
-      await firestoreSet('users', uid, {
-        uid,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        displayName: user.displayName,
-        role: user.role,
-        organizationId: ORG_ID,
-        isActive: true,
-        caseload: [],
-        createdAt: new Date().toISOString(),
-        lastLoginAt: null,
-      });
-
-      console.log(`   ✅ ${user.role.padEnd(14)} ${user.email} (uid: ${uid})`);
-    } catch (err) {
-      console.error(`   ❌ Failed ${user.email}: ${err.message}`);
+    // Delete "CaseManagement Demo Org" duplicates
+    if (name.toLowerCase().includes('casemanagement demo org') ||
+        name.toLowerCase().includes('case management demo org')) {
+      await deleteDoc('organizations', org.id);
+      log(`→ DELETED: "${name}" (${org.id})`);
     }
   }
-
-  const kathyUid = userUids['kathy@demo.casemanagement.ai'];
-  console.log();
-
-  // 3. Create Individuals
-  console.log('🧑‍🤝‍🧑 Creating 3 demo individuals...');
-
-  const individuals = [
-    {
-      id: 'ind-001',
-      first_name: 'Joseph',
-      last_name: 'Brown',
-      county: 'Carroll',
-      risk_score: 71,
-      status: 'active',
-      pcp_status: 'out_of_compliance',
-      assigned_case_manager: kathyUid || 'unknown',
-      organizationId: ORG_ID,
-      dob: '1985-03-15',
-      gender: 'Male',
-      diagnosis: 'Intellectual Disability',
-      enrollment_status: 'active',
-      open_tasks: 3,
-      open_incidents: 1,
-      alerts: ['PCP overdue — out of compliance'],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'ind-002',
-      first_name: 'Travis',
-      last_name: 'Langston',
-      county: 'Dallas',
-      risk_score: 42,
-      status: 'active',
-      pcp_status: 'off_track',
-      assigned_case_manager: kathyUid || 'unknown',
-      organizationId: ORG_ID,
-      dob: '1990-07-22',
-      gender: 'Male',
-      diagnosis: 'Autism Spectrum Disorder',
-      enrollment_status: 'active',
-      open_tasks: 2,
-      open_incidents: 0,
-      alerts: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'ind-003',
-      first_name: 'Ashley',
-      last_name: 'Walker',
-      county: 'Clinton',
-      risk_score: 45,
-      status: 'active',
-      pcp_status: 'off_track',
-      assigned_case_manager: kathyUid || 'unknown',
-      organizationId: ORG_ID,
-      dob: '1995-11-08',
-      gender: 'Female',
-      diagnosis: 'Cerebral Palsy',
-      enrollment_status: 'active',
-      open_tasks: 1,
-      open_incidents: 0,
-      alerts: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
-
-  for (const ind of individuals) {
-    const { id, ...data } = ind;
-    await firestoreSet('individuals', id, data);
-    console.log(`   ✅ ${ind.first_name} ${ind.last_name} — ID: ${id}`);
-  }
-  console.log();
-
-  // 4. Update Kathy's caseload
-  if (kathyUid) {
-    await firestoreSet('users', kathyUid, {
-      uid: kathyUid,
-      email: 'kathy@demo.casemanagement.ai',
-      firstName: 'Kathy',
-      lastName: 'Morrison',
-      displayName: 'Kathy Morrison',
-      role: 'case_manager',
-      organizationId: ORG_ID,
-      isActive: true,
-      caseload: ['ind-001', 'ind-002', 'ind-003'],
-      createdAt: new Date().toISOString(),
-    });
-    console.log('   ✅ Updated Kathy\'s caseload → [ind-001, ind-002, ind-003]\n');
-  }
-
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('✅ SEED COMPLETE');
-  console.log('═══════════════════════════════════════════════════════════\n');
-  console.log('🔑 LOGIN CREDENTIALS:');
-  console.log('   Case Manager : kathy@demo.casemanagement.ai  / Demo1234!');
-  console.log('   Supervisor   : jennie@demo.casemanagement.ai / Demo1234!');
-  console.log('   Admin        : admin@demo.casemanagement.ai  / Demo1234!');
-  console.log('\n👤 UIDs:');
-  for (const [email, uid] of Object.entries(userUids)) {
-    console.log(`   ${email}: ${uid}`);
-  }
-
-  process.exit(0);
+  console.log('  ✓ Organizations cleaned');
 }
 
-seed().catch(err => {
-  console.error('❌ Seed failed:', err.message || err);
-  process.exit(1);
-});
+// ── TASK 2B — Clean duplicate individuals ─────────────────────────────────────
+async function cleanIndividuals() {
+  console.log('\n[TASK 2B] Cleaning duplicate individuals…');
+  const inds = await listDocs('individuals');
+  log(`Found ${inds.length} individual doc(s)`);
+
+  const keepPattern = /^ind-\d{3}$/;
+  let deleted = 0;
+
+  for (const ind of inds) {
+    if (!keepPattern.test(ind.id)) {
+      const name = `${ind.firstName || ind.first_name || ''} ${ind.lastName || ind.last_name || ''}`.trim();
+      log(`→ DELETE duplicate: ${ind.id} (${name})`);
+      await deleteDoc('individuals', ind.id);
+      deleted++;
+    }
+  }
+  log(`Deleted ${deleted} duplicate(s)`);
+  console.log('  ✓ Individuals de-duplicated');
+}
+
+// ── TASK 2C — Fix ind-001 ─────────────────────────────────────────────────────
+async function fixInd001() {
+  console.log('\n[TASK 2C] Fixing ind-001 (Joseph Brown)…');
+  await setDoc('individuals', 'ind-001', {
+    id: 'ind-001',
+    firstName: 'Joseph',
+    lastName: 'Brown',
+    first_name: 'Joseph',
+    last_name: 'Brown',
+    preferredName: 'Joe',
+    dob: '1988-01-15',
+    gender: 'Male',
+    risk_score: 71,
+    county: 'Carroll',
+    enrollment_status: 'active',
+    program: 'Community Pathways',
+    organizationId: 'demo-org-001',
+    companion_token: uuid(),
+    companion_link_active: true,
+  });
+  console.log('  ✓ ind-001 fixed');
+}
+
+// ── TASK 3 — Seed 15 new individuals ─────────────────────────────────────────
+const INDIVIDUALS = [
+  { id:'ind-002', firstName:'Travis', lastName:'Langston', first_name:'Travis', last_name:'Langston', dob:'1984-07-22', gender:'Male', county:'Howard', program:'HCBS Waiver', risk_score:55, enrollment_status:'active' },
+  { id:'ind-003', firstName:'Ashley', lastName:'Walker', first_name:'Ashley', last_name:'Walker', dob:'1997-02-14', gender:'Female', county:'Carroll', program:'Community Pathways', risk_score:42, enrollment_status:'active' },
+  { id:'ind-004', firstName:'Maria', lastName:'Garcia', first_name:'Maria', last_name:'Garcia', preferredName:'Mari', dob:'1995-03-22', gender:'Female', county:'Baltimore', program:'Community Pathways', risk_score:45, enrollment_status:'active', assigned_case_manager:'kathy' },
+  { id:'ind-005', firstName:'Robert', lastName:'Johnson', first_name:'Robert', last_name:'Johnson', dob:'1978-11-08', gender:'Male', county:'Carroll', program:'HCBS Waiver', risk_score:62, enrollment_status:'active' },
+  { id:'ind-006', firstName:'Sarah', lastName:'Mitchell', first_name:'Sarah', last_name:'Mitchell', dob:'2001-06-14', gender:'Female', county:'Howard', program:'Family Support', risk_score:28, enrollment_status:'active' },
+  { id:'ind-007', firstName:'David', lastName:'Williams', first_name:'David', last_name:'Williams', dob:'1990-09-30', gender:'Male', county:'Frederick', program:'Community Pathways', risk_score:55, enrollment_status:'active' },
+  { id:'ind-008', firstName:'Jennifer', lastName:'Davis', first_name:'Jennifer', last_name:'Davis', dob:'1985-01-17', gender:'Female', county:'Anne Arundel', program:'Supported Living', risk_score:38, enrollment_status:'active' },
+  { id:'ind-009', firstName:'Michael', lastName:'Thompson', first_name:'Michael', last_name:'Thompson', dob:'2003-04-05', gender:'Male', county:'Baltimore', program:'Community Pathways', risk_score:71, enrollment_status:'active', compliance_flag:'ISP overdue' },
+  { id:'ind-010', firstName:'Lisa', lastName:'Anderson', first_name:'Lisa', last_name:'Anderson', dob:'1972-08-19', gender:'Female', county:'Carroll', program:'Aging and Disability', risk_score:82, enrollment_status:'active' },
+  { id:'ind-011', firstName:'James', lastName:'Martinez', first_name:'James', last_name:'Martinez', dob:'1998-12-11', gender:'Male', county:'Harford', program:'Community Pathways', risk_score:33, enrollment_status:'active' },
+  { id:'ind-012', firstName:'Patricia', lastName:'Taylor', first_name:'Patricia', last_name:'Taylor', dob:'1969-05-28', gender:'Female', county:'Montgomery', program:'HCBS Waiver', risk_score:58, enrollment_status:'transition' },
+  { id:'ind-013', firstName:'Kevin', lastName:'Wilson', first_name:'Kevin', last_name:'Wilson', dob:'2005-02-14', gender:'Male', county:"Prince George's", program:'Family Support', risk_score:41, enrollment_status:'active' },
+  { id:'ind-014', firstName:'Dorothy', lastName:'Brown', first_name:'Dorothy', last_name:'Brown', dob:'1955-07-03', gender:'Female', county:'Baltimore', program:'Aging and Disability', risk_score:77, enrollment_status:'active' },
+  { id:'ind-015', firstName:'Christopher', lastName:'Lee', first_name:'Christopher', last_name:'Lee', dob:'1993-10-22', gender:'Male', county:'Howard', program:'Community Pathways', risk_score:49, enrollment_status:'active' },
+  { id:'ind-016', firstName:'Michelle', lastName:'Harris', first_name:'Michelle', last_name:'Harris', dob:'2000-03-18', gender:'Female', county:'Carroll', program:'Supported Employment', risk_score:31, enrollment_status:'active' },
+  { id:'ind-017', firstName:'Thomas', lastName:'Jackson', first_name:'Thomas', last_name:'Jackson', dob:'1987-06-09', gender:'Male', county:'Frederick', program:'HCBS Waiver', risk_score:65, enrollment_status:'active', compliance_flag:'Monitoring form due' },
+  { id:'ind-018', firstName:'Nancy', lastName:'White', first_name:'Nancy', last_name:'White', dob:'1963-11-30', gender:'Female', county:'Anne Arundel', program:'Community Pathways', risk_score:44, enrollment_status:'active' },
+];
+
+async function seedIndividuals() {
+  console.log('\n[TASK 3] Seeding individuals (upsert with organizationId)…');
+  for (const ind of INDIVIDUALS) {
+    const doc = {
+      ...ind,
+      organizationId: 'demo-org-001',
+      companion_token: uuid(),
+      companion_link_active: true,
+    };
+    await setDoc('individuals', ind.id, doc);
+    log(`✓ ${ind.id}: ${ind.firstName} ${ind.lastName}`);
+  }
+  console.log('  ✓ All individuals seeded');
+}
+
+// ── TASK 4 — Verify ───────────────────────────────────────────────────────────
+async function verify() {
+  console.log('\n[TASK 4] Verifying result…');
+  const inds = await listDocs('individuals');
+  const orgInds = inds.filter(i => i.organizationId === 'demo-org-001');
+  const withFlags = orgInds.filter(i => i.compliance_flag);
+  const ind001 = orgInds.find(i => i.id === 'ind-001');
+
+  log(`Total in demo-org-001: ${orgInds.length}`);
+  log(`Compliance flags: ${withFlags.length} (${withFlags.map(i => `${i.id}:${i.compliance_flag}`).join(', ')})`);
+  if (ind001) {
+    log(`ind-001: firstName="${ind001.firstName}" lastName="${ind001.lastName}" risk=${ind001.risk_score}`);
+  }
+
+  console.log('');
+  const tests = [
+    ['18+ individuals present', orgInds.length >= 18],
+    ['No duplicates (all IDs match ind-XXX pattern)', inds.every(i => /^ind-\d+$/.test(i.id))],
+    ['ind-001 name correct', ind001?.firstName === 'Joseph' && ind001?.lastName === 'Brown'],
+    ['Risk scores present', orgInds.every(i => i.risk_score !== undefined)],
+    ['Compliance flags on ind-009 and ind-017', withFlags.some(i=>i.id==='ind-009') && withFlags.some(i=>i.id==='ind-017')],
+  ];
+
+  for (const [label, pass] of tests) {
+    console.log(`  ${pass ? '✅ PASS' : '❌ FAIL'} — ${label}`);
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+async function main() {
+  console.log('='.repeat(55));
+  console.log('  CaseManagement.AI — Firestore Seed (REST API)');
+  console.log('  Project: casemanagement-ai');
+  console.log('='.repeat(55));
+  try {
+    await cleanOrganizations();
+    await cleanIndividuals();
+    await fixInd001();
+    await seedIndividuals();
+    await verify();
+    console.log('\n✅ All tasks complete.\n');
+  } catch (err) {
+    console.error('\n❌ Error:', err.message);
+    console.error(err.stack);
+    process.exit(1);
+  }
+}
+
+main();

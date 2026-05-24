@@ -3,7 +3,8 @@ import { Sparkles, Send, Loader2, ChevronDown, X, RotateCcw, Copy, Check } from 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -72,7 +73,83 @@ const toneStyles: Record<Tone, { wrap: string; chip: string }> = {
   good: { wrap: "bg-icm-green-soft border-icm-green/20", chip: "bg-icm-green text-white" },
 };
 
-// ── Hook: call the Cloud Function ─────────────────────────────────────────────
+// ── Authorization intent detection + Firestore enrichment ──────────────────
+
+const AUTH_INTENT_UNITS = /units? (left|remaining|used|balance)|how many units|units? (avail|this month)/i;
+const AUTH_INTENT_EXPIRING = /expir|renew|renewal/i;
+const AUTH_INTENT_CAP = /over cap|near cap|cap|exceed|limit|85%|utiliz/i;
+
+async function fetchAuthContext(personId: string, orgId?: string): Promise<string> {
+  const lines: string[] = [];
+
+  try {
+    // Fetch individual's auths
+    const authsSnap = await getDocs(
+      query(
+        collection(db, "service_authorizations"),
+        where("individualId", "==", personId),
+        orderBy("end_date", "asc")
+      )
+    );
+
+    if (authsSnap.empty) {
+      return "No service authorizations found for this individual.";
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const auths = authsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+    const active = auths.filter((a: any) => a.status === "active" || a.status === "pending");
+
+    lines.push("=== REAL SERVICE AUTHORIZATION DATA (from Firestore, do not fabricate) ===");
+    lines.push(`Total authorizations: ${auths.length}, Active: ${active.length}`);
+    lines.push("");
+
+    for (const auth of active) {
+      const daysLeft = Math.ceil(
+        (new Date(auth.end_date + "T00:00:00").getTime() - today.getTime()) / 86400000
+      );
+      const unitsLeft = (auth.units_authorized || 0) - (auth.units_used || 0);
+      const pct = auth.units_authorized > 0
+        ? Math.round((auth.units_used / auth.units_authorized) * 100)
+        : 0;
+      // Pace computation
+      const elapsed = Math.max(1, Math.ceil(
+        (today.getTime() - new Date(auth.start_date + "T00:00:00").getTime()) / 86400000
+      ));
+      const dailyRate = auth.units_used / elapsed;
+      const totalDays = elapsed + Math.max(0, daysLeft);
+      const projectedTotal = Math.round(dailyRate * totalDays);
+
+      lines.push(`Authorization: ${auth.service_name}`);
+      lines.push(`  Auth #: ${auth.auth_number}`);
+      lines.push(`  Procedure Code: ${auth.procedure_code || "N/A"}`);
+      lines.push(`  Payer: ${auth.payer || "N/A"}`);
+      lines.push(`  Units: ${auth.units_used} used of ${auth.units_authorized} authorized (${pct}% used, ${unitsLeft} remaining)`);
+      lines.push(`  Billing Period: ${auth.billing_period}`);
+      lines.push(`  Period: ${auth.start_date} to ${auth.end_date} (${daysLeft} days remaining)`);
+      lines.push(`  Daily pace: ${dailyRate.toFixed(2)} units/day, projected total: ${projectedTotal} units`);
+      if (projectedTotal > auth.units_authorized) {
+        lines.push(`  ⚠️ OVER PACE: Projected to exceed cap by ${projectedTotal - auth.units_authorized} units`);
+      }
+      if (pct >= 85) {
+        lines.push(`  🔴 NEAR CAP: ${pct}% of units used`);
+      }
+      if (daysLeft <= 7) {
+        lines.push(`  🔴 CRITICAL: Expires in ${daysLeft} days`);
+      } else if (daysLeft <= 30) {
+        lines.push(`  🟡 EXPIRING SOON: Expires in ${daysLeft} days`);
+      }
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  } catch (err) {
+    console.warn("[AIPanel] Auth context fetch failed:", err);
+    return "";
+  }
+}
 
 async function callChatAPI(
   message: string,
@@ -82,6 +159,22 @@ async function callChatAPI(
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Not authenticated");
 
+  // Detect auth intent and enrich with real Firestore data
+  const needsAuthContext =
+    AUTH_INTENT_UNITS.test(message) ||
+    AUTH_INTENT_EXPIRING.test(message) ||
+    AUTH_INTENT_CAP.test(message);
+
+  let enrichedMessage = message;
+  if (needsAuthContext && context.personId) {
+    const authData = await fetchAuthContext(context.personId);
+    if (authData) {
+      enrichedMessage =
+        `${message}\n\n[SYSTEM CONTEXT — REAL DATA, use this to answer precisely]\n${authData}\n` +
+        `Please answer the question using only the real data above. Be specific with numbers.`;
+    }
+  }
+
   const res = await fetch(`${FUNCTIONS_BASE}/api/chat`, {
     method: "POST",
     headers: {
@@ -89,7 +182,7 @@ async function callChatAPI(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      message,
+      message: enrichedMessage,
       history: history.slice(-10).map((m) => ({ role: m.role, text: m.text })),
       context,
     }),

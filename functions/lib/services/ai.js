@@ -67,12 +67,11 @@ const genai_1 = require("@google/genai");
 const collections_1 = require("../config/collections");
 const PROJECT_ID = process.env.GCLOUD_PROJECT || "casemanagement-ai";
 const LOCATION = "us-central1";
-// Gemini model IDs — using gemini-1.5-flash (stable GA, available on all Vertex AI projects)
-// Upgrade to gemini-2.0-flash after enabling Vertex AI Gemini 2.0 in GCP Console
+// Gemini model IDs — gemini-2.0-flash is GA and valid for both Gemini Developer API and Vertex AI
 const MODELS = {
-    companion: "gemini-flash-latest", // Care Companion bot
-    quality: "gemini-flash-latest", // Documentation & quality checks
-    fast: "gemini-flash-latest", // Form prefill, daily brief, scribe
+    companion: "gemini-2.0-flash", // Care Companion bot
+    quality: "gemini-2.0-flash", // Documentation & quality checks
+    fast: "gemini-2.0-flash", // Form prefill, daily brief, scribe
 };
 // Check org is allowed to use AI before making any call
 async function checkOrgAIAccess(organizationId) {

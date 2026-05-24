@@ -46,7 +46,9 @@ export type AuditAction =
   | 'plan_saved'
   | 'plan_submitted'
   | 'workflow_task_updated'
-  | 'eligibility_verified';
+  | 'eligibility_verified'
+  | 'create_individual'
+  | 'update_organization';
 
 export interface AuditEntry {
   actorUserId: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -42,22 +42,27 @@ const SettingsPrograms = () => {
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<DraftProgram | null>(null);
 
-  // Load programs from Firestore org doc
+  // Load programs from Firestore flat programs collection
   useEffect(() => {
     if (!orgId) return;
     setLoading(true);
-    getDoc(doc(db, "organizations", orgId))
-      .then((snap) => {
-        if (snap.exists()) {
-          const d = snap.data();
-          setPrograms((d.programs as Program[]) ?? []);
-        }
-      })
-      .catch((err) => {
+    const q = query(
+      collection(db, "programs"),
+      where("organizationId", "==", orgId)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPrograms(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Program)));
+        setLoading(false);
+      },
+      (err) => {
         console.error("Failed to load programs:", err);
         toast.error("Failed to load programs");
-      })
-      .finally(() => setLoading(false));
+        setLoading(false);
+      }
+    );
+    return unsub;
   }, [orgId]);
 
   const openAdd = () => setDraft({ ...emptyProgram });
@@ -69,23 +74,27 @@ const SettingsPrograms = () => {
     if (!orgId) return;
 
     setSaving(true);
-    let newList: Program[];
-
-    if (draft.id) {
-      newList = programs.map((p) =>
-        p.id === draft.id ? { ...p, ...draft, id: draft.id as string } : p
-      );
-    } else {
-      const newId = `prg-${Date.now()}`;
-      newList = [...programs, { ...draft, id: newId } as Program];
-    }
-
     try {
-      await updateDoc(doc(db, "organizations", orgId), {
-        programs: newList,
-        updatedAt: new Date(),
-      });
-      setPrograms(newList);
+      const programData = {
+        name: draft.name.trim(),
+        code: draft.code?.trim() || "",
+        payer: draft.payer || "",
+        type: draft.payer || "IDD Waiver",
+        state: "IN",
+        active: draft.active !== undefined ? draft.active : true,
+        organizationId: orgId,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (draft.id) {
+        await updateDoc(doc(db, "programs", draft.id), programData);
+      } else {
+        await addDoc(collection(db, "programs"), {
+          ...programData,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       toast.success(draft.id ? "Program updated" : "Program created", {
         description: `${draft.name} saved.`,
       });
@@ -100,12 +109,13 @@ const SettingsPrograms = () => {
 
   const toggleActive = async (programId: string) => {
     if (!orgId) return;
-    const newList = programs.map((p) =>
-      p.id === programId ? { ...p, active: !p.active } : p
-    );
+    const p = programs.find((x) => x.id === programId);
+    if (!p) return;
     try {
-      await updateDoc(doc(db, "organizations", orgId), { programs: newList, updatedAt: new Date() });
-      setPrograms(newList);
+      await updateDoc(doc(db, "programs", programId), {
+        active: !p.active,
+        updatedAt: serverTimestamp(),
+      });
       toast.success("Program status updated");
     } catch (err) {
       console.error(err);

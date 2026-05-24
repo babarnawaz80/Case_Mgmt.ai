@@ -10,6 +10,7 @@ import {
   CheckSquare,
   MessageSquare,
   CreditCard,
+  FileCheck,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const items: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "People Supported", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Authorization Tracker", url: "/authorizations", icon: FileCheck },
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Documentation", url: "/documentation", icon: FileText },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },

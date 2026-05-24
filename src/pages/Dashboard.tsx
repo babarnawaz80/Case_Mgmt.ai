@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIndividuals, riskTier, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useAllProgressNotes } from "@/hooks/useProgressNotes";
 import { useIncidentSummary } from "@/hooks/useIncidents";
+import { useAllAuthorizations } from "@/hooks/useFirestore";
 import {
   Sun,
   Users,
@@ -28,6 +29,7 @@ import {
   ArrowRight,
   Search,
   X,
+  FileCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -457,8 +459,10 @@ const ACTIONS: ActionTile[] = [
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },
   { label: "Referrals", icon: Phone, to: "/referrals", category: "Care" },
   { label: "Team", icon: Heart, to: "/settings/users", category: "Care" },
-  { label: "Communications", icon: PhoneCall, to: "/documentation", category: "Care", count: 5 },
+  { label: "Authorizations", icon: FileCheck, to: "/authorizations", category: "Care" },
 ];
+
+// Authorizations count is injected dynamically in QuickActions below
 
 function ActionTileBtn({ tile, onClick }: { tile: ActionTile; onClick: () => void }) {
   const tone = ACTION_TONES[tile.category];
@@ -487,6 +491,15 @@ function QuickActions() {
   const navigate = useNavigate();
   const categories: ActionCategory[] = ["Documentation", "Operations", "Care"];
   const [picker, setPicker] = useState<{ label: string; formRoute: (id: string) => string } | null>(null);
+  const { data: allAuths } = useAllAuthorizations();
+  const activeAuthCount = (allAuths ?? []).filter((a) => a.status === "active" || a.status === "pending").length;
+
+  // Inject live count into Authorizations tile
+  const tiles = ACTIONS.map((t) =>
+    t.label === "Authorizations" && activeAuthCount > 0
+      ? { ...t, count: activeAuthCount }
+      : t
+  );
 
   const handleTileClick = (tile: ActionTile) => {
     if (tile.formRoute) {
@@ -509,7 +522,7 @@ function QuickActions() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         {categories.map((cat) => {
-          const items = ACTIONS.filter((a) => a.category === cat);
+          const items = tiles.filter((a) => a.category === cat);
           return (
             <div key={cat} className="space-y-2.5">
               {items.map((a) => (

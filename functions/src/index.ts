@@ -55,9 +55,15 @@ app.post("/care-assistant/:token/end-session", companionEndSession);
 import { runPcpRenewalAgent } from "./api/agents";
 app.post("/api/agents/pcp-renewal/run", runPcpRenewalAgent);
 
+// ─── Ambient / Deepgram Token API ─────────────────────────────────────────
+import { deepgramToken } from "./api/ambient";
+app.post("/api/ambient/deepgram-token", deepgramToken);
+
 // ─── Export the Express app as a single Gen 2 Cloud Function ──────────────
 export const api = onRequest({ cors: true }, app);
 
 // ─── Firestore Triggers ───────────────────────────────────────────────────
 export { onNewBillingClaim, onWorkflowTaskDailyCheck } from "./triggers/billing-claims";
 
+// ─── Scheduled Functions ──────────────────────────────────────────────────
+export { dailyAuthRenewalCheck } from "./api/authorizationRenewal";

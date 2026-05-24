@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { isAdminDomain } from '@/lib/domainConfig';
 
 const NAV_ITEMS = [
   { label: 'Organizations', icon: Building2, path: '/super-admin/organizations' },
@@ -148,6 +149,21 @@ export function SuperAdminLayout({ children, title }: SuperAdminLayoutProps) {
             </button>
           </div>
         </header>
+
+        {/* ── Admin Domain Banner (RULE 4) ──────────────────────────── */}
+        {isAdminDomain && (
+          <div
+            className="flex items-center justify-center gap-2 px-6 py-1.5 text-[11px] font-geist flex-shrink-0"
+            style={{
+              background: 'rgba(20,184,166,0.07)',
+              borderBottom: '1px solid rgba(20,184,166,0.15)',
+              color: '#14b8a6',
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse flex-shrink-0" />
+            <span>You are on the admin portal · admin.casemanagement.ai</span>
+          </div>
+        )}
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-6" style={{ background: '#0d0d1a' }}>

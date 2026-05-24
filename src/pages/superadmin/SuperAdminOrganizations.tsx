@@ -289,7 +289,6 @@ export default function SuperAdminOrganizations() {
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}
           />
         </div>
-
         {/* Table */}
         <SACard>
           {loading ? (
@@ -301,26 +300,24 @@ export default function SuperAdminOrganizations() {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b" style={{ borderColor: 'rgba(99,102,241,0.15)' }}>
-                    {['Name', 'State', 'Status', 'Users', 'Credits', 'AI Spend/mo', 'Created', 'Actions'].map(h => (
+                    {['Name', 'Plan', 'Credit Balance', 'Status', 'Created', 'Actions'].map(h => (
                       <th key={h} className="text-left py-3 px-3 text-slate-400 font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={8} className="text-center py-8 text-slate-500">No organizations found</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-slate-500">No organizations found</td></tr>
                   )}
                   {filtered.map(org => (
                     <tr key={org.id} className="border-b hover:bg-white/[0.02] transition-colors"
                         style={{ borderColor: 'rgba(99,102,241,0.08)' }}>
                       <td className="py-3 px-3 text-white font-medium">{org.name}</td>
-                      <td className="py-3 px-3 text-slate-300">{org.state ?? '—'}</td>
+                      <td className="py-3 px-3 text-slate-300">{org.plan ?? 'Enterprise'}</td>
+                      <td className="py-3 px-3 text-teal-400 font-mono">{(org.credit_balance ?? org.creditBalance ?? 0).toLocaleString()}</td>
                       <td className="py-3 px-3"><StatusBadge status={org.status} /></td>
-                      <td className="py-3 px-3 text-slate-300">{org.totalUsers ?? 0}</td>
-                      <td className="py-3 px-3 text-teal-400 font-mono">{org.creditBalance?.toLocaleString() ?? 0}</td>
-                      <td className="py-3 px-3 text-slate-300 font-mono">${(org.monthlyAISpend ?? 0).toFixed(2)}</td>
                       <td className="py-3 px-3 text-slate-500 text-[11px]">
-                        {org.createdAt?.toDate?.()?.toLocaleDateString() ?? '—'}
+                        {org.createdAt?.toDate?.()?.toLocaleDateString() ?? org.createdAt_iso ?? '—'}
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1">
@@ -339,7 +336,6 @@ export default function SuperAdminOrganizations() {
                               <Pause className="w-3.5 h-3.5" />
                             </button>
                           )}
-
                         </div>
                       </td>
                     </tr>

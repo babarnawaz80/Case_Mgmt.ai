@@ -430,6 +430,15 @@ function PlanTable({ plans, onOpen, variant, onShare }: { plans: CarePlan[]; onO
                 <button onClick={() => onOpen(p.id)} className="font-mono font-semibold text-icm-accent hover:underline">
                   {p.id}
                 </button>
+                {p.goals && p.goals.length > 0 && (
+                  <div className="text-[11px] text-icm-text-dim mt-1 space-y-0.5 max-w-[220px]">
+                    {p.goals.map((g: any, idx: number) => (
+                      <div key={idx} className="truncate">
+                        • {g.title || g.goal || "Goal"}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3"><DateCell value={p.internalDueDate} /></td>
               <td className="px-4 py-3"><DateCell value={p.meetingDate} /></td>

@@ -44,13 +44,29 @@ import { useAuth } from "@/contexts/AuthContext";
 
 // ---------- Shape adapter: Firestore Task → MyWorkTask ----------
 function mapTaskToMyWork(t: Task): MyWorkTask {
-  // Convert YYYY-MM-DD → MM/DD/YYYY for existing date helpers
-  function toMDY(iso: string): string {
-    if (!iso) return "";
-    // already MM/DD/YYYY?
-    if (iso.includes("/")) return iso;
-    const [y, m, d] = iso.split("-");
-    return `${m}/${d}/${y}`;
+  // Convert YYYY-MM-DD or Timestamp → MM/DD/YYYY for existing date helpers
+  function toMDY(val: any): string {
+    if (!val) return "";
+    if (val.toDate) {
+      val = val.toDate();
+    }
+    if (val instanceof Date) {
+      const m = String(val.getMonth() + 1).padStart(2, "0");
+      const d = String(val.getDate()).padStart(2, "0");
+      const y = val.getFullYear();
+      return `${m}/${d}/${y}`;
+    }
+    if (typeof val === "string") {
+      if (val.includes("/")) return val;
+      if (val.includes("-")) {
+        const parts = val.split("T")[0].split("-");
+        if (parts.length === 3) {
+          const [y, m, d] = parts;
+          return `${m}/${d}/${y}`;
+        }
+      }
+    }
+    return String(val);
   }
 
   // Derive initials from name
@@ -101,9 +117,7 @@ function mapTaskToMyWork(t: Task): MyWorkTask {
     daysOverdue: isOverdue && diff !== null ? Math.abs(diff) : undefined,
     staffResponsible: "Me",
     priority: priorityMap[t.priority] ?? "Medium",
-    createdOn: t.createdAt
-      ? toMDY(new Date((t.createdAt as any)?.seconds ? (t.createdAt as any).seconds * 1000 : t.createdAt as any).toISOString().split("T")[0])
-      : "",
+    createdOn: toMDY(t.createdAt),
     createdBy: t.assignedTo ?? "",
   };
 }

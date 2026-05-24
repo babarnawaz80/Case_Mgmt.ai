@@ -21,6 +21,11 @@ import {
   type FundingSource
 } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
+import { db } from "@/lib/firebase";
+import {
+  collection, query, where, getDocs, updateDoc,
+  addDoc, serverTimestamp, doc,
+} from "firebase/firestore";
 
 const MA_STATUS_OPTIONS: MAStatus[] = [
   "MA Eligible — Active",
@@ -149,6 +154,90 @@ const PersonEligibilityVerificationDetail = () => {
         });
         toast.success("Eligibility record updated", { description: `MA status: ${form.maStatus}` });
       }
+
+      // ── ADDITION 1: Eligibility → Authorization linkage ───────────────────
+      const isSuspended =
+        form.maStatus === "MA Ineligible — Suspended" ||
+        form.maStatus === "MA Ineligible — Terminated";
+      const isRestored = form.maStatus === "MA Eligible — Active";
+
+      if (isSuspended || isRestored) {
+        const authsSnap = await getDocs(
+          query(
+            collection(db, "service_authorizations"),
+            where("individualId", "==", individual.id),
+            where("status", "==", "active")
+          )
+        );
+
+        const activeAuthCount = authsSnap.size;
+        const individualName =
+          `${individual.first_name} ${individual.last_name}`;
+        const suspendedDate = now.toLocaleDateString("en-US");
+
+        // Flag / unflag each active auth
+        for (const authDoc of authsSnap.docs) {
+          await updateDoc(doc(db, "service_authorizations", authDoc.id), {
+            eligibility_suspended: isSuspended,
+            eligibility_suspended_date: isSuspended ? suspendedDate : null,
+            updated_at: serverTimestamp(),
+          });
+        }
+
+        // Create workflow task
+        const tomorrow = new Date(now);
+        tomorrow.setDate(now.getDate() + 1);
+        const dueDateStr = tomorrow.toISOString().split("T")[0];
+
+        if (isSuspended) {
+          await addDoc(collection(db, "workflow_tasks"), {
+            title: `URGENT: MA suspended for ${individualName} — review ${activeAuthCount} active authorization${activeAuthCount !== 1 ? "s" : ""}`,
+            description:
+              `MA status for ${individualName} was changed to "${form.maStatus}" on ${suspendedDate}. ` +
+              `All ${activeAuthCount} active service authorizations have been flagged. ` +
+              `Do not submit billing claims until eligibility is restored.`,
+            individualId: individual.id,
+            individual_id: individual.id,
+            individualName,
+            organizationId: individual.organizationId || "",
+            due_date: dueDateStr,
+            priority: "critical",
+            status: "open",
+            type: "eligibility_suspension",
+            source: "ai_generated",
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp(),
+          });
+          toast.warning(
+            `⚠️ ${activeAuthCount} authorization${activeAuthCount !== 1 ? "s" : ""} flagged`,
+            { description: "MA suspended — billing at risk. Critical task created in My Work." }
+          );
+        } else if (isRestored) {
+          await addDoc(collection(db, "workflow_tasks"), {
+            title: `MA restored for ${individualName} — verify authorization status before billing`,
+            description:
+              `MA eligibility for ${individualName} has been restored to Active as of ${suspendedDate}. ` +
+              `Please review all ${activeAuthCount} active authorization${activeAuthCount !== 1 ? "s" : ""} and confirm it is safe to resume billing.`,
+            individualId: individual.id,
+            individual_id: individual.id,
+            individualName,
+            organizationId: individual.organizationId || "",
+            due_date: dueDateStr,
+            priority: "high",
+            status: "open",
+            type: "eligibility_restored",
+            source: "ai_generated",
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp(),
+          });
+          toast.success(
+            `✅ MA restored for ${individualName}`,
+            { description: "Authorization flags cleared. Verify before resuming billing." }
+          );
+        }
+      }
+      // ── END ADDITION 1 ───────────────────────────────────────────────
+
     } catch (err) {
       console.error("Failed to save eligibility verification:", err);
       toast.error("Failed to save record");

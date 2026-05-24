@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { useIndividual, useIndividuals } from "@/hooks/useIndividuals";
@@ -15,6 +15,7 @@ import { db } from "@/lib/firebase";
 interface ContactNoteDoc {
   id: string;
   individualId?: string;
+  individualName?: string;
   person: string;
   activityType: string;
   billable: boolean;
@@ -34,14 +35,16 @@ interface ContactNoteDoc {
   updatedOn: string;
   organizationId?: string;
   createdAt?: unknown;
+  updatedAt?: unknown;
 }
 
 function toNote(id: string, d: DocumentData): ContactNoteDoc {
   return {
     id,
-    individualId: d.individualId,
-    person: d.person ?? "",
-    activityType: d.activityType ?? "",
+    individualId: d.individualId ?? d.individual_id,
+    individualName: d.individualName ?? d.individual_name ?? d.person ?? "",
+    person: d.person ?? d.individual_name ?? "",
+    activityType: d.activityType ?? d.activity_type ?? "",
     billable: d.billable ?? true,
     nonBillableReason: d.nonBillableReason,
     date: d.date ?? "",
@@ -58,7 +61,8 @@ function toNote(id: string, d: DocumentData): ContactNoteDoc {
     updatedBy: d.updatedBy ?? "",
     updatedOn: d.updatedOn ?? "",
     organizationId: d.organizationId,
-    createdAt: d.createdAt,
+    createdAt: d.createdAt ?? d.created_at ?? null,
+    updatedAt: d.updatedAt ?? d.updated_at ?? null,
   };
 }
 
@@ -74,6 +78,8 @@ const activityTypes = [
 const contactTypes = ["In-person", "Phone", "Video", "Email", "Other"];
 
 const ContactNote = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { userProfile } = useAuth();
   const [notes, setNotes] = useState<ContactNoteDoc[]>([]);
   const [notesLoading, setNotesLoading] = useState(true);
@@ -85,45 +91,39 @@ const ContactNote = () => {
     date: new Date().toISOString().slice(0, 10),
   });
 
-  // Load notes from Firestore
+  const formatDate = (ts: any) => {
+    if (!ts) return "—";
+    if (ts?.toDate) return ts.toDate().toLocaleDateString("en-US");
+    if (ts instanceof Date) return ts.toLocaleDateString("en-US");
+    return String(ts);
+  };
+
+  // Load notes from Firestore — scoped to this individual only
   useEffect(() => {
-    if (!userProfile?.organizationId) return;
+    if (!userProfile?.organizationId || !id) return;
     setNotesLoading(true);
 
-    let q;
-    try {
-      q = query(
-        collection(db, "contact_notes"),
-        where("organizationId", "==", userProfile.organizationId),
-        orderBy("createdAt", "desc"),
-      );
-    } catch {
-      q = query(
-        collection(db, "contact_notes"),
-        where("organizationId", "==", userProfile.organizationId),
-      );
-    }
+    const q = query(
+      collection(db, "contact_notes"),
+      where("individualId", "==", id),
+    );
 
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setNotes(snap.docs.map((d) => toNote(d.id, d.data())));
+        const mapped = snap.docs.map((d) => toNote(d.id, d.data()));
+        mapped.sort((a, b) => {
+          const tA = (a.createdAt as any)?.seconds || 0;
+          const tB = (b.createdAt as any)?.seconds || 0;
+          if (tB !== tA) return tB - tA;
+          return b.date.localeCompare(a.date);
+        });
+        setNotes(mapped);
         setNotesLoading(false);
       },
       (err) => {
-        console.warn("[contact_notes]", err.message);
-        // Fallback without orderBy
-        const fallback = query(
-          collection(db, "contact_notes"),
-          where("organizationId", "==", userProfile.organizationId),
-        );
-        onSnapshot(fallback, (snap) => {
-          const sorted = snap.docs
-            .map((d) => toNote(d.id, d.data()))
-            .sort((a, b) => b.date.localeCompare(a.date));
-          setNotes(sorted);
-          setNotesLoading(false);
-        });
+        console.error("[contact_notes] query error:", err.message);
+        setNotesLoading(false);
       },
     );
     return unsub;
@@ -143,9 +143,13 @@ const ContactNote = () => {
     const updatedOn = now.toISOString().slice(0, 16).replace("T", " ");
     try {
       await addDoc(collection(db, "contact_notes"), {
-        individualId: form.individualId ?? null,
+        individualId: form.individualId ?? id ?? null,
+        individualName: form.person,
+        individual_id: form.individualId ?? id ?? null,
+        individual_name: form.person,
         person: form.person,
         activityType: form.activityType,
+        activity_type: form.activityType,
         billable: !!form.billable,
         nonBillableReason: form.billable ? null : (form.nonBillableReason || ""),
         date: form.date || now.toISOString().slice(0, 10),
@@ -163,6 +167,7 @@ const ContactNote = () => {
         updatedOn,
         organizationId: userProfile.organizationId,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
       toast.success(`Contact note saved — ${form.person} · ${form.activityType}`);
       setOpen(false);
@@ -203,9 +208,9 @@ const ContactNote = () => {
         <div className="flex flex-wrap gap-2">
           {[
             { label: "Total", value: notes.length, cls: "bg-icm-bg text-icm-text-dim ring-icm-border" },
-            { label: "Draft", value: notes.filter((n) => n.status === "Draft").length, cls: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" },
-            { label: "Submitted", value: notes.filter((n) => n.status === "Submitted").length, cls: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20" },
-            { label: "Signed", value: notes.filter((n) => n.status === "Signed").length, cls: "bg-icm-green-soft text-icm-green ring-icm-green/20" },
+            { label: "Draft", value: notes.filter((n) => n.status?.toLowerCase() === "draft").length, cls: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" },
+            { label: "Submitted", value: notes.filter((n) => n.status?.toLowerCase() === "submitted").length, cls: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20" },
+            { label: "Signed", value: notes.filter((n) => n.status?.toLowerCase() === "signed").length, cls: "bg-icm-green-soft text-icm-green ring-icm-green/20" },
           ].map((chip) => (
             <div key={chip.label} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ring-1 ${chip.cls}`}>
               <span className="text-[10px] uppercase tracking-wide font-geist font-semibold opacity-70">{chip.label}</span>
@@ -239,7 +244,7 @@ const ContactNote = () => {
                 {notes.map((n) => (
                   <tr key={n.id} className="hover:bg-icm-bg/60">
                     <td className="px-4 py-3 font-mono text-icm-text">{n.date}</td>
-                    <td className="px-4 py-3 text-icm-text font-medium">{n.person}</td>
+                    <td className="px-4 py-3 text-icm-text font-medium">{n.individualName || "Unknown"}</td>
                     <td className="px-4 py-3 text-icm-text-dim">{n.activityType}</td>
                     <td className="px-4 py-3 text-icm-text-dim">{n.contactType}</td>
                     <td className="px-4 py-3">
@@ -248,24 +253,24 @@ const ContactNote = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${n.status === "Signed" ? "bg-icm-green-soft text-icm-green" : n.status === "Submitted" ? "bg-icm-accent-soft text-icm-accent" : "bg-icm-amber-soft text-icm-amber"}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${n.status?.toLowerCase() === "signed" ? "bg-icm-green-soft text-icm-green" : n.status?.toLowerCase() === "submitted" ? "bg-icm-accent-soft text-icm-accent" : "bg-icm-amber-soft text-icm-amber"}`}>
                         {n.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-[11px] text-icm-text-faint">
-                      {n.updatedOn} · {n.updatedBy}
+                      {formatDate(n.updatedAt || n.createdAt)} · {n.updatedBy || "System"}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <button
-                          onClick={() => toast.info(`Viewing note for ${n.person}`)}
+                          onClick={() => navigate(`/people/${id || n.individualId || "ind-001"}/contact-note/${n.id}`)}
                           className="w-7 h-7 rounded-md hover:bg-icm-bg text-icm-text-dim hover:text-icm-text flex items-center justify-center"
                           title="View"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => toast.info(`Print note for ${n.person}`)}
+                          onClick={() => navigate(`/people/${id || n.individualId || "ind-001"}/contact-note/${n.id}`)}
                           className="w-7 h-7 rounded-md hover:bg-icm-bg text-icm-text-dim hover:text-icm-text flex items-center justify-center"
                           title="Print"
                         >

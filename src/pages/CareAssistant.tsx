@@ -1,310 +1,374 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-import { Mic, Send, CheckCircle2 } from "lucide-react";
-import SiriOrb from "@/components/ui/siri-orb";
-import logo from "@/assets/casemanagement-logo.png";
-import {
-  TOKEN_MAP,
-  matchBotReply,
-  buildSummary,
-  buildTasks,
-  topicLabel,
-  appendCheckIn,
-  type CheckInMessage,
-  type TopicKey,
-  type AICheckInSession,
-} from "@/lib/aiCheckIns";
+// CareAssistant — Public companion page for participants
+// Route: /care-assistant/:linkToken
+// Token format: cmp_<base64(individualId_timestamp)>
+// Decodes the token, fetches the individual from Firestore, and renders
+// the premium orb-based AI companion chat interface.
 
-function fmtTime(ts: number) {
-  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import { Send, Mic, MicOff, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
+import SiriOrb from "@/components/ui/siri-orb";
+import logo from "@/assets/casemanagement-ai-logo.png";
+import { useIndividual } from "@/hooks/useIndividuals";
+
+const API_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
+
+/** Decodes cmp_<base64(individualId_timestamp)> → individualId */
+function decodeToken(token: string | undefined): string | null {
+  if (!token) return null;
+  const raw = token.startsWith("cmp_") ? token.slice(4) : token;
+  try {
+    const decoded = atob(raw);
+    const underscoreIdx = decoded.lastIndexOf("_");
+    return underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
+  } catch {
+    return null;
+  }
+}
+
+type Role = "agent" | "user";
+interface Message {
+  id: string;
+  role: Role;
+  text: string;
 }
 
 export default function CareAssistant() {
-  const { linkToken = "" } = useParams();
-  const person = TOKEN_MAP[linkToken];
+  const { linkToken } = useParams<{ linkToken: string }>();
+  const personId = decodeToken(linkToken);
+  const { individual: person, loading } = useIndividual(personId ?? undefined);
 
-  if (!person) {
-    return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-inter">
-        <div className="max-w-md text-center">
-          <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center text-2xl">!</div>
-          <h1 className="mt-4 text-xl font-semibold text-gray-900">Link not recognized</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            This link is not recognized. Please contact your case manager.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const firstName = person?.preferred_name || person?.first_name || "Friend";
 
-  const [messages, setMessages] = useState<CheckInMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
-  const [topics, setTopics] = useState<Set<TopicKey>>(new Set());
-  const [urgent, setUrgent] = useState(false);
-  const [ended, setEnded] = useState(false);
-  const [startedAt] = useState(Date.now());
-  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [orbPulse, setOrbPulse] = useState(false);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, ended]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
 
+  const sendMessage = async (overrideText?: string) => {
+    const msgText = (overrideText ?? input).trim();
+    if (!msgText || sending) return;
 
-  const exchangeCount = useMemo(
-    () => messages.filter((m) => m.role === "individual").length,
-    [messages]
-  );
+    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", text: msgText };
+    const history = messages.map((m) => ({
+      role: m.role === "agent" ? "assistant" : "user",
+      text: m.text,
+    }));
 
-  function finalize(allMessages: CheckInMessage[], topicSet: Set<TopicKey>, isUrgent: boolean) {
-    const endedAt = Date.now();
-    const seconds = Math.max(1, Math.round((endedAt - startedAt) / 1000));
-    const mm = Math.floor(seconds / 60);
-    const ss = seconds % 60;
-    const durationLabel = `${mm} min ${String(ss).padStart(2, "0")} sec`;
-    const topicList = Array.from(topicSet);
-    const session: AICheckInSession = {
-      id: `CHK-${Date.now()}`,
-      individualId: person.individualId,
-      individualName: person.individualName,
-      firstName: person.firstName,
-      caseManager: person.caseManager,
-      county: person.county,
-      startedAt,
-      endedAt,
-      durationLabel,
-      contactType: "Case Companion Check-In",
-      transcript: allMessages,
-      summary: buildSummary(person.firstName, topicList),
-      detectedTopics: topicList.map((k) => ({ key: k, label: topicLabel(k) })),
-      tasks: buildTasks(person.firstName, topicList),
-      urgent: isUrgent,
-      status: "Pending Review",
-    };
-    appendCheckIn(session);
-    setEnded(true);
-  }
-
-  function send(textRaw: string) {
-    const text = textRaw.trim();
-    if (!text || ended) return;
-    const userMsg: CheckInMessage = { id: `u-${Date.now()}`, role: "individual", text, ts: Date.now() };
-    const next = [...messages, userMsg];
-    setMessages(next);
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setSending(true);
+    setOrbPulse(true);
+    setError(null);
 
-    setTimeout(() => {
-      const match = matchBotReply(text, person.firstName);
-      const newTopics = new Set(topics);
-      if (match.topic) newTopics.add(match.topic);
-      const isUrgent = urgent || match.topic === "crisis";
-      const botMsg: CheckInMessage = { id: `b-${Date.now()}`, role: "bot", text: match.reply, ts: Date.now() };
-      const withBot = [...next, botMsg];
-      setMessages(withBot);
-      setTopics(newTopics);
-      setUrgent(isUrgent);
-      if (match.end) {
-        setTimeout(() => finalize(withBot, newTopics, isUrgent), 600);
-      }
-    }, 700);
-  }
+    try {
+      const res = await fetch(`${API_BASE}/care-assistant/${linkToken}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msgText, history }),
+      });
 
-  function handleEndSession() {
-    finalize(messages, topics, urgent);
-  }
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      const replyText =
+        data.reply ?? data.message ?? data.text ?? "I'm here to listen. Can you tell me more?";
 
-  function toggleMic() {
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: "agent", text: replyText },
+      ]);
+    } catch {
+      setError("Couldn't connect. Please check your internet and try again.");
+    } finally {
+      setSending(false);
+      setOrbPulse(false);
+    }
+  };
+
+  const toggleMic = () => {
     if (recording) {
       setRecording(false);
-      // Mock: drop a fake transcript into the input for the user to review
       const samples = [
-        "I'm not feeling well today",
-        "I'd like to explore getting a job",
-        "Everything is going well, thank you",
-        "I want to change my day program",
+        "I'm feeling a little tired today",
+        "I wanted to check in about my medications",
+        "Everything is going well, just checking in",
+        "I'd like to talk about my goals this week",
       ];
       const pick = samples[Math.floor(Math.random() * samples.length)];
       setInput((prev) => (prev ? `${prev} ${pick}` : pick));
     } else {
       setRecording(true);
+      inputRef.current?.focus();
     }
-  }
+  };
 
-  // group messages by minute for timestamp display
-  const grouped: { ts: number; items: CheckInMessage[] }[] = [];
-  for (const m of messages) {
-    const last = grouped[grouped.length - 1];
-    if (last && Math.abs(m.ts - last.ts) < 60000 && last.items[0].role === m.role) {
-      last.items.push(m);
-    } else {
-      grouped.push({ ts: m.ts, items: [m] });
-    }
-  }
-
-  if (ended) {
+  // ── Loading ──────────────────────────────────────────────────────────────
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6 font-inter">
-        <div className="max-w-md text-center">
-          <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-          <h1 className="mt-6 text-2xl font-semibold text-gray-900">Thanks for checking in!</h1>
-          <p className="mt-3 text-[15px] text-gray-700 leading-relaxed">
-            Your care team has received your update. Your case manager will follow up with you soon.
-          </p>
-          <p className="mt-6 text-[12.5px] text-gray-500">
-            You can close this window or come back anytime using the same link.
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "linear-gradient(160deg, #0d0d1a 0%, #0f1428 50%, #0a1a20 100%)" }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-7 h-7 animate-spin text-teal-400" />
+          <p className="text-sm text-slate-400 font-geist">Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Invalid / expired token ──────────────────────────────────────────────
+  if (!person) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{ background: "linear-gradient(160deg, #0d0d1a 0%, #0f1428 50%, #0a1a20 100%)" }}
+      >
+        <div className="text-center max-w-sm space-y-4">
+          <img
+            src={logo}
+            alt="CaseManagement AI"
+            className="h-9 mx-auto brightness-0 invert opacity-80"
+          />
+          <div className="text-4xl">🔗</div>
+          <h1 className="text-xl font-bold text-white">Link not recognized</h1>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            This companion link has expired or is not valid. Please ask your case
+            manager for a new link.
           </p>
         </div>
       </div>
     );
   }
 
+  // ── Main companion UI ────────────────────────────────────────────────────
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="min-h-screen bg-[#101a2e] font-inter flex flex-col text-white">
-      {/* Header */}
-      <header className="pt-6 sm:pt-8 pb-4 px-4 sm:px-6 text-center flex flex-col items-center">
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        background: "linear-gradient(160deg, #0d0d1a 0%, #0f1428 40%, #0a1a20 100%)",
+      }}
+    >
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header className="flex items-center justify-center pt-8 pb-2 px-6 flex-shrink-0">
         <img
           src={logo}
           alt="CaseManagement AI"
-          className="h-7 sm:h-8 w-auto select-none brightness-0 invert"
+          className="h-8 brightness-0 invert opacity-80 select-none"
           draggable={false}
         />
-        {/* Orb — centered, clickable to start speaking */}
-        <div className="mt-8 sm:mt-12 flex justify-center w-full">
-          <button
-            type="button"
-            onClick={toggleMic}
-            aria-label={recording ? "Stop listening" : "Tap to talk"}
-            className="relative w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px] rounded-full transition hover:scale-[1.02] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5eead4]/60"
-          >
-            {recording && (
-              <span className="absolute inset-0 rounded-full ring-2 ring-[#5eead4]/40 animate-ping" />
-            )}
-            <SiriOrb
-              size="100%"
-              colors={{
-                c1: "oklch(82% 0.18 195)",
-                c2: "oklch(78% 0.22 330)",
-                c3: "oklch(70% 0.18 280)",
-              }}
-              animationDuration={recording ? 8 : 18}
-            />
-          </button>
-        </div>
-        <h1 className="mt-6 sm:mt-8 text-[22px] sm:text-[26px] font-semibold text-white">
-          Hi {person.firstName} <span>👋</span>
-        </h1>
-        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 text-emerald-300 text-[12px]">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          {recording ? "Listening…" : "Tap the orb to talk"}
-        </div>
-
       </header>
 
-      {/* Conversation */}
-      <div
-        ref={scrollerRef}
-        className="flex-1 overflow-y-auto px-4 md:px-6 pb-4 max-w-2xl w-full mx-auto"
-      >
-        <div className="space-y-4">
-          {grouped.map((g, gi) => {
-            const isBot = g.items[0].role === "bot";
-            return (
-              <div key={gi} className={`flex ${isBot ? "justify-start" : "justify-end"}`}>
-                <div className={`flex items-end gap-2 max-w-[85%] ${isBot ? "" : "flex-row-reverse"}`}>
-                  {isBot && (
-                    <div className="shrink-0">
-                      <SiriOrb size="28px" animationDuration={14} />
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {g.items.map((m) => (
-                      <div
-                        key={m.id}
-                        className={
-                          isBot
-                            ? "bg-white/10 text-white/90 rounded-2xl rounded-bl-md px-4 py-2.5 text-[14.5px] leading-relaxed backdrop-blur-sm"
-                            : "bg-[#5eead4] text-[#0b1220] rounded-2xl rounded-br-md px-4 py-2.5 text-[14.5px] leading-relaxed font-medium"
-                        }
-                      >
-                        {m.text}
-                      </div>
-                    ))}
-                    <div className={`text-[10.5px] text-white/40 ${isBot ? "text-left" : "text-right"}`}>
-                      {fmtTime(g.ts)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* ── Orb + greeting ─────────────────────────────────────────────────── */}
+      <div className="flex flex-col items-center pt-6 pb-4 px-6 flex-shrink-0">
+        <button
+          type="button"
+          onClick={toggleMic}
+          aria-label={recording ? "Stop listening" : "Tap orb to talk"}
+          className="relative rounded-full transition-transform hover:scale-[1.03] active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+          style={{ width: 260, height: 260 }}
+        >
+          {(recording || orbPulse) && (
+            <span className="absolute inset-[-10px] rounded-full ring-2 ring-teal-400/30 animate-ping pointer-events-none" />
+          )}
+          <SiriOrb
+            size="260px"
+            colors={{
+              c1: "oklch(82% 0.18 195)",
+              c2: "oklch(78% 0.22 330)",
+              c3: "oklch(70% 0.18 280)",
+            }}
+            animationDuration={recording || sending ? 6 : 16}
+          />
+        </button>
 
-        {exchangeCount >= 2 && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={handleEndSession}
-              className="text-[12.5px] text-white/50 hover:text-[#5eead4] underline-offset-2 hover:underline"
-            >
-              Done for now? End this check-in →
-            </button>
-          </div>
-        )}
+        <h1 className="mt-7 text-[26px] font-bold text-white tracking-tight">
+          Hi {firstName} <span>👋</span>
+        </h1>
+
+        <div
+          className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-semibold"
+          style={{
+            background: "rgba(52,211,153,0.1)",
+            border: "1px solid rgba(52,211,153,0.25)",
+            color: "#34d399",
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          {recording ? "Listening…" : sending ? "Thinking…" : "Tap the orb to talk"}
+        </div>
       </div>
 
-      {/* Input */}
-      <div className="border-t border-white/10 bg-[#0b1220]/80 backdrop-blur px-4 md:px-6 py-4 pb-6">
+      {/* ── Conversation ───────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 pb-2 max-w-2xl w-full mx-auto">
+        <div className="space-y-3">
+          {/* Welcome bubble shown before conversation starts */}
+          {!hasMessages && !sending && (
+            <div className="flex justify-start">
+              <div
+                className="max-w-[82%] rounded-2xl rounded-tl-sm px-4 py-3 text-[14px] leading-relaxed text-white/90"
+                style={{
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                Hi {firstName}! I'm your Care Companion. I'm here whenever you want
+                to check in. How are you doing today?
+              </div>
+            </div>
+          )}
+
+          {messages.map((m) => (
+            <div
+              key={m.id}
+              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[82%] px-4 py-3 text-[14px] leading-relaxed ${
+                  m.role === "user" ? "text-[#0d1117] font-medium" : "text-white/90"
+                }`}
+                style={
+                  m.role === "user"
+                    ? {
+                        background: "#34d399",
+                        borderRadius: "1rem 1rem 0.25rem 1rem",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.07)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "1rem 1rem 1rem 0.25rem",
+                      }
+                }
+              >
+                {m.text}
+              </div>
+            </div>
+          ))}
+
+          {/* Typing indicator */}
+          {sending && (
+            <div className="flex justify-start">
+              <div
+                className="rounded-2xl px-4 py-3 flex items-center gap-1.5"
+                style={{
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "120ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "240ms" }} />
+              </div>
+            </div>
+          )}
+
+          {/* Connection error */}
+          {error && (
+            <div className="flex justify-center">
+              <div
+                className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs max-w-[90%]"
+                style={{
+                  background: "rgba(239,68,68,0.1)",
+                  color: "#f87171",
+                  border: "1px solid rgba(239,68,68,0.25)",
+                }}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {error}
+              </div>
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* ── Input bar ──────────────────────────────────────────────────────── */}
+      <div
+        className="px-4 pb-8 pt-3 flex-shrink-0"
+        style={{
+          borderTop: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(13,13,26,0.85)",
+          backdropFilter: "blur(16px)",
+        }}
+      >
         <div className="max-w-2xl mx-auto">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              send(input);
+              sendMessage();
             }}
-            className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 shadow-sm focus-within:border-[#5eead4]/60"
+            className="flex items-center gap-2 rounded-2xl px-3 py-2"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
           >
             <input
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={recording ? "Listening..." : "Type your message..."}
-              className="flex-1 bg-transparent outline-none text-[14.5px] text-white placeholder:text-white/40 py-1.5"
-              disabled={recording}
+              placeholder={recording ? "Listening…" : "Type your message…"}
+              disabled={sending}
+              className="flex-1 bg-transparent outline-none text-[14px] text-white placeholder:text-white/35 py-1.5"
             />
-            {recording && (
-              <div className="flex items-end gap-0.5 h-5 mr-1">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <span
-                    key={i}
-                    className="w-0.5 bg-[#5eead4] rounded-full animate-pulse"
-                    style={{ height: `${6 + (i % 3) * 5}px`, animationDelay: `${i * 120}ms` }}
-                  />
-                ))}
-              </div>
-            )}
+
+            {/* Mic button */}
             <button
               type="button"
               onClick={toggleMic}
               aria-label="Toggle microphone"
-              className={`relative w-9 h-9 rounded-full flex items-center justify-center transition ${
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0"
+              style={
                 recording
-                  ? "bg-[#5eead4] text-[#0b1220]"
-                  : "bg-white/10 text-white/70 hover:bg-white/15"
-              }`}
+                  ? {
+                      background: "rgba(52,211,153,0.18)",
+                      border: "1px solid rgba(52,211,153,0.4)",
+                      color: "#34d399",
+                    }
+                  : {
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.5)",
+                    }
+              }
             >
-              {recording && (
-                <span className="absolute inset-0 rounded-full ring-2 ring-[#5eead4]/40 animate-ping" />
-              )}
-              <Mic className="w-4 h-4" />
+              {recording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
+
+            {/* Send button */}
             <button
               type="submit"
               aria-label="Send"
-              disabled={!input.trim()}
-              className="w-9 h-9 rounded-full bg-[#5eead4] text-[#0b1220] flex items-center justify-center disabled:opacity-40"
+              disabled={!input.trim() || sending}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity disabled:opacity-40 flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #34d399, #059669)" }}
             >
-              <Send className="w-4 h-4" />
+              {sending ? (
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 text-white" />
+              )}
             </button>
           </form>
+
+          <p
+            className="text-center text-[10.5px] mt-2.5"
+            style={{ color: "rgba(255,255,255,0.22)" }}
+          >
+            <ShieldCheck className="w-3 h-3 inline mr-1 opacity-70" />
+            Private &amp; secure · For emergencies call 911
+          </p>
         </div>
       </div>
     </div>

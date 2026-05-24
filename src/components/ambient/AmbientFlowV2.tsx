@@ -21,6 +21,7 @@ import {
   CircleStop,
   Search,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,7 +83,7 @@ interface AmbientFlowV2Props {
 // Browser speech recognition type (not in all TS libs)
 // ─────────────────────────────────────────────────────────────────────────────
 
-type TranscriptLine = { speaker: string; text: string };
+type TranscriptLine = { speaker: string; text: string; speakerIndex?: number };
 
 // SpeechRecognition browser API typings (not in lib.dom)
 type SpeechRecognition = any;
@@ -336,10 +337,8 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
   const [selectedPerson, setSelectedPerson] = useState<any>(undefined);
 
   useEffect(() => {
-    if (individuals && individuals.length > 0 && !selectedPerson) {
-      const found = defaultIndividualId
-        ? individuals.find((p) => p.id === defaultIndividualId)
-        : individuals[0];
+    if (individuals && individuals.length > 0 && defaultIndividualId && !selectedPerson) {
+      const found = individuals.find((p) => p.id === defaultIndividualId);
       if (found) setSelectedPerson(found);
     }
   }, [individuals, defaultIndividualId]);
@@ -349,13 +348,14 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
   const [sessionType, setSessionType] = useState<SessionType>("In-person visit");
   const [consent, setConsent] = useState(false);
 
-  // Speech recognition
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [speechSupported] = useState<boolean>(
-    () => typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
-  );
+  // Deepgram real-time transcription refs
+  const socketRef        = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef        = useRef<MediaStream | null>(null);
+  const [deepgramError,  setDeepgramError]  = useState<string | null>(null);
+  const [dgConnecting,   setDgConnecting]   = useState(false);
   const [liveTranscript, setLiveTranscript] = useState<TranscriptLine[]>([]);
-  const [interimText, setInterimText] = useState("");
+  const [interimText,    setInterimText]    = useState("");
 
   // Step 2 state
   const [elapsed, setElapsed] = useState(0);
@@ -378,6 +378,22 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
   const [includedItems, setIncludedItems] = useState<Set<string>>(new Set());
   const [confirmedRisk, setConfirmedRisk] = useState(false);
 
+  // Inline field editing state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+
+  /** Persist an edited value back into extractGroups state */
+  const updateItemValue = (itemId: string, newValue: string) => {
+    setExtractGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        items: g.items.map((it) =>
+          it.id === itemId ? { ...it, value: newValue } : it
+        ),
+      }))
+    );
+  };
+
   // Step 5 state
   const [undoSeconds, setUndoSeconds] = useState(60);
 
@@ -388,55 +404,118 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
     return () => clearInterval(t);
   }, [step, paused]);
 
-  // Start / stop / pause SpeechRecognition
+  // ── Deepgram session helpers ───────────────────────────────────────────────
+  const startDeepgramSession = async () => {
+    setDeepgramError(null);
+    setDgConnecting(true);
+    try {
+      // 1. Fetch Deepgram API key from backend (auth-gated)
+      const userToken = await currentUser?.getIdToken();
+      const tokenRes = await fetch(
+        "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/ambient/deepgram-token",
+        { method: "POST", headers: { Authorization: `Bearer ${userToken}` } }
+      );
+      if (!tokenRes.ok) {
+        const { error } = await tokenRes.json().catch(() => ({}));
+        throw new Error(error ?? `Token request failed (${tokenRes.status})`);
+      }
+      const { key } = await tokenRes.json();
+
+      // 2. Open microphone stream
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // 3. Determine best supported mimeType
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+
+      // 4. Open Deepgram WebSocket
+      const ws = new WebSocket(
+        `wss://api.deepgram.com/v1/listen?` +
+        `model=nova-2&diarize=true&diarize_version=latest&` +
+        `punctuate=true&language=en-US&` +
+        `encoding=webm-opus&sample_rate=48000&channels=1&interim_results=false`,
+        ["token", key]
+      );
+      socketRef.current = ws;
+
+      ws.onopen = () => {
+        setDgConnecting(false);
+        // 5. Start sending audio chunks every 250 ms
+        const recorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorderRef.current = recorder;
+        recorder.addEventListener("dataavailable", (e) => {
+          if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
+            ws.send(e.data);
+          }
+        });
+        recorder.start(250);
+      };
+
+      ws.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data as string);
+          // Only process final, non-empty utterances
+          if (data.type !== "Results" || !data.is_final) return;
+          const words: { word: string; speaker?: number; punctuated_word?: string }[] =
+            data.channel?.alternatives?.[0]?.words ?? [];
+          if (words.length === 0) return;
+          const transcript: string =
+            data.channel?.alternatives?.[0]?.transcript?.trim() ?? "";
+          if (!transcript) return;
+
+          // Find dominant speaker in this utterance
+          const counts: Record<number, number> = {};
+          words.forEach((w) => {
+            const s = w.speaker ?? 0;
+            counts[s] = (counts[s] ?? 0) + 1;
+          });
+          const dominantSpeaker = Number(
+            Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? 0
+          );
+          const speakerLabel =
+            dominantSpeaker === 0
+              ? "Case Manager"
+              : personFirst || "Individual";
+
+          setLiveTranscript((prev) => [
+            ...prev,
+            { speaker: speakerLabel, text: transcript, speakerIndex: dominantSpeaker },
+          ]);
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      ws.onerror = () => {
+        setDeepgramError("Deepgram connection error — check your network.");
+        setDgConnecting(false);
+      };
+      ws.onclose = () => setDgConnecting(false);
+    } catch (err: any) {
+      setDeepgramError(err?.message ?? "Could not start transcription.");
+      setDgConnecting(false);
+    }
+  };
+
+  const stopDeepgramSession = () => {
+    mediaRecorderRef.current?.stop();
+    socketRef.current?.close();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    mediaRecorderRef.current = null;
+    socketRef.current        = null;
+    streamRef.current        = null;
+    setDgConnecting(false);
+  };
+
+  // Start Deepgram when recording begins; clean up on unmount / step change
   useEffect(() => {
     if (step !== "recording") return;
-    if (!speechSupported) return;
-    // When paused, don't run recognition at all
-    if (paused) return;
-
-    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          const text = result[0].transcript.trim();
-          if (text) {
-            setLiveTranscript((prev) => [...prev, { speaker: "Speaker", text }]);
-          }
-          interim = "";
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-      setInterimText(interim);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // 'aborted' is expected on pause/stop — not a real error
-      if (event.error !== "aborted") {
-        console.error("SpeechRecognition error:", event.error);
-      }
-    };
-
-    recognitionRef.current = recognition;
-    try { recognition.start(); } catch { /* already running */ }
-
-    return () => {
-      recognition.onresult = null;
-      recognition.onerror = null;
-      try { recognition.stop(); } catch { /* already stopped */ }
-      recognitionRef.current = null;
-    };
-  // Re-run whenever step or paused changes — paused=true skips the effect (early return above)
+    startDeepgramSession();
+    return () => stopDeepgramSession();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, speechSupported, paused]);
+  }, [step]);
 
   // Processing: call /api/chat then animate steps → review
   useEffect(() => {
@@ -468,7 +547,7 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
       // Call extraction API and parse response into extractGroups state
       try {
         const token = await currentUser?.getIdToken();
-        const fullTranscript = liveTranscript.map((l) => `${l.speaker}: ${l.text}`).join("\n");
+      const fullTranscript = liveTranscript.map((l) => `${l.speaker}: ${l.text}`).join("\n");
         if (fullTranscript.trim() && token) {
           const res = await fetch(
             "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat",
@@ -479,7 +558,26 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                message: `You are a case management AI assistant. Extract structured data from the following session transcript and return ONLY valid JSON (no markdown, no explanation) with these keys:\n{\n  "contactNote": "concise narrative summary of the session",\n  "tasks": [{"title": "task description", "priority": "high|medium|low"}],\n  "riskFlags": ["any risk or safety concerns mentioned"],\n  "ispNotes": "any goals or ISP-related notes mentioned",\n  "billable": true\n}\n\nTranscript:\n${fullTranscript}`,
+                message:
+                  `You are a case management AI assistant. Extract structured data from the following session transcript and return ONLY valid JSON (no markdown, no explanation).
+
+The transcript was captured during a home visit or case management session. Speaker labels are:
+- "Case Manager" = the case worker (observations, questions, notes)
+- Any other name (e.g. "Joseph", "Individual") = the person receiving services (their expressed preferences, concerns, barriers)
+
+Attribute information correctly based on who said it.
+
+Return JSON with these keys:
+{
+  "contactNote": "concise narrative summary of the session",
+  "tasks": [{"title": "task description", "priority": "high|medium|low"}],
+  "riskFlags": ["any risk or safety concerns mentioned"],
+  "ispNotes": "any goals or ISP-related notes — especially things the individual expressed",
+  "billable": true
+}
+
+Transcript:
+${fullTranscript}`,
               }),
             }
           );
@@ -601,12 +699,16 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
 
         // Write to contact_notes (what the eChart Contact Note tile reads)
         await addDoc(collection(db, "contact_notes"), {
+          individualId:    indId,
+          individualName:  indName,
           individual_id:   indId,
           individual_name: indName,
           organizationId:   orgId,
           author_id:   uid,
           author_name: authorName,
           type:        contactType,
+          activityType:    sessionType || "Phone Call",
+          activity_type:   sessionType || "Phone Call",
           date:        today,
           purpose:     contactNotePurpose || "Ambient session",
           details:     noteText,
@@ -614,6 +716,8 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
           next_steps:  contactNoteNextSteps,
           status:      "draft",
           ai_drafted:  true,
+          createdAt:   serverTimestamp(),
+          updatedAt:   serverTimestamp(),
           created_at:  serverTimestamp(),
           updated_at:  serverTimestamp(),
         });
@@ -825,32 +929,50 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
           </button>
         </div>
 
-        {/* Transcript */}
+        {/* Transcript area */}
         <div className="flex-1 overflow-y-auto px-6 py-8">
-          {!speechSupported ? (
+          {deepgramError ? (
             <div className="flex items-center justify-center h-full">
               <div className="max-w-sm text-center">
-                <p className="text-amber-400 text-[15px] font-semibold mb-2">Browser not supported</p>
-                <p className="text-white/60 text-[13px] leading-relaxed">
-                  Real-time transcription requires Chrome or Edge. Please use Scribe mode instead.
-                </p>
+                <p className="text-rose-400 text-[15px] font-semibold mb-2">Transcription error</p>
+                <p className="text-white/60 text-[13px] leading-relaxed">{deepgramError}</p>
+                <button
+                  onClick={startDeepgramSession}
+                  className="mt-4 px-4 py-2 rounded-lg bg-white/10 text-white/80 text-[12px] hover:bg-white/15 transition-colors"
+                >
+                  Retry connection
+                </button>
               </div>
+            </div>
+          ) : dgConnecting ? (
+            <div className="flex items-center justify-center h-full gap-3">
+              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <span className="text-white/60 text-[14px]">Connecting to Deepgram…</span>
             </div>
           ) : (
             <div className="max-w-3xl mx-auto space-y-5">
-              {liveTranscript.map((line, i) => (
-                <div key={i} className="text-[15px] leading-[1.6] text-white/90">
-                  <span className="text-blue-400 font-semibold mr-2">{line.speaker}:</span>
-                  {renderTranscriptLine(line)}
-                </div>
-              ))}
-              {interimText && (
-                <div className="text-[15px] leading-[1.6] text-white/50 italic">
-                  <span className="text-blue-400/50 font-semibold mr-2">Speaker:</span>
-                  {interimText}
+              {/* Connection badge */}
+              {liveTranscript.length === 0 && (
+                <div className="flex items-center gap-2 text-[12px] text-white/40">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Deepgram connected · Speak to begin transcription
                 </div>
               )}
-              {!paused && (
+              {liveTranscript.map((line, i) => (
+                <div key={i} className="text-[15px] leading-[1.6]">
+                  <span
+                    className={`font-semibold mr-2 ${
+                      line.speakerIndex === 0 ? "text-blue-400" : "text-emerald-400"
+                    }`}
+                  >
+                    {line.speaker}:
+                  </span>
+                  <span className={line.speakerIndex === 0 ? "text-white/90" : "text-white/70"}>
+                    {line.text}
+                  </span>
+                </div>
+              ))}
+              {!paused && liveTranscript.length > 0 && (
                 <div className="flex gap-1 text-white/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" />
                   <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: "0.15s" }} />
@@ -873,25 +995,49 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
           <div className="flex items-center gap-6">
             {/* Pause / Resume button */}
             <button
-              onClick={() => setPaused((p) => !p)}
-              className={`flex flex-col items-center gap-1.5 group`}
+              onClick={() => {
+                if (!paused) {
+                  // Pause: stop the MediaRecorder so we stop sending audio
+                  mediaRecorderRef.current?.stop();
+                  mediaRecorderRef.current = null;
+                  setPaused(true);
+                } else {
+                  // Resume: restart MediaRecorder on the same stream
+                  if (streamRef.current && socketRef.current?.readyState === WebSocket.OPEN) {
+                    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                      ? "audio/webm;codecs=opus"
+                      : "audio/webm";
+                    const recorder = new MediaRecorder(streamRef.current, { mimeType });
+                    mediaRecorderRef.current = recorder;
+                    recorder.addEventListener("dataavailable", (e) => {
+                      if (socketRef.current?.readyState === WebSocket.OPEN && e.data.size > 0) {
+                        socketRef.current.send(e.data);
+                      }
+                    });
+                    recorder.start(250);
+                  }
+                  setPaused(false);
+                }
+              }}
+              className="flex flex-col items-center gap-1.5 group"
             >
               <span className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all
-                ${paused
-                  ? 'border-green-400/60 text-green-400 bg-green-500/10 hover:bg-green-500/20'
-                  : 'border-white/30 text-white/80 hover:bg-white/10'
+                ${
+                  paused
+                    ? "border-green-400/60 text-green-400 bg-green-500/10 hover:bg-green-500/20"
+                    : "border-white/30 text-white/80 hover:bg-white/10"
                 }`}>
                 {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
               </span>
-              <span className={`text-[11px] font-medium ${paused ? 'text-green-400' : 'text-white/50'}`}>
-                {paused ? 'Resume' : 'Pause'}
+              <span className={`text-[11px] font-medium ${paused ? "text-green-400" : "text-white/50"}`}>
+                {paused ? "Resume" : "Pause"}
               </span>
             </button>
 
             {/* Stop & Process */}
             <button
               onClick={() => {
-                recognitionRef.current?.stop();
+                stopDeepgramSession();
                 setInterimText("");
                 setStep("processing");
               }}
@@ -900,7 +1046,7 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
               <span className="w-16 h-16 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-[0_0_30px_rgba(244,63,94,0.4)] flex items-center justify-center transition-colors">
                 <CircleStop className="w-6 h-6" />
               </span>
-              <span className="text-[11px] text-white/50 font-medium">Stop & Process</span>
+              <span className="text-[11px] text-white/50 font-medium">Stop &amp; Process</span>
             </button>
 
             {/* Add note button */}
@@ -1023,30 +1169,123 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
                           <span className="text-[11px] text-icm-text-dim">→ {g.destinationModule}</span>
                         </div>
                         <div className="divide-y divide-icm-border">
-                          {g.items.map((item) => (
-                            <label key={item.id} className="flex items-start gap-3 px-4 py-3 hover:bg-icm-bg/50 cursor-pointer">
-                              <Checkbox
-                                checked={includedItems.has(item.id)}
-                                onCheckedChange={() => toggleItem(item.id)}
-                                className="mt-0.5 shrink-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[11px] uppercase tracking-wide font-semibold text-icm-text-faint mb-0.5">{item.label}</p>
-                                <p className="text-[13px] text-icm-text leading-snug">{item.value}</p>
-                                {item.confidence !== undefined && (
-                                  <div className="flex items-center gap-1.5 mt-1">
-                                    {item.confidence < 85 ? (
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                                        <AlertTriangle className="w-3 h-3" /> AI confidence: {item.confidence}%
-                                      </span>
-                                    ) : (
-                                      <span className="text-[11px] text-icm-text-faint">AI confidence: {item.confidence}%</span>
+                          {g.items.map((item) => {
+                            const isEditing = editingItemId === item.id;
+                            return (
+                              <div
+                                key={item.id}
+                                className="group flex items-start gap-3 px-4 py-3 hover:bg-icm-bg/50"
+                              >
+                                {/* Checkbox — clicking it toggles inclusion */}
+                                <div
+                                  className="mt-0.5 shrink-0 cursor-pointer"
+                                  onClick={() => !isEditing && toggleItem(item.id)}
+                                >
+                                  <Checkbox
+                                    checked={includedItems.has(item.id)}
+                                    onCheckedChange={() => toggleItem(item.id)}
+                                    className="pointer-events-none"
+                                  />
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  {/* Label row with hover Edit button */}
+                                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                                    <p className="text-[11px] uppercase tracking-wide font-semibold text-icm-text-faint">
+                                      {item.label}
+                                    </p>
+                                    {!isEditing && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingItemId(item.id);
+                                          setEditingValue(item.value);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-icm-text-dim hover:text-icm-accent px-1.5 py-0.5 rounded border border-transparent hover:border-icm-border shrink-0"
+                                      >
+                                        <Pencil className="w-2.5 h-2.5" /> Edit
+                                      </button>
                                     )}
                                   </div>
-                                )}
+
+                                  {/* Value — editable textarea or static text */}
+                                  {isEditing ? (
+                                    <div
+                                      className="space-y-1.5"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <textarea
+                                        autoFocus
+                                        value={editingValue}
+                                        onChange={(e) => setEditingValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Escape") {
+                                            setEditingItemId(null);
+                                            setEditingValue("");
+                                          }
+                                          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                            updateItemValue(item.id, editingValue.trim() || item.value);
+                                            setEditingItemId(null);
+                                          }
+                                        }}
+                                        className="w-full text-[13px] text-icm-text leading-snug border border-icm-accent/30 rounded-md px-2.5 py-1.5 resize-none bg-white focus:outline-none focus:ring-2 focus:ring-icm-accent/20"
+                                        rows={Math.max(2, editingValue.split("\n").length + 1)}
+                                      />
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingItemId(null);
+                                            setEditingValue("");
+                                          }}
+                                          className="text-[11px] text-icm-text-dim hover:text-icm-text px-2 py-0.5 rounded"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => {
+                                            updateItemValue(item.id, editingValue.trim() || item.value);
+                                            setEditingItemId(null);
+                                          }}
+                                          className="text-[11px] text-white bg-icm-accent hover:opacity-90 px-2.5 py-0.5 rounded font-medium"
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p
+                                      className="text-[13px] text-icm-text leading-snug cursor-text"
+                                      onClick={() => {
+                                        setEditingItemId(item.id);
+                                        setEditingValue(item.value);
+                                      }}
+                                    >
+                                      {item.value}
+                                    </p>
+                                  )}
+
+                                  {/* Confidence badge */}
+                                  {item.confidence !== undefined && (
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                      {item.confidence < 85 ? (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                          <AlertTriangle className="w-3 h-3" /> AI confidence: {item.confidence}%
+                                        </span>
+                                      ) : (
+                                        <span className="text-[11px] text-icm-text-faint">
+                                          AI confidence: {item.confidence}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </label>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );

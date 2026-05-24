@@ -41,10 +41,12 @@ import {
   AlertCircle,
   MapPin,
   Loader2,
+  FileCheck,
   type LucideIcon,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { CompanionLinkCard } from "@/components/icm/CompanionLinkCard";
+import { useServiceAuthorizations } from "@/hooks/useFirestore";
 
 
 type Category = "Documentation" | "Care" | "Operations";
@@ -94,6 +96,7 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "services", label: "Services", icon: Briefcase, route: "services", category: "Operations" },
   { slug: "service-plan", label: "Service Plan", icon: LayoutIcon, route: "service-plan", count: 1, category: "Operations" },
   { slug: "billing", label: "General Ledger", icon: CreditCard, route: "billing", category: "Operations", roles: ["billing", "admin"] },
+  { slug: "authorizations", label: "Authorizations", icon: FileCheck, route: "authorizations", category: "Operations" },
 ];
 
 // Category visual language
@@ -322,16 +325,25 @@ const EChart = () => {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {tiles.map((t) => (
-                <ModuleTileCard
-                  key={t.slug}
-                  tile={{
-                    ...t,
-                    count: liveCounts[t.slug] !== undefined
-                      ? liveCounts[t.slug]
-                      : t.count,
-                  }}
-                  onOpen={() => navigate(`/people/${individual.id}/${t.route}`)}
-                />
+                t.slug === "authorizations" ? (
+                  <AuthorizationTileCard
+                    key={t.slug}
+                    tile={t}
+                    individualId={individual.id}
+                    onOpen={() => navigate(`/people/${individual.id}/${t.route}`)}
+                  />
+                ) : (
+                  <ModuleTileCard
+                    key={t.slug}
+                    tile={{
+                      ...t,
+                      count: liveCounts[t.slug] !== undefined
+                        ? liveCounts[t.slug]
+                        : t.count,
+                    }}
+                    onOpen={() => navigate(`/people/${individual.id}/${t.route}`)}
+                  />
+                )
         ))}
             </div>
           </section>
@@ -501,6 +513,91 @@ function ModuleTileCard({ tile, onOpen }: { tile: ModuleTile; onOpen: () => void
       <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight mt-2">
         {tile.label}
       </p>
+    </button>
+  );
+}
+
+// ─── Authorization tile — real-time, with mini bars & urgency badges ──────────
+
+function AuthorizationTileCard({
+  tile,
+  individualId,
+  onOpen,
+}: {
+  tile: ModuleTile;
+  individualId: string;
+  onOpen: () => void;
+}) {
+  const meta = CATEGORY_META[tile.category];
+  const { data: auths } = useServiceAuthorizations(individualId);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  function daysLeft(endDate: string) {
+    return Math.ceil((new Date(endDate + "T00:00:00").getTime() - today.getTime()) / 86400000);
+  }
+
+  const active = auths.filter((a) => a.status === "active" || a.status === "pending");
+  const critical = active.filter((a) => daysLeft(a.end_date) <= 7);
+  const expiringSoon = active.filter((a) => { const d = daysLeft(a.end_date); return d > 7 && d <= 30; });
+  const overUnits = active.filter((a) => a.units_authorized > 0 && (a.units_used / a.units_authorized) >= 0.85);
+
+  // Top 3 by urgency: sort by days_left ascending then units pct descending
+  const sorted = [...active].sort((a, b) => daysLeft(a.end_date) - daysLeft(b.end_date));
+  const top3 = sorted.slice(0, 3);
+
+  const hasRed = critical.length > 0 || overUnits.length > 0;
+  const hasOrange = !hasRed && expiringSoon.length > 0;
+
+  return (
+    <button
+      onClick={onOpen}
+      className="group relative text-left rounded-xl border border-icm-border bg-icm-panel pl-4 pr-3.5 py-3 min-h-[96px] hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col justify-between overflow-hidden"
+    >
+      <span className={`absolute left-0 top-0 bottom-0 w-1 ${meta.accentBar}`} />
+
+      <div className="flex items-start justify-between">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.iconBg} ${meta.iconColor}`}>
+          <FileCheck className="w-4 h-4" />
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className="font-mono font-bold text-[15px] text-icm-text leading-none">{active.length}</span>
+          {hasRed && (
+            <span className="inline-block w-2 h-2 rounded-full bg-icm-red" title="Critical authorization" />
+          )}
+          {hasOrange && !hasRed && (
+            <span className="inline-block w-2 h-2 rounded-full bg-icm-amber" title="Expiring soon" />
+          )}
+        </div>
+      </div>
+
+      <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight mt-1.5 mb-1">
+        {tile.label}
+      </p>
+
+      {/* Mini progress bars for top 3 auths */}
+      {top3.length > 0 && (
+        <div className="space-y-0.5 mt-1">
+          {top3.map((auth) => {
+            const pct = auth.units_authorized > 0
+              ? Math.min(100, (auth.units_used / auth.units_authorized) * 100)
+              : 0;
+            const barColor = pct >= 85 ? "bg-icm-red" : pct >= 70 ? "bg-icm-amber" : "bg-icm-green";
+            const dl = daysLeft(auth.end_date);
+            return (
+              <div key={auth.id} className="flex items-center gap-1.5">
+                <div className="flex-1 h-1 rounded-full bg-icm-border overflow-hidden">
+                  <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className={`text-[9px] font-mono shrink-0 ${dl <= 7 ? "text-icm-red" : dl <= 30 ? "text-icm-amber" : "text-icm-text-faint"}`}>
+                  {dl}d
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </button>
   );
 }

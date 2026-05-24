@@ -33,7 +33,7 @@ function toTask(id: string, data: DocumentData): Task {
     description: data.description,
     individualId: data.individualId,
     individualName: data.individualName,
-    dueDate: data.dueDate ?? "",
+    dueDate: data.dueDate ?? data.due_date ?? "",
     status: data.status ?? "open",
     priority: data.priority ?? "medium",
     type: data.type ?? "General",

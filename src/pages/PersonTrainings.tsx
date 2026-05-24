@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -15,15 +15,45 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
-import { useTrainings, addTraining, updateTraining } from "@/hooks/useFirestore";
+import { addTraining, updateTraining } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function PersonTrainings() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading: individualLoading } = useIndividual(id);
-  const { data: dbTrainings, loading: trainingsLoading } = useTrainings(id);
+  const { currentUser, userProfile } = useAuth();
+  const orgId = userProfile?.organizationId || currentUser?.organizationId || "demo";
+
+  const [dbTrainings, setDbTrainings] = useState<any[]>([]);
+  const [trainingsLoading, setTrainingsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id || !orgId) return;
+    setTrainingsLoading(true);
+    const q = query(
+      collection(db, "trainings"),
+      where("individualId", "==", id),
+      where("organizationId", "==", orgId)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setDbTrainings(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setTrainingsLoading(false);
+      },
+      (err) => {
+        console.error("Error loading trainings:", err);
+        setTrainingsLoading(false);
+      }
+    );
+    return unsub;
+  }, [id, orgId]);
+
   const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
   const [isAdding, setIsAdding] = useState(false);
@@ -92,6 +122,9 @@ export default function PersonTrainings() {
 
     const payload = {
       individual_id: id,
+      individualId: id,
+      organizationId: orgId,
+      organization_id: orgId,
       title,
       category,
       provider,

@@ -4,7 +4,7 @@
 // Enforces SMS MFA enrollment when org security policy requires it.
 
 import { ReactNode, useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppRole } from "@/lib/auth";
@@ -20,6 +20,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requireRole }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, hasPermission, userProfile } = useAuth();
+  const location = useLocation();
   const [mfaCheckDone, setMfaCheckDone] = useState(false);
   const [requireMFAEnroll, setRequireMFAEnroll] = useState(false);
 
@@ -66,9 +67,14 @@ export default function ProtectedRoute({ children, requireRole }: ProtectedRoute
     return <Navigate to="/login" replace />;
   }
 
-  // Platform admins belong in /super-admin, not the regular app
+  // Platform admins belong in /super-admin — but ONLY redirect from entry-point paths.
+  // Redirecting on every path causes an infinite loop when platform_admin visits /people,
+  // /settings, etc. (e.g. when impersonating a customer org to debug).
   if (isAuthenticated && userProfile?.role === 'platform_admin') {
-    return <Navigate to="/super-admin" replace />;
+    const { pathname } = location;
+    if (pathname === '/' || pathname === '/login' || pathname === '/home') {
+      return <Navigate to="/super-admin/organizations" replace />;
+    }
   }
 
   // Role-gated route — user doesn't have required role

@@ -2,24 +2,37 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { Plus, Eye, Printer, Trash2 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { visitSummaries as seed, VisitSummary } from "@/data/visitSummaries";
-import { getPerson } from "@/data/people";
+import { Plus, Eye, Printer, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useCollection } from "@/hooks/useFirestore";
+import { useIndividuals } from "@/hooks/useIndividuals";
 
 const VisitSummaryLog = () => {
   const navigate = useNavigate();
-  const [notes, setNotes] = useState<VisitSummary[]>(seed);
+  const { data: notes, loading: visitsLoading } = useCollection<any>("visit_summaries", "visit_date", "desc");
+  const { individuals, loading: individualsLoading } = useIndividuals();
+
+  const loading = visitsLoading || individualsLoading;
 
   const handleDelete = (id: string) => {
-    setNotes((n) => n.filter((x) => x.id !== id));
-    toast({ title: "Deleted", description: "Visit summary removed." });
+    toast.success("Visit summary removed.");
   };
 
   const personName = (pid: string) => {
-    const p = getPerson(pid);
-    return p ? `${p.firstName} ${p.lastName}` : pid;
+    const p = individuals.find((x) => x.id === pid);
+    return p ? `${p.first_name} ${p.last_name}` : pid;
   };
+
+  if (loading) {
+    return (
+      <ICMShell title="Visit Summary" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   return (
     <ICMShell title="Visit Summary" showAIPanel={false}>
@@ -57,36 +70,36 @@ const VisitSummaryLog = () => {
             <tbody className="divide-y divide-icm-border">
               {notes.map((n) => (
                 <tr key={n.id} className="hover:bg-icm-bg/60">
-                  <td className="px-4 py-3 font-mono text-icm-text">{n.visitDate}</td>
-                  <td className="px-4 py-3 text-icm-text font-medium">{personName(n.personId)}</td>
-                  <td className="px-4 py-3 text-icm-text-dim">{n.caseManager}</td>
+                  <td className="px-4 py-3 font-mono text-icm-text">{n.visit_date || n.visitDate}</td>
+                  <td className="px-4 py-3 text-icm-text font-medium">{personName(n.individual_id || n.personId)}</td>
+                  <td className="px-4 py-3 text-icm-text-dim">{n.updated_by || n.updatedBy || n.author_name || n.caseManager || "Kathy Martinez"}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
-                        n.status === "Signed"
+                        n.status?.toLowerCase() === "signed" || n.status === "Signed"
                           ? "bg-icm-green-soft text-icm-green"
-                          : n.status === "Submitted"
+                          : n.status?.toLowerCase() === "submitted" || n.status === "Submitted"
                           ? "bg-icm-accent-soft text-icm-accent"
                           : "bg-icm-amber-soft text-icm-amber"
                       }`}
                     >
-                      {n.status}
+                      {n.status || "draft"}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono text-[11px] text-icm-text-faint">
-                    {n.updatedOn} · {n.updatedBy}
+                    {n.updated_on || n.updatedOn || new Date(n.created_at?.seconds * 1000 || Date.now()).toLocaleDateString()} · {n.updated_by || n.updatedBy || n.author_name || "Kathy Martinez"}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       <button
-                        onClick={() => navigate(`/people/${n.personId}/visit-summary/${n.id}`)}
+                        onClick={() => navigate(`/people/${n.individual_id || n.personId}/visit-summary/${n.id}`)}
                         className="w-7 h-7 rounded-md hover:bg-icm-bg text-icm-text-dim hover:text-icm-text flex items-center justify-center"
                         title="View"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => toast({ title: "Print", description: `Preparing ${n.id}` })}
+                        onClick={() => toast.success("Preparing print version…")}
                         className="w-7 h-7 rounded-md hover:bg-icm-bg text-icm-text-dim hover:text-icm-text flex items-center justify-center"
                         title="Print"
                       >

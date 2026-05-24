@@ -3,7 +3,9 @@ import { X, Maximize2, Minimize2, Send, Sparkles, ChevronRight, Plus, ShieldChec
 import { Button } from '@/components/ui/button';
 import { demoToast } from '@/lib/demoToast';
 import { cn } from '@/lib/utils';
-import { AiResponseRenderer, STRUCTURED_RESPONSES, DEFAULT_STRUCTURED_RESPONSE, type StructuredResponse } from './AiResponseRenderer';
+import { AiResponseRenderer, type StructuredResponse } from './AiResponseRenderer';
+import { auth } from '@/lib/firebase';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ------------------------------------------------------------------ */
 /* Quick-prompt data                                                    */
@@ -120,6 +122,7 @@ interface AiChatPanelProps {
 }
 
 const AiChatPanel = ({ open, onClose }: AiChatPanelProps) => {
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -142,18 +145,37 @@ const AiChatPanel = ({ open, onClose }: AiChatPanelProps) => {
     }
   }, [messages, isThinking]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isThinking) return;
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsThinking(true);
 
-    setTimeout(() => {
-      const structured = STRUCTURED_RESPONSES[text] ?? DEFAULT_STRUCTURED_RESPONSE;
-      const aiMsg: Message = { id: crypto.randomUUID(), role: 'ai', content: '', structured, timestamp: new Date() };
-      setMessages((prev) => [...prev, aiMsg]);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          message: text,
+          context: { page: 'billing_hub', module: 'billing_ai_chat' },
+          history: messages.slice(-8).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', text: m.content || '' })),
+        }),
+      });
+      const data = res.ok ? await res.json() : { reply: 'AI service unavailable. Please try again.' };
+      const reply = data.reply ?? data.message ?? 'No response from AI.';
+      const aiMsg: Message = { id: crypto.randomUUID(), role: 'ai', content: reply, timestamp: new Date() };
+      setMessages(prev => [...prev, aiMsg]);
+    } catch {
+      const errMsg: Message = { id: crypto.randomUUID(), role: 'ai', content: 'Connection error. Please check your network and try again.', timestamp: new Date() };
+      setMessages(prev => [...prev, errMsg]);
+    } finally {
       setIsThinking(false);
-    }, 1200);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -274,7 +296,7 @@ const AiChatPanel = ({ open, onClose }: AiChatPanelProps) => {
                         </div>
                       ) : (
                         <div className="max-w-[90%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed bg-secondary/50 border border-border/50 text-foreground">
-                          {msg.structured ? <AiResponseRenderer response={msg.structured} /> : <MarkdownLite content={msg.content} />}
+                          {msg.structured ? <AiResponseRenderer response={msg.structured} /> : <MarkdownLite content={msg.content || ''} />}
                         </div>
                       )}
                     </div>

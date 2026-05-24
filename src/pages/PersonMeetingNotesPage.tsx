@@ -15,9 +15,10 @@ import {
   X,
   FileText,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import { writeAudit } from "@/data/supervisor";
 
 interface ActionItem {
@@ -172,8 +173,8 @@ const TYPE_TONE: Record<MeetingNote["type"], string> = {
 const PersonMeetingNotesPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const personLabel = person ? `${person.lastName}, ${person.firstName}` : "Person";
+  const { individual, loading } = useIndividual(id);
+  const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
   const [notes, setNotes] = useState<MeetingNote[]>(() => loadNotes(id ?? ""));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -256,6 +257,17 @@ const PersonMeetingNotesPage = () => {
     });
   }
 
+  if (loading) {
+    return (
+      <ICMShell title="Team Meeting Notes" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
   return (
     <ICMShell title="Team Meeting Notes" showAIPanel={false}>
       <div className="space-y-5">
@@ -265,10 +277,10 @@ const PersonMeetingNotesPage = () => {
             People
           </button>
           <span className="text-icm-text-faint">›</span>
-          {person && (
+          {individual && (
             <>
               <button
-                onClick={() => navigate(`/people/${person.id}/echart`)}
+                onClick={() => navigate(`/people/${individual.id}/echart`)}
                 className="hover:text-icm-text"
               >
                 {personLabel}

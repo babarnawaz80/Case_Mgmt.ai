@@ -19,54 +19,44 @@ import {
   Mail,
   Lock,
   MoreHorizontal,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
-import { getPlansForPerson, type CarePlan } from "@/data/carePlans";
-import type { AISuggestion } from "@/data/people";
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { type CarePlan } from "@/data/carePlans";
+import { useCarePlans, addCarePlan } from "@/hooks/useFirestore";
 
-const carePlanSuggestions: AISuggestion[] = [
-  {
-    tone: "urgent",
-    label: "Urgent",
-    body: "PCP review overdue 25 days. 3 required signatures still pending.",
-    cta: "Request signatures",
-  },
-  {
-    tone: "insight",
-    label: "Insight",
-    body: "Goal 2 (Community Integration) has had no progress update in 4 months. Last monitoring note mentioned 3 community events. Update progress?",
-    cta: "Update goal",
-  },
-  {
-    tone: "insight",
-    label: "Insight",
-    body: "Employment goal mentioned in 2 recent sessions. Not currently in plan. Want me to draft a new goal?",
-    cta: "Draft goal",
-  },
-  {
-    tone: "good",
-    label: "Good news",
-    body: "All service authorizations are current. Next renewal: August 2026.",
-    cta: "View services",
-  },
-];
 
 const PersonCarePlan = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const allPlans = getPlansForPerson(id ?? "");
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: allPlans, loading: plansLoading } = useCarePlans(id);
   const [completedOpen, setCompletedOpen] = useState(false);
   const [newPlanOpen, setNewPlanOpen] = useState(false);
   const [draftingAI, setDraftingAI] = useState(false);
   const [sharePlan, setSharePlan] = useState<CarePlan | null>(null);
 
-  const inProgress = useMemo(() => allPlans.filter((p) => !p.isCompleted), [allPlans]);
-  const completed = useMemo(() => allPlans.filter((p) => p.isCompleted), [allPlans]);
+  const [planType, setPlanType] = useState("Person-Centered Plan (PCP)");
+  const [internalDueDate, setInternalDueDate] = useState("2026-08-01");
+  const [notes, setNotes] = useState("");
 
-  if (!person) {
+  const inProgress = useMemo(() => allPlans.filter((p: any) => !p.isCompleted), [allPlans]);
+  const completed = useMemo(() => allPlans.filter((p: any) => p.isCompleted), [allPlans]);
+
+  const loading = individualLoading || plansLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="PCP" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+  if (!individual) {
     return (
       <ICMShell title="PCP" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -81,12 +71,77 @@ const PersonCarePlan = () => {
 
   const openPlan = (planId: string) => navigate(`/people/${id}/care-plan/${planId}`);
 
+  const handleCreatePlan = async (isAi = false) => {
+    if (!individual) return;
+    try {
+      const docRef = await addCarePlan({
+        individual_id: id,
+        personId: id,
+        status: isAi ? "In Progress" : "Draft",
+        isCompleted: false,
+        internalDueDate: internalDueDate,
+        updatedBy: "Kathy Martinez",
+        updatedOn: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
+        effectiveDate: "08/01/2026",
+        reviewDate: "08/01/2027",
+        aiDrafted: isAi,
+        goals: isAi ? [
+          {
+            id: "g1",
+            number: 1,
+            title: "Explore part-time employment opportunities",
+            description: `Joseph has expressed interest in pursuing part-time employment. Connect with Supported Employment provider to assess vocational interests, identify community-based work opportunities aligned with his skills, and arrange job shadowing within 90 days.`,
+            targetDate: "10/31/2026",
+            responsibleParty: "Kathy Martinez + Supported Employment provider",
+            progress: "Not Started",
+            aiSuggested: true,
+            objectives: [
+              { id: "g1o1", description: "Complete vocational interest assessment", status: "Not Started", aiSuggested: true },
+              { id: "g1o2", description: "Schedule 2 job shadowing visits", status: "Not Started", aiSuggested: true }
+            ]
+          }
+        ] : [],
+        services: [
+          {
+            id: "s1",
+            name: "Day Habilitation (T2021)",
+            provider: "Carroll Community Services",
+            startDate: "08/01/2025",
+            endDate: "07/31/2026",
+            units: "5 days/week",
+            status: "Active"
+          }
+        ],
+        supportNeeds: {
+          workingWell: { value: "Joseph is consistently attending Day Habilitation 4-5 days per week." },
+          notWorking: { value: "Recent withdrawn behavior reported by mother (last 2 weeks)." },
+          preferences: { value: "Joseph has expressed clear interest in exploring part-time employment." },
+          healthSafety: { value: "Behavioral changes at home flagged Low-Medium severity." }
+        },
+        team: [
+          { role: "Individual", name: `${individual.first_name} ${individual.last_name}`, status: "Pending" },
+          { role: "Case Manager", name: "Kathy Martinez", status: "Pending" }
+        ],
+        history: [
+          { date: new Date().toLocaleDateString(), user: "Kathy Martinez", action: isAi ? "AI draft generated from ambient session" : "Plan created" }
+        ]
+      });
+      toast.success("Plan created successfully!");
+      setNewPlanOpen(false);
+      setDraftingAI(false);
+      navigate(`/people/${id}/care-plan/${docRef.id}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create plan");
+    }
+  };
+
   // Empty state
   if (allPlans.length === 0) {
     return (
       <ICMShell
         title="PCP"
-        rightPanel={<PersonAIPanel person={person} suggestions={carePlanSuggestions} intro={`I'm tracking ${carePlanSuggestions.length} items on ${person.firstName}'s plan.`} />}
+        showAIPanel={false}
       >
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
@@ -94,7 +149,7 @@ const PersonCarePlan = () => {
           </div>
           <h2 className="font-manrope font-extrabold text-[20px] text-icm-text mb-1">No care plans yet</h2>
           <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
-            Start {person.firstName}'s first plan or let AI draft one based on existing records.
+            Start {individual.first_name}'s first plan or let AI draft one based on existing records.
           </p>
           <div className="flex gap-2">
             <button onClick={() => setNewPlanOpen(true)} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
@@ -112,41 +167,35 @@ const PersonCarePlan = () => {
   return (
     <ICMShell
       title="PCP"
-      rightPanel={
-        <PersonAIPanel
-          person={person}
-          suggestions={carePlanSuggestions}
-          intro={`I'm tracking ${carePlanSuggestions.length} items on ${person.firstName}'s plan.`}
-        />
-      }
+      showAIPanel={false}
     >
       <div className="space-y-5">
         {/* Breadcrumb */}
         <button
-          onClick={() => navigate(`/people/${person.id}/echart`)}
+          onClick={() => navigate(`/people/${individual.id}/echart`)}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · PCP
+          People · {individual.last_name}, {individual.first_name} · PCP
         </button>
 
         {/* Sticky person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
-          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>
-            {initials(person)}
+          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>
+            {initials(individual)}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">
-              {person.lastName}, {person.firstName}
-              {person.nickname && <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>}
+              {individual.last_name}, {individual.first_name}
+              {individual.preferred_name && <span className="font-medium text-icm-text-dim"> ({individual.preferred_name})</span>}
             </h2>
             <p className="text-[11.5px] font-mono text-icm-text-dim">
-              {person.gender} · {person.age}y · {person.county} · ID #{person.id}
+              {individual.gender ?? "—"} · {individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}
             </p>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
             <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
-            {person.status}
+            {individual.enrollment_status}
           </span>
         </div>
 
@@ -180,7 +229,7 @@ const PersonCarePlan = () => {
             <p className="text-[12.5px] font-geist text-icm-text leading-snug">
               <span className="font-semibold">PCP review is 25 days overdue.</span>{" "}
               <span className="text-icm-text-dim">
-                I drafted updated goal language based on recent monitoring notes and {person.firstName}'s expressed interests.
+                I drafted updated goal language based on recent monitoring notes and {individual.first_name}'s expressed interests.
               </span>
             </p>
           </div>
@@ -223,7 +272,7 @@ const PersonCarePlan = () => {
       {sharePlan && (
         <SharePlanModal
           plan={sharePlan}
-          personName={`${person.lastName}, ${person.firstName}`}
+          personName={`${individual.last_name}, ${individual.first_name}`}
           onClose={() => setSharePlan(null)}
         />
       )}
@@ -235,33 +284,55 @@ const PersonCarePlan = () => {
             <>
               <div className="space-y-3">
                 <Field label="Plan type">
-                  <select className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text">
+                  <select 
+                    value={planType}
+                    onChange={(e) => setPlanType(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text"
+                  >
                     <option>Person-Centered Plan (PCP)</option>
                     <option>Care Plan</option>
                     <option>Service Plan</option>
                   </select>
                 </Field>
                 <Field label="Internal due date">
-                  <input type="date" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text" />
+                  <input 
+                    type="date" 
+                    value={internalDueDate}
+                    onChange={(e) => setInternalDueDate(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text" 
+                  />
                 </Field>
                 <Field label="Notes">
-                  <textarea rows={2} className="w-full px-3 py-2 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text" />
+                  <textarea 
+                    rows={2} 
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text" 
+                  />
                 </Field>
               </div>
               <div className="mt-4 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3">
                 <div className="flex items-start gap-2">
                   <Sparkles className="w-3.5 h-3.5 text-icm-accent mt-0.5 shrink-0" />
                   <p className="text-[12px] text-icm-text leading-relaxed">
-                    Based on {person.firstName}'s last plan and current monitoring notes, I can pre-populate goals, services, and outcomes. Want me to draft this plan?
+                    Based on {individual.first_name}'s last plan and current monitoring notes, I can pre-populate goals, services, and outcomes. Want me to draft this plan?
                   </p>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-5">
-                <button onClick={() => setNewPlanOpen(false)} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">
+                <button 
+                  onClick={() => handleCreatePlan(false)} 
+                  className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg"
+                >
                   Start blank
                 </button>
                 <button
-                  onClick={() => setDraftingAI(true)}
+                  onClick={() => {
+                    setDraftingAI(true);
+                    setTimeout(() => {
+                      handleCreatePlan(true);
+                    }, 1200);
+                  }}
                   className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5"
                 >
                   <Sparkles className="w-3.5 h-3.5" /> Start with AI draft
@@ -273,14 +344,12 @@ const PersonCarePlan = () => {
               <div className="w-12 h-12 rounded-xl ai-gradient flex items-center justify-center mx-auto mb-3 animate-pulse">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <p className="text-[13px] text-icm-text font-medium">AI is reviewing {person.firstName}'s records...</p>
+              <p className="text-[13px] text-icm-text font-medium">AI is reviewing {individual.first_name}'s records...</p>
               <p className="text-[12px] text-icm-text-dim mt-1">6 monitoring forms · 3 visit summaries · 2 contact notes</p>
-              <button
-                onClick={() => { setNewPlanOpen(false); setDraftingAI(false); if (activePlan) openPlan(activePlan.id); }}
-                className="mt-5 h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90"
-              >
-                Open draft →
-              </button>
+              <div className="flex items-center justify-center gap-2 mt-5">
+                <Loader2 className="w-4 h-4 animate-spin text-icm-accent" />
+                <span className="text-[12px] font-geist text-icm-text-dim">Generating AI draft…</span>
+              </div>
             </div>
           )}
         </Modal>

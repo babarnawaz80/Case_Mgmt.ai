@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { Plus, Eye, Printer, Trash2, PhoneCall } from "lucide-react";
+import { Plus, Eye, Printer, Trash2, PhoneCall, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { onCallLogs as seed, type OnCallLogEntry } from "@/data/onCallLogs";
-import { getPerson } from "@/data/people";
+import { useIndividuals } from "@/hooks/useIndividuals";
+import { useAllOnCallLogs } from "@/hooks/useFirestore";
 
 const urgencyClass: Record<string, string> = {
   Routine: "bg-icm-bg text-icm-text-dim",
@@ -21,18 +21,60 @@ const statusClass: Record<string, string> = {
 
 const OnCallLog = () => {
   const navigate = useNavigate();
-  const [logs, setLogs] = useState<OnCallLogEntry[]>(seed);
+  const { data: dbLogs, loading } = useAllOnCallLogs();
+  const { individuals } = useIndividuals();
+
+  const logs = useMemo(() => {
+    return (dbLogs || []).map((n) => ({
+      id: n.id,
+      callDate: n.date,
+      callStartTime: n.time ?? "—",
+      callerName: n.caller ?? "—",
+      callerType: n.call_type ?? "—",
+      personId: n.individual_id,
+      category: (n as any).category ?? "General",
+      urgency: (n as any).urgency ?? "Routine",
+      status: (n as any).status ?? "Open",
+      receivedBy: n.author_name ?? "Kathy Adams",
+    }));
+  }, [dbLogs]);
 
   const handleDelete = (id: string) => {
-    setLogs((l) => l.filter((x) => x.id !== id));
-    toast({ title: "Deleted", description: "On-call log removed." });
+    toast({
+      title: "Action Restricted",
+      description: "Deleting clinical on-call logs is prohibited under SOC 2 compliance rules.",
+      variant: "destructive",
+    });
   };
 
   const personName = (pid?: string) => {
     if (!pid) return "—";
-    const p = getPerson(pid);
-    return p ? `${p.firstName} ${p.lastName}` : pid;
+    const p = individuals.find((x) => x.id === pid);
+    return p ? `${p.first_name} ${p.last_name}` : pid;
   };
+
+  if (loading) {
+    return (
+      <ICMShell title="On-Call Log" showAIPanel={false}>
+        <div className="space-y-5">
+          <div className="h-3.5 w-32 bg-slate-100 rounded animate-pulse" />
+          <div className="flex justify-between items-start flex-wrap gap-3">
+            <div className="space-y-2">
+              <div className="h-6 w-48 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3.5 w-80 bg-slate-100 rounded animate-pulse" />
+            </div>
+            <div className="h-9 w-32 bg-slate-100 rounded-lg animate-pulse shrink-0" />
+          </div>
+          <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-hidden p-4 space-y-3">
+            <div className="h-8 w-full bg-slate-50 rounded animate-pulse" />
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 w-full bg-slate-100/40 rounded animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </ICMShell>
+    );
+  }
 
   return (
     <ICMShell title="On-Call Log" showAIPanel={false}>

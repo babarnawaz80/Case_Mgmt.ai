@@ -1,45 +1,94 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft, Sparkles, Save, Send, Printer, X, AlertTriangle,
-  CheckCircle2, FileText, Target, ListChecks, FileSignature, Ban,
+  CheckCircle2, FileText, Target, ListChecks, FileSignature, Ban, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import {
-  getProgressNote, buildAIPreFilledProgressNote, ACTIVITY_TYPES, NON_BILLABLE_REASONS,
+  buildAIPreFilledProgressNote, ACTIVITY_TYPES, NON_BILLABLE_REASONS,
   type ProgressNote, type ProgressStatus, type ContactType, type GoalProgressEntry, type GoalProgressStatus,
 } from "@/data/progressNotes";
-import type { AISuggestion } from "@/data/people";
-
-const progressSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Sign this note to enable billing for 3 units.", cta: "Sign now" },
-  { tone: "insight", label: "Insight", body: "Goal 2 progress is critical — this is the first documented progress in 60 days.", cta: "Review goal section" },
-  { tone: "insight", label: "Insight", body: "Authorization SA-2026-001 has 18 of 40 units remaining this month.", cta: "View utilization" },
-  { tone: "good", label: "Good news", body: "AI pre-filled 8 of 10 fields from the ambient session.", cta: "Continue" },
-];
+import { useProgressNote, updateProgressNote } from "@/hooks/useProgressNotes";
+import { writeAudit } from "@/lib/auditService";
 
 const PersonProgressNoteDetail = () => {
   const { id, noteId } = useParams<{ id: string; noteId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading: indLoading } = useIndividual(id);
+  const { data: dbRecord, loading: recordLoading } = useProgressNote(noteId);
 
   const isNew = noteId === "new";
-  const initial = useMemo<ProgressNote | undefined>(() => {
-    if (!person) return undefined;
-    if (isNew) return buildAIPreFilledProgressNote(person.id);
-    return getProgressNote(noteId ?? "");
-  }, [person, isNew, noteId]);
-
-  const [form, setForm] = useState<ProgressNote | undefined>(initial);
+  const [form, setForm] = useState<ProgressNote | undefined>(undefined);
+  const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [showAIBanner, setShowAIBanner] = useState(true);
   const [signOpen, setSignOpen] = useState(false);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
 
-  if (!person || !form) {
+  useEffect(() => {
+    if (initialized) return;
+    if (isNew && individual) {
+      setForm(buildAIPreFilledProgressNote(individual.id));
+      setInitialized(true);
+    } else if (dbRecord) {
+      setForm({
+        id: dbRecord.id,
+        personId: dbRecord.individualId,
+        date: dbRecord.progressDate,
+        startTime: dbRecord.startTime,
+        endTime: dbRecord.endTime,
+        activityType: dbRecord.activityType,
+        contactType: dbRecord.contactType as any,
+        isBillable: dbRecord.isBillable,
+        nonBillableReason: (dbRecord as any).nonBillableReason,
+        serviceCode: (dbRecord as any).serviceCode,
+        units: (dbRecord as any).units,
+        authorizationId: (dbRecord as any).authorizationId,
+        authorizationRemaining: (dbRecord as any).authorizationRemaining,
+        purposeOfActivity: dbRecord.purposeOfActivity,
+        goalProgress: dbRecord.goalsProgress ? dbRecord.goalsProgress.map(g => ({
+          goalId: g.goalId,
+          goalTitle: g.goalText,
+          progressNotes: g.narrative,
+          status: g.progressStatus === "met" ? "Goal achieved" :
+                  g.progressStatus === "progressing" ? "Progressing" :
+                  g.progressStatus === "no_change" ? "No change" :
+                  g.progressStatus === "regressing" ? "No change" : "No change",
+        })) : [],
+        additionalObservations: dbRecord.additionalObservations,
+        nextSteps: dbRecord.nextSteps,
+        status: dbRecord.status === "signed" ? "Signed" :
+                dbRecord.status === "void" ? "Void" :
+                dbRecord.status === "pending_signature" ? "Pending Signature" : "Draft",
+        voidReason: (dbRecord as any).voidReason,
+        signedBy: (dbRecord as any).signedBy,
+        signedOn: (dbRecord as any).signedOn,
+        updatedBy: dbRecord.authorName,
+        updatedOn: dbRecord.progressDate,
+      });
+      setInitialized(true);
+    }
+  }, [dbRecord, isNew, individual, initialized]);
+
+  const loading = indLoading || recordLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Progress Note" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual || !form) {
     return (
       <ICMShell title="Progress Note" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Note not found.</p>
@@ -79,27 +128,101 @@ const PersonProgressNoteDetail = () => {
   const wouldExceedAuth =
     form.isBillable && form.authorizationRemaining !== undefined && (form.units ?? 0) > form.authorizationRemaining;
 
-  const handleSign = () => {
-    if (!form) return;
-    const today = new Date().toLocaleDateString("en-US");
-    setForm({ ...form, status: "Signed", signedBy: "Kathy Adams, CM", signedOn: today });
-    setSignOpen(false);
-    setConfirmReviewed(false);
+  const handleSaveDraft = async () => {
+    if (!form || !noteId) return;
+    setSaving(true);
+    try {
+      const payload = {
+        activityType: form.activityType,
+        contactType: form.contactType ?? "In-Person",
+        progressDate: form.date,
+        startTime: form.startTime ?? "",
+        endTime: form.endTime ?? "",
+        isBillable: form.isBillable,
+        purposeOfActivity: form.purposeOfActivity ?? "",
+        goalsProgress: form.goalProgress ? form.goalProgress.map(g => ({
+          goalId: g.goalId,
+          goalText: g.goalTitle,
+          narrative: g.progressNotes ?? "",
+          progressStatus: g.status === "Goal achieved" ? "met" as const :
+                          g.status === "Progressing" ? "progressing" as const :
+                          g.status === "No change" ? "no_change" as const : "no_change" as const,
+        })) : [],
+        additionalObservations: form.additionalObservations ?? "",
+        nextSteps: form.nextSteps ?? "",
+        status: "draft" as const,
+      };
+
+      await updateProgressNote(noteId, payload);
+      await writeAudit('edit_note', 'note', noteId, { status: 'draft' });
+      toast.success("Draft saved successfully");
+    } catch (err) {
+      toast.error("Failed to save draft: " + (err as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleVoid = () => {
-    if (!voidReason.trim()) return;
-    setForm({ ...form, status: "Void", voidReason });
-    setVoidOpen(false);
+  const handleSign = async () => {
+    if (!form || !noteId) return;
+    setSaving(true);
+    try {
+      const today = new Date().toLocaleDateString("en-US");
+      const updatedFields = {
+        status: "signed" as const,
+        signedBy: "Kathy Adams, CM",
+        signedOn: today,
+        goalsProgress: form.goalProgress ? form.goalProgress.map(g => ({
+          goalId: g.goalId,
+          goalText: g.goalTitle,
+          narrative: g.progressNotes ?? "",
+          progressStatus: g.status === "Goal achieved" ? "met" as const :
+                          g.status === "Progressing" ? "progressing" as const :
+                          g.status === "No change" ? "no_change" as const : "no_change" as const,
+        })) : [],
+      };
+      
+      await updateProgressNote(noteId, updatedFields);
+      await writeAudit('edit_note', 'note', noteId, { status: 'signed' });
+
+      setForm({ ...form, status: "Signed", signedBy: "Kathy Adams, CM", signedOn: today });
+      toast.success("Progress note signed successfully");
+    } catch (err) {
+      toast.error("Failed to sign progress note: " + (err as Error).message);
+    } finally {
+      setSaving(false);
+      setSignOpen(false);
+      setConfirmReviewed(false);
+    }
+  };
+
+  const handleVoid = async () => {
+    if (!form || !noteId || !voidReason.trim()) return;
+    setSaving(true);
+    try {
+      await updateProgressNote(noteId, {
+        status: "void" as const,
+        voidReason: voidReason,
+      } as any);
+      await writeAudit('edit_note', 'note', noteId, { status: 'voided', reason: voidReason });
+
+      setForm({ ...form, status: "Void", voidReason });
+      toast.success("Progress note voided successfully");
+    } catch (err) {
+      toast.error("Failed to void progress note: " + (err as Error).message);
+    } finally {
+      setSaving(false);
+      setVoidOpen(false);
+    }
   };
 
   return (
-    <ICMShell title="Progress Note" rightPanel={<PersonAIPanel person={person} suggestions={progressSuggestions} intro={`${progressSuggestions.length} suggestions for ${person.firstName}.`} />}>
+    <ICMShell title="Progress Note" showAIPanel={false}>
       <div className="space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <button onClick={() => navigate(`/people/${person.id}/progress-note`)} className="inline-flex items-center gap-1.5 text-[14px] font-geist font-bold text-icm-text hover:text-icm-accent mb-2">
+            <button onClick={() => navigate(`/people/${individual.id}/progress-note`)} className="inline-flex items-center gap-1.5 text-[14px] font-geist font-bold text-icm-text hover:text-icm-accent mb-2">
               <ChevronLeft className="w-4 h-4" />
               Progress Notes
             </button>
@@ -113,14 +236,14 @@ const PersonProgressNoteDetail = () => {
               </span>
             </div>
             <h1 className="font-manrope text-[24px] font-extrabold text-icm-text leading-tight tracking-[-0.02em] mt-2">
-              {person.lastName}, {person.firstName}
+              {individual.last_name}, {individual.first_name}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {!isReadOnly && (
               <>
-                <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
-                  <Save className="w-3.5 h-3.5" /> Save draft
+                <button onClick={handleSaveDraft} disabled={saving} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5 disabled:opacity-40">
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save draft
                 </button>
                 <button onClick={() => setSignOpen(true)} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                   <FileSignature className="w-3.5 h-3.5" /> Sign &amp; submit
@@ -162,7 +285,7 @@ const PersonProgressNoteDetail = () => {
               </div>
               <p className="text-[12.5px] font-geist text-icm-text leading-snug">
                 <span className="font-semibold">Pre-filled from ambient session 04/27/2026.</span>{" "}
-                <span className="text-icm-text-dim">Progress observations drafted for 2 of {person.firstName}'s active goals. Review and edit before signing.</span>
+                <span className="text-icm-text-dim">Progress observations drafted for 2 of {individual.first_name}'s active goals. Review and edit before signing.</span>
               </p>
             </div>
             <button onClick={() => setShowAIBanner(false)} className="p-1 rounded hover:bg-white/50 text-icm-text-dim shrink-0">
@@ -175,7 +298,7 @@ const PersonProgressNoteDetail = () => {
         <Section title="Note Details" titleIcon={<FileText className="w-4 h-4 text-icm-text-dim" />}>
           <Grid2>
             <Field label="Person Supported" required>
-              <input disabled value={`${person.lastName}, ${person.firstName}`} className={inputCls} />
+              <input disabled value={`${individual.last_name}, ${individual.first_name}`} className={inputCls} />
             </Field>
             <Field label="Activity Type" required aiSource={aiSourceFor("activityType")}>
               <select disabled={isReadOnly} value={form.activityType} onChange={(e) => update("activityType", e.target.value)} className={selectCls}>
@@ -269,7 +392,7 @@ const PersonProgressNoteDetail = () => {
               <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft px-3.5 py-2.5 mb-3 flex items-start gap-2">
                 <Sparkles className="w-4 h-4 text-icm-accent mt-0.5 shrink-0" />
                 <p className="text-[12px] font-geist text-icm-text leading-snug">
-                  <span className="font-semibold">I pulled {person.firstName}'s active goals from the Care Plan.</span>{" "}
+                  <span className="font-semibold">I pulled {individual.first_name}'s active goals from the Care Plan.</span>{" "}
                   <span className="text-icm-text-dim">I detected progress-relevant content in the 04/27 ambient session for 2 goals. Review below.</span>
                 </p>
               </div>
@@ -284,7 +407,7 @@ const PersonProgressNoteDetail = () => {
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-icm-amber mt-0.5 shrink-0" />
                 <p>
-                  <span className="font-semibold">No active goals found for {person.firstName}.</span>{" "}
+                  <span className="font-semibold">No active goals found for {individual.first_name}.</span>{" "}
                   <span className="text-icm-text-dim">Goals are set in the Care Plan / ISP module. You can still document general progress below.</span>
                 </p>
               </div>
@@ -328,7 +451,7 @@ const PersonProgressNoteDetail = () => {
             <h3 className="font-manrope font-extrabold text-[18px] text-icm-text">Sign this progress note?</h3>
             <div className="mt-3 rounded-xl bg-icm-bg border border-icm-border p-3 text-[12px] font-geist text-icm-text-dim space-y-1">
               <p><span className="font-semibold text-icm-text">Date:</span> {form.date}</p>
-              <p><span className="font-semibold text-icm-text">Person:</span> {person.lastName}, {person.firstName}</p>
+              <p><span className="font-semibold text-icm-text">Person:</span> {individual.last_name}, {individual.first_name}</p>
               <p><span className="font-semibold text-icm-text">Activity:</span> {form.activityType}</p>
               <p><span className="font-semibold text-icm-text">Billable:</span> {form.isBillable ? `Yes — ${form.units ?? 0} units` : "No"}</p>
             </div>

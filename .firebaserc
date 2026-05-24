@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "casemanagement-ai",
+    "production": "casemanagement-ai"
+  }
+}

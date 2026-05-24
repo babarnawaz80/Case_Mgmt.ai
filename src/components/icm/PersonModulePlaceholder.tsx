@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { ChevronLeft, type LucideIcon } from "lucide-react";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 
 interface PersonModulePlaceholderProps {
   moduleName: string;
@@ -16,8 +16,10 @@ export function PersonModulePlaceholder({
 }: PersonModulePlaceholderProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const personLabel = person ? `${person.lastName}, ${person.firstName}` : "Person";
+  const { individual } = useIndividual(id);
+  const personLabel = individual
+    ? `${individual.last_name}, ${individual.first_name}`
+    : "Person";
 
   return (
     <ICMShell title={moduleName} showAIPanel={false}>
@@ -28,10 +30,10 @@ export function PersonModulePlaceholder({
             People
           </button>
           <span className="text-icm-text-faint">›</span>
-          {person && (
+          {individual && (
             <>
               <button
-                onClick={() => navigate(`/people/${person.id}/echart`)}
+                onClick={() => navigate(`/people/${individual.id}/echart`)}
                 className="hover:text-icm-text"
               >
                 {personLabel}
@@ -43,9 +45,9 @@ export function PersonModulePlaceholder({
         </nav>
 
         {/* Back link */}
-        {person && (
+        {individual && (
           <button
-            onClick={() => navigate(`/people/${person.id}/echart`)}
+            onClick={() => navigate(`/people/${individual.id}/echart`)}
             className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
@@ -61,12 +63,17 @@ export function PersonModulePlaceholder({
           <h1 className="font-manrope font-bold text-[18px] text-icm-text mt-4 tracking-tight">
             {moduleName}
           </h1>
+          {individual && (
+            <p className="text-[13px] font-geist text-icm-accent mt-1 font-semibold">
+              {individual.first_name} {individual.last_name}
+            </p>
+          )}
           <p className="text-[14px] text-icm-text-dim font-geist mt-2 max-w-md mx-auto leading-relaxed">
             {description}
           </p>
-          {person && (
+          {individual && (
             <button
-              onClick={() => navigate(`/people/${person.id}/echart`)}
+              onClick={() => navigate(`/people/${individual.id}/echart`)}
               className="mt-6 h-9 px-4 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text hover:border-icm-border-strong inline-flex items-center gap-1.5"
             >
               <ChevronLeft className="w-3.5 h-3.5" />

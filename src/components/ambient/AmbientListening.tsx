@@ -599,21 +599,33 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
           </div>
 
           {!isProcessed && (
-            <div className="px-5 py-4 border-t border-border flex items-center justify-center gap-3">
-              <button
-                onClick={() => setIsPaused(!isPaused)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors"
-              >
-                {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-                {isPaused ? "Resume" : "Pause"}
-              </button>
-              <button
-                onClick={handleStopAndProcess}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
-              >
-                <Square className="w-4 h-4" />
-                Stop & Process
-              </button>
+            <div className="px-5 py-4 border-t border-border space-y-2">
+              {isPaused && (
+                <div className="flex items-center justify-center gap-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-amber-600 text-[12px] font-semibold">Paused — transcript and timer stopped</span>
+                </div>
+              )}
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setIsPaused(!isPaused)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm font-medium transition-all
+                    ${isPaused
+                      ? 'border-green-500/40 text-green-600 bg-green-500/10 hover:bg-green-500/20'
+                      : 'border-border text-foreground hover:bg-secondary'
+                    }`}
+                >
+                  {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                  {isPaused ? "Resume Recording" : "Pause"}
+                </button>
+                <button
+                  onClick={handleStopAndProcess}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
+                >
+                  <Square className="w-4 h-4" />
+                  Stop & Process
+                </button>
+              </div>
             </div>
           )}
         </div>

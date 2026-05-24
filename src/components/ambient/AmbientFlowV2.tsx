@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   Sparkles,
   Shield,
@@ -18,10 +20,16 @@ import {
   ChevronRight,
   CircleStop,
   Search,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
-import { people, type Person } from "@/data/people";
+import { useIndividuals } from "@/hooks/useIndividuals";
+import { saveProgressNote } from "@/hooks/useProgressNotes";
+import { createTask } from "@/hooks/useTasks";
+import { audit } from "@/lib/auditService";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -67,53 +75,119 @@ interface AmbientFlowV2Props {
   defaultIndividualId?: string;
   defaultIndividualName?: string;
   onClose: () => void;
+  initialStep?: Step;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock seed for Joseph Brown session
+// Browser speech recognition type (not in all TS libs)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const mockTranscript: { speaker: string; text: string; tags?: { word: string; tone: string }[] }[] = [
-  {
-    speaker: "Kathy",
-    text: "Hi Joseph, thanks for having me today. I just wanted to check in on how things have been going with the day program.",
-  },
-  {
-    speaker: "Joseph",
-    text: "It's been good. I really like going. I was thinking I might want to try working part-time too.",
-    tags: [
-      { word: "working part-time", tone: "purple" },
-    ],
-  },
-  {
-    speaker: "Kathy",
-    text: "That's great to hear. Let me note that down for your next ISP review.",
-    tags: [{ word: "ISP review", tone: "amber" }],
-  },
-  {
-    speaker: "Linda",
-    text: "I do want to mention — at home, we've noticed some behavioral changes the last couple weeks. Joseph has been more withdrawn.",
-    tags: [
-      { word: "behavioral changes", tone: "red" },
-      { word: "withdrawn", tone: "red" },
-    ],
-  },
-  {
-    speaker: "Kathy",
-    text: "Thank you for sharing that, Linda. I'll loop in the behavioral support team and we'll follow up within two weeks.",
-    tags: [
-      { word: "behavioral support team", tone: "blue" },
-      { word: "two weeks", tone: "amber" },
-    ],
-  },
-  {
-    speaker: "Joseph",
-    text: "Okay. I'd like to keep doing the day program though.",
-    tags: [{ word: "day program", tone: "green" }],
-  },
-];
+type TranscriptLine = { speaker: string; text: string };
 
-const extractGroups: ExtractGroup[] = [
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
+// Build extract groups from AI-parsed response
+function buildExtractGroups(ai: {
+  contactNote?: string;
+  tasks?: { title: string; priority?: string }[];
+  riskFlags?: string[];
+  ispNotes?: string;
+  billable?: boolean;
+  sessionDate?: string;
+}): ExtractGroup[] {
+  const groups: ExtractGroup[] = [];
+
+  // Contact Note
+  if (ai.contactNote) {
+    groups.push({
+      id: "contact_note",
+      title: "Contact Note",
+      icon: FileText,
+      borderClass: "border-l-blue-500",
+      bgClass: "bg-blue-50",
+      destinationModule: "Contact Note",
+      items: [
+        { id: "cn_details", label: "Summary", value: ai.contactNote },
+      ],
+    });
+  }
+
+  // Tasks
+  if (ai.tasks && ai.tasks.length > 0) {
+    groups.push({
+      id: "tasks",
+      title: "Tasks",
+      icon: ClipboardCheck,
+      borderClass: "border-l-emerald-500",
+      bgClass: "bg-emerald-50",
+      destinationModule: "Case Management",
+      items: ai.tasks.map((t, i) => ({
+        id: `tk_${i}`,
+        label: t.priority ? `Create task · ${t.priority} priority` : "Create new task",
+        value: t.title,
+      })),
+    });
+  }
+
+  // ISP Notes
+  if (ai.ispNotes) {
+    groups.push({
+      id: "isp",
+      title: "ISP / Care Plan",
+      icon: FileText,
+      borderClass: "border-l-purple-500",
+      bgClass: "bg-purple-50",
+      destinationModule: "Care Plan / ISP",
+      items: [
+        { id: "isp_goal", label: "Goal note", value: ai.ispNotes },
+      ],
+    });
+  }
+
+  // Risk flags
+  if (ai.riskFlags && ai.riskFlags.length > 0) {
+    groups.push({
+      id: "risk",
+      title: "Risk & Safety",
+      icon: ShieldAlert,
+      borderClass: "border-l-rose-500",
+      bgClass: "bg-rose-50",
+      destinationModule: "Risk & Safety",
+      items: ai.riskFlags.map((flag, i) => ({
+        id: `risk_${i}`,
+        label: "Flag",
+        value: flag,
+        confidence: 80,
+        requiresConfirm: true,
+      })),
+    });
+  }
+
+  // Billable
+  if (ai.billable !== false) {
+    groups.push({
+      id: "billable",
+      title: "Billable Activity",
+      icon: Clock,
+      borderClass: "border-l-slate-400",
+      bgClass: "bg-slate-50",
+      destinationModule: "Billable Activity",
+      items: [
+        { id: "bl_1", label: "Activity type", value: "Face-to-face visit" },
+        { id: "bl_2", label: "Date", value: ai.sessionDate ?? new Date().toLocaleDateString() },
+      ],
+    });
+  }
+
+  return groups;
+}
+
+const EMPTY_EXTRACT_GROUPS: ExtractGroup[] = [
   {
     id: "contact_note",
     title: "Contact Note",
@@ -243,52 +317,47 @@ const toneClass = (tone?: string) => {
   }
 };
 
-const renderTranscriptLine = (line: typeof mockTranscript[number]) => {
-  if (!line.tags || line.tags.length === 0) return line.text;
-  let parts: (string | JSX.Element)[] = [line.text];
-  line.tags.forEach((tag, idx) => {
-    const next: (string | JSX.Element)[] = [];
-    parts.forEach((p) => {
-      if (typeof p !== "string") return next.push(p);
-      const segs = p.split(tag.word);
-      segs.forEach((s, i) => {
-        if (i > 0) {
-          next.push(
-            <span key={`tag-${idx}-${i}`} className={`px-1 rounded ${toneClass(tag.tone)}`}>
-              {tag.word}
-            </span>
-          );
-        }
-        if (s) next.push(s);
-      });
-    });
-    parts = next;
-  });
-  return <>{parts}</>;
-};
+const renderTranscriptLine = (line: TranscriptLine) => line.text;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main flow
 // ─────────────────────────────────────────────────────────────────────────────
 
-const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: AmbientFlowV2Props) => {
+const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, initialStep }: AmbientFlowV2Props) => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>("consent");
+  const [step, setStep] = useState<Step>(initialStep ?? "consent");
+  const { currentUser, userProfile } = useAuth();
+  const { individuals } = useIndividuals();
+  const [saving, setSaving] = useState(false);
 
   // Step 1 state
-  const seedPerson = defaultIndividualId
-    ? people.find((p) => p.id === defaultIndividualId)
-    : people.find((p) => p.firstName === "Joseph" && p.lastName === "Brown");
-  const [selectedPerson, setSelectedPerson] = useState<Person | undefined>(seedPerson);
+  const [selectedPerson, setSelectedPerson] = useState<any>(undefined);
+
+  useEffect(() => {
+    if (individuals && individuals.length > 0 && !selectedPerson) {
+      const found = defaultIndividualId
+        ? individuals.find((p) => p.id === defaultIndividualId)
+        : individuals[0];
+      if (found) setSelectedPerson(found);
+    }
+  }, [individuals, defaultIndividualId]);
+
   const [personSearch, setPersonSearch] = useState("");
   const [personOpen, setPersonOpen] = useState(false);
   const [sessionType, setSessionType] = useState<SessionType>("In-person visit");
   const [consent, setConsent] = useState(false);
 
+  // Speech recognition
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [speechSupported] = useState<boolean>(
+    () => typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+  );
+  const [liveTranscript, setLiveTranscript] = useState<TranscriptLine[]>([]);
+  const [interimText, setInterimText] = useState("");
+
   // Step 2 state
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [visibleLines, setVisibleLines] = useState(0);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   // Step 3 state
@@ -301,45 +370,153 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
     "✓ Building review summary...",
   ];
 
-  // Step 4 state
+  // Step 4 state — extractGroups is populated by AI response in processing step
+  const [extractGroups, setExtractGroups] = useState<ExtractGroup[]>(EMPTY_EXTRACT_GROUPS);
   const [tab, setTab] = useState<"items" | "transcript">("items");
-  const [includedItems, setIncludedItems] = useState<Set<string>>(
-    () => new Set(extractGroups.flatMap((g) => g.items.map((i) => i.id)).filter((id) => id !== "bl_4"))
-  );
+  const [includedItems, setIncludedItems] = useState<Set<string>>(new Set());
   const [confirmedRisk, setConfirmedRisk] = useState(false);
 
   // Step 5 state
   const [undoSeconds, setUndoSeconds] = useState(60);
 
-  const personName =
-    selectedPerson ? `${selectedPerson.firstName}${selectedPerson.nickname ? ` (${selectedPerson.nickname})` : ""} ${selectedPerson.lastName}` :
-    defaultIndividualName ?? "General / No individual";
-  const personFirst = selectedPerson?.firstName ?? defaultIndividualName?.split(" ")[0] ?? "this person";
-
-  // Recording timer + transcript reveal
+  // Recording timer
   useEffect(() => {
     if (step !== "recording" || paused) return;
     const t = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [step, paused]);
 
+  // Start / stop / pause SpeechRecognition
   useEffect(() => {
-    if (step !== "recording" || paused) return;
-    if (visibleLines >= mockTranscript.length) return;
-    const t = setTimeout(() => setVisibleLines((v) => v + 1), 1800);
-    return () => clearTimeout(t);
-  }, [step, paused, visibleLines]);
+    if (step !== "recording") return;
+    if (!speechSupported) return;
+    // When paused, don't run recognition at all
+    if (paused) return;
 
-  // Processing animation → review
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          const text = result[0].transcript.trim();
+          if (text) {
+            setLiveTranscript((prev) => [...prev, { speaker: "Speaker", text }]);
+          }
+          interim = "";
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      setInterimText(interim);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      // 'aborted' is expected on pause/stop — not a real error
+      if (event.error !== "aborted") {
+        console.error("SpeechRecognition error:", event.error);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    try { recognition.start(); } catch { /* already running */ }
+
+    return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      try { recognition.stop(); } catch { /* already stopped */ }
+      recognitionRef.current = null;
+    };
+  // Re-run whenever step or paused changes — paused=true skips the effect (early return above)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, speechSupported, paused]);
+
+  // Processing: call /api/chat then animate steps → review
   useEffect(() => {
     if (step !== "processing") return;
-    if (progressStep >= progressLines.length) {
-      const t = setTimeout(() => setStep("review"), 500);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setProgressStep((s) => s + 1), 500);
-    return () => clearTimeout(t);
-  }, [step, progressStep]);
+
+    const runProcessing = async () => {
+      const wordCount = liveTranscript.reduce((acc, l) => acc + l.text.split(" ").length, 0);
+      const dynamicLines = [
+        `✓ Transcription complete (${wordCount} words)`,
+        "✓ Extracting entities and action items...",
+        "✓ Matching to modules...",
+        "✓ Generating draft notes...",
+        "✓ Building review summary...",
+      ];
+
+      const animate = () => {
+        setProgressStep((s) => {
+          if (s < dynamicLines.length) return s + 1;
+          return s;
+        });
+      };
+
+      const intervals: ReturnType<typeof setTimeout>[] = [];
+      for (let i = 0; i < dynamicLines.length; i++) {
+        const timer = setTimeout(() => animate(), i * 500);
+        intervals.push(timer);
+      }
+
+      // Call extraction API and parse response into extractGroups state
+      try {
+        const token = await currentUser?.getIdToken();
+        const fullTranscript = liveTranscript.map((l) => `${l.speaker}: ${l.text}`).join("\n");
+        if (fullTranscript.trim() && token) {
+          const res = await fetch(
+            "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                message: `You are a case management AI assistant. Extract structured data from the following session transcript and return ONLY valid JSON (no markdown, no explanation) with these keys:\n{\n  "contactNote": "concise narrative summary of the session",\n  "tasks": [{"title": "task description", "priority": "high|medium|low"}],\n  "riskFlags": ["any risk or safety concerns mentioned"],\n  "ispNotes": "any goals or ISP-related notes mentioned",\n  "billable": true\n}\n\nTranscript:\n${fullTranscript}`,
+              }),
+            }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const rawReply: string = data?.reply ?? data?.text ?? "";
+            const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                const parsed = JSON.parse(jsonMatch[0]);
+                const groups = buildExtractGroups(parsed);
+                if (groups.length > 0) {
+                  setExtractGroups(groups);
+                  setIncludedItems(new Set(groups.flatMap((g) => g.items.map((i) => i.id))));
+                }
+              } catch {
+                // JSON parse failed — keep EMPTY_EXTRACT_GROUPS
+              }
+            }
+          }
+        } else if (!fullTranscript.trim()) {
+          setExtractGroups([]);
+          setIncludedItems(new Set());
+        }
+      } catch (err) {
+        console.warn("Extraction API call failed (non-blocking):", err);
+      }
+
+      const finalTimer = setTimeout(() => setStep("review"), dynamicLines.length * 500 + 500);
+      return () => {
+        intervals.forEach(clearTimeout);
+        clearTimeout(finalTimer);
+      };
+    };
+
+    const cleanup = runProcessing();
+    return () => { cleanup.then((fn) => fn && fn()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // Undo timer
   useEffect(() => {
@@ -371,9 +548,150 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
   const riskIncluded = riskItem ? includedItems.has(riskItem.id) : false;
   const needsRiskConfirm = riskIncluded && !confirmedRisk;
 
-  const filteredPeople = people.filter((p) =>
-    `${p.firstName} ${p.lastName} ${p.nickname ?? ""}`.toLowerCase().includes(personSearch.toLowerCase())
-  );
+  const selectedFirstName = selectedPerson?.first_name || selectedPerson?.firstName || "";
+  const selectedLastName = selectedPerson?.last_name || selectedPerson?.lastName || "";
+  const selectedPreferredName = selectedPerson?.preferred_name || selectedPerson?.nickname || "";
+
+  const personName =
+    selectedPerson ? `${selectedFirstName}${selectedPreferredName ? ` (${selectedPreferredName})` : ""} ${selectedLastName}` :
+    defaultIndividualName ?? "General / No individual";
+  const personFirst = selectedFirstName || defaultIndividualName?.split(" ")[0] || "this person";
+
+  const filteredPeople = (individuals || []).filter((p) => {
+    const fname = p.first_name || p.firstName || "";
+    const lname = p.last_name || p.lastName || "";
+    const pref = p.preferred_name || p.nickname || "";
+    return `${fname} ${lname} ${pref}`.toLowerCase().includes(personSearch.toLowerCase());
+  });
+
+  const handleSaveAndPush = async () => {
+    if (!currentUser) return;
+    setSaving(true);
+    try {
+      const orgId = selectedPerson?.organizationId || userProfile?.organizationId || "";
+      const uid = currentUser.uid;
+      const authorName = userProfile?.first_name
+        ? `${userProfile.first_name} ${userProfile.last_name}`
+        : "Case Manager";
+      const indId = selectedPerson?.id || defaultIndividualId || "";
+      const indName = selectedPerson
+        ? `${selectedPerson.first_name || selectedPerson.firstName || ""} ${selectedPerson.last_name || selectedPerson.lastName || ""}`.trim()
+        : defaultIndividualName || "Unknown";
+
+      // Derive values from AI-extracted groups
+      const contactNoteGroup = extractGroups.find((g) => g.id === "contact_note");
+      const taskGroup        = extractGroups.find((g) => g.id === "tasks");
+      const riskGroup        = extractGroups.find((g) => g.id === "risk");
+      const ispGroup         = extractGroups.find((g) => g.id === "isp");
+
+      const contactNoteSummary = contactNoteGroup?.items.find((i) => i.id === "cn_details")?.value ?? "";
+      const contactNotePurpose = contactNoteGroup?.items.find((i) => i.id === "cn_purpose")?.value ?? "";
+      const contactNoteNextSteps = contactNoteGroup?.items.find((i) => i.id === "cn_next")?.value ?? "";
+      const includedTasks = taskGroup?.items.filter((i) => includedItems.has(i.id)) ?? [];
+      const today = new Date().toISOString().split("T")[0];
+      const contactType = sessionType.includes("Phone") ? "Phone" : sessionType.includes("Virtual") ? "Virtual" : "In-Person";
+      const isBillable = !sessionType.includes("non-billable");
+
+      // ── 1. Contact Note (eChart Contact Note tile reads contact_notes collection) ──
+      const noteIncluded = includedItems.has("cn_details") || includedItems.has("cn_purpose");
+      if (noteIncluded && (contactNoteSummary || contactNotePurpose)) {
+        const noteText = contactNoteSummary || contactNotePurpose;
+
+        // Write to contact_notes (what the eChart Contact Note tile reads)
+        await addDoc(collection(db, "contact_notes"), {
+          individual_id:   indId,
+          individual_name: indName,
+          organizationId:   orgId,
+          author_id:   uid,
+          author_name: authorName,
+          type:        contactType,
+          date:        today,
+          purpose:     contactNotePurpose || "Ambient session",
+          details:     noteText,
+          issues:      contactNoteGroup?.items.find((i) => i.id === "cn_concerns")?.value ?? "",
+          next_steps:  contactNoteNextSteps,
+          status:      "draft",
+          ai_drafted:  true,
+          created_at:  serverTimestamp(),
+          updated_at:  serverTimestamp(),
+        });
+
+        // Also write to progress_notes (Progress Note module)
+        await saveProgressNote({
+          individualId:           indId,
+          organizationId:         orgId,
+          authorId:               uid,
+          authorName,
+          activityType:           "Case Management",
+          contactType,
+          progressDate:           today,
+          startTime:              "",
+          endTime:                "",
+          isBillable,
+          purposeOfActivity:      noteText,
+          goalsProgress:          [],
+          additionalObservations: ispGroup?.items[0]?.value ?? "",
+          nextSteps:              contactNoteNextSteps,
+          status:                 "draft",
+          aiDrafted:              true,
+        });
+      }
+
+      // ── 2. Risk flags → incidents collection ────────────────────────────────
+      for (const riskItem of (riskGroup?.items ?? [])) {
+        if (!includedItems.has(riskItem.id)) continue;
+        await addDoc(collection(db, "incidents"), {
+          individual_id:    indId,
+          individual_name:  indName,
+          organizationId:   orgId,
+          type:             "Behavioral Incident",
+          severity:         "minor",
+          status:           "open",
+          description:      riskItem.value,
+          reported_at:      new Date().toISOString(),
+          reported_by:      uid,
+          reported_by_name: authorName,
+          ai_flagged:       true,
+          created_at:       serverTimestamp(),
+          updated_at:       serverTimestamp(),
+        });
+      }
+
+      // ── 3. Tasks ────────────────────────────────────────────────────────────
+      for (const t of includedTasks) {
+        await createTask({
+          title:          t.value,
+          description:    `AI-extracted from ambient session with ${indName}.`,
+          individualId:   indId,
+          individualName: indName,
+          dueDate:        new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+          status:         "open",
+          priority:       (t.label.toLowerCase().includes("high") ? "high" : t.label.toLowerCase().includes("low") ? "low" : "medium") as "high" | "medium" | "low",
+          type:           "Follow-up",
+          assignedTo:     uid,
+          organizationId: orgId,
+        });
+      }
+
+      // ── 4. Audit log ────────────────────────────────────────────────────────
+      try {
+        await audit.applyAmbient("amb-" + Date.now().toString().slice(-6), indId, [...includedItems].join(","));
+      } catch {
+        // audit failure is non-blocking
+      }
+
+      setStep("success");
+    } catch (err: any) {
+      console.error("Save & push failed:", err);
+      toast({
+        title: "Save failed",
+        description: err?.message ?? "Could not write to modules. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ───────────────────────────────────────────────────────────────────────────
   // Step 1: Consent overlay
@@ -435,15 +753,20 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
                   >
                     General / No individual
                   </button>
-                  {filteredPeople.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => { setSelectedPerson(p); setPersonOpen(false); setPersonSearch(""); }}
-                      className="w-full text-left px-3 py-2 text-[13px] hover:bg-icm-bg text-icm-text"
-                    >
-                      {p.lastName}, {p.firstName}{p.nickname ? ` (${p.nickname})` : ""}
-                    </button>
-                  ))}
+                  {filteredPeople.map((p) => {
+                    const fname = p.first_name || p.firstName || "";
+                    const lname = p.last_name || p.lastName || "";
+                    const pref = p.preferred_name || p.nickname || "";
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => { setSelectedPerson(p); setPersonOpen(false); setPersonSearch(""); }}
+                        className="w-full text-left px-3 py-2 text-[13px] hover:bg-icm-bg text-icm-text"
+                      >
+                        {lname}, {fname}{pref ? ` (${pref})` : ""}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -502,40 +825,88 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
 
         {/* Transcript */}
         <div className="flex-1 overflow-y-auto px-6 py-8">
-          <div className="max-w-3xl mx-auto space-y-5">
-            {mockTranscript.slice(0, visibleLines).map((line, i) => (
-              <div key={i} className="text-[15px] leading-[1.6] text-white/90">
-                <span className="text-blue-400 font-semibold mr-2">{line.speaker}:</span>
-                {renderTranscriptLine(line)}
+          {!speechSupported ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="max-w-sm text-center">
+                <p className="text-amber-400 text-[15px] font-semibold mb-2">Browser not supported</p>
+                <p className="text-white/60 text-[13px] leading-relaxed">
+                  Real-time transcription requires Chrome or Edge. Please use Scribe mode instead.
+                </p>
               </div>
-            ))}
-            {visibleLines < mockTranscript.length && !paused && (
-              <div className="flex gap-1 text-white/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: "0.15s" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: "0.3s" }} />
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-5">
+              {liveTranscript.map((line, i) => (
+                <div key={i} className="text-[15px] leading-[1.6] text-white/90">
+                  <span className="text-blue-400 font-semibold mr-2">{line.speaker}:</span>
+                  {renderTranscriptLine(line)}
+                </div>
+              ))}
+              {interimText && (
+                <div className="text-[15px] leading-[1.6] text-white/50 italic">
+                  <span className="text-blue-400/50 font-semibold mr-2">Speaker:</span>
+                  {interimText}
+                </div>
+              )}
+              {!paused && (
+                <div className="flex gap-1 text-white/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: "0.15s" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: "0.3s" }} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom controls */}
-        <div className="shrink-0 pb-10 pt-4 flex flex-col items-center gap-3">
+        <div className="shrink-0 pb-10 pt-4 flex flex-col items-center gap-4">
+          {/* Paused indicator */}
+          {paused && (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-500/40">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-amber-300 text-[12px] font-semibold">Recording paused — microphone off</span>
+            </div>
+          )}
           <div className="flex items-center gap-6">
+            {/* Pause / Resume button */}
             <button
               onClick={() => setPaused((p) => !p)}
-              className="w-11 h-11 rounded-full border border-white/30 text-white/80 hover:bg-white/10 flex items-center justify-center"
+              className={`flex flex-col items-center gap-1.5 group`}
             >
-              {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              <span className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all
+                ${paused
+                  ? 'border-green-400/60 text-green-400 bg-green-500/10 hover:bg-green-500/20'
+                  : 'border-white/30 text-white/80 hover:bg-white/10'
+                }`}>
+                {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              </span>
+              <span className={`text-[11px] font-medium ${paused ? 'text-green-400' : 'text-white/50'}`}>
+                {paused ? 'Resume' : 'Pause'}
+              </span>
             </button>
+
+            {/* Stop & Process */}
             <button
-              onClick={() => setStep("processing")}
-              className="w-16 h-16 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-[0_0_30px_rgba(244,63,94,0.4)] flex items-center justify-center transition-colors"
+              onClick={() => {
+                recognitionRef.current?.stop();
+                setInterimText("");
+                setStep("processing");
+              }}
+              className="flex flex-col items-center gap-1.5"
             >
-              <CircleStop className="w-6 h-6" />
+              <span className="w-16 h-16 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-[0_0_30px_rgba(244,63,94,0.4)] flex items-center justify-center transition-colors">
+                <CircleStop className="w-6 h-6" />
+              </span>
+              <span className="text-[11px] text-white/50 font-medium">Stop & Process</span>
             </button>
-            <button className="w-11 h-11 rounded-full border border-white/30 text-white/80 hover:bg-white/10 flex items-center justify-center">
-              <Plus className="w-4 h-4" />
+
+            {/* Add note button */}
+            <button className="flex flex-col items-center gap-1.5">
+              <span className="w-11 h-11 rounded-full border border-white/30 text-white/80 hover:bg-white/10 flex items-center justify-center">
+                <Plus className="w-4 h-4" />
+              </span>
+              <span className="text-[11px] text-white/50 font-medium">Add note</span>
             </button>
           </div>
           <p className="text-[12px] text-white/50">Nothing is saved until you review and confirm.</p>
@@ -682,19 +1053,23 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
               ) : (
                 <div className="bg-white rounded-lg border border-icm-border p-5 relative">
                   <button
-                    onClick={() => navigator.clipboard.writeText(mockTranscript.map(l => `${l.speaker}: ${l.text}`).join("\n\n"))}
+                    onClick={() => navigator.clipboard.writeText(liveTranscript.map(l => `${l.speaker}: ${l.text}`).join("\n\n"))}
                     className="absolute top-3 right-3 flex items-center gap-1 text-[11px] text-icm-text-dim hover:text-icm-text px-2 py-1 rounded border border-icm-border"
                   >
                     <Copy className="w-3 h-3" /> Copy
                   </button>
-                  <div className="space-y-4 max-w-2xl">
-                    {mockTranscript.map((line, i) => (
-                      <div key={i} className="text-[13.5px] leading-[1.6] text-icm-text">
-                        <span className="text-icm-accent font-semibold mr-1.5">{line.speaker}:</span>
-                        {line.text}
-                      </div>
-                    ))}
-                  </div>
+                  {liveTranscript.length === 0 ? (
+                    <p className="text-[13px] text-icm-text-dim italic">No transcript captured.</p>
+                  ) : (
+                    <div className="space-y-4 max-w-2xl">
+                      {liveTranscript.map((line, i) => (
+                        <div key={i} className="text-[13.5px] leading-[1.6] text-icm-text">
+                          <span className="text-icm-accent font-semibold mr-1.5">{line.speaker}:</span>
+                          {line.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -760,11 +1135,12 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
             {/* Actions */}
             <div className="shrink-0 border-t border-icm-border p-4 space-y-2">
               <button
-                onClick={() => setStep("success")}
-                disabled={needsRiskConfirm || includedCount === 0}
-                className="w-full py-2.5 rounded-lg bg-icm-text text-white text-[13px] font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                onClick={handleSaveAndPush}
+                disabled={needsRiskConfirm || includedCount === 0 || saving}
+                className="w-full py-2.5 rounded-lg bg-icm-text text-white text-[13px] font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
               >
-                Save & push to all modules →
+                {saving && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
+                {saving ? "Saving & pushing..." : "Save & push to all modules →"}
               </button>
               <p className="text-[11px] text-icm-text-faint text-center">
                 Writes to {moduleCount} modules simultaneously. Undoable for 60 seconds.
@@ -832,7 +1208,7 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose }: 
             Back to dashboard
           </button>
           <button
-            onClick={() => { onClose(); if (selectedPerson) navigate(`/people/${selectedPerson.id}/echart`); }}
+            onClick={() => { onClose(); if (selectedPerson?.id || defaultIndividualId) navigate(`/people/${selectedPerson?.id || defaultIndividualId}/echart`); }}
             className="flex-1 py-2.5 rounded-lg border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg"
           >
             View {personFirst}'s eChart

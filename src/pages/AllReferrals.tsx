@@ -10,18 +10,18 @@ import {
   X,
   ExternalLink,
   Paperclip,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson, initials, riskAvatarClass } from "@/data/people";
+import { useIndividuals, riskAvatarClass, initials, type Individual } from "@/hooks/useIndividuals";
+import { useCollection, updateReferral } from "@/hooks/useFirestore";
 import {
   REFERRAL_TYPES,
   REFERRAL_STATUSES,
-  referrals as allReferrals,
   daysOpenTone,
   statusTone,
   summarize,
   lastConversation,
-  addConversationEntry,
   type Referral,
   type ReferralStatus,
 } from "@/data/referrals";
@@ -61,12 +61,68 @@ const AllReferrals = () => {
   const [notesFor, setNotesFor] = useState<Referral | null>(null);
   const [tick, setTick] = useState(0); // re-render after note add
 
+  const { data: dbReferrals, loading: referralsLoading } = useCollection("referrals");
+  const { individuals } = useIndividuals();
+
+  const allReferrals = useMemo(() => {
+    return dbReferrals.map((r: any) => {
+      let daysOpen = r.daysOpen || 0;
+      if (!daysOpen && r.date) {
+        const [m, d, y] = r.date.split("/").map(Number);
+        if (m) {
+          const dt = new Date(y, m - 1, d);
+          daysOpen = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 86400000));
+        }
+      }
+      return {
+        id: r.id,
+        personId: r.individual_id,
+        date: r.date || "—",
+        type: r.referral_type || r.type || "—",
+        priority: r.priority || "Routine",
+        reason: r.reason || "—",
+        sourceOfNeed: r.sourceOfNeed || "Case manager recommendation",
+        linkedGoalId: r.linkedGoalId,
+        linkedGoalLabel: r.linkedGoalLabel,
+        urgencyDate: r.urgencyDate,
+        providerId: r.providerId,
+        providerName: r.referred_to || r.providerName || "—",
+        providerPhone: r.providerPhone,
+        providerAddress: r.providerAddress,
+        providerEmail: r.providerEmail,
+        acceptsMedicaid: !!r.acceptsMedicaid,
+        referralMethod: r.referralMethod,
+        contactDate: r.contactDate,
+        contactPerson: r.contactPerson,
+        referenceNumber: r.referenceNumber,
+        infoShared: r.infoShared || [],
+        consentDocumented: !!r.consentDocumented,
+        consentDate: r.consentDate,
+        consentMethod: r.consentMethod,
+        expectedTimeframe: r.expectedTimeframe,
+        followUpDate: r.followUpDate,
+        assignedTo: r.referred_by || r.assignedTo || "—",
+        notes: r.notes || "",
+        status: r.status || "Pending Response",
+        daysOpen,
+        lastActivity: r.lastActivity || r.date || "—",
+        closeReason: r.closeReason,
+        outcomeNotes: r.outcomeNotes,
+        serviceStartDate: r.serviceStartDate,
+        aiPrefilled: !!r.aiPrefilled,
+        timeline: r.timeline || [],
+        attachments: r.attachments || [],
+        conversation: r.conversation || [],
+      };
+    });
+  }, [dbReferrals]);
+
   const peopleInList = useMemo(() => {
     const ids = Array.from(new Set(allReferrals.map((r) => r.personId)));
     return ids
-      .map((id) => getPerson(id))
-      .filter((p): p is NonNullable<ReturnType<typeof getPerson>> => !!p);
-  }, []);
+      .map((id) => individuals.find((i) => i.id === id))
+      .filter((p): p is Individual => !!p);
+  }, [individuals, allReferrals]);
 
   const filtered = useMemo(() => {
     const ql = q.toLowerCase();
@@ -75,8 +131,8 @@ const AllReferrals = () => {
       if (typeFilter !== "All" && r.type !== typeFilter) return false;
       if (personFilter !== "All" && r.personId !== personFilter) return false;
       if (!ql) return true;
-      const p = getPerson(r.personId);
-      const name = p ? `${p.firstName} ${p.lastName}` : "";
+      const p = individuals.find((i) => i.id === r.personId);
+      const name = p ? `${p.first_name} ${p.last_name}` : "";
       return (
         r.providerName.toLowerCase().includes(ql) ||
         r.type.toLowerCase().includes(ql) ||
@@ -84,9 +140,20 @@ const AllReferrals = () => {
         name.toLowerCase().includes(ql)
       );
     });
-  }, [q, statusFilter, typeFilter, personFilter, tick]);
+  }, [q, statusFilter, typeFilter, personFilter, individuals, allReferrals]);
 
-  const sum = summarize(filtered);
+  const sum = useMemo(() => summarize(filtered), [filtered]);
+
+  if (referralsLoading) {
+    return (
+      <ICMShell title="All Referrals" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   return (
     <ICMShell title="All Referrals" showAIPanel={false}>
@@ -139,7 +206,7 @@ const AllReferrals = () => {
             <option value="All">All individuals</option>
             {peopleInList.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.lastName}, {p.firstName}
+                {p.last_name}, {p.first_name}
               </option>
             ))}
           </select>
@@ -202,7 +269,7 @@ const AllReferrals = () => {
                   </tr>
                 )}
                 {filtered.map((r) => {
-                  const person = getPerson(r.personId);
+                  const person = individuals.find((i) => i.id === r.personId);
                   const lc = lastConversation(r);
                   const dTone = daysOpenTone(r.daysOpen);
                   const sTone = statusTone(r.status);
@@ -215,16 +282,16 @@ const AllReferrals = () => {
                             className="flex items-center gap-2 text-left"
                           >
                             <div
-                              className={`w-8 h-8 rounded-lg border flex items-center justify-center font-mono text-[11px] font-bold ${riskAvatarClass(person.riskScore)}`}
+                              className={`w-8 h-8 rounded-lg border flex items-center justify-center font-mono text-[11px] font-bold ${riskAvatarClass(person.risk_score)}`}
                             >
                               {initials(person)}
                             </div>
                             <div className="min-w-0">
                               <div className="text-[12.5px] font-semibold text-icm-text truncate">
-                                {person.lastName}, {person.firstName}
+                                {person.last_name}, {person.first_name}
                               </div>
                               <div className="text-[10.5px] font-mono text-icm-text-faint">
-                                ID #{person.id} · {r.date}
+                                ID #{person.id.slice(0, 8)} · {r.date}
                               </div>
                             </div>
                           </button>
@@ -300,6 +367,7 @@ const AllReferrals = () => {
       {notesFor && (
         <NotesModal
           referral={notesFor}
+          person={individuals.find((i) => i.id === notesFor.personId)}
           onClose={() => setNotesFor(null)}
           onSaved={() => setTick((n) => n + 1)}
         />
@@ -335,18 +403,19 @@ function Chip({
 
 function NotesModal({
   referral,
+  person,
   onClose,
   onSaved,
 }: {
   referral: Referral;
+  person: Individual | undefined;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const person = getPerson(referral.personId);
   const [text, setText] = useState("");
   const [kind, setKind] = useState<"note" | "phone" | "email">("note");
 
-  const save = () => {
+  const save = async () => {
     if (!text.trim()) {
       toast.error("Please write a note first");
       return;
@@ -359,18 +428,26 @@ function NotesModal({
       hour: "2-digit",
       minute: "2-digit",
     })}`;
-    addConversationEntry(referral.id, {
+    const newConvo = {
       id: `c-${Date.now()}`,
       type: kind,
       by: "Kathy Adams",
       initials: "KA",
       date,
       message: text.trim(),
-    });
-    referral.lastActivity = date.split(" ")[0];
-    toast.success("Note added to referral");
-    onSaved();
-    onClose();
+    };
+    try {
+      await updateReferral(referral.id, {
+        conversation: [...referral.conversation, newConvo] as any,
+        lastActivity: date.split(" ")[0],
+      });
+      toast.success("Note added to referral");
+      onSaved();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to add note");
+    }
   };
 
   return (
@@ -386,7 +463,7 @@ function NotesModal({
           </button>
         </div>
         <p className="text-[11.5px] text-icm-text-dim mb-3 font-geist">
-          {person ? `${person.lastName}, ${person.firstName}` : "Referral"} · {referral.type} ·{" "}
+          {person ? `${person.last_name}, ${person.first_name}` : "Referral"} · {referral.type} ·{" "}
           {referral.providerName}
         </p>
 

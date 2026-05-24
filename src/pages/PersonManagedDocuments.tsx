@@ -1,13 +1,17 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, Folder, FolderPlus, Upload, FileText, FileImage, FileSpreadsheet,
   File as FileIcon, Search, MoreVertical, Download, Trash2, Pencil, Star, ArrowLeft, Home,
-  Eye, Calendar, User, X, FolderOpen, Archive
+  Eye, Calendar, User, X, FolderOpen, Archive, Loader2
 } from "lucide-react";
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useManagedDocuments } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Node = {
@@ -79,22 +83,6 @@ function seedTree(personId: string): Node[] {
   return nodes;
 }
 
-const storageKey = (personId: string) => `cm_ai_docs_${personId}`;
-
-function loadTree(personId: string): Node[] {
-  try {
-    const raw = localStorage.getItem(storageKey(personId));
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  const seeded = seedTree(personId);
-  try { localStorage.setItem(storageKey(personId), JSON.stringify(seeded)); } catch {}
-  return seeded;
-}
-
-function saveTree(personId: string, nodes: Node[]) {
-  try { localStorage.setItem(storageKey(personId), JSON.stringify(nodes)); } catch {}
-}
-
 function fmtSize(b?: number) {
   if (!b) return "—";
   if (b < 1024) return `${b} B`;
@@ -127,10 +115,10 @@ function fileColor(mime?: string) {
 export default function PersonManagedDocuments() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id);
-  const personLabel = person ? `${person.lastName}, ${person.firstName}` : "Person";
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: dbDocs, loading: docsLoading } = useManagedDocuments(id);
+  const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
-  const [nodes, setNodes] = useState<Node[]>(() => loadTree(id));
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -143,7 +131,49 @@ export default function PersonManagedDocuments() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { saveTree(id, nodes); }, [id, nodes]);
+  const nodes = useMemo(() => {
+    return (dbDocs || []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type || "file",
+      parentId: d.parent_id || null,
+      createdAt: d.created_at_iso || new Date().toISOString(),
+      updatedAt: d.updated_at_iso || new Date().toISOString(),
+      createdBy: d.created_by || "System",
+      starred: d.starred || false,
+      size: d.size || 0,
+      mime: d.mime || "",
+      dataUrl: d.data_url || "",
+    }));
+  }, [dbDocs]);
+
+  useEffect(() => {
+    if (!docsLoading && (dbDocs || []).length === 0 && id) {
+      const seeded = seedTree(id);
+      seeded.forEach(async (n) => {
+        try {
+          await addDoc(collection(db, "managed_documents"), {
+            individual_id: id,
+            name: n.name,
+            type: n.type,
+            parent_id: n.parentId || "",
+            created_at_iso: n.createdAt,
+            updated_at_iso: n.updatedAt,
+            created_by: n.createdBy,
+            starred: n.starred || false,
+            size: n.size || 0,
+            mime: n.mime || "",
+            data_url: n.dataUrl || "",
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp(),
+          });
+        } catch (err) {
+          console.error("Error seeding document:", err);
+        }
+      });
+    }
+  }, [dbDocs, docsLoading, id]);
+
   useEffect(() => {
     const onDoc = () => setMenuOpen(null);
     document.addEventListener("click", onDoc);
@@ -185,34 +215,76 @@ export default function PersonManagedDocuments() {
   }, [nodes]);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
-  const createFolder = () => {
+  const createFolder = async () => {
     const name = newFolderName.trim();
     if (!name) return;
     const now = new Date().toISOString();
-    setNodes((n) => [...n, { id: uid(), name, type: "folder", parentId: currentFolderId, createdAt: now, updatedAt: now, createdBy: "Jordan Reyes" }]);
-    setNewFolderName("");
-    setShowNewFolder(false);
-    toast.success("Folder created", { description: name });
+    try {
+      await addDoc(collection(db, "managed_documents"), {
+        individual_id: id,
+        name,
+        type: "folder",
+        parent_id: currentFolderId || "",
+        created_at_iso: now,
+        updated_at_iso: now,
+        created_by: "Kathy Martinez",
+        starred: false,
+        size: 0,
+        mime: "",
+        data_url: "",
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      });
+      await writeAudit("edit_note", "individual", id ?? "", {
+        action: "document_folder_created",
+        folderName: name,
+      });
+      setNewFolderName("");
+      setShowNewFolder(false);
+      toast.success("Folder created", { description: name });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create folder");
+    }
   };
 
   const handleFiles = (files: FileList | null) => {
     if (!files || !files.length) return;
     const now = new Date().toISOString();
-    const newNodes: Node[] = [];
     let processed = 0;
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const dataUrl = (file.size < 2_000_000 && (file.type.startsWith("image/") || file.type.includes("pdf")))
           ? (e.target?.result as string) : undefined;
-        newNodes.push({
-          id: uid(), name: file.name, type: "file", parentId: currentFolderId,
-          createdAt: now, updatedAt: now, createdBy: "Jordan Reyes",
-          size: file.size, mime: file.type || "application/octet-stream", dataUrl,
-        });
+        try {
+          await addDoc(collection(db, "managed_documents"), {
+            individual_id: id,
+            name: file.name,
+            type: "file",
+            parent_id: currentFolderId || "",
+            created_at_iso: now,
+            updated_at_iso: now,
+            created_by: "Kathy Martinez",
+            starred: false,
+            size: file.size,
+            mime: file.type || "application/octet-stream",
+            data_url: dataUrl || "",
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp(),
+          });
+
+          await writeAudit("edit_note", "individual", id ?? "", {
+            action: "document_uploaded",
+            documentName: file.name,
+            documentSizeKb: Math.round(file.size / 1024),
+          });
+        } catch (err) {
+          console.error("Error saving uploaded file:", err);
+        }
+
         processed++;
         if (processed === files.length) {
-          setNodes((n) => [...n, ...newNodes]);
           toast.success(`${files.length} file${files.length > 1 ? "s" : ""} uploaded`, {
             description: `Saved to ${breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].name : "All Documents"}`,
           });
@@ -222,40 +294,74 @@ export default function PersonManagedDocuments() {
     });
   };
 
-  const deleteNode = (nodeId: string) => {
+  const deleteNode = async (nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
     if (!confirm(`Delete "${node.name}"${node.type === "folder" ? " and all its contents" : ""}?`)) return;
-    // Cascade delete folder children
-    const toDelete = new Set<string>([nodeId]);
-    if (node.type === "folder") {
-      let changed = true;
-      while (changed) {
-        changed = false;
-        nodes.forEach((n) => {
-          if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
-            toDelete.add(n.id); changed = true;
-          }
-        });
+
+    try {
+      const toDelete = new Set<string>([nodeId]);
+      if (node.type === "folder") {
+        let changed = true;
+        while (changed) {
+          changed = false;
+          nodes.forEach((n) => {
+            if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+              toDelete.add(n.id);
+              changed = true;
+            }
+          });
+        }
       }
+
+      for (const deleteId of Array.from(toDelete)) {
+        await deleteDoc(doc(db, "managed_documents", deleteId));
+      }
+
+      await writeAudit("edit_note", "individual", id ?? "", {
+        action: "document_deleted",
+        documentName: node.name,
+        documentType: node.type,
+      });
+
+      toast.success(`Deleted "${node.name}"`, { description: "Audit log updated." });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete item");
     }
-    setNodes((n) => n.filter((x) => !toDelete.has(x.id)));
-    toast.success(`Deleted "${node.name}"`, { description: "Audit log updated." });
   };
 
   const startRename = (n: Node) => { setRenaming(n.id); setRenameValue(n.name); setMenuOpen(null); };
-  const commitRename = () => {
+  const commitRename = async () => {
     if (!renaming) return;
     const v = renameValue.trim();
     if (v) {
-      setNodes((nds) => nds.map((x) => x.id === renaming ? { ...x, name: v, updatedAt: new Date().toISOString() } : x));
-      toast.success("Renamed", { description: v });
+      try {
+        await updateDoc(doc(db, "managed_documents", renaming), {
+          name: v,
+          updated_at_iso: new Date().toISOString(),
+          updated_at: serverTimestamp(),
+        });
+        toast.success("Renamed", { description: v });
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to rename");
+      }
     }
     setRenaming(null);
   };
 
-  const toggleStar = (nodeId: string) => {
-    setNodes((nds) => nds.map((x) => x.id === nodeId ? { ...x, starred: !x.starred } : x));
+  const toggleStar = async (nodeId: string) => {
+    const n = nodes.find((x) => x.id === nodeId);
+    if (!n) return;
+    try {
+      await updateDoc(doc(db, "managed_documents", nodeId), {
+        starred: !n.starred,
+        updated_at: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const downloadFile = (n: Node) => {
@@ -273,6 +379,17 @@ export default function PersonManagedDocuments() {
     e.preventDefault(); setDragOver(false);
     handleFiles(e.dataTransfer.files);
   };
+
+  if (individualLoading || docsLoading) {
+    return (
+      <ICMShell title="Managed Documents" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading Documents…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (

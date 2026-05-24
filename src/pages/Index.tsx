@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import AmbientFlowV2 from "@/components/ambient/AmbientFlowV2";
+import ScribeFlowModal from "@/components/ambient/ScribeFlowModal";
 import { motion, AnimatePresence } from "framer-motion";
 import brandLogo from "@/assets/casemanagement-ai-logo.png";
 import {
@@ -32,9 +33,11 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
+import { useFirestoreConversations } from "@/hooks/useFirestoreMessages";
 import { cn } from "@/lib/utils";
-import { people, getPerson } from "@/data/people";
+import { useIndividuals } from "@/hooks/useIndividuals";
 import { demoToast } from "@/lib/demoToast";
+import { auth } from "@/lib/firebase";
 import { InlineIndividualSnapshot } from "@/components/InlineIndividualSnapshot";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { UserMenu } from "@/components/icm/UserMenu";
@@ -75,8 +78,8 @@ const chatHistory: ChatHistoryItem[] = [
   { id: "6", title: "Training Compliance Check", preview: "4 staff members overdue on training...", time: "Feb 18 08:00 AM" },
 ];
 
-const quickStats = [
-  { label: "People Supported", value: people.length.toString(), icon: Users, route: "/people" },
+const quickStatsStatic = [
+  { label: "People Supported", value: "—", icon: Users, route: "/people" },
   { label: "Pending Tasks", value: "5", icon: ClipboardList, route: "/my-work" },
   { label: "Unsigned Notes", value: "3", icon: FileText, route: "/documentation" },
   { label: "Critical Alerts", value: "2", icon: AlertTriangle, route: "/my-work?view=alerts", highlight: true },
@@ -156,22 +159,28 @@ interface ChatTurn {
 }
 
 const Index = () => {
+  const { individuals } = useIndividuals();
   const [message, setMessage] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [plusSearch, setPlusSearch] = useState("");
   const [ambientOpen, setAmbientOpen] = useState(false);
+  const [scribeOpen, setScribeOpen] = useState(false);
   const [thread, setThread] = useState<ChatTurn[]>([]);
   const [activeIndividualId, setActiveIndividualId] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [snapshotPickerOpen, setSnapshotPickerOpen] = useState(false);
   const [snapshotQuery, setSnapshotQuery] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const snapshotRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { role } = useRole();
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
+  const { totalUnread: fsMessagesUnread } = useFirestoreConversations();
 
   const badgeFor = (item: TopNavItem) => {
     if (item.url === "/my-work") {
@@ -179,7 +188,8 @@ const Index = () => {
       if (OVERDUE_TASK_COUNT > 0) return { count: OVERDUE_TASK_COUNT, tone: "red" as const };
       if (unread > 0) return { count: unread, tone: "accent" as const };
     }
-    if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" as const };
+    const totalMessagesUnread = unreadMessages + fsMessagesUnread;
+    if (item.url === "/messages" && totalMessagesUnread > 0) return { count: totalMessagesUnread, tone: "red" as const };
     if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" as const };
     return null;
   };
@@ -189,7 +199,14 @@ const Index = () => {
     accent: "bg-icm-accent text-white",
   };
 
-  const individualOptions = ["Select Individual", ...people.map((p) => `${p.firstName} ${p.lastName}`)];
+  const quickStats = useMemo(() => [
+    { label: "People Supported", value: individuals.length.toString(), icon: Users, route: "/people" },
+    { label: "Pending Tasks", value: "5", icon: ClipboardList, route: "/my-work" },
+    { label: "Unsigned Notes", value: "3", icon: FileText, route: "/documentation" },
+    { label: "Critical Alerts", value: "2", icon: AlertTriangle, route: "/my-work?view=alerts", highlight: true },
+  ], [individuals.length]);
+
+  const individualOptions = ["Select Individual", ...individuals.map((p) => `${p.first_name} ${p.last_name}`)];
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -201,7 +218,7 @@ const Index = () => {
   }, []);
 
   function openSnapshotFor(personId: string) {
-    const p = getPerson(personId);
+    const p = individuals.find((i) => i.id === personId);
     if (!p) return;
     setSnapshotPickerOpen(false);
     setSnapshotQuery("");
@@ -209,30 +226,107 @@ const Index = () => {
     setMessage("");
     setActiveIndividualId(p.id);
     setThread([
-      { role: "user", text: `Individual Snapshot for ${p.firstName} ${p.lastName}` },
-      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.firstName}. This chat is scoped to ${p.firstName} ${p.lastName} — ask follow-up questions or convert into a note below.` },
+      { role: "user", text: `Individual Snapshot for ${p.first_name} ${p.last_name}` },
+      { role: "ai", snapshotPersonId: p.id, text: `Here's the case management snapshot for ${p.first_name}. This chat is scoped to ${p.first_name} ${p.last_name} — ask follow-up questions or convert into a note below.` },
     ]);
   }
 
 
+  const handleSend = useCallback(async (text?: string) => {
+    const content = (text ?? message).trim();
+    if (!content || aiLoading) return;
+    const active = activeIndividualId ? individuals.find((i) => i.id === activeIndividualId) : null;
+    setThread((prev) => [...prev, { role: "user", text: content }]);
+    setMessage("");
+    setAiLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(
+        "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            message: content,
+            context: {
+              page: "home_chat",
+              module: "case_management_assistant",
+              ...(active ? {
+                personId: active.id,
+                personName: `${active.first_name} ${active.last_name}`,
+                personRisk: active.risk_level,
+                personProgram: active.program,
+                personCounty: active.county,
+              } : {}),
+            },
+            history: thread.slice(-10).map((m) => ({
+              role: m.role === "ai" ? "assistant" : "user",
+              text: m.text,
+            })),
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.reply ?? "No response from AI.";
+        setThread((prev) => [...prev, { role: "ai", text: reply }]);
+      } else if (res.status === 403) {
+        // User profile not found in Firestore — retry after a brief moment (seed may still be running)
+        const errData = await res.json().catch(() => ({}));
+        if (errData.error === "User not found") {
+          setThread((prev) => [...prev, {
+            role: "ai",
+            text: "⚙️ **Setting up your account...** Your profile is being initialized. Please wait a moment and try again — this only happens on first login.",
+          }]);
+        } else {
+          setThread((prev) => [...prev, { role: "ai", text: "Access denied. Please sign out and sign back in." }]);
+        }
+      } else if (res.status === 402) {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.error === "AI_PAUSED") {
+          setThread((prev) => [...prev, { role: "ai", text: "⏸️ AI features are currently paused for your organization. Contact your administrator to re-enable." }]);
+        } else {
+          setThread((prev) => [...prev, { role: "ai", text: "💳 AI credits are exhausted. Contact your administrator to purchase more credits." }]);
+        }
+      } else if (res.status === 429) {
+        setThread((prev) => [...prev, { role: "ai", text: "⏱️ Daily AI limit reached. Try again tomorrow or ask your administrator to increase the limit." }]);
+      } else {
+        const msg = res.status >= 500
+          ? "⚠️ AI service temporarily unavailable. The AI backend may need configuration — contact your administrator."
+          : "⚠️ Unexpected error. Please try again.";
+        setThread((prev) => [...prev, { role: "ai", text: msg }]);
+      }
+    } catch {
+      setThread((prev) => [...prev, { role: "ai", text: "Connection error. Please check your network and try again." }]);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [message, aiLoading, activeIndividualId, individuals, thread]);
+
+
+  // Legacy — kept so existing JSX onClick={handleSend} calls still work
   function findReply(text: string): { reply: string; cta?: { label: string; href: string } } {
     const t = text.toLowerCase();
-    const active = activeIndividualId ? getPerson(activeIndividualId) : null;
+    const active = activeIndividualId ? individuals.find((i) => i.id === activeIndividualId) : null;
 
     if (active) {
-      const name = `${active.firstName} ${active.lastName}`;
+      const name = `${active.first_name} ${active.last_name}`;
       if (t.includes("med") || t.includes("allerg"))
-        return { reply: `**${name}** — Allergies on file: ${active.allergies ?? "None known"}. ${active.specialInstructions ?? ""}`.trim() };
+        return { reply: `**${name}** — Allergies on file: ${(active as any).allergies ?? "None known"}. ${(active as any).specialInstructions ?? ""}`.trim() };
       if (t.includes("isp") || t.includes("pcp") || t.includes("compliance"))
-        return active.aiFlag
-          ? { reply: `**${name}** — ${active.aiFlag.detail ?? active.aiFlag.label}`, cta: { label: "Open eChart", href: `/people/${active.id}/echart` } }
-          : { reply: `**${name}** is currently in compliance. Last review on file ${active.updatedOn}.` };
+        return (active as any).aiFlag
+          ? { reply: `**${name}** — ${(active as any).aiFlag.detail ?? (active as any).aiFlag.label}`, cta: { label: "Open eChart", href: `/people/${active.id}/echart` } }
+          : { reply: `**${name}** is currently in compliance. Last review on file ${active.pcp_due_date || "—"}.` };
       if (t.includes("note") || t.includes("contact"))
         return { reply: `**${name}** has 2 unsigned contact notes from last week and 1 progress note pending.`, cta: { label: "Open Contact Note", href: `/people/${active.id}/contact-note` } };
       if (t.includes("incident"))
         return { reply: `**${name}** — 1 low-severity incident (medication error) logged Apr 09; follow-up assigned.`, cta: { label: "Open Incidents", href: `/people/${active.id}/incident-reporting` } };
       if (t.includes("risk"))
-        return { reply: `**${name}** — Current risk score: ${active.riskScore ?? "not scored"}.` };
+        return { reply: `**${name}** — Current risk score: ${active.risk_score ?? "not scored"}.` };
       if (t.includes("monitor") || t.includes("form"))
         return { reply: `**${name}** — Monthly monitoring form due in 7 days.`, cta: { label: "Open Monitoring", href: `/people/${active.id}/monitoring-form` } };
       // Default in-context answer
@@ -254,13 +348,7 @@ const Index = () => {
     };
   }
 
-  function handleSend(text?: string) {
-    const content = (text ?? message).trim();
-    if (!content) return;
-    const { reply, cta } = findReply(content);
-    setThread((prev) => [...prev, { role: "user", text: content }, { role: "ai", text: reply, cta }]);
-    setMessage("");
-  }
+  // handleSend is defined above as async via useCallback
 
   function startNewChat() {
     setThread([]);
@@ -268,16 +356,27 @@ const Index = () => {
     setActiveIndividualId(null);
   }
 
+  const activeInd = individuals.find(p => `${p.first_name} ${p.last_name}` === selectedIndividual);
   const ambientOverlay = ambientOpen ? (
     <AmbientFlowV2
+      defaultIndividualId={activeInd?.id}
       defaultIndividualName={selectedIndividual && selectedIndividual !== "Select Individual" ? selectedIndividual : undefined}
       onClose={() => setAmbientOpen(false)}
+    />
+  ) : null;
+  const scribeOverlay = scribeOpen ? (
+    <AmbientFlowV2
+      defaultIndividualId={activeInd?.id}
+      defaultIndividualName={selectedIndividual && selectedIndividual !== "Select Individual" ? selectedIndividual : undefined}
+      initialStep="recording"
+      onClose={() => setScribeOpen(false)}
     />
   ) : null;
 
   return (
     <>
     {ambientOverlay}
+    {scribeOverlay}
     
     <div className="flex h-screen w-full bg-background">
       {/* Collapsible Chat History Sidebar */}
@@ -301,8 +400,22 @@ const Index = () => {
                   <MessageSquare className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => demoToast("Chat export coming soon")}
-                  title="Copy thread"
+                  onClick={() => {
+                    if (thread.length === 0) return;
+                    const date = new Date().toISOString().split("T")[0];
+                    const lines = thread.map((t) => {
+                      const label = t.role === "user" ? "You" : "AI Assistant";
+                      return `[${label}]\n${t.text ?? "(inline snapshot)"}\n`;
+                    });
+                    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `chat-export-${date}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  title="Export chat"
                   className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Copy className="w-4 h-4" />
@@ -311,8 +424,8 @@ const Index = () => {
             </div>
             <div className="flex-1 overflow-y-auto py-2">
               {thread.length > 0 && (() => {
-                const active = activeIndividualId ? getPerson(activeIndividualId) : null;
-                const title = active ? `${active.firstName} ${active.lastName} — Snapshot` : (thread[0]?.text ?? "Current chat");
+                const active = activeIndividualId ? individuals.find((i) => i.id === activeIndividualId) : null;
+                const title = active ? `${active.first_name} ${active.last_name} — Snapshot` : (thread[0]?.text ?? "Current chat");
                 return (
                   <div className="px-4 py-3 mx-2 mb-2 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300 mb-1">Active chat</p>
@@ -453,7 +566,7 @@ const Index = () => {
           {thread.length > 0 && (
             <div className="w-full max-w-2xl space-y-4 mt-2 mb-6">
               {thread.map((turn, idx) => {
-                const snapPerson = turn.snapshotPersonId ? getPerson(turn.snapshotPersonId) : undefined;
+                const snapPerson = turn.snapshotPersonId ? individuals.find((i) => i.id === turn.snapshotPersonId) : undefined;
                 if (snapPerson) {
                   return (
                     <div key={idx} className="flex justify-start">
@@ -494,6 +607,16 @@ const Index = () => {
                   </div>
                 );
               })}
+              {aiLoading && (
+                <div className="flex justify-start">
+                  <div className="glass rounded-2xl px-4 py-3 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
@@ -502,11 +625,11 @@ const Index = () => {
           {thread.length > 0 && (
             <div className="w-full max-w-2xl flex items-center justify-between gap-2 mt-2 mb-2">
               {activeIndividualId && (() => {
-                const ap = getPerson(activeIndividualId);
+                const ap = individuals.find((i) => i.id === activeIndividualId);
                 return ap ? (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 text-xs text-purple-800 dark:text-purple-200">
                     <Sparkles className="w-3.5 h-3.5" />
-                    Chatting about <strong className="font-semibold">{ap.firstName} {ap.lastName}</strong>
+                    Chatting about <strong className="font-semibold">{ap.first_name} {ap.last_name}</strong>
                   </div>
                 ) : null;
               })()}
@@ -571,19 +694,19 @@ const Index = () => {
                             onClick={() => { setSelectedIndividual("Select Individual"); setPlusMenuOpen(false); setPlusSearch(""); }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${!selectedIndividual || selectedIndividual === "Select Individual" ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
                           >
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-muted/50">
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-muted/50">
                               <User className="w-4 h-4 text-muted-foreground" />
                             </div>
                             <span>Select Individual</span>
                           </button>
-                          {people
+                          {individuals
                             .filter((p) => {
                               const q = plusSearch.trim().toLowerCase();
                               if (!q) return true;
-                              return `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) || (p.county || "").toLowerCase().includes(q);
+                              return `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) || (p.county || "").toLowerCase().includes(q);
                             })
                             .map((p) => {
-                              const name = `${p.firstName} ${p.lastName}`;
+                              const name = `${p.first_name} ${p.last_name}`;
                               const isSel = selectedIndividual === name;
                               return (
                                 <button
@@ -591,10 +714,10 @@ const Index = () => {
                                   onClick={() => { setSelectedIndividual(name); setPlusMenuOpen(false); setPlusSearch(""); }}
                                   className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${isSel ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
                                 >
-                                  <PersonAvatar person={p} size={36} shape="circle" />
+                                  <PersonAvatar person={p as any} size={36} shape="circle" />
                                   <div className="min-w-0 flex-1">
                                     <div className={`font-medium truncate ${isSel ? 'text-primary' : 'text-foreground'}`}>{name}</div>
-                                    <div className="text-xs text-muted-foreground truncate">{p.county} County · {p.status}</div>
+                                    <div className="text-xs text-muted-foreground truncate">{p.county} County · {p.enrollment_status}</div>
                                   </div>
                                 </button>
                               );
@@ -628,7 +751,7 @@ const Index = () => {
                           Ambient
                         </button>
                         <button
-                          onClick={() => isIndividualSelected && setAmbientOpen(true)}
+                          onClick={() => isIndividualSelected && setScribeOpen(true)}
                           disabled={!isIndividualSelected}
                           className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
                             isIndividualSelected
@@ -644,8 +767,41 @@ const Index = () => {
                     );
                   })()}
                   <button
-                    onClick={() => demoToast("Voice dictation coming soon")}
-                    className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => {
+                      const SpeechRecognition =
+                        (window as any).SpeechRecognition ||
+                        (window as any).webkitSpeechRecognition;
+                      if (!SpeechRecognition) {
+                        import("@/lib/demoToast").then((m) =>
+                          m.demoToast("Voice dictation is not supported in this browser")
+                        );
+                        return;
+                      }
+                      if (isListening) {
+                        recognitionRef.current?.stop();
+                        setIsListening(false);
+                        return;
+                      }
+                      const recognition = new SpeechRecognition();
+                      recognition.lang = "en-US";
+                      recognition.continuous = false;
+                      recognition.interimResults = false;
+                      recognition.onresult = (e: any) => {
+                        const transcript = e.results[0][0].transcript;
+                        setMessage((prev) => (prev ? prev + " " + transcript : transcript));
+                      };
+                      recognition.onend = () => setIsListening(false);
+                      recognition.onerror = () => setIsListening(false);
+                      recognitionRef.current = recognition;
+                      recognition.start();
+                      setIsListening(true);
+                    }}
+                    className={`p-2 rounded-lg hover:bg-secondary transition-colors ${
+                      isListening
+                        ? "text-red-500 animate-pulse"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={isListening ? "Stop dictation" : "Voice dictation"}
                   >
                     <Mic className="w-4 h-4" />
                   </button>
@@ -700,9 +856,9 @@ const Index = () => {
                     />
                   </div>
                   <div className="max-h-64 overflow-y-auto">
-                    {people
+                    {individuals
                       .filter((p) =>
-                        `${p.firstName} ${p.lastName} ${p.nickname ?? ""}`
+                        `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`
                           .toLowerCase()
                           .includes(snapshotQuery.trim().toLowerCase())
                       )
@@ -712,13 +868,13 @@ const Index = () => {
                           onClick={() => openSnapshotFor(p.id)}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
                         >
-                          <PersonAvatar person={p} size={28} shape="circle" />
+                          <PersonAvatar person={p as any} size={28} shape="circle" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">
-                              {p.firstName} {p.lastName}
+                              {p.first_name} {p.last_name}
                             </p>
                             <p className="text-[11px] text-muted-foreground truncate">
-                              {p.county} · {p.status}
+                              {p.county} · {p.enrollment_status}
                             </p>
                           </div>
                         </button>

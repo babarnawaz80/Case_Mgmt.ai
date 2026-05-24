@@ -1,16 +1,27 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { DocumentVault } from "@/components/documents/DocumentVault";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import { getDocumentsForIndividual } from "@/data/documents";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 
 const PersonDocuments = () => {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const person = getPerson(id);
+  const { individual, loading } = useIndividual(id);
 
-  if (!person) {
+  if (loading) {
+    return (
+      <ICMShell title="Documents" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="Documents" showAIPanel={false}>
         <p className="text-[13px] font-geist text-icm-text-dim">Individual not found.</p>
@@ -18,7 +29,7 @@ const PersonDocuments = () => {
     );
   }
 
-  const { folders, documents } = getDocumentsForIndividual(person.id);
+  const { folders, documents } = getDocumentsForIndividual(individual.id);
 
   return (
     <ICMShell title="Documents" showAIPanel={false}>
@@ -32,11 +43,11 @@ const PersonDocuments = () => {
           </button>
           <span>›</span>
           <button
-            onClick={() => navigate(`/people/${person.id}/echart`)}
+            onClick={() => navigate(`/people/${individual.id}/echart`)}
             className="hover:text-icm-text transition-colors inline-flex items-center gap-1"
           >
             <ChevronLeft className="w-3 h-3" />
-            {person.firstName} {person.lastName}
+            {individual.first_name} {individual.last_name}
           </button>
           <span>›</span>
           <span className="text-icm-text font-medium">Documents</span>
@@ -46,7 +57,8 @@ const PersonDocuments = () => {
           folders={folders}
           documents={documents}
           scope="individual"
-          scopeLabel={`${person.firstName} ${person.lastName} · Document vault`}
+          scopeLabel={`${individual.first_name} ${individual.last_name} · Document vault`}
+          activePersonId={individual.id}
         />
       </div>
     </ICMShell>

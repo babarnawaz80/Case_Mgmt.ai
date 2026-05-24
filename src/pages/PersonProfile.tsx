@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Sparkles,
@@ -20,15 +20,24 @@ import {
   ArrowRight,
   Phone as PhoneIcon,
   Mail,
+  Loader2,
+  Copy,
+  Check,
+  RotateCcw,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { VoiceCompanionCard } from "@/components/VoiceCompanionCard";
 import { cn } from "@/lib/utils";
-import { getPerson, initials, riskAvatarClass, riskScoreClass } from "@/data/people";
+import { auth } from "@/lib/firebase";
+import { useIndividual, updateIndividual, initials, riskAvatarClass, riskScoreClass, calcAge, type Individual } from "@/hooks/useIndividuals";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { demoToast } from "@/lib/demoToast";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 import {
   getProfile,
@@ -52,7 +61,7 @@ const PersonProfile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const person = getPerson(id ?? "");
+  const { individual: person, loading } = useIndividual(id);
   const profile = useMemo(() => (person ? getProfile(person.id) : null), [person]);
 
   const initialTab = (params.get("tab") as TabKey) ?? "basic";
@@ -60,6 +69,17 @@ const PersonProfile = () => {
   const [showSsn, setShowSsn] = useState(false);
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [echartOpen, setEchartOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <ICMShell title="Profile" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   if (!person || !profile) {
     return (
@@ -77,7 +97,7 @@ const PersonProfile = () => {
     );
   }
 
-  const tabs = tabCompleteness(profile, person.firstName, person.lastName, person.dob);
+  const tabs = tabCompleteness(profile, person.first_name, person.last_name, person.dob);
   const overall = overallCompleteness(tabs);
   const tabMap = Object.fromEntries(tabs.map((t) => [t.tab, t]));
 
@@ -98,7 +118,7 @@ const PersonProfile = () => {
           backLabel="eChart"
           items={[
             { label: "People Supported", to: "/people" },
-            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+            { label: `${person.first_name} ${person.last_name}`, to: `/people/${person.id}/echart` },
             { label: "Profile", to: `/people/${person.id}/profile` },
             { label: TABS.find((t) => t.key === tab)?.label ?? "" },
           ]}
@@ -108,21 +128,21 @@ const PersonProfile = () => {
         <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-3 bg-icm-bg/95 backdrop-blur-sm">
           <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
             <div className="flex items-start gap-4 flex-wrap">
-              <PersonAvatar person={person} size={64} shape="square" className="text-[18px]" />
+              <PersonAvatar person={person as any} size={64} shape="square" className="text-[18px]" />
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-manrope font-extrabold text-[22px] text-icm-text tracking-tight leading-tight">
-                    {person.lastName}, {person.firstName}
-                    {person.nickname && (
-                      <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
+                    {person.last_name}, {person.first_name}
+                    {person.preferred_name && (
+                      <span className="font-medium text-icm-text-dim"> ({person.preferred_name})</span>
                     )}
                   </h1>
-                  {person.riskScore !== undefined && (
+                  {person.risk_score !== undefined && (
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ring-1 ring-current/20 ${riskScoreClass(person.riskScore)}`}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ring-1 ring-current/20 ${riskScoreClass(person.risk_score)}`}
                     >
-                      RISK {person.riskScore}
+                      RISK {person.risk_score}
                     </span>
                   )}
                 </div>
@@ -200,7 +220,7 @@ const PersonProfile = () => {
                   <div>
                     <p className="text-[12.5px] font-geist text-icm-text leading-snug">
                       <span className="font-semibold">
-                        {person.firstName}'s profile is {overall.pct}% complete.
+                        {person.first_name}'s profile is {overall.pct}% complete.
                       </span>{" "}
                       <span className="text-icm-text-dim">
                         {overall.missing.length > 0 &&
@@ -258,7 +278,7 @@ const PersonProfile = () => {
           <>
             <VoiceCompanionCard
               personId={person.id}
-              firstName={person.firstName}
+              firstName={person.first_name}
               phone={(person as { phone?: string }).phone}
             />
             <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} />
@@ -295,7 +315,7 @@ function BasicInfoTab({
   showSsn,
   setShowSsn,
 }: {
-  person: ReturnType<typeof getPerson> & {};
+  person: Individual;
   profile: ProfileData;
   showSsn: boolean;
   setShowSsn: (v: boolean) => void;
@@ -305,11 +325,11 @@ function BasicInfoTab({
       <Section title="Personal Information">
         <KvGrid
           rows={[
-            ["First Name", person!.firstName, true],
+            ["First Name", person!.first_name, true],
             ["Middle Name", profile.middleName ?? "—"],
-            ["Last Name", person!.lastName, true],
+            ["Last Name", person!.last_name, true],
             ["Preferred Name", profile.preferredName ?? "—"],
-            ["Date of Birth", `${person!.dob}  ·  ${person!.age}y`, true],
+            ["Date of Birth", `${person!.dob}  ·  ${calcAge(person!.dob)}y`, true],
             ["Gender", person!.gender === "M" ? "Male" : "Female"],
             ["Pronouns", profile.pronouns ?? "—"],
             ["Race / Ethnicity", profile.raceEthnicity?.join(", ") ?? "—"],
@@ -695,7 +715,7 @@ function FundingStreamsSection({ profile }: { profile: ProfileData }) {
           Last billing record: Progress Note 04/27/2026 · 3 units · T2022 · Pending scrub
         </p>
         <button
-          onClick={() => (id ? navigate(`/people/${id}?tab=billing`) : demoToast("View all billing records"))}
+          onClick={() => (id ? navigate(`/people/${id}?tab=billing`) : navigate("/billing"))}
           className="text-[11px] font-geist font-semibold text-icm-accent hover:underline inline-flex items-center gap-1"
         >
           View all billing records <ArrowRight className="w-3 h-3" />
@@ -765,6 +785,7 @@ function FundingStreamCard({ card }: { card: FundingCard }) {
 }
 
 function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
+  const { id } = useParams<{ id: string }>();
   const STREAMS = [
     { name: "Indiana HCBS — CIH Waiver", payer: "IHCP" },
     { name: "Indiana HCBS — Family Supports", payer: "IHCP" },
@@ -774,10 +795,42 @@ function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
   const CODES = ["T2022", "T2023", "T1019", "T1016"];
   const [stream, setStream] = useState(STREAMS[0].name);
   const [codes, setCodes] = useState<string[]>(["T2022"]);
+  const [authNumber, setAuthNumber] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState("");
+  const [expirationDate, setExpirationDate] = useState("");
+  const [authorizedUnits, setAuthorizedUnits] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
   const payer = STREAMS.find((s) => s.name === stream)?.payer ?? "";
 
   const toggleCode = (c: string) =>
     setCodes((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+
+  const handleSave = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, "authorizations"), {
+        individualId: id,
+        fundingStream: stream,
+        payer,
+        authorizationNumber: authNumber,
+        effectiveDate,
+        expirationDate,
+        authorizedUnits: authorizedUnits ? Number(authorizedUnits) : null,
+        serviceCodes: codes,
+        notes,
+        createdAt: serverTimestamp(),
+      });
+      toast.success("Authorization saved");
+      onClose();
+    } catch (err) {
+      console.error("Failed to save authorization:", err);
+      toast.error("Failed to save authorization");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -809,20 +862,20 @@ function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
           </ModalField>
 
           <ModalField label="Authorization number">
-            <input className="modal-input" placeholder="SA-2026-003" />
+            <input className="modal-input" placeholder="SA-2026-003" value={authNumber} onChange={(e) => setAuthNumber(e.target.value)} />
           </ModalField>
 
           <div className="grid grid-cols-2 gap-3">
             <ModalField label="Effective date">
-              <input className="modal-input" type="date" />
+              <input className="modal-input" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
             </ModalField>
             <ModalField label="Expiration date">
-              <input className="modal-input" type="date" />
+              <input className="modal-input" type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} />
             </ModalField>
           </div>
 
           <ModalField label="Authorized units">
-            <input className="modal-input" type="number" placeholder="40" />
+            <input className="modal-input" type="number" placeholder="40" value={authorizedUnits} onChange={(e) => setAuthorizedUnits(e.target.value)} />
           </ModalField>
 
           <ModalField label="Service codes">
@@ -849,7 +902,7 @@ function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
           </ModalField>
 
           <ModalField label="Notes">
-            <textarea className="modal-input" rows={2} />
+            <textarea className="modal-input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </ModalField>
         </div>
 
@@ -861,9 +914,11 @@ function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
           <button
-            onClick={() => { demoToast("Authorization saved"); onClose(); }}
-            className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
+            onClick={handleSave}
+            disabled={saving}
+            className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[12px] font-geist font-semibold disabled:opacity-60 flex items-center gap-1.5"
           >
+            {saving && <Loader2 className="w-3 h-3 animate-spin" />}
             Save
           </button>
         </div>
@@ -1145,8 +1200,28 @@ function AdminTab({ profile }: { profile: ProfileData }) {
 // =============================================================
 // Reusable bits
 // =============================================================
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, onSave }: { title: string; children: React.ReactNode; onSave?: () => Promise<void> }) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (onSave) {
+      setSaving(true);
+      try {
+        await onSave();
+        toast.success(`${title} saved`);
+      } catch (err) {
+        console.error(`Failed to save ${title}:`, err);
+        toast.error(`Failed to save ${title}`);
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      demoToast(`${title} saved`);
+    }
+    setEditing(false);
+  };
+
   return (
     <section className={cn(
       "rounded-xl border bg-icm-panel p-4 transition-colors",
@@ -1168,9 +1243,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
             </button>
             <button
               type="button"
-              onClick={() => { setEditing(false); demoToast(`${title} saved`); }}
-              className="text-[11px] font-geist font-medium text-white bg-icm-accent hover:opacity-90 px-2.5 py-1 rounded-md"
+              onClick={handleSave}
+              disabled={saving}
+              className="text-[11px] font-geist font-medium text-white bg-icm-accent hover:opacity-90 px-2.5 py-1 rounded-md disabled:opacity-60 flex items-center gap-1.5"
             >
+              {saving && <Loader2 className="w-3 h-3 animate-spin" />}
               Save
             </button>
           </div>
@@ -1443,37 +1520,181 @@ function CompletenessFooter({
 // =============================================================
 // AI panel
 // =============================================================
+const PROFILE_CHAT_ENDPOINT = "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat";
+const PROFILE_QUICK_PROMPTS = ["What's missing from this profile?", "Check compliance"];
+
+type ProfileChatMsg = { role: "user" | "ai"; text: string };
+
 function ProfileAIPanel({ pct }: { pct: number }) {
+  const [messages, setMessages] = useState<ProfileChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState<number | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || loading) return;
+    const userMsg: ProfileChatMsg = { role: "user", text: text.trim() };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(PROFILE_CHAT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          message: text.trim(),
+          context: { page: "person_profile", module: "profile_assistant" },
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const reply = data.reply ?? data.message ?? data.text ?? "Sorry, no response.";
+      setMessages((prev) => [...prev, { role: "ai", text: reply }]);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: "ai", text: "⚠️ Couldn't reach the AI. Please try again." }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
+
+  const handleCopy = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopied(idx);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
   return (
-    <aside className="w-[320px] shrink-0 border-l border-icm-border bg-icm-panel p-4 overflow-y-auto">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center">
-          <Sparkles className="w-3.5 h-3.5 text-white" />
+    <aside className="w-[320px] shrink-0 border-l border-icm-border bg-icm-panel flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-icm-border/50 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="text-[12px] font-semibold text-icm-text font-geist">Profile assistant</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-icm-green animate-pulse" />
+            <span className="text-[10px] font-geist text-icm-green font-semibold">Ready</span>
+          </div>
         </div>
-        <span className="text-[12px] font-semibold text-icm-text font-geist">Profile assistant</span>
+        {/* Profile completion card — kept as-is */}
+        <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft p-3">
+          <p className="text-[11px] font-mono font-bold tracking-wider text-icm-accent">PROFILE STATUS</p>
+          <p className="text-[12px] text-icm-text mt-1 font-geist">
+            Profile is <span className="font-bold">{pct}% complete</span>. The more complete the profile,
+            the better AI performs across every module.
+          </p>
+        </div>
       </div>
 
-      <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft p-3">
-        <p className="text-[11px] font-mono font-bold tracking-wider text-icm-accent">PROFILE STATUS</p>
-        <p className="text-[12px] text-icm-text mt-1 font-geist">
-          Profile is <span className="font-bold">{pct}% complete</span>. The more complete the profile,
-          the better AI performs across every module.
-        </p>
+      {/* Message list */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-0">
+        {messages.length === 0 && !loading && (
+          <div className="text-center py-6">
+            <div className="w-10 h-10 rounded-2xl ai-gradient flex items-center justify-center mx-auto mb-2">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-[11.5px] text-icm-text-dim font-geist leading-relaxed">
+              Ask me about this profile, compliance gaps, or missing information.
+            </p>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={cn("flex gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
+            {m.role === "ai" && (
+              <div className="w-6 h-6 rounded-lg ai-gradient flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-3 h-3 text-white" />
+              </div>
+            )}
+            <div
+              className={cn(
+                "max-w-[220px] rounded-2xl px-3 py-2 text-[11.5px] font-geist leading-relaxed relative group",
+                m.role === "user"
+                  ? "bg-icm-text text-icm-panel rounded-tr-sm"
+                  : "bg-icm-bg border border-icm-border text-icm-text rounded-tl-sm"
+              )}
+            >
+              {m.text}
+              {m.role === "ai" && (
+                <button
+                  onClick={() => handleCopy(m.text, i)}
+                  className="absolute -bottom-5 right-0 opacity-0 group-hover:opacity-100 transition-opacity text-icm-text-faint hover:text-icm-text-dim"
+                >
+                  {copied === i ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex gap-2 justify-start">
+            <div className="w-6 h-6 rounded-lg ai-gradient flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles className="w-3 h-3 text-white" />
+            </div>
+            <div className="bg-icm-bg border border-icm-border rounded-2xl rounded-tl-sm px-3 py-2 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-dim animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-dim animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-dim animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
 
-      <PanelSection tone="red" title="URGENT">
-        Profile is {pct}% complete. Missing emergency contact phone — required for compliance.
-      </PanelSection>
-      <PanelSection tone="accent" title="INSIGHT">
-        Joseph's HRST score has not been updated since admission in 2022. Annual update recommended.
-      </PanelSection>
-      <PanelSection tone="accent" title="INSIGHT">
-        Primary diagnosis is F70 (Mild intellectual disability). 2 secondary diagnoses have been
-        mentioned in recent notes but not added to the profile.
-      </PanelSection>
-      <PanelSection tone="green" title="GOOD NEWS">
-        Joseph's Medicaid ID is verified and active. All insurance records are current.
-      </PanelSection>
+      {/* Quick prompts */}
+      {messages.length === 0 && (
+        <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
+          {PROFILE_QUICK_PROMPTS.map((p) => (
+            <button
+              key={p}
+              onClick={() => sendMessage(p)}
+              className="h-7 px-2.5 rounded-full border border-icm-accent/30 bg-icm-accent-soft text-icm-accent text-[11px] font-geist hover:bg-icm-accent hover:text-white transition-colors"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="px-3 pb-3 shrink-0">
+        <div className="flex items-center gap-1.5 rounded-xl border border-icm-border bg-icm-bg px-2.5 py-1.5 focus-within:border-icm-accent focus-within:ring-2 focus-within:ring-icm-accent/15 transition-all">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage(input))}
+            placeholder="Ask anything…"
+            className="flex-1 bg-transparent text-[11.5px] font-geist text-icm-text outline-none placeholder:text-icm-text-faint"
+          />
+          {messages.length > 0 && (
+            <button
+              onClick={() => setMessages([])}
+              className="text-icm-text-faint hover:text-icm-text-dim transition-colors"
+              title="Clear chat"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          )}
+          <button
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || loading}
+            className="w-6 h-6 rounded-lg bg-icm-text text-icm-panel flex items-center justify-center disabled:opacity-40 hover:opacity-80 transition-opacity"
+          >
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

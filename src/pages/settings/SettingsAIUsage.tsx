@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { doc, onSnapshot, updateDoc, collection, query, where, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import { toast } from "sonner";
 import {
@@ -11,13 +14,6 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -26,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Zap, TrendingUp, DollarSign, Plus, CreditCard } from "lucide-react";
+import { Zap, TrendingUp, DollarSign, Plus, CreditCard, Loader2 } from "lucide-react";
 
 const dailyUsage = Array.from({ length: 30 }, (_, i) => {
   const base = 1200 + i * 40;
@@ -58,14 +54,6 @@ const staffRows = [
   { name: "Brenda Smith", role: "Case Manager", actions: 156, credits: 2220 },
 ];
 
-const historyRows = [
-  { date: "05/01/2026", desc: "Credit pack purchased — Standard 150K", credits: "+150,000", balance: "150,000" },
-  { date: "05/01/2026", desc: "May usage — Week 1", credits: "-18,240", balance: "131,760" },
-  { date: "05/08/2026", desc: "May usage — Week 2", credits: "-21,890", balance: "109,870" },
-  { date: "05/15/2026", desc: "May usage — Week 3", credits: "-33,420", balance: "76,450" },
-  { date: "05/22/2026", desc: "May usage — Week 4 (est.)", credits: "-29,210", balance: "47,240" },
-];
-
 const packs = [
   { name: "Starter", credits: 50000, price: 50, sub: "~25 days for small caseloads", popular: false },
   { name: "Standard", credits: 150000, price: 100, sub: "~75 days for average agencies", popular: true },
@@ -74,8 +62,10 @@ const packs = [
 ];
 
 export default function SettingsAIUsage() {
-  const [balance, setBalance] = useState(47240);
-  const [selectedPack, setSelectedPack] = useState<typeof packs[number] | null>(null);
+  const { userProfile } = useAuth();
+  const orgId = userProfile?.organizationId ?? "demo-org-001";
+
+  const [balance, setBalance] = useState(50000);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [lowAlerts, setLowAlerts] = useState(true);
   const [lowThreshold, setLowThreshold] = useState("20");
@@ -84,13 +74,128 @@ export default function SettingsAIUsage() {
   const [perUser, setPerUser] = useState(false);
   const [perUserVal, setPerUserVal] = useState(10000);
 
-  const pctRemaining = Math.round((balance / 100000) * 100);
+  const [paymentMethod, setPaymentMethod] = useState<any>(null);
+  const [creditHistory, setCreditHistory] = useState<any[]>([]);
+  const [isRedirectingCheckout, setIsRedirectingCheckout] = useState<string | null>(null);
+  const [isRedirectingPortal, setIsRedirectingPortal] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  const confirmPurchase = () => {
-    if (!selectedPack) return;
-    setBalance((b) => b + selectedPack.credits);
-    toast.success(`${selectedPack.credits.toLocaleString()} credits added to your account`);
-    setSelectedPack(null);
+  const pctRemaining = Math.round((balance / 150000) * 100);
+
+  useEffect(() => {
+    if (!orgId) return;
+    const unsub = onSnapshot(doc(db, "organizations", orgId), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setBalance(d.credit_balance ?? 0);
+        setAiEnabled(d.ai_features_enabled !== false);
+        setLowAlerts(d.credit_alert_enabled !== false);
+        setLowThreshold(String(d.credit_alert_threshold_pct ?? "20"));
+        setDailyLimit((d.daily_credit_limit ?? 0) > 0);
+        setDailyLimitVal(d.daily_credit_limit || 3000);
+        setPaymentMethod(d.payment_method || null);
+      }
+    });
+    return () => unsub();
+  }, [orgId]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setIsLoadingHistory(true);
+    const q = query(
+      collection(db, "credit_history"),
+      where("organizationId", "==", orgId),
+      orderBy("timestamp", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const logs = snap.docs.map(d => {
+        const data = d.data();
+        let formattedDate = "—";
+        if (data.timestamp) {
+          const dt = data.timestamp.toDate();
+          formattedDate = `${dt.getMonth() + 1}/${dt.getDate()}/${dt.getFullYear()}`;
+        }
+        return {
+          date: formattedDate,
+          desc: data.description || "Credit adjustment",
+          credits: data.amount > 0 ? `+${data.amount.toLocaleString()}` : data.amount.toLocaleString(),
+          balance: data.balanceAfter ? data.balanceAfter.toLocaleString() : "—"
+        };
+      });
+      setCreditHistory(logs);
+      setIsLoadingHistory(false);
+    }, (err) => {
+      console.error("Credit history listener error:", err);
+      setIsLoadingHistory(false);
+    });
+    return () => unsub();
+  }, [orgId]);
+
+  const updateOrgField = async (fields: Record<string, any>) => {
+    try {
+      await updateDoc(doc(db, "organizations", orgId), fields);
+    } catch (err) {
+      console.error("Failed to update organization controls:", err);
+      toast.error("Failed to save limit controls.");
+    }
+  };
+
+  const handlePurchase = async (pack: typeof packs[number]) => {
+    setIsRedirectingCheckout(pack.name);
+    try {
+      const response = await fetch("/api/api/billing/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packId: pack.name.toLowerCase(),
+          organizationId: orgId
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to create checkout session");
+
+      const resData = await response.json();
+      if (resData.url) {
+        window.location.href = resData.url;
+      } else {
+        throw new Error("Missing redirect URL in billing response.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Billing session failed", {
+        description: err.message || "Could not connect to payment processor."
+      });
+      setIsRedirectingCheckout(null);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setIsRedirectingPortal(true);
+    try {
+      const response = await fetch("/api/api/billing/create-portal-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: orgId
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to create portal session");
+
+      const resData = await response.json();
+      if (resData.url) {
+        window.location.href = resData.url;
+      } else {
+        throw new Error("Missing portal URL in billing response.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Billing portal failed", {
+        description: err.message || "Could not connect to payment portal."
+      });
+    } finally {
+      setIsRedirectingPortal(false);
+    }
   };
 
   return (
@@ -99,9 +204,7 @@ export default function SettingsAIUsage() {
       subtitle="Monitor token usage, manage credit balance, and set usage limits."
     >
       <div className="space-y-5">
-        {/* Stat cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Card 1 */}
           <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
             <div className="flex items-center gap-2 text-icm-text-dim text-[11.5px] font-geist uppercase tracking-wide">
               <Zap className="w-3.5 h-3.5 text-teal-600" /> Credit Balance
@@ -114,20 +217,25 @@ export default function SettingsAIUsage() {
               ~23 days at current usage rate
             </div>
             <button
-              onClick={() => setSelectedPack(packs[1])}
-              className="mt-3 inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700"
+              onClick={() => handlePurchase(packs[1])}
+              disabled={isRedirectingCheckout !== null}
+              className="mt-3 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-50 transition"
             >
-              <Plus className="w-3.5 h-3.5" /> Add Credits
+              {isRedirectingCheckout === packs[1].name ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              Add Credits
             </button>
             <div className="mt-3 h-2 w-full rounded-full bg-icm-bg overflow-hidden">
               <div
                 className="h-full bg-icm-amber"
-                style={{ width: `${Math.min(100, pctRemaining)}%` }}
+                style={{ width: `${Math.max(5, Math.min(100, pctRemaining))}%` }}
               />
             </div>
             <div className="text-[10.5px] text-icm-text-faint font-mono mt-1">{pctRemaining}% remaining</div>
           </div>
-          {/* Card 2 */}
           <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
             <div className="flex items-center gap-2 text-icm-text-dim text-[11.5px] font-geist uppercase tracking-wide">
               <TrendingUp className="w-3.5 h-3.5 text-icm-accent" /> This Month's Usage
@@ -136,12 +244,11 @@ export default function SettingsAIUsage() {
               52,760
             </div>
             <div className="text-[12px] text-icm-text-dim font-geist">Credits used this month</div>
-            <div className="text-[11.5px] text-icm-green font-geist mt-1">↑ 12% vs last month</div>
+            <div className="text-[11.5px] text-icm-green font-geist mt-1 font-semibold">↑ 12% vs last month</div>
           </div>
-          {/* Card 3 */}
           <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
             <div className="flex items-center gap-2 text-icm-text-dim text-[11.5px] font-geist uppercase tracking-wide">
-              <DollarSign className="w-3.5 h-3.5 text-icm-green" /> Estimated Cost
+              <DollarSign className="w-3.5 h-3.5 text-icm-green" /> Estimated Spend
             </div>
             <div className="font-manrope text-[32px] font-extrabold text-icm-text mt-2 tracking-tight">
               $105.52
@@ -153,7 +260,6 @@ export default function SettingsAIUsage() {
           </div>
         </div>
 
-        {/* Chart */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-manrope font-bold text-[14.5px] text-icm-text">
@@ -194,7 +300,57 @@ export default function SettingsAIUsage() {
           </div>
         </div>
 
-        {/* Usage by feature */}
+        <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-icm-border/60 pb-4 mb-4 gap-3">
+            <div>
+              <h3 className="font-manrope font-bold text-[14.5px] text-icm-text flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-teal-600" /> Payment & Billing
+              </h3>
+              <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">
+                Manage credit card, view billing statements, and download PDF invoices securely.
+              </p>
+            </div>
+            <button
+              onClick={handleManageBilling}
+              disabled={isRedirectingPortal}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-[12px] font-geist font-semibold transition"
+            >
+              {isRedirectingPortal ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CreditCard className="w-3.5 h-3.5" />
+              )}
+              Manage Cards & Invoices
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl border border-icm-border bg-icm-bg flex items-center justify-center shrink-0">
+              <CreditCard className="w-4 h-4 text-teal-600" />
+            </div>
+            <div>
+              {paymentMethod ? (
+                <>
+                  <div className="text-[13px] font-bold text-icm-text">
+                    {paymentMethod.brand} ending in {paymentMethod.last4}
+                  </div>
+                  <p className="text-[11px] text-icm-text-dim mt-0.5">
+                    Expires {paymentMethod.expMonth}/{paymentMethod.expYear} · {paymentMethod.name} · Primary card
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="text-[13px] font-bold text-icm-text">
+                    No credit card on file
+                  </div>
+                  <p className="text-[11px] text-icm-text-dim mt-0.5">
+                    Click Manage Cards & Invoices to set up a credit card securely via Stripe Customer Billing.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
           <h3 className="font-manrope font-bold text-[14.5px] text-icm-text mb-3">
             Usage by Feature — This Month
@@ -220,8 +376,8 @@ export default function SettingsAIUsage() {
                     <td className="py-2 text-right font-mono">{r.avg}</td>
                   </tr>
                 ))}
-                <tr className="font-semibold">
-                  <td className="py-2.5 text-icm-text">TOTAL</td>
+                <tr className="font-semibold text-icm-text">
+                  <td className="py-2.5">TOTAL</td>
                   <td className="py-2.5 text-right font-mono">—</td>
                   <td className="py-2.5 text-right font-mono">52,760</td>
                   <td className="py-2.5 text-right font-mono">100%</td>
@@ -232,7 +388,6 @@ export default function SettingsAIUsage() {
           </div>
         </div>
 
-        {/* Usage by staff */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
           <h3 className="font-manrope font-bold text-[14.5px] text-icm-text mb-3">
             Usage by Staff Member — This Month
@@ -261,7 +416,6 @@ export default function SettingsAIUsage() {
           </div>
         </div>
 
-        {/* Controls */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
           <h3 className="font-manrope font-bold text-[14.5px] text-icm-text mb-3">
             Controls & Limits
@@ -270,15 +424,15 @@ export default function SettingsAIUsage() {
             <ControlRow
               title="AI features enabled"
               subtitle="Turn off to pause all AI usage across the organization"
-              control={<Switch checked={aiEnabled} onCheckedChange={setAiEnabled} />}
+              control={<Switch checked={aiEnabled} onCheckedChange={(checked) => { setAiEnabled(checked); updateOrgField({ ai_features_enabled: checked }); }} />}
             />
             <ControlRow
               title="Low balance alerts"
               subtitle="Alert admin when balance drops below threshold"
               control={
                 <div className="flex items-center gap-2">
-                  <Select value={lowThreshold} onValueChange={setLowThreshold}>
-                    <SelectTrigger className="h-8 w-[80px] text-[12px]">
+                  <Select value={lowThreshold} onValueChange={(val) => { setLowThreshold(val); updateOrgField({ credit_alert_threshold_pct: Number(val) }); }}>
+                    <SelectTrigger className="h-8 w-[80px] text-[12px] bg-background">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -287,7 +441,7 @@ export default function SettingsAIUsage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Switch checked={lowAlerts} onCheckedChange={setLowAlerts} />
+                  <Switch checked={lowAlerts} onCheckedChange={(checked) => { setLowAlerts(checked); updateOrgField({ credit_alert_enabled: checked }); }} />
                 </div>
               }
             />
@@ -299,11 +453,11 @@ export default function SettingsAIUsage() {
                   <input
                     type="number"
                     value={dailyLimitVal}
-                    onChange={(e) => setDailyLimitVal(Number(e.target.value))}
+                    onChange={(e) => { const v = Number(e.target.value); setDailyLimitVal(v); if (dailyLimit) updateOrgField({ daily_credit_limit: v }); }}
                     disabled={!dailyLimit}
-                    className="h-8 w-[100px] rounded-md border border-icm-border bg-icm-panel px-2 text-[12px] font-mono disabled:opacity-50"
+                    className="h-8 w-[100px] rounded-md border border-icm-border bg-background px-2 text-[12px] font-mono disabled:opacity-50 text-icm-text"
                   />
-                  <Switch checked={dailyLimit} onCheckedChange={setDailyLimit} />
+                  <Switch checked={dailyLimit} onCheckedChange={(checked) => { setDailyLimit(checked); updateOrgField({ daily_credit_limit: checked ? dailyLimitVal : 0 }); }} />
                 </div>
               }
             />
@@ -315,53 +469,61 @@ export default function SettingsAIUsage() {
                   <input
                     type="number"
                     value={perUserVal}
-                    onChange={(e) => setPerUserVal(Number(e.target.value))}
+                    onChange={(e) => { const v = Number(e.target.value); setPerUserVal(v); if (perUser) updateOrgField({ per_user_limit: v }); }}
                     disabled={!perUser}
-                    className="h-8 w-[100px] rounded-md border border-icm-border bg-icm-panel px-2 text-[12px] font-mono disabled:opacity-50"
+                    className="h-8 w-[100px] rounded-md border border-icm-border bg-background px-2 text-[12px] font-mono disabled:opacity-50 text-icm-text"
                   />
-                  <Switch checked={perUser} onCheckedChange={setPerUser} />
+                  <Switch checked={perUser} onCheckedChange={(checked) => { setPerUser(checked); updateOrgField({ per_user_limit_enabled: checked }); if (checked) updateOrgField({ per_user_limit: perUserVal }); }} />
                 </div>
               }
             />
           </div>
         </div>
 
-        {/* Credit History */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
           <h3 className="font-manrope font-bold text-[14.5px] text-icm-text mb-3">
             Credit History
           </h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-[12.5px] font-geist">
-              <thead>
-                <tr className="text-icm-text-dim text-[11px] uppercase tracking-wide border-b border-icm-border">
-                  <th className="text-left py-2 font-medium">Date</th>
-                  <th className="text-left py-2 font-medium">Description</th>
-                  <th className="text-right py-2 font-medium">Credits</th>
-                  <th className="text-right py-2 font-medium">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyRows.map((r, i) => (
-                  <tr key={i} className="border-b border-icm-border/60">
-                    <td className="py-2 font-mono text-icm-text-dim">{r.date}</td>
-                    <td className="py-2 text-icm-text">{r.desc}</td>
-                    <td
-                      className={`py-2 text-right font-mono ${
-                        r.credits.startsWith("+") ? "text-icm-green" : "text-icm-text"
-                      }`}
-                    >
-                      {r.credits}
-                    </td>
-                    <td className="py-2 text-right font-mono">{r.balance}</td>
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center py-6 text-icm-text-dim text-[12.5px] font-geist">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading transaction logs...
+              </div>
+            ) : creditHistory.length === 0 ? (
+              <div className="text-center py-6 text-icm-text-dim text-[12.5px] font-geist">
+                No billing adjustments or payments recorded yet.
+              </div>
+            ) : (
+              <table className="w-full text-[12.5px] font-geist">
+                <thead>
+                  <tr className="text-icm-text-dim text-[11px] uppercase tracking-wide border-b border-icm-border">
+                    <th className="text-left py-2 font-medium">Date</th>
+                    <th className="text-left py-2 font-medium">Description</th>
+                    <th className="text-right py-2 font-medium">Credits</th>
+                    <th className="text-right py-2 font-medium">Balance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {creditHistory.map((r, i) => (
+                    <tr key={i} className="border-b border-icm-border/60">
+                      <td className="py-2 font-mono text-icm-text-dim">{r.date}</td>
+                      <td className="py-2 text-icm-text">{r.desc}</td>
+                      <td
+                        className={`py-2 text-right font-mono font-semibold ${
+                          r.credits.startsWith("+") ? "text-icm-green" : "text-icm-text"
+                        }`}
+                      >
+                        {r.credits}
+                      </td>
+                      <td className="py-2 text-right font-mono text-icm-text-dim">{r.balance}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
-        {/* Buy More Credits */}
         <div>
           <h3 className="font-manrope font-bold text-[14.5px] text-icm-text mb-3">
             Buy More Credits
@@ -370,7 +532,7 @@ export default function SettingsAIUsage() {
             {packs.map((p) => (
               <div
                 key={p.name}
-                className={`relative rounded-xl border bg-icm-panel p-4 ${
+                className={`relative rounded-xl border bg-icm-panel p-4 flex flex-col justify-between ${
                   p.popular ? "border-teal-500 ring-1 ring-teal-500/30" : "border-icm-border"
                 }`}
               >
@@ -379,76 +541,40 @@ export default function SettingsAIUsage() {
                     Most Popular
                   </span>
                 )}
-                <h4 className="font-manrope font-bold text-icm-text text-[14px]">{p.name}</h4>
-                <div className="font-manrope text-[22px] font-extrabold text-icm-text mt-2">
-                  {p.credits.toLocaleString()} credits
+                <div>
+                  <h4 className="font-manrope font-bold text-icm-text text-[14px]">{p.name}</h4>
+                  <div className="font-manrope text-[22px] font-extrabold text-icm-text mt-2">
+                    {p.credits.toLocaleString()} credits
+                  </div>
+                  <div className="font-manrope text-[18px] font-bold text-teal-600 mt-1">
+                    ${p.price}
+                  </div>
+                  <p className="text-[11.5px] text-icm-text-dim font-geist mt-2">{p.sub}</p>
                 </div>
-                <div className="font-manrope text-[18px] font-bold text-teal-600 mt-1">
-                  ${p.price}
+                <div>
+                  <button
+                    onClick={() => handlePurchase(p)}
+                    disabled={isRedirectingCheckout !== null}
+                    className={`mt-4 w-full h-9 rounded-lg text-[12.5px] font-geist font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                      p.popular
+                        ? "bg-teal-600 text-white hover:bg-teal-700 disabled:bg-teal-600/50"
+                        : "border border-icm-border text-icm-text hover:border-icm-border-strong disabled:opacity-50"
+                    }`}
+                  >
+                    {isRedirectingCheckout === p.name ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : null}
+                    Purchase
+                  </button>
+                  <p className="text-[10.5px] text-icm-text-faint font-geist mt-2 text-center">
+                    Credits never expire
+                  </p>
                 </div>
-                <p className="text-[11.5px] text-icm-text-dim font-geist mt-2">{p.sub}</p>
-                <button
-                  onClick={() => setSelectedPack(p)}
-                  className={`mt-3 w-full h-9 rounded-lg text-[12.5px] font-geist font-semibold transition-colors ${
-                    p.popular
-                      ? "bg-teal-600 text-white hover:bg-teal-700"
-                      : "border border-icm-border text-icm-text hover:border-icm-border-strong"
-                  }`}
-                >
-                  Purchase
-                </button>
-                <p className="text-[10.5px] text-icm-text-faint font-geist mt-2 text-center">
-                  Credits never expire
-                </p>
               </div>
             ))}
           </div>
         </div>
       </div>
-
-      {/* Purchase Modal */}
-      <Dialog open={!!selectedPack} onOpenChange={(o) => !o && setSelectedPack(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-manrope">Purchase Credits</DialogTitle>
-          </DialogHeader>
-          {selectedPack && (
-            <div className="space-y-3 text-[13px] font-geist">
-              <p className="text-icm-text">
-                You are purchasing: <span className="font-semibold">{selectedPack.name}</span> —{" "}
-                {selectedPack.credits.toLocaleString()} credits
-              </p>
-              <p className="text-icm-text font-semibold text-[15px]">
-                Total: ${selectedPack.price}
-              </p>
-              <div className="rounded-lg border border-icm-border p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-icm-text-dim" />
-                  <span className="text-icm-text">Visa ending in 4242</span>
-                </div>
-                <button className="text-[12px] text-teal-600 hover:underline">Change</button>
-              </div>
-              <p className="text-[11px] text-icm-text-faint">
-                By purchasing you agree to our Terms of Service
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <button
-              onClick={() => setSelectedPack(null)}
-              className="h-9 px-4 rounded-lg border border-icm-border text-[12.5px] font-geist font-semibold text-icm-text hover:bg-icm-bg"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={confirmPurchase}
-              className="h-9 px-4 rounded-lg bg-teal-600 text-white text-[12.5px] font-geist font-semibold hover:bg-teal-700"
-            >
-              Confirm Purchase
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SettingsLayout>
   );
 }

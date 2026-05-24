@@ -4,12 +4,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { RoleProvider } from "@/contexts/RoleContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import SignDocument from "./pages/SignDocument";
 import CareAssistant from "./pages/CareAssistant";
 import PersonCommunicationsLog from "./pages/PersonCommunicationsLog";
 import SmartNoteAttacher from "./components/SmartNoteAttacher";
+import { CommandPalette } from "@/components/CommandPalette";
 import Dashboard from "./pages/Dashboard";
 import PeopleSupported from "./pages/PeopleSupported";
 import NewParticipantIntake from "./pages/NewParticipantIntake";
@@ -56,6 +58,7 @@ import WorkflowsGlobal from "./pages/WorkflowsGlobal";
 import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
 import PersonIncidentReporting from "./pages/PersonIncidentReporting";
 import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
+import PersonIncidentReportNew from "./pages/PersonIncidentReportNew";
 import IncidentsGlobal from "./pages/IncidentsGlobal";
 import MyWork from "./pages/MyWork";
 import PersonProfile from "./pages/PersonProfile";
@@ -85,8 +88,13 @@ import SettingsSecurity from "./pages/settings/SettingsSecurity";
 import SettingsNotifications from "./pages/settings/SettingsNotifications";
 import SettingsBillingConfig from "./pages/settings/SettingsBillingConfig";
 import SettingsAIUsage from "./pages/settings/SettingsAIUsage";
+import BillingCheckoutSimulation from "./pages/settings/BillingCheckoutSimulation";
+import BillingPortalSimulation from "./pages/settings/BillingPortalSimulation";
+import SettingsImport from "./pages/settings/SettingsImport";
+import MyProfile from "./pages/MyProfile";
 import AIRoadmap from "./pages/AIRoadmap";
 import ProviderDirectory from "./pages/admin/ProviderDirectory";
+import AuditLogPage from "./pages/AuditLogPage";
 import Reports from "./pages/Reports";
 import ReportRunner from "./pages/ReportRunner";
 import ReportBuilder from "./pages/ReportBuilder";
@@ -118,6 +126,7 @@ import Companion from "./pages/Companion";
 import MultiStateConfig from "./pages/MultiStateConfig";
 import CommunicationsHub from "./pages/CommunicationsHub";
 import AIGovernance from "./pages/AIGovernance";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
@@ -138,10 +147,19 @@ import BClaimsManagement from "@/pages/billing/ClaimsManagement";
 import BAuditLog from "@/pages/billing/AuditLog";
 import BRevenueCycle from "@/pages/billing/RevenueCycle";
 import { Navigate } from "react-router-dom";
+import { PlatformAdminGuard } from "@/components/superadmin/PlatformAdminGuard";
+import SuperAdminOrganizations from "./pages/superadmin/SuperAdminOrganizations";
+import SuperAdminUsers from "./pages/superadmin/SuperAdminUsers";
+import SuperAdminBilling from "./pages/superadmin/SuperAdminBilling";
+import SuperAdminAIUsage from "./pages/superadmin/SuperAdminAIUsage";
+import SuperAdminSupport from "./pages/superadmin/SuperAdminSupport";
+import SuperAdminHealth from "./pages/superadmin/SuperAdminHealth";
+import PlatformLogin from "./pages/PlatformLogin";
 
 const queryClient = new QueryClient();
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <RoleProvider>
       <BillingProvider>
@@ -150,150 +168,168 @@ const App = () => (
         <Sonner />
         <SmartNoteAttacher />
         <BrowserRouter>
+          <CommandPalette />
           <Routes>
+            {/* ── PUBLIC ROUTES — no auth required ─────────────────────── */}
             <Route path="/" element={<Login />} />
-            <Route path="/home" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/platform-login" element={<PlatformLogin />} />
             <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="/companion/:token" element={<Companion />} />
             <Route path="/care-assistant/:linkToken" element={<CareAssistant />} />
-            <Route path="/people/:id/communications-log" element={<PersonCommunicationsLog />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/people" element={<PeopleSupported />} />
-            <Route path="/people/new" element={<NewParticipantIntake />} />
-            <Route path="/people/:id/profile" element={<PersonProfile />} />
-            <Route path="/people/:id/facesheet" element={<PersonFaceSheet />} />
-           <Route path="/people/:id/echart" element={<EChart />} />
-           <Route path="/people/:id/monitors-baselines" element={<PersonMonitorsBaselines />} />
-            <Route path="/people/:id/contact-note" element={<ContactNote />} />
-            <Route path="/people/:id/case-management" element={<PersonCaseManagement />} />
-            <Route path="/people/:id/care-plan" element={<PersonCarePlan />} />
-            <Route path="/people/:id/care-plan/:planId" element={<PersonCarePlanDetail />} />
-            <Route path="/people/:id/monitoring-form" element={<PersonMonitoringForm />} />
-            <Route path="/people/:id/monitoring-form/:formId" element={<PersonMonitoringFormDetail />} />
-            <Route path="/people/:id/visit-summary" element={<PersonVisitSummary />} />
-            <Route path="/people/:id/visit-summary/schedule" element={<PersonVisitScheduler />} />
-            <Route path="/people/:id/visit-summary/document" element={<PersonVisitDocument />} />
-            <Route path="/exceptions" element={<ExceptionsQueue />} />
-            <Route path="/supervisor" element={<SupervisorDashboard />} />
-            <Route path="/supervisor/review/:docId" element={<SupervisorReviewNote />} />
-            <Route path="/supervisor/compliance" element={<SupervisorCompliance />} />
-            <Route path="/people/:id/visit-summary/:visitId" element={<PersonVisitSummaryDetail />} />
-            <Route path="/people/:id/eligibility-verification" element={<PersonEligibilityVerification />} />
-            <Route path="/people/:id/eligibility-verification/:verificationId" element={<PersonEligibilityVerificationDetail />} />
-            <Route path="/people/:id/progress-note" element={<PersonProgressNote />} />
-            <Route path="/people/:id/progress-note/:noteId" element={<PersonProgressNoteDetail />} />
-            <Route path="/progress-note" element={<ProgressNoteLog />} />
-            <Route path="/progress-note/new" element={<ProgressNoteNew />} />
-            <Route path="/visit-summary" element={<VisitSummaryLog />} />
-            <Route path="/visit-summary/new" element={<VisitSummaryNew />} />
-            <Route path="/oncall-log" element={<OnCallLog />} />
-            <Route path="/oncall-log/new" element={<OnCallLogNew />} />
-            <Route path="/oncall-log/:id" element={<OnCallLog />} />
-            <Route path="/people/:id/workflow-manager" element={<PersonWorkflowManager />} />
-            <Route path="/people/:id/workflow-manager/:workflowId" element={<PersonWorkflowDetail />} />
-            <Route path="/workflows" element={<WorkflowsGlobal />} />
-            <Route path="/admin/workflow-templates" element={<WorkflowTemplatesAdmin />} />
-            <Route path="/people/:id/incident-reporting" element={<PersonIncidentReporting />} />
-            <Route path="/people/:id/incident-reporting/:incidentId" element={<PersonIncidentReportingDetail />} />
-            <Route path="/incidents" element={<IncidentsGlobal />} />
-            <Route path="/my-work" element={<MyWork />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/people/:id/module/:slug" element={<PersonModule />} />
-            <Route path="/modules/contact-note" element={<ContactNote />} />
-            <Route path="/lifeplan" element={<Navigate to="/platform" replace />} />
-            <Route path="/lifeplan/guidelines-engines" element={<ComplianceEngineDashboard />} />
-            <Route path="/lifeplan/guidelines-library/new" element={<RuleLibraryBuilder />} />
-            <Route path="/lifeplan/agent/new" element={<RuntimeAgentBuilder />} />
-            <Route path="/lifeplan/agent/new/layer2" element={<Layer2AgentBuilder />} />
-            <Route path="/lifeplan/engine/:id/history" element={<EngineHistory />} />
-            <Route path="/lifeplan/agent/:agentId/drafts" element={<AgentDraftRuns />} />
-            <Route path="/lifeplan/agent/:agentId/monitoring" element={<AgentMonitoringSettings />} />
-            <Route path="/lifeplan/agent/:id" element={<LifePlanAgentDetail />} />
-            <Route path="/admin/assessment-builder" element={<AssessmentBuilderList />} />
-            <Route path="/admin/assessment-builder/new" element={<AssessmentBuilderEdit />} />
-            <Route path="/admin/assessment-builder/:templateId/edit" element={<AssessmentBuilderEdit />} />
-            <Route path="/people/:id/assessments" element={<PersonAssessments />} />
-            <Route path="/people/:id/assessments/new" element={<PersonAssessmentForm />} />
-            <Route path="/people/:id/assessments/:assessmentId" element={<PersonAssessmentForm />} />
-            <Route path="/people/:id/referrals" element={<PersonReferrals />} />
-            <Route path="/referrals" element={<AllReferrals />} />
-            <Route path="/people/:id/referrals" element={<PersonReferrals />} />
-            <Route path="/people/:id/referrals/new" element={<PersonReferralForm />} />
-            <Route path="/people/:id/referrals/:referralId" element={<PersonReferralDetail />} />
-            <Route path="/people/:id/documents" element={<PersonDocuments />} />
-            <Route path="/documents" element={<Documents />} />
-            <Route path="/leads" element={<Leads />} />
-            <Route path="/leads/new" element={<LeadForm />} />
-            <Route path="/leads/:id" element={<LeadDetail />} />
-            <Route path="/leads/:id/edit" element={<LeadForm />} />
-            <Route path="/documentation" element={<Documentation />} />
-            <Route path="/documentation/contact-notes" element={<Documentation />} />
-            <Route path="/documentation/progress-notes" element={<Documentation />} />
-            <Route path="/documentation/visit-summaries" element={<Documentation />} />
-            <Route path="/documentation/monitoring-forms" element={<Documentation />} />
-            <Route path="/documentation/assessments" element={<Documentation />} />
-            <Route path="/documentation/care-plans" element={<Documentation />} />
-            <Route path="/documentation/referrals" element={<Documentation />} />
-            <Route path="/documentation/meeting-notes" element={<Documentation />} />
-            <Route path="/documentation/communications" element={<Documentation />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/settings/users" element={<SettingsUsers />} />
-            <Route path="/settings/users/:userId" element={<SettingsUserDetail />} />
-            <Route path="/settings/roles" element={<SettingsUsers />} />
-            <Route path="/settings/organization" element={<SettingsOrganization />} />
-            <Route path="/settings/programs" element={<SettingsPrograms />} />
-            <Route path="/settings/ai" element={<SettingsAI />} />
-            <Route path="/settings/integrations" element={<SettingsIntegrations />} />
-            <Route path="/settings/security" element={<SettingsSecurity />} />
-            <Route path="/settings/notifications" element={<SettingsNotifications />} />
-            <Route path="/settings/billing-config" element={<SettingsBillingConfig />} />
-            <Route path="/settings/ai-usage" element={<SettingsAIUsage />} />
-            <Route path="/ai-roadmap" element={<AIRoadmap />} />
-            <Route path="/admin/provider-directory" element={<ProviderDirectory />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/reports/builder" element={<ReportBuilder />} />
-            <Route path="/reports/audit-evidence" element={<AuditEvidence />} />
-            <Route path="/reports/:reportId" element={<ReportRunner />} />
-            <Route path="/platform" element={<PlatformHub />} />
-            <Route path="/platform/guidelines-engines" element={<GuidelinesEnginesList />} />
-            <Route path="/platform/guidelines-engines/new" element={<NewEngineWizard />} />
-            <Route path="/platform/guidelines-engines/:engineId" element={<EngineDetail />} />
-            <Route path="/platform/rule-library" element={<RuleLibrary />} />
-            <Route path="/platform/agents" element={<LifePlanBoard />} />
-            <Route path="/platform/agents/new" element={<RuntimeAgentBuilder />} />
-            <Route path="/platform/agents/:agentId/runs" element={<Layer2AgentBuilder />} />
-            <Route path="/platform/agents/:agentId/drafts" element={<AgentDraftRuns />} />
-            <Route path="/platform/agents/:agentId/monitoring" element={<AgentMonitoringSettings />} />
 
-            {/* Per-person placeholder routes (modules not yet built) */}
-            <Route path="/people/:id/care-tracker" element={<PersonCareTracker />} />
-            <Route path="/people/:id/meeting-notes" element={<PersonMeetingNotesPage />} />
-            <Route path="/people/:id/communications" element={<PersonCommunications />} />
-            <Route path="/people/:id/services" element={<PersonServices />} />
-            <Route path="/people/:id/employment" element={<PersonEmployment />} />
-            <Route path="/people/:id/assigned-staff" element={<PersonCareTeam />} />
-            <Route path="/people/:id/care-team" element={<PersonCareTeam />} />
-            <Route path="/people/:id/managed-documents" element={<PersonManagedDocuments />} />
-            <Route path="/people/:id/oncall" element={<PersonOnCall />} />
-            <Route path="/people/:id/trainings" element={<PersonTrainings />} />
-            <Route path="/people/:id/service-plan" element={<PersonServicePlan />} />
-            <Route path="/people/:id/billing" element={<PersonBillingSummary />} />
-            <Route path="/people/:id/esignature" element={<PersonESignature />} />
+            {/* ── AUTHENTICATED ROUTES — require login ──────────────────── */}
+            <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/people/:id/communications-log" element={<ProtectedRoute><PersonCommunicationsLog /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/people" element={<ProtectedRoute><PeopleSupported /></ProtectedRoute>} />
+            <Route path="/people/new" element={<ProtectedRoute><NewParticipantIntake /></ProtectedRoute>} />
+            <Route path="/people/:id/profile" element={<ProtectedRoute><PersonProfile /></ProtectedRoute>} />
+            <Route path="/people/:id/facesheet" element={<ProtectedRoute><PersonFaceSheet /></ProtectedRoute>} />
+           <Route path="/people/:id/echart" element={<ProtectedRoute><EChart /></ProtectedRoute>} />
+           <Route path="/people/:id/monitors-baselines" element={<ProtectedRoute><PersonMonitorsBaselines /></ProtectedRoute>} />
+            <Route path="/people/:id/contact-note" element={<ProtectedRoute><ContactNote /></ProtectedRoute>} />
+            <Route path="/people/:id/case-management" element={<ProtectedRoute><PersonCaseManagement /></ProtectedRoute>} />
+            <Route path="/people/:id/care-plan" element={<ProtectedRoute><PersonCarePlan /></ProtectedRoute>} />
+            <Route path="/people/:id/care-plan/:planId" element={<ProtectedRoute><PersonCarePlanDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/monitoring-form" element={<ProtectedRoute><PersonMonitoringForm /></ProtectedRoute>} />
+            <Route path="/people/:id/monitoring-form/:formId" element={<ProtectedRoute><PersonMonitoringFormDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/visit-summary" element={<ProtectedRoute><PersonVisitSummary /></ProtectedRoute>} />
+            <Route path="/people/:id/visit-summary/schedule" element={<ProtectedRoute><PersonVisitScheduler /></ProtectedRoute>} />
+            <Route path="/people/:id/visit-summary/document" element={<ProtectedRoute><PersonVisitDocument /></ProtectedRoute>} />
+            <Route path="/exceptions" element={<ProtectedRoute requireRole="supervisor"><ExceptionsQueue /></ProtectedRoute>} />
+            <Route path="/supervisor" element={<ProtectedRoute requireRole="supervisor"><SupervisorDashboard /></ProtectedRoute>} />
+            <Route path="/supervisor/review/:docId" element={<ProtectedRoute requireRole="supervisor"><SupervisorReviewNote /></ProtectedRoute>} />
+            <Route path="/supervisor/compliance" element={<ProtectedRoute requireRole="supervisor"><SupervisorCompliance /></ProtectedRoute>} />
+            <Route path="/people/:id/visit-summary/:visitId" element={<ProtectedRoute><PersonVisitSummaryDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/eligibility-verification" element={<ProtectedRoute><PersonEligibilityVerification /></ProtectedRoute>} />
+            <Route path="/people/:id/eligibility-verification/:verificationId" element={<ProtectedRoute><PersonEligibilityVerificationDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/progress-note" element={<ProtectedRoute><PersonProgressNote /></ProtectedRoute>} />
+            <Route path="/people/:id/progress-note/:noteId" element={<ProtectedRoute><PersonProgressNoteDetail /></ProtectedRoute>} />
+            <Route path="/progress-note" element={<ProtectedRoute><ProgressNoteLog /></ProtectedRoute>} />
+            <Route path="/progress-note/new" element={<ProtectedRoute><ProgressNoteNew /></ProtectedRoute>} />
+            <Route path="/visit-summary" element={<ProtectedRoute><VisitSummaryLog /></ProtectedRoute>} />
+            <Route path="/visit-summary/new" element={<ProtectedRoute><VisitSummaryNew /></ProtectedRoute>} />
+            <Route path="/oncall-log" element={<ProtectedRoute><OnCallLog /></ProtectedRoute>} />
+            <Route path="/oncall-log/new" element={<ProtectedRoute><OnCallLogNew /></ProtectedRoute>} />
+            <Route path="/oncall-log/:id" element={<ProtectedRoute><OnCallLog /></ProtectedRoute>} />
+            <Route path="/people/:id/workflow-manager" element={<ProtectedRoute><PersonWorkflowManager /></ProtectedRoute>} />
+            <Route path="/people/:id/workflow-manager/:workflowId" element={<ProtectedRoute><PersonWorkflowDetail /></ProtectedRoute>} />
+            <Route path="/workflows" element={<ProtectedRoute><WorkflowsGlobal /></ProtectedRoute>} />
+            <Route path="/admin/workflow-templates" element={<ProtectedRoute requireRole="admin"><WorkflowTemplatesAdmin /></ProtectedRoute>} />
+            <Route path="/people/:id/incident-reporting" element={<ProtectedRoute><PersonIncidentReporting /></ProtectedRoute>} />
+            <Route path="/people/:id/incident-reporting/:incidentId" element={<ProtectedRoute><PersonIncidentReportingDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/incident-report/new" element={<ProtectedRoute><PersonIncidentReportNew /></ProtectedRoute>} />
+            <Route path="/incidents" element={<ProtectedRoute><IncidentsGlobal /></ProtectedRoute>} />
+            <Route path="/my-work" element={<ProtectedRoute><MyWork /></ProtectedRoute>} />
+            <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
+            <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            <Route path="/people/:id/module/:slug" element={<ProtectedRoute><PersonModule /></ProtectedRoute>} />
+            <Route path="/modules/contact-note" element={<ProtectedRoute><ContactNote /></ProtectedRoute>} />
+            <Route path="/lifeplan" element={<ProtectedRoute><Navigate to="/platform" replace /></ProtectedRoute>} />
+            <Route path="/lifeplan/guidelines-engines" element={<ProtectedRoute><ComplianceEngineDashboard /></ProtectedRoute>} />
+            <Route path="/lifeplan/guidelines-library/new" element={<ProtectedRoute><RuleLibraryBuilder /></ProtectedRoute>} />
+            <Route path="/lifeplan/agent/new" element={<ProtectedRoute><RuntimeAgentBuilder /></ProtectedRoute>} />
+            <Route path="/lifeplan/agent/new/layer2" element={<ProtectedRoute><Layer2AgentBuilder /></ProtectedRoute>} />
+            <Route path="/lifeplan/engine/:id/history" element={<ProtectedRoute><EngineHistory /></ProtectedRoute>} />
+            <Route path="/lifeplan/agent/:agentId/drafts" element={<ProtectedRoute><AgentDraftRuns /></ProtectedRoute>} />
+            <Route path="/lifeplan/agent/:agentId/monitoring" element={<ProtectedRoute><AgentMonitoringSettings /></ProtectedRoute>} />
+            <Route path="/lifeplan/agent/:id" element={<ProtectedRoute><LifePlanAgentDetail /></ProtectedRoute>} />
+            <Route path="/admin/assessment-builder" element={<ProtectedRoute requireRole="admin"><AssessmentBuilderList /></ProtectedRoute>} />
+            <Route path="/admin/assessment-builder/new" element={<ProtectedRoute requireRole="admin"><AssessmentBuilderEdit /></ProtectedRoute>} />
+            <Route path="/admin/assessment-builder/:templateId/edit" element={<ProtectedRoute requireRole="admin"><AssessmentBuilderEdit /></ProtectedRoute>} />
+            <Route path="/people/:id/assessments" element={<ProtectedRoute><PersonAssessments /></ProtectedRoute>} />
+            <Route path="/people/:id/assessments/new" element={<ProtectedRoute><PersonAssessmentForm /></ProtectedRoute>} />
+            <Route path="/people/:id/assessments/:assessmentId" element={<ProtectedRoute><PersonAssessmentForm /></ProtectedRoute>} />
+            <Route path="/people/:id/referrals" element={<ProtectedRoute><PersonReferrals /></ProtectedRoute>} />
+            <Route path="/referrals" element={<ProtectedRoute><AllReferrals /></ProtectedRoute>} />
+            <Route path="/people/:id/referrals" element={<ProtectedRoute><PersonReferrals /></ProtectedRoute>} />
+            <Route path="/people/:id/referrals/new" element={<ProtectedRoute><PersonReferralForm /></ProtectedRoute>} />
+            <Route path="/people/:id/referrals/:referralId" element={<ProtectedRoute><PersonReferralDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/documents" element={<ProtectedRoute><PersonDocuments /></ProtectedRoute>} />
+            <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
+            <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
+            <Route path="/leads/new" element={<ProtectedRoute><LeadForm /></ProtectedRoute>} />
+            <Route path="/leads/:id" element={<ProtectedRoute><LeadDetail /></ProtectedRoute>} />
+            <Route path="/leads/:id/edit" element={<ProtectedRoute><LeadForm /></ProtectedRoute>} />
+            <Route path="/documentation" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/contact-notes" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/progress-notes" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/visit-summaries" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/monitoring-forms" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/assessments" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/care-plans" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/referrals" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/meeting-notes" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/documentation/communications" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
 
-            {/* Billing hub (Fix 3) */}
-            <Route path="/billing" element={<BillingHub />} />
+            {/* ── ADMIN-ONLY ROUTES ─────────────────────────────────────── */}
+            <Route path="/settings" element={<ProtectedRoute requireRole="admin"><Settings /></ProtectedRoute>} />
+            <Route path="/settings/users" element={<ProtectedRoute requireRole="admin"><SettingsUsers /></ProtectedRoute>} />
+            <Route path="/settings/users/:userId" element={<ProtectedRoute requireRole="admin"><SettingsUserDetail /></ProtectedRoute>} />
+            <Route path="/settings/roles" element={<ProtectedRoute requireRole="admin"><SettingsUsers /></ProtectedRoute>} />
+            <Route path="/settings/organization" element={<ProtectedRoute requireRole="admin"><SettingsOrganization /></ProtectedRoute>} />
+            <Route path="/settings/programs" element={<ProtectedRoute requireRole="admin"><SettingsPrograms /></ProtectedRoute>} />
+            <Route path="/settings/ai" element={<ProtectedRoute requireRole="admin"><SettingsAI /></ProtectedRoute>} />
+            <Route path="/settings/integrations" element={<ProtectedRoute requireRole="admin"><SettingsIntegrations /></ProtectedRoute>} />
+            <Route path="/settings/security" element={<ProtectedRoute requireRole="admin"><SettingsSecurity /></ProtectedRoute>} />
+            <Route path="/settings/notifications" element={<ProtectedRoute requireRole="admin"><SettingsNotifications /></ProtectedRoute>} />
+            <Route path="/settings/billing-config" element={<ProtectedRoute requireRole="admin"><SettingsBillingConfig /></ProtectedRoute>} />
+            <Route path="/settings/ai-usage" element={<ProtectedRoute requireRole="admin"><SettingsAIUsage /></ProtectedRoute>} />
+            <Route path="/settings/billing/checkout-simulation" element={<ProtectedRoute requireRole="admin"><BillingCheckoutSimulation /></ProtectedRoute>} />
+            <Route path="/settings/billing/portal-simulation" element={<ProtectedRoute requireRole="admin"><BillingPortalSimulation /></ProtectedRoute>} />
+            <Route path="/settings/import" element={<ProtectedRoute requireRole="admin"><SettingsImport /></ProtectedRoute>} />
+            <Route path="/ai-roadmap" element={<ProtectedRoute><AIRoadmap /></ProtectedRoute>} />
+            <Route path="/admin/provider-directory" element={<ProtectedRoute requireRole="admin"><ProviderDirectory /></ProtectedRoute>} />
+            <Route path="/admin/audit-log" element={<ProtectedRoute requireRole="admin"><AuditLogPage /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/reports/builder" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />
+            <Route path="/reports/audit-evidence" element={<ProtectedRoute requireRole="admin"><AuditEvidence /></ProtectedRoute>} />
+            <Route path="/reports/:reportId" element={<ProtectedRoute><ReportRunner /></ProtectedRoute>} />
+            <Route path="/platform" element={<ProtectedRoute><PlatformHub /></ProtectedRoute>} />
+            <Route path="/platform/guidelines-engines" element={<ProtectedRoute><GuidelinesEnginesList /></ProtectedRoute>} />
+            <Route path="/platform/guidelines-engines/new" element={<ProtectedRoute requireRole="admin"><NewEngineWizard /></ProtectedRoute>} />
+            <Route path="/platform/guidelines-engines/:engineId" element={<ProtectedRoute><EngineDetail /></ProtectedRoute>} />
+            <Route path="/platform/rule-library" element={<ProtectedRoute><RuleLibrary /></ProtectedRoute>} />
+            <Route path="/platform/agents" element={<ProtectedRoute><LifePlanBoard /></ProtectedRoute>} />
+            <Route path="/platform/agents/new" element={<ProtectedRoute requireRole="admin"><RuntimeAgentBuilder /></ProtectedRoute>} />
+            <Route path="/platform/agents/:agentId/runs" element={<ProtectedRoute><Layer2AgentBuilder /></ProtectedRoute>} />
+            <Route path="/platform/agents/:agentId/drafts" element={<ProtectedRoute><AgentDraftRuns /></ProtectedRoute>} />
+            <Route path="/platform/agents/:agentId/monitoring" element={<ProtectedRoute requireRole="admin"><AgentMonitoringSettings /></ProtectedRoute>} />
 
-            {/* Legacy /lifeplan redirects → /platform/agents (Fix 4) */}
-            {/* duplicate removed - handled at line 187 */}
+            {/* Per-person placeholder routes */}
+            <Route path="/people/:id/care-tracker" element={<ProtectedRoute><PersonCareTracker /></ProtectedRoute>} />
+            <Route path="/people/:id/meeting-notes" element={<ProtectedRoute><PersonMeetingNotesPage /></ProtectedRoute>} />
+            <Route path="/people/:id/communications" element={<ProtectedRoute><PersonCommunications /></ProtectedRoute>} />
+            <Route path="/people/:id/services" element={<ProtectedRoute><PersonServices /></ProtectedRoute>} />
+            <Route path="/people/:id/employment" element={<ProtectedRoute><PersonEmployment /></ProtectedRoute>} />
+            <Route path="/people/:id/assigned-staff" element={<ProtectedRoute><PersonCareTeam /></ProtectedRoute>} />
+            <Route path="/people/:id/care-team" element={<ProtectedRoute><PersonCareTeam /></ProtectedRoute>} />
+            <Route path="/people/:id/managed-documents" element={<ProtectedRoute><PersonManagedDocuments /></ProtectedRoute>} />
+            <Route path="/people/:id/oncall" element={<ProtectedRoute><PersonOnCall /></ProtectedRoute>} />
+            <Route path="/people/:id/trainings" element={<ProtectedRoute><PersonTrainings /></ProtectedRoute>} />
+            <Route path="/people/:id/service-plan" element={<ProtectedRoute><PersonServicePlan /></ProtectedRoute>} />
+            <Route path="/people/:id/billing" element={<ProtectedRoute><PersonBillingSummary /></ProtectedRoute>} />
+            <Route path="/people/:id/esignature" element={<ProtectedRoute><PersonESignature /></ProtectedRoute>} />
+
+            {/* Billing hub */}
+            <Route path="/billing" element={<ProtectedRoute><BillingHub /></ProtectedRoute>} />
+
             <Route path="/lifeplan/agent/new/layer2" element={<Navigate to="/platform/agents" replace />} />
+            <Route path="/admin/multi-state" element={<ProtectedRoute requireRole="admin"><MultiStateConfig /></ProtectedRoute>} />
+            <Route path="/communications" element={<ProtectedRoute><CommunicationsHub /></ProtectedRoute>} />
+            <Route path="/admin/ai-governance" element={<ProtectedRoute requireRole="admin"><AIGovernance /></ProtectedRoute>} />
+            <Route path="/visit/:sessionId" element={<ProtectedRoute><VirtualVisit /></ProtectedRoute>} />
 
-            <Route path="/admin/multi-state" element={<MultiStateConfig />} />
-            <Route path="/communications" element={<CommunicationsHub />} />
-            <Route path="/admin/ai-governance" element={<AIGovernance />} />
+            {/* ── SUPER ADMIN — platform_admin role only ─────────────── */}
+            <Route path="/super-admin" element={<PlatformAdminGuard><Navigate to="/super-admin/organizations" replace /></PlatformAdminGuard>} />
+            <Route path="/super-admin/organizations" element={<PlatformAdminGuard><SuperAdminOrganizations /></PlatformAdminGuard>} />
+            <Route path="/super-admin/users" element={<PlatformAdminGuard><SuperAdminUsers /></PlatformAdminGuard>} />
+            <Route path="/super-admin/billing" element={<PlatformAdminGuard><SuperAdminBilling /></PlatformAdminGuard>} />
+            <Route path="/super-admin/ai-usage" element={<PlatformAdminGuard><SuperAdminAIUsage /></PlatformAdminGuard>} />
+            <Route path="/super-admin/support" element={<PlatformAdminGuard><SuperAdminSupport /></PlatformAdminGuard>} />
+            <Route path="/super-admin/health" element={<PlatformAdminGuard><SuperAdminHealth /></PlatformAdminGuard>} />
 
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="/visit/:sessionId" element={<VirtualVisit />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
@@ -301,6 +337,7 @@ const App = () => (
       </BillingProvider>
     </RoleProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

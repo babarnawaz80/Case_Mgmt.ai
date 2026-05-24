@@ -2,30 +2,25 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, ShieldCheck,
-  AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import {
-  getEligibilityForPerson, getCurrentEligibility, daysUntil, complianceToneFor,
+  daysUntil, complianceToneFor,
   type MAStatus, type MAType, type RecordStatus,
 } from "@/data/eligibility";
-import type { AISuggestion } from "@/data/people";
+import { useEligibilityVerifications, type EligibilityVerification } from "@/hooks/useFirestore";
 
-const eligibilitySuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "MA redetermination is due in 45 days. Based on past experience, this process takes 2-3 weeks. Start by May 10 to avoid a lapse.", cta: "Create reminder task" },
-  { tone: "insight", label: "Insight", body: "Joseph's last verification was on 08/01/2023 — over 2 years ago. A current verification screenshot from the state portal should be uploaded.", cta: "Add verification" },
-  { tone: "insight", label: "Insight", body: "MA status is currently Active but no current renewal date is recorded. Adding the redetermination date will enable automatic compliance tracking.", cta: "Update record" },
-  { tone: "good", label: "Good news", body: "Joseph has maintained continuous Medicaid eligibility since admission on 09/01/2022. No lapses in coverage.", cta: "View history" },
-];
 
 const PersonEligibilityVerification = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const records = getEligibilityForPerson(id ?? "");
-  const current = getCurrentEligibility(id ?? "");
+  const { individual, loading } = useIndividual(id);
+  const { data: eligibilityRecords, loading: eligibilityLoading } = useEligibilityVerifications(id);
+
+  const records = useMemo(() => eligibilityRecords || [], [eligibilityRecords]);
+  const current = useMemo(() => records[0], [records]);
 
   const [filterType, setFilterType] = useState<"All" | MAType>("All");
   const [filterStatus, setFilterStatus] = useState<"All" | RecordStatus>("All");
@@ -40,7 +35,18 @@ const PersonEligibilityVerification = () => {
     });
   }, [records, filterType, filterStatus]);
 
-  if (!person) {
+  if (loading || eligibilityLoading) {
+    return (
+      <ICMShell title="Eligibility Verification" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="Eligibility Verification" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -53,14 +59,14 @@ const PersonEligibilityVerification = () => {
 
   if (records.length === 0) {
     return (
-      <ICMShell title="Eligibility Verification" rightPanel={<PersonAIPanel person={person} suggestions={eligibilitySuggestions} intro={`${eligibilitySuggestions.length} suggestions for ${person.firstName}.`} />}>
+      <ICMShell title="Eligibility Verification" showAIPanel={false}>
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
             <ShieldCheck className="w-7 h-7 text-icm-text-faint" />
           </div>
           <h2 className="font-manrope font-extrabold text-[20px] text-icm-text mb-1">No eligibility records yet</h2>
           <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
-            Track {person.firstName}'s Medicaid status to get compliance alerts and renewal reminders.
+            Track {individual.first_name}'s Medicaid status to get compliance alerts and renewal reminders.
           </p>
           <div className="flex gap-2">
             <button onClick={newRecord} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
@@ -80,29 +86,29 @@ const PersonEligibilityVerification = () => {
   const overdue = days !== undefined && days < 0;
 
   return (
-    <ICMShell title="Eligibility Verification" rightPanel={<PersonAIPanel person={person} suggestions={eligibilitySuggestions} intro={`${eligibilitySuggestions.length} suggestions for ${person.firstName}.`} />}>
+    <ICMShell title="Eligibility Verification" showAIPanel={false}>
       <div className="space-y-5">
-        <button onClick={() => navigate(`/people/${person.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Eligibility Verification
+          People · {individual.last_name}, {individual.first_name} · Eligibility Verification
         </button>
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
-          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>
-            {initials(person)}
+          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>
+            {initials(individual)}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">
-              {person.lastName}, {person.firstName}
+              {individual.last_name}, {individual.first_name}
             </h2>
             <p className="text-[11.5px] font-mono text-icm-text-dim">
-              {person.gender} · {person.age}y · {person.county} · ID #{person.id}
+              {individual.gender ?? "—"} · {individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}
             </p>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
             <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
-            {person.status}
+            {individual.enrollment_status}
           </span>
         </div>
 
@@ -129,7 +135,7 @@ const PersonEligibilityVerification = () => {
             <div className="flex items-center gap-2.5 min-w-0">
               <AlertTriangle className="w-5 h-5 text-icm-red shrink-0" />
               <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                <span className="font-semibold">{person.firstName}'s Medicaid renewal was due on {current?.redeterminationDate}.</span>{" "}
+                <span className="font-semibold">{individual.first_name}'s Medicaid renewal was due on {current?.redeterminationDate}.</span>{" "}
                 <span className="text-icm-text-dim">This is {Math.abs(days!)} days overdue. Immediate action required.</span>
               </p>
             </div>

@@ -12,9 +12,10 @@ import {
   PenLine,
   History,
   X,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import {
   AssessmentAnswer,
   AssessmentTemplate,
@@ -30,7 +31,7 @@ export default function PersonAssessmentForm() {
   const { id, assessmentId } = useParams<{ id: string; assessmentId: string }>();
   const navigate = useNavigate();
   const [search] = useSearchParams();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
 
   // Existing read-only assessment vs new draft.
   const existing = assessmentId && assessmentId !== "new" ? getAssessment(assessmentId) : null;
@@ -66,7 +67,15 @@ export default function PersonAssessmentForm() {
   });
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  if (!person || !template) {
+  if (!individual || !template) {
+    if (loading) {
+      return (
+        <div className="p-10 text-center text-[13px] text-icm-text-dim flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading…
+        </div>
+      );
+    }
     return (
       <div className="p-10 text-center text-[13px] text-icm-text-dim">
         Assessment template not found.{" "}
@@ -231,7 +240,7 @@ export default function PersonAssessmentForm() {
       ts: new Date().toISOString(),
       actor: signCM || "Care Manager",
       action: `Completed assessment: ${template!.name} ${template!.version}`,
-      target: `${person!.firstName} ${person!.lastName}`,
+      target: `${individual!.first_name} ${individual!.last_name}`,
       category: "assessment",
       details: `Score ${score} · LOC ${loc} · ${findings.length} risk finding(s) · ${attachments.length} attachment(s)`,
     });
@@ -241,7 +250,7 @@ export default function PersonAssessmentForm() {
         ts: new Date().toISOString(),
         actor: "System",
         action: `Risk findings flagged for review`,
-        target: `${person!.firstName} ${person!.lastName}`,
+        target: `${individual!.first_name} ${individual!.last_name}`,
         category: "ai",
         details: findings.map(f => `[${f.severity}] ${f.label}`).join("; "),
       });
@@ -256,7 +265,7 @@ export default function PersonAssessmentForm() {
       newTasks.push({
         id: `task-${Date.now()}-a1`, title: `Update person-centered plan: address critical risk findings`,
         dueDate: due(3), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
-        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        participantId: id!, participantName: `${individual!.first_name} ${individual!.last_name}`,
         status: "open", category: "Planning", escalationDays: 1, reminders: ["1 day before due"],
         source: `Assessment ${newId} ${template!.version}`,
       });
@@ -265,7 +274,7 @@ export default function PersonAssessmentForm() {
       newTasks.push({
         id: `task-${Date.now()}-a2`, title: `Supervisor review: assessment risk findings`,
         dueDate: due(2), owner: "Diane Carter (Supervisor)", supervisor: "Diane Carter (Supervisor)",
-        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        participantId: id!, participantName: `${individual!.first_name} ${individual!.last_name}`,
         status: "open", category: "Supervisor Review", escalationDays: 1, reminders: ["same day"],
         source: `Assessment ${newId} ${template!.version}`,
       });
@@ -274,7 +283,7 @@ export default function PersonAssessmentForm() {
       newTasks.push({
         id: `task-${Date.now()}-a3`, title: `Increase monitoring frequency (LOC ${loc})`,
         dueDate: due(7), owner: signCM || "Care Manager", supervisor: "Diane Carter (Supervisor)",
-        participantId: id!, participantName: `${person!.firstName} ${person!.lastName}`,
+        participantId: id!, participantName: `${individual!.first_name} ${individual!.last_name}`,
         status: "open", category: "Monitoring", escalationDays: 3, reminders: ["3 days before due"],
         source: `Assessment ${newId} ${template!.version}`,
       });
@@ -362,7 +371,7 @@ export default function PersonAssessmentForm() {
           <p className="font-manrope font-extrabold text-[16px] text-icm-text leading-tight">
             {template.name}{" "}
             <span className="text-icm-text-dim font-medium text-[12px]">
-              {template.version} · {person.firstName} {person.lastName}
+              {template.version} · {individual.first_name} {individual.last_name}
             </span>
           </p>
           <p className="text-[11px] text-icm-text-dim">
@@ -436,7 +445,7 @@ export default function PersonAssessmentForm() {
               <p className="text-[12px] font-geist text-icm-text">
                 <span className="font-semibold">I pre-filled {aiCount} questions</span>{" "}
                 <span className="text-icm-text-dim">
-                  from {person.firstName}'s profile, prior assessment, and recent notes.
+                  from {individual.first_name}'s profile, prior assessment, and recent notes.
                   All pre-filled answers are labeled — review each one.
                 </span>
               </p>

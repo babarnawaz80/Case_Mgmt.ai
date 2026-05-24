@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { demoSuccess, demoToast } from "@/lib/demoToast";
 import {
@@ -19,12 +19,16 @@ import {
   Sparkle,
   Keyboard,
   PartyPopper,
+  Loader2,
+  Copy,
+  Check,
+  RotateCcw,
+  Send,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/firebase";
 import {
-  myWorkTasks as seedTasks,
-  focusedSessionTaskIds,
   bucketForTask,
   parseMDY,
   daysBetween,
@@ -32,6 +36,76 @@ import {
   type MyWorkTask,
   type TaskStatus,
 } from "@/data/myWork";
+import { useTasks, completeTask as firestoreCompleteTask, addTaskComment, createTask } from "@/hooks/useTasks";
+import type { Task } from "@/hooks/useTasks";
+import { useIndividuals } from "@/hooks/useIndividuals";
+import { useAuth } from "@/contexts/AuthContext";
+
+// ---------- Shape adapter: Firestore Task → MyWorkTask ----------
+function mapTaskToMyWork(t: Task): MyWorkTask {
+  // Convert YYYY-MM-DD → MM/DD/YYYY for existing date helpers
+  function toMDY(iso: string): string {
+    if (!iso) return "";
+    // already MM/DD/YYYY?
+    if (iso.includes("/")) return iso;
+    const [y, m, d] = iso.split("-");
+    return `${m}/${d}/${y}`;
+  }
+
+  // Derive initials from name
+  function initials(name?: string): string {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase())
+      .slice(0, 2)
+      .join("");
+  }
+
+  // Map Firestore status → display status
+  const statusMap: Record<string, TaskStatus> = {
+    open: "Open",
+    in_progress: "In Progress",
+    completed: "Completed",
+    overdue: "Overdue",
+  };
+
+  // Map Firestore priority → display priority
+  const priorityMap: Record<string, MyWorkTask["priority"]> = {
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  };
+
+  const dueMDY = toMDY(t.dueDate);
+  const dueDate = parseMDY(dueMDY);
+  const today = new Date();
+  const diff = dueDate ? daysBetween(today, dueDate) : null;
+  const status = statusMap[t.status] ?? "Open";
+  const isOverdue = diff !== null && diff < 0 && status !== "Completed";
+
+  return {
+    id: t.id,
+    name: t.title,
+    description: t.description,
+    source: "Case Management" as const,
+    sourceDetail: t.type ?? "General",
+    individualId: t.individualId ?? "unknown",
+    individualName: t.individualName ?? "Unknown Individual",
+    individualCounty: "",
+    individualInitials: initials(t.individualName),
+    dueDate: dueMDY,
+    status: isOverdue && status !== "Completed" ? "Overdue" : status,
+    daysOverdue: isOverdue && diff !== null ? Math.abs(diff) : undefined,
+    staffResponsible: "Me",
+    priority: priorityMap[t.priority] ?? "Medium",
+    createdOn: t.createdAt
+      ? toMDY(new Date((t.createdAt as any)?.seconds ? (t.createdAt as any).seconds * 1000 : t.createdAt as any).toISOString().split("T")[0])
+      : "",
+    createdBy: t.assignedTo ?? "",
+  };
+}
 import { AlertsTab } from "@/components/notifications/AlertsTab";
 import { MentionsTab } from "@/components/notifications/MentionsTab";
 import { AICheckInsTab } from "@/components/icm/AICheckInsTab";
@@ -119,7 +193,27 @@ const MyWork = () => {
     else setSearchParams({ tab: v }, { replace: true });
   }
 
-  const [tasks, setTasks] = useState<MyWorkTask[]>(seedTasks);
+  // --- Real Firestore tasks ---
+  const { tasks: firestoreTasks, loading: tasksLoading } = useTasks();
+  // Map Firestore shape → MyWorkTask shape for UI compatibility
+  const tasks = useMemo(() => firestoreTasks.map(mapTaskToMyWork), [firestoreTasks]);
+  // Local optimistic override for completions (id → true)
+  const [localCompleted, setLocalCompleted] = useState<Set<string>>(new Set());
+  // Apply optimistic completions
+  const tasksWithOptimistic = useMemo(
+    () =>
+      tasks.map((t) =>
+        localCompleted.has(t.id) ? { ...t, status: "Completed" as TaskStatus } : t,
+      ),
+    [tasks, localCompleted],
+  );
+
+  // Dynamic focused-session: first 4 open non-completed task IDs
+  const focusedSessionTaskIds = useMemo(
+    () => tasksWithOptimistic.filter((t) => t.status !== "Completed").slice(0, 4).map((t) => t.id),
+    [tasksWithOptimistic],
+  );
+
   const [tab, setTab] = useState<Exclude<TabKey, "completed">>("today");
   const [groupMode, setGroupMode] = useState<GroupMode>("individual");
   const [sort, setSort] = useState<"priority" | "due" | "name" | "type" | "created">("priority");
@@ -138,22 +232,27 @@ const MyWork = () => {
 
   const notif = useNotifications();
 
+  // Use optimistic tasks everywhere below
+  // (aliased for backwards compat with existing code that references `tasks`)
+  // We shadow the const declared above
+  const allTasks = tasksWithOptimistic;
+
   // ---- counts ----
   const counts = useMemo(() => {
-    const open = tasks.filter((t) => t.status !== "Completed");
+    const open = allTasks.filter((t) => t.status !== "Completed");
     const overdue = open.filter((t) => bucketForTask(t) === "overdue").length;
     const today = open.filter((t) => bucketForTask(t) === "today").length;
     const week = open.filter((t) => {
       const b = bucketForTask(t);
       return b === "today" || b === "tomorrow" || b === "thisWeek";
     }).length;
-    const completed = tasks.filter((t) => t.status === "Completed").length;
+    const completed = allTasks.filter((t) => t.status === "Completed").length;
     return { total: open.length, overdue, today, week, completed };
-  }, [tasks]);
+  }, [allTasks]);
 
   // ---- filter pipeline ----
   const filtered = useMemo(() => {
-    let list = tasks.slice();
+    let list = allTasks.slice();
 
     if (focused) {
       list = list.filter((t) => focusedSessionTaskIds.includes(t.id));
@@ -207,12 +306,12 @@ const MyWork = () => {
     });
 
     return list;
-  }, [tasks, view, tab, filterIndividual, filterCounty, filterSource, filterStatus, sort, focused]);
+  }, [allTasks, view, tab, filterIndividual, filterCounty, filterSource, filterStatus, sort, focused]);
 
   // unique counties for filter dropdown
   const counties = useMemo(
-    () => Array.from(new Set(tasks.map((t) => t.individualCounty).filter(Boolean))).sort(),
-    [tasks],
+    () => Array.from(new Set(allTasks.map((t) => t.individualCounty).filter(Boolean))).sort(),
+    [allTasks],
   );
   const grouped = useMemo(() => {
     if (groupMode === "individual") {
@@ -269,15 +368,24 @@ const MyWork = () => {
   }
 
   function completeTask(id: string) {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: "Completed" as TaskStatus } : t)),
-    );
+    // Optimistic update locally
+    setLocalCompleted((prev) => new Set([...prev, id]));
     setActionTask(null);
+    // Persist to Firestore
+    firestoreCompleteTask(id).catch((err) => {
+      console.error("[completeTask]", err);
+      // Roll back optimistic if Firestore write failed
+      setLocalCompleted((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    });
 
     if (focused) {
       const remaining = focusedSessionTaskIds.filter((tid) => {
-        const updated = tasks.find((x) => x.id === tid);
-        return updated && updated.status !== "Completed" && tid !== id;
+        const current = allTasks.find((x) => x.id === tid);
+        return current && current.status !== "Completed" && tid !== id;
       });
       if (remaining.length === 0) {
         setShowSessionDone(true);
@@ -299,10 +407,34 @@ const MyWork = () => {
     if (!focused) return null;
     const total = focusedSessionTaskIds.length;
     const done = focusedSessionTaskIds.filter(
-      (id) => tasks.find((t) => t.id === id)?.status === "Completed",
+      (id) => allTasks.find((t) => t.id === id)?.status === "Completed",
     ).length;
     return { done, total };
-  }, [focused, tasks]);
+  }, [focused, allTasks, focusedSessionTaskIds]);
+
+  // ---- loading skeleton ----
+  if (tasksLoading) {
+    return (
+      <ICMShell title="My Work">
+        <div className="space-y-5">
+          <div className="space-y-1">
+            <div className="h-9 w-40 rounded-xl bg-icm-border/40 animate-pulse" />
+            <div className="h-4 w-72 rounded-lg bg-icm-border/30 animate-pulse" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 rounded-[1.75rem] bg-icm-border/30 animate-pulse" />
+            ))}
+          </div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-20 rounded-[2rem] bg-icm-border/30 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </ICMShell>
+    );
+  }
 
   return (
     <ICMShell title="My Work" rightPanel={<MyWorkAIPanel onStartFocused={() => setFocused(true)} />}>
@@ -737,6 +869,9 @@ function TaskRow({
   onAdvance?: () => void;
   showIndividualName?: boolean;
 }) {
+  const { userProfile } = useAuth();
+  const [commentText, setCommentText] = useState("");
+  const [commentPosting, setCommentPosting] = useState(false);
   const tone = statusTone(task.status);
   const due = parseMDY(task.dueDate);
   const diff = due ? daysBetween(DEMO_TODAY, due) : null;
@@ -826,14 +961,37 @@ function TaskRow({
           </div>
           <div className="flex items-center gap-2">
             <input
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && !commentPosting && commentText.trim()) {
+                  setCommentPosting(true);
+                  try {
+                    await addTaskComment(task.id, commentText.trim(), userProfile?.uid ?? "", userProfile?.displayName ?? "Unknown");
+                    setCommentText("");
+                    toast.success("Comment posted");
+                  } catch { toast.error("Failed to post comment."); }
+                  finally { setCommentPosting(false); }
+                }
+              }}
               placeholder="Add a comment… use @ to mention"
               className="flex-1 h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text focus:border-icm-accent focus:ring-2 focus:ring-icm-accent/15 outline-none transition-all"
             />
             <button
-              onClick={() => demoSuccess("Comment posted")}
-              className="text-[11px] text-icm-accent hover:underline font-bold"
+              disabled={!commentText.trim() || commentPosting}
+              onClick={async () => {
+                if (!commentText.trim() || commentPosting) return;
+                setCommentPosting(true);
+                try {
+                  await addTaskComment(task.id, commentText.trim(), userProfile?.uid ?? "", userProfile?.displayName ?? "Unknown");
+                  setCommentText("");
+                  toast.success("Comment posted");
+                } catch { toast.error("Failed to post comment."); }
+                finally { setCommentPosting(false); }
+              }}
+              className="text-[11px] text-icm-accent hover:underline font-bold disabled:opacity-40"
             >
-              Post
+              {commentPosting ? "Posting…" : "Post"}
             </button>
           </div>
         </div>
@@ -923,71 +1081,198 @@ function TaskActionModal({
 
 // ---------- Add Task Modal ----------
 function AddTaskModal({ onClose }: { onClose: () => void }) {
+  const { userProfile } = useAuth();
+  const { individuals, loading: indLoading } = useIndividuals();
+  const [aiLoading, setAiLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Form states
+  const [title, setTitle] = useState("");
+  const [individualId, setIndividualId] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [type, setType] = useState("General");
+  const [description, setDescription] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      toast.error("Task name is required");
+      return;
+    }
+    if (!dueDate) {
+      toast.error("Due date is required");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const selectedInd = individuals.find((ind) => ind.id === individualId);
+      const indName = selectedInd
+        ? `${selectedInd.first_name} ${selectedInd.last_name}`
+        : "Unknown Individual";
+
+      await createTask({
+        title: title.trim(),
+        description: description.trim(),
+        individualId: individualId || "unknown",
+        individualName: indName,
+        dueDate, // YYYY-MM-DD
+        status: "open",
+        priority,
+        type: type || "General",
+        assignedTo: userProfile?.uid ?? "",
+        organizationId: userProfile?.organizationId ?? "",
+      });
+
+      toast.success("Task added successfully");
+      onClose();
+    } catch (err: any) {
+      console.error("Failed to add task:", err);
+      toast.error("Failed to add task: " + (err.message || ""));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <ModalShell onClose={onClose} title="Add Task">
-      <div className="space-y-2.5">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         <Field label="Task name">
-          <input className="modal-input" placeholder="e.g. Schedule annual review" />
+          <input
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="modal-input"
+            placeholder="e.g. Schedule annual review"
+          />
         </Field>
         <Field label="Individual">
-          <input className="modal-input" placeholder="Search individual…" />
+          <select
+            value={individualId}
+            onChange={(e) => setIndividualId(e.target.value)}
+            className="modal-input"
+            disabled={indLoading}
+          >
+            <option value="">— select individual —</option>
+            {individuals.map((ind) => (
+              <option key={ind.id} value={ind.id}>
+                {ind.first_name} {ind.last_name} ({ind.county})
+              </option>
+            ))}
+          </select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Due date">
-            <input type="date" className="modal-input" />
+            <input
+              required
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="modal-input"
+            />
           </Field>
           <Field label="Priority">
-            <select className="modal-input">
-              <option>Medium</option>
-              <option>Low</option>
-              <option>High</option>
-              <option>Critical</option>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as any)}
+              className="modal-input"
+            >
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="high">High</option>
             </select>
           </Field>
         </div>
         <Field label="Link to module (optional)">
-          <select className="modal-input">
-            <option value="">— none —</option>
-            <option>Contact Note</option>
-            <option>Monitoring Form</option>
-            <option>Visit Summary</option>
-            <option>Eligibility Verification</option>
-            <option>Care Plan / ISP</option>
-            <option>Progress Note</option>
-            <option>Workflow</option>
-            <option>Incident</option>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="modal-input"
+          >
+            <option value="General">— none —</option>
+            <option value="Contact Note">Contact Note</option>
+            <option value="Monitoring Form">Monitoring Form</option>
+            <option value="Visit Summary">Visit Summary</option>
+            <option value="Eligibility Verification">Eligibility Verification</option>
+            <option value="Care Plan / ISP">Care Plan / ISP</option>
+            <option value="Progress Note">Progress Note</option>
+            <option value="Workflow">Workflow</option>
+            <option value="Incident">Incident</option>
           </select>
         </Field>
         <Field label="Description">
-          <textarea className="modal-input min-h-[60px]" placeholder="Optional details…" />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="modal-input min-h-[60px]"
+            placeholder="Optional details…"
+          />
         </Field>
         <div className="rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 text-[11.5px] text-icm-text font-geist flex items-start gap-2">
           <Sparkle className="w-3.5 h-3.5 text-icm-accent mt-0.5" />
           <span>
             Want me to suggest tasks based on this individual's upcoming compliance deadlines?{" "}
             <button
-              onClick={() => demoToast("AI task suggestions")}
-              className="text-icm-accent font-semibold hover:underline"
+              type="button"
+              disabled={aiLoading || !individualId}
+              onClick={async () => {
+                if (aiLoading) return;
+                setAiLoading(true);
+                try {
+                  const token = await auth.currentUser?.getIdToken();
+                  const selectedInd = individuals.find((ind) => ind.id === individualId);
+                  const indName = selectedInd ? `${selectedInd.first_name} ${selectedInd.last_name}` : "";
+                  
+                  const res = await fetch(
+                    "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
+                      body: JSON.stringify({
+                        message: `Suggest 3 high-priority tasks for individual ${indName} based on upcoming compliance deadlines, ISP reviews, and health assessments. Be concise — one sentence per task.`,
+                        context: { page: "my_work", module: "task_suggestions" },
+                      }),
+                    }
+                  );
+                  const data = await res.json();
+                  const reply = data.reply ?? "Unable to generate suggestions at this time.";
+                  import("@/lib/demoToast").then((m) => m.demoToast(reply));
+                } catch {
+                  import("@/lib/demoToast").then((m) => m.demoToast("Failed to get AI suggestions. Check your connection."));
+                } finally {
+                  setAiLoading(false);
+                }
+              }}
+              className="text-icm-accent font-semibold hover:underline inline-flex items-center gap-1 disabled:opacity-40 disabled:hover:no-underline"
             >
-              Show suggestions
+              {aiLoading ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : null}
+              {aiLoading ? "Loading…" : "Show suggestions"}
             </button>
           </span>
         </div>
         <div className="flex items-center justify-end gap-2 pt-2">
           <button
+            type="button"
             onClick={onClose}
             className="h-8 px-3 rounded-lg border border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text"
           >
             Cancel
           </button>
           <button
-            onClick={onClose}
-            className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90"
+            type="submit"
+            disabled={saving}
+            className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90 disabled:opacity-50"
           >
-            Add task
+            {saving ? "Adding…" : "Add task"}
           </button>
         </div>
-      </div>
+      </form>
     </ModalShell>
   );
 }
@@ -1152,63 +1437,179 @@ function EmptyState({ tab, onJumpWeek }: { tab: TabKey; onJumpWeek: () => void }
 }
 
 // ---------- AI panel ----------
-function MyWorkAIPanel({ onStartFocused }: { onStartFocused: () => void }) {
-  return (
-    <aside className="w-[320px] shrink-0 border-l border-icm-border bg-icm-panel p-4 overflow-y-auto">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center">
-          <Sparkles className="w-3.5 h-3.5 text-white" />
-        </div>
-        <span className="text-[12px] font-semibold text-icm-text font-geist">Daily plan</span>
-      </div>
+const CHAT_ENDPOINT = "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat";
+const MW_QUICK_PROMPTS = ["Prioritize my day", "What's overdue?", "Draft a note"];
 
-      <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft p-3 space-y-2">
-        <p className="text-[11.5px] font-geist text-icm-text-dim">
-          Here's how I'd prioritize your day:
-        </p>
-        <ol className="space-y-1.5 text-[11.5px] font-geist text-icm-text">
-          <li>
-            <span className="font-semibold">1.</span> Joseph Brown — Quarterly visit
-            <span className="text-icm-red"> (76d overdue)</span>
-          </li>
-          <li>
-            <span className="font-semibold">2.</span> Joseph Brown — Verify MA status
-            <span className="text-icm-red"> (10d overdue)</span>
-          </li>
-          <li>
-            <span className="font-semibold">3.</span> Mohsin Raza — Monitoring form due today
-          </li>
-          <li>
-            <span className="font-semibold">4.</span> Ashley Walker — PCP renewal in 14 days
-          </li>
-        </ol>
+type ChatMsg = { role: "user" | "ai"; text: string };
+
+function MyWorkAIPanel({ onStartFocused }: { onStartFocused: () => void }) {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState<number | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || loading) return;
+    const userMsg: ChatMsg = { role: "user", text: text.trim() };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(CHAT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          message: text.trim(),
+          context: { page: "my_work", module: "daily_planner" },
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const reply = data.reply ?? data.message ?? data.text ?? "Sorry, no response.";
+      setMessages((prev) => [...prev, { role: "ai", text: reply }]);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: "ai", text: "⚠️ Couldn't reach the AI. Please try again." }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
+
+  const handleCopy = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopied(idx);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  return (
+    <aside className="w-[320px] shrink-0 border-l border-icm-border bg-icm-panel flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-icm-border/50 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="text-[12px] font-semibold text-icm-text font-geist">Daily AI</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-icm-green animate-pulse" />
+            <span className="text-[10px] font-geist text-icm-green font-semibold">Ready</span>
+          </div>
+        </div>
         <button
           onClick={onStartFocused}
-          className="mt-1 w-full h-8 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90"
+          className="w-full h-8 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90 transition-opacity"
         >
           Start focused session
         </button>
       </div>
 
-      <Section tone="red" title="URGENT">
-        3 tasks are past due. Longest overdue: Joseph's quarterly visit at 76 days. This affects his
-        compliance status.
-      </Section>
-      <Section tone="accent" title="INSIGHT">
-        You have 4 tasks due today. Based on location, I suggest starting with Joseph (Carroll
-        County) then Mohsin (Bremer County) to minimize travel.
-      </Section>
-      <Section tone="accent" title="INSIGHT">
-        Ashley Walker's PCP renewal is 14 days away. Starting the ISP Renewal Workflow now gives
-        you enough time to complete all 8 steps.
-      </Section>
-      <Section tone="green" title="GOOD NEWS">
-        You completed 3 tasks yesterday. Dwight Doe's case management is fully up to date.
-      </Section>
+      {/* Message list */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-0">
+        {messages.length === 0 && !loading && (
+          <div className="text-center py-6">
+            <div className="w-10 h-10 rounded-2xl ai-gradient flex items-center justify-center mx-auto mb-2">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-[11.5px] text-icm-text-dim font-geist leading-relaxed">
+              Ask me anything about your tasks, caseload, or upcoming deadlines.
+            </p>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={cn("flex gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
+            {m.role === "ai" && (
+              <div className="w-6 h-6 rounded-lg ai-gradient flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-3 h-3 text-white" />
+              </div>
+            )}
+            <div
+              className={cn(
+                "max-w-[220px] rounded-2xl px-3 py-2 text-[11.5px] font-geist leading-relaxed relative group",
+                m.role === "user"
+                  ? "bg-icm-text text-icm-panel rounded-tr-sm"
+                  : "bg-icm-bg border border-icm-border text-icm-text rounded-tl-sm"
+              )}
+            >
+              {m.text}
+              {m.role === "ai" && (
+                <button
+                  onClick={() => handleCopy(m.text, i)}
+                  className="absolute -bottom-5 right-0 opacity-0 group-hover:opacity-100 transition-opacity text-icm-text-faint hover:text-icm-text-dim"
+                >
+                  {copied === i ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex gap-2 justify-start">
+            <div className="w-6 h-6 rounded-lg ai-gradient flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles className="w-3 h-3 text-white" />
+            </div>
+            <div className="bg-icm-bg border border-icm-border rounded-2xl rounded-tl-sm px-3 py-2 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-dim animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-dim animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-dim animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
 
-      <p className="text-[10.5px] text-icm-text-faint mt-4 font-geist border-t border-icm-border pt-3">
-        Your daily task summary was sent to kathy@agency.com at 7:00 AM.
-      </p>
+      {/* Quick prompts */}
+      {messages.length === 0 && (
+        <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
+          {MW_QUICK_PROMPTS.map((p) => (
+            <button
+              key={p}
+              onClick={() => sendMessage(p)}
+              className="h-7 px-2.5 rounded-full border border-icm-accent/30 bg-icm-accent-soft text-icm-accent text-[11px] font-geist hover:bg-icm-accent hover:text-white transition-colors"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="px-3 pb-3 shrink-0">
+        <div className="flex items-center gap-1.5 rounded-xl border border-icm-border bg-icm-bg px-2.5 py-1.5 focus-within:border-icm-accent focus-within:ring-2 focus-within:ring-icm-accent/15 transition-all">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage(input))}
+            placeholder="Ask anything…"
+            className="flex-1 bg-transparent text-[11.5px] font-geist text-icm-text outline-none placeholder:text-icm-text-faint"
+          />
+          {messages.length > 0 && (
+            <button
+              onClick={() => setMessages([])}
+              className="text-icm-text-faint hover:text-icm-text-dim transition-colors"
+              title="Clear chat"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          )}
+          <button
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || loading}
+            className="w-6 h-6 rounded-lg bg-icm-text text-icm-panel flex items-center justify-center disabled:opacity-40 hover:opacity-80 transition-opacity"
+          >
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

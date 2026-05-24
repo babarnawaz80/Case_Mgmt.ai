@@ -5,27 +5,23 @@ import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
   CheckCircle2, Clock, Mail, FileText, Users, Heart, ListChecks, Briefcase, History,
   AlertCircle, Compass, Star, Link2, ShieldCheck, GitBranch, Eye, ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson } from "@/data/people";
-import { getPlan, type CarePlan, type PlanGoal } from "@/data/carePlans";
-import type { AISuggestion } from "@/data/people";
-
-const planSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "ISP review overdue 25 days. 3 required signatures still pending.", cta: "Request signatures" },
-  { tone: "insight", label: "Insight", body: "Goal 2 (Community Integration) has had no progress update in 4 months. Want me to update the progress status?", cta: "Update goal" },
-  { tone: "insight", label: "Insight", body: "Employment goal mentioned in 2 recent sessions. Not currently in plan. Want me to draft?", cta: "Draft goal" },
-  { tone: "good", label: "Good news", body: "All service authorizations are current. Next renewal: August 2026.", cta: "View services" },
-];
+import { useIndividual } from "@/hooks/useIndividuals";
+import { type CarePlan, type PlanGoal } from "@/data/carePlans";
+import { useCarePlans, updateCarePlan } from "@/hooks/useFirestore";
 
 type SectionKey = "details" | "profile" | "nsr" | "goals" | "services" | "support" | "lifecourse" | "linkages" | "team" | "history";
 
 const PersonCarePlanDetail = () => {
   const { id, planId } = useParams<{ id: string; planId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const plan = getPlan(planId ?? "");
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: allPlans, loading: plansLoading } = useCarePlans(id);
+
+  const plan = allPlans.find((p: any) => p.id === planId);
+  const loading = individualLoading || plansLoading;
 
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     details: true, profile: false, nsr: true, goals: true, services: false,
@@ -34,13 +30,55 @@ const PersonCarePlanDetail = () => {
   const [aiBannerVisible, setAiBannerVisible] = useState(true);
   const [printOpen, setPrintOpen] = useState(false);
 
-  if (!person || !plan) {
+  if (loading) {
+    return (
+      <ICMShell title="Care Plan" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+  if (!individual || !plan) {
     return (
       <ICMShell title="Care Plan" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Plan not found.</p>
       </ICMShell>
     );
   }
+
+  const handleSaveDraft = async () => {
+    if (!planId) return;
+    try {
+      await updateCarePlan(planId, {
+        status: "Draft",
+        updatedOn: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
+        updatedBy: "Kathy Martinez"
+      });
+      toast.success("Draft saved successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save draft");
+    }
+  };
+
+  const handleMarkComplete = async () => {
+    if (!planId) return;
+    try {
+      await updateCarePlan(planId, {
+        isCompleted: true,
+        status: "Completed",
+        completedDate: new Date().toISOString().split("T")[0],
+        updatedOn: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
+        updatedBy: "Kathy Martinez"
+      });
+      toast.success("Care Plan marked completed!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to mark complete");
+    }
+  };
 
   const readOnly = plan.isCompleted;
   const toggle = (k: SectionKey) => setOpen((o) => ({ ...o, [k]: !o[k] }));
@@ -54,12 +92,12 @@ const PersonCarePlanDetail = () => {
   return (
     <ICMShell
       title="Care Plan / ISP"
-      rightPanel={<PersonAIPanel person={person} suggestions={planSuggestions} intro={`I'm tracking ${planSuggestions.length} items on plan #${plan.id}.`} />}
+      showAIPanel={false}
     >
       <div className="space-y-5">
         {/* Back */}
         <button
-          onClick={() => navigate(`/people/${person.id}/care-plan`)}
+          onClick={() => navigate(`/people/${individual.id}/care-plan`)}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -83,10 +121,10 @@ const PersonCarePlanDetail = () => {
           <div className="ml-auto flex items-center gap-2">
             {!readOnly && (
               <>
-                <button onClick={() => toast.success("Draft saved", { description: `Plan #${plan.id} autosaved at ${new Date().toLocaleTimeString()}` })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+                <button onClick={handleSaveDraft} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
-                <button onClick={() => toast.success("Marked complete", { description: "Plan locked. Past versions remain pinned for audit." })} className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+                <button onClick={handleMarkComplete} className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Mark complete
                 </button>
               </>
@@ -152,16 +190,16 @@ const PersonCarePlanDetail = () => {
         {/* SECTION 2 — Individual Profile */}
         <PlanSection icon={Users} title="Individual Profile Summary" complete={5} total={5} open={open.profile} onToggle={() => toggle("profile")}>
           <div className="grid grid-cols-2 gap-3 text-[12.5px]">
-            <ProfileLine label="Name" value={`${person.firstName} ${person.lastName}`} />
-            <ProfileLine label="DOB" value={person.dob} />
+            <ProfileLine label="Name" value={`${individual.first_name} ${individual.last_name}`} />
+            <ProfileLine label="DOB" value={individual.dob ?? "—"} />
             <ProfileLine label="Diagnosis" value="IDD, mild" />
             <ProfileLine label="Medicaid ID" value="MA-7842301" />
-            <ProfileLine label="Address" value={`${person.county}`} />
+            <ProfileLine label="Address" value={`${individual.county ?? "—"}`} />
             <ProfileLine label="Emergency contact" value="Linda Brown (mother)" />
           </div>
           <div className="mt-3 flex items-center justify-between text-[11.5px]">
             <span className="text-icm-text-faint">Pulled from face sheet. Last updated 01/15/2026.</span>
-            <button onClick={() => navigate(`/people/${person.id}/face-sheet`)} className="text-icm-accent hover:underline">Update in Face Sheet →</button>
+            <button onClick={() => navigate(`/people/${individual.id}/face-sheet`)} className="text-icm-accent hover:underline">Update in Face Sheet →</button>
           </div>
         </PlanSection>
 
@@ -224,7 +262,7 @@ const PersonCarePlanDetail = () => {
               <div className="mt-3 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 flex items-start justify-between gap-3">
                 <p className="text-[12px] text-icm-text leading-snug">
                   <Sparkles className="inline w-3 h-3 text-icm-accent mr-1" />
-                  {person.firstName} mentioned interest in employment support during the 04/27/2026 visit. Consider adding Supported Employment service.
+                  {individual.first_name} mentioned interest in employment support during the 04/27/2026 visit. Consider adding Supported Employment service.
                 </p>
                 <button onClick={() => toast.success("Supported Employment added as draft service", { description: "Review & Apply required before billing." })} className="text-[11.5px] font-semibold text-icm-accent hover:underline shrink-0">Add suggested service</button>
               </div>
@@ -294,7 +332,7 @@ const PersonCarePlanDetail = () => {
             <LifeCourseCard
               icon={Eye}
               title="Vision for a Good Life"
-              body={`${person.firstName} wants to live independently with family support, work part-time in a community setting, and stay active with friends.`}
+              body={`${individual.first_name} wants to live independently with family support, work part-time in a community setting, and stay active with friends.`}
               disabled={readOnly}
             />
             <LifeCourseCard
@@ -332,7 +370,7 @@ const PersonCarePlanDetail = () => {
               <h4 className="font-tight font-semibold text-[13px] text-icm-text">Supported Decision-Making</h4>
             </div>
             <p className="text-[12px] text-icm-text-dim leading-relaxed">
-              {person.firstName} makes decisions with support from mother (Linda), older brother (David),
+              {individual.first_name} makes decisions with support from mother (Linda), older brother (David),
               and care manager. Decisions about medical care require co-signature; daily routine decisions
               are made independently.
             </p>
@@ -376,7 +414,7 @@ const PersonCarePlanDetail = () => {
                 ].map((a) => (
                   <li key={a.id}>
                     <button
-                      onClick={() => navigate(`/people/${person.id}/assessments/${a.id}`)}
+                      onClick={() => navigate(`/people/${individual.id}/assessments/${a.id}`)}
                       className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border hover:border-icm-accent text-left"
                     >
                       <div className="min-w-0">
@@ -428,7 +466,7 @@ const PersonCarePlanDetail = () => {
               <p className="text-[10px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">Guardian & Participant Access</p>
               <div className="space-y-2">
                 {[
-                  { name: `${person.firstName} (participant)`, access: "View plan + comment", status: "Active" },
+                  { name: `${individual.first_name} (participant)`, access: "View plan + comment", status: "Active" },
                   { name: "Linda Brown (guardian)", access: "View plan + e-sign", status: "Active" },
                 ].map((p) => (
                   <div key={p.name} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border">

@@ -1,143 +1,150 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Phone, ShieldCheck, X } from "lucide-react";
+import { Send, ShieldCheck, Phone, Loader2, AlertTriangle, Sparkles } from "lucide-react";
 import brandLogo from "@/assets/casemanagement-ai-logo.png";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
+
+const API_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
 /**
- * Decode a token like `cmp_<base64(personId)>` back to the person id.
- * Pure demo encoding — not secure, just opaque enough for the UX.
+ * Decode a token like `cmp_<base64(personId_timestamp)>` back to the person id.
+ * The token format is: cmp_ + btoa(individualId + '_' + Date.now())
  */
 function decodeToken(token: string | undefined): string | null {
   if (!token) return null;
   const raw = token.startsWith("cmp_") ? token.slice(4) : token;
   try {
-    return atob(raw);
+    const decoded = atob(raw);
+    // Format: "individualId_timestamp" — extract just the ID part
+    const underscoreIdx = decoded.lastIndexOf("_");
+    return underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
   } catch {
     return null;
   }
 }
 
-type TurnRole = "agent" | "user";
-interface Turn {
-  id: string;
-  role: TurnRole;
-  text: string;
-}
+type Role = "agent" | "user";
 
-/**
- * Demo conversation script. The voice agent walks through a friendly
- * daily check-in. Each user prompt is auto-played to simulate speech
- * recognition; each agent reply is animated as if streamed from a model.
- */
-function buildScript(firstName: string): Array<{ user: string; agent: string }> {
-  return [
-    {
-      user: "Hi, I just woke up.",
-      agent: `Good morning, ${firstName}. I'm so glad to hear from you. How are you feeling this morning — rested, tired, or somewhere in between?`,
-    },
-    {
-      user: "I'm a little tired but okay.",
-      agent: `Thanks for telling me. I'll make a gentle note of that for your case manager. Did you take your morning medications yet?`,
-    },
-    {
-      user: "Not yet, I'll take them now.",
-      agent: `Perfect. I'll check back in fifteen minutes to confirm. Anything bothering you today that you'd like me to pass along — pain, mood, or anything else?`,
-    },
-    {
-      user: "My knee hurts a little.",
-      agent: `I'm sorry to hear that, ${firstName}. On a scale from one to ten, how strong is the knee pain right now?`,
-    },
-    {
-      user: "About a four.",
-      agent: `Got it — a four out of ten. I'll flag that for your care team so they can follow up. Would you like me to remind you to do your stretches this afternoon?`,
-    },
-  ];
+interface Message {
+  id: string;
+  role: Role;
+  text: string;
 }
 
 const Companion = () => {
   const { token } = useParams<{ token: string }>();
   const personId = decodeToken(token);
-  const person = personId ? getPerson(personId) : null;
+  const { individual: person, loading } = useIndividual(personId ?? undefined);
 
-  const firstName = person?.firstName ?? "Friend";
-  const script = useMemo(() => buildScript(firstName), [firstName]);
+  const firstName = person?.preferred_name || person?.first_name || "Friend";
 
-  const [phase, setPhase] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const timers = useRef<number[]>([]);
+  const [started, setStarted] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Greet on connect
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (!connected) return;
-    setPhase("speaking");
-    const greeting: Turn = {
-      id: `greet-${Date.now()}`,
-      role: "agent",
-      text: `Hi ${firstName}, this is your AI companion. I'm here whenever you want to talk or check in. Tap the microphone when you're ready.`,
-    };
-    setTurns([greeting]);
-    const t = window.setTimeout(() => setPhase("idle"), 3200);
-    timers.current.push(t);
-    return () => {
-      timers.current.forEach((id) => window.clearTimeout(id));
-      timers.current = [];
-    };
-  }, [connected, firstName]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
 
-  const handleTalk = () => {
-    if (phase !== "idle") return;
-    if (stepIndex >= script.length) {
-      // Loop politely
-      const t: Turn = {
-        id: `wrap-${Date.now()}`,
-        role: "agent",
-        text: `Thanks for checking in today, ${firstName}. I'll be here whenever you need me.`,
-      };
-      setTurns((p) => [...p, t]);
-      return;
+  // Focus input after start
+  useEffect(() => {
+    if (started) {
+      setTimeout(() => inputRef.current?.focus(), 300);
     }
-    const step = script[stepIndex];
-    setPhase("listening");
+  }, [started]);
 
-    const t1 = window.setTimeout(() => {
-      setTurns((p) => [...p, { id: `u-${stepIndex}`, role: "user", text: step.user }]);
-      setPhase("thinking");
-    }, 1600);
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
 
-    const t2 = window.setTimeout(() => {
-      setPhase("speaking");
-      setTurns((p) => [...p, { id: `a-${stepIndex}`, role: "agent", text: step.agent }]);
-    }, 2600);
+    const userMessage: Message = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      text,
+    };
 
-    const t3 = window.setTimeout(() => {
-      setPhase("idle");
-      setStepIndex((i) => i + 1);
-    }, 2600 + Math.min(5200, step.agent.length * 35));
+    const history = messages.map((m) => ({ role: m.role === "agent" ? "assistant" : "user", text: m.text }));
 
-    timers.current.push(t1, t2, t3);
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setSending(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/care-assistant/${token}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          history,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const replyText: string =
+        data.reply ?? data.message ?? data.text ?? "I'm here to listen. Can you tell me more?";
+
+      const agentMessage: Message = {
+        id: `a-${Date.now()}`,
+        role: "agent",
+        text: replyText,
+      };
+      setMessages((prev) => [...prev, agentMessage]);
+    } catch (err) {
+      console.error("Care assistant error:", err);
+      setError("I had trouble connecting. Please check your internet and try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   const handleEnd = () => {
-    timers.current.forEach((id) => window.clearTimeout(id));
-    timers.current = [];
-    setConnected(false);
-    setPhase("idle");
-    setTurns([]);
-    setStepIndex(0);
+    setStarted(false);
+    setMessages([]);
+    setInput("");
+    setError(null);
   };
 
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center companion-bg p-6">
+        <div className="flex items-center gap-2" style={{ color: "var(--comp-muted)" }}>
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm font-geist">Loading…</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Invalid / expired token ───────────────────────────────────────────────
   if (!person) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary to-background p-6">
-        <div className="max-w-md text-center space-y-4">
-          <img src={brandLogo} alt="CaseManagement AI" className="h-10 mx-auto" />
-          <h1 className="font-display text-2xl font-bold">Link not valid</h1>
-          <p className="text-muted-foreground">
+      <div className="min-h-screen flex items-center justify-center companion-bg p-6">
+        <div className="comp-card max-w-md w-full text-center space-y-5 p-7 rounded-3xl">
+          <img src={brandLogo} alt="CaseManagement AI" className="h-9 mx-auto" />
+          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--comp-text)" }}>
+            Link not valid
+          </h1>
+          <p style={{ color: "var(--comp-muted)" }} className="text-sm leading-relaxed">
             This companion link has expired or was not recognized. Please ask your case manager for a new link.
           </p>
         </div>
@@ -145,157 +152,283 @@ const Companion = () => {
     );
   }
 
-  // Consent / start screen
-  if (!connected) {
+  // ── Consent / start screen ────────────────────────────────────────────────
+  if (!started) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary to-background p-6">
+      <div className="min-h-screen flex items-center justify-center companion-bg p-6">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md rounded-3xl border bg-card shadow-xl p-7 text-center space-y-5"
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="comp-card w-full max-w-md rounded-3xl p-7 text-center space-y-5"
         >
           <img src={brandLogo} alt="CaseManagement AI" className="h-9 mx-auto" />
-          <div className="space-y-2">
-            <h1 className="font-display text-2xl font-bold">Hi {firstName} 👋</h1>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Your case manager invited you to use your private AI voice companion. Tap below to start a conversation —
-              you can talk about how you're feeling, ask questions, or just check in.
-            </p>
+
+          {/* Avatar */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-full comp-avatar flex items-center justify-center">
+              <Sparkles className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="font-display text-2xl font-bold" style={{ color: "var(--comp-text)" }}>
+                Hi {firstName} 👋
+              </h1>
+              <p className="text-sm mt-1" style={{ color: "var(--comp-muted)" }}>
+                Your AI Care Companion is ready
+              </p>
+            </div>
           </div>
-          <div className="rounded-2xl bg-secondary/60 border p-3 text-left text-xs text-muted-foreground flex gap-2">
-            <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+
+          <p className="text-sm leading-relaxed" style={{ color: "var(--comp-muted)" }}>
+            Your case manager invited you to use your private AI companion. You can share how you're feeling, ask
+            questions, or just check in. Your conversations help your care team support you better.
+          </p>
+
+          <div
+            className="rounded-2xl p-3.5 text-left text-xs flex gap-2.5"
+            style={{ background: "var(--comp-notice-bg)", color: "var(--comp-muted)" }}
+          >
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--comp-accent)" }} />
             <span>
               This link is private to you. Conversations are summarized for your care team to help support you better.
+              Nothing is recorded without your knowledge.
             </span>
           </div>
+
           <button
-            onClick={() => setConnected(true)}
-            className="w-full h-12 rounded-2xl text-white font-semibold gradient-primary shadow-lg hover:opacity-95 transition"
+            onClick={() => setStarted(true)}
+            className="comp-btn-primary w-full h-12 rounded-2xl font-semibold text-white transition-opacity hover:opacity-90"
           >
-            Start Talking
+            Start Conversation
           </button>
-          <p className="text-[11px] text-muted-foreground">Demo preview · No audio is recorded</p>
+
+          <p className="text-[11px]" style={{ color: "var(--comp-faint)" }}>
+            For emergencies, call 911
+          </p>
         </motion.div>
       </div>
     );
   }
 
+  // ── Active chat screen ────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-secondary to-background">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-5 py-4 border-b bg-background/70 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <img src={brandLogo} alt="CaseManagement AI" className="h-6" />
+    <div className="min-h-screen flex flex-col companion-bg">
+      {/* Header */}
+      <header
+        className="flex items-center justify-between px-5 py-3 border-b"
+        style={{ background: "var(--comp-header-bg)", borderColor: "var(--comp-border)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full comp-avatar flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="text-[13px] font-semibold leading-tight" style={{ color: "var(--comp-text)" }}>
+              AI Care Companion
+            </p>
+            <p className="text-[11px] leading-none flex items-center gap-1" style={{ color: "var(--comp-muted)" }}>
+              <span
+                className="w-1.5 h-1.5 rounded-full animate-pulse inline-block"
+                style={{ background: "var(--comp-green)" }}
+              />
+              Chatting with {firstName}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          Connected · {firstName}
+        <div className="flex items-center gap-2">
+          <img src={brandLogo} alt="CaseManagement AI" className="h-5 opacity-60" />
+          <button
+            onClick={handleEnd}
+            title="End session"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: "var(--comp-end-btn-bg)", color: "var(--comp-end-btn-color)" }}
+            aria-label="End session"
+          >
+            <Phone className="w-4 h-4 rotate-[135deg]" />
+          </button>
         </div>
       </header>
 
-      {/* Orb / status */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pt-8 pb-4">
-        <div className="relative w-56 h-56 flex items-center justify-center">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-3 max-w-2xl w-full mx-auto">
+        {/* Welcome message */}
+        {messages.length === 0 && !sending && (
           <motion.div
-            className="absolute inset-0 rounded-full gradient-primary opacity-30 blur-2xl"
-            animate={{
-              scale: phase === "speaking" ? [1, 1.15, 1] : phase === "listening" ? [1, 1.08, 1] : 1,
-            }}
-            transition={{ duration: 1.4, repeat: phase === "idle" ? 0 : Infinity }}
-          />
-          <motion.div
-            className="absolute inset-6 rounded-full gradient-primary opacity-80"
-            animate={{
-              scale: phase === "speaking" ? [1, 1.06, 1] : phase === "listening" ? [1, 1.03, 1] : 1,
-            }}
-            transition={{ duration: 1.1, repeat: phase === "idle" ? 0 : Infinity }}
-          />
-          <div className="relative w-28 h-28 rounded-full bg-background/90 border shadow-inner flex items-center justify-center">
-            {phase === "listening" ? (
-              <Mic className="w-10 h-10 text-primary" />
-            ) : phase === "thinking" ? (
-              <span className="flex gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "120ms" }} />
-                <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "240ms" }} />
-              </span>
-            ) : phase === "speaking" ? (
-              <span className="flex items-end gap-1 h-8">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <motion.span
-                    key={i}
-                    className="w-1.5 rounded-full bg-primary"
-                    animate={{ height: ["20%", "100%", "40%", "80%", "30%"] }}
-                    transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.1 }}
-                    style={{ height: "30%" }}
-                  />
-                ))}
-              </span>
-            ) : (
-              <Mic className="w-10 h-10 text-muted-foreground" />
-            )}
-          </div>
-        </div>
-        <p className="mt-6 text-sm font-medium text-foreground">
-          {phase === "listening"
-            ? "Listening…"
-            : phase === "thinking"
-              ? "Thinking…"
-              : phase === "speaking"
-                ? "Speaking…"
-                : "Tap the mic to talk"}
-        </p>
-      </div>
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div
+              className="rounded-2xl rounded-tl-sm px-4 py-3 text-sm max-w-[85%] leading-relaxed"
+              style={{ background: "var(--comp-bubble-agent)", color: "var(--comp-text)", border: "1px solid var(--comp-border)" }}
+            >
+              Hi {firstName}! I'm your AI Care Companion. I'm here to listen and check in with you.
+              How are you feeling today?
+            </div>
+          </motion.div>
+        )}
 
-      {/* Transcript */}
-      <div className="max-w-xl w-full mx-auto px-5 pb-4 space-y-3 max-h-[34vh] overflow-y-auto">
         <AnimatePresence initial={false}>
-          {turns.slice(-5).map((t) => (
+          {messages.map((m) => (
             <motion.div
-              key={t.id}
+              key={m.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}
+              transition={{ duration: 0.25 }}
+              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`rounded-2xl px-4 py-2.5 text-sm max-w-[85%] ${
-                  t.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card border text-foreground"
-                }`}
+                className="rounded-2xl px-4 py-3 text-sm max-w-[85%] leading-relaxed"
+                style={
+                  m.role === "user"
+                    ? {
+                        background: "var(--comp-accent)",
+                        color: "#fff",
+                        borderRadius: "1rem 1rem 0.25rem 1rem",
+                      }
+                    : {
+                        background: "var(--comp-bubble-agent)",
+                        color: "var(--comp-text)",
+                        border: "1px solid var(--comp-border)",
+                        borderRadius: "1rem 1rem 1rem 0.25rem",
+                      }
+                }
               >
-                {t.text}
+                {m.text}
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
+
+        {/* Sending indicator */}
+        {sending && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-1.5"
+              style={{ background: "var(--comp-bubble-agent)", border: "1px solid var(--comp-border)" }}
+            >
+              <span
+                className="w-2 h-2 rounded-full animate-bounce"
+                style={{ background: "var(--comp-accent)", animationDelay: "0ms" }}
+              />
+              <span
+                className="w-2 h-2 rounded-full animate-bounce"
+                style={{ background: "var(--comp-accent)", animationDelay: "120ms" }}
+              />
+              <span
+                className="w-2 h-2 rounded-full animate-bounce"
+                style={{ background: "var(--comp-accent)", animationDelay: "240ms" }}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {/* Error message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex justify-center"
+          >
+            <div
+              className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs max-w-[90%]"
+              style={{ background: "var(--comp-error-bg)", color: "var(--comp-error-color)", border: "1px solid var(--comp-error-border)" }}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {error}
+            </div>
+          </motion.div>
+        )}
+
+        <div ref={bottomRef} />
       </div>
 
-      {/* Controls */}
-      <div className="px-6 pb-10 pt-2 flex items-center justify-center gap-4">
-        <button
-          onClick={() => setMuted((m) => !m)}
-          className="w-12 h-12 rounded-full bg-card border flex items-center justify-center text-muted-foreground hover:text-foreground"
-          aria-label="Mute"
-        >
-          {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-        </button>
-        <button
-          onClick={handleTalk}
-          disabled={phase !== "idle"}
-          className="w-16 h-16 rounded-full gradient-primary text-white shadow-xl flex items-center justify-center disabled:opacity-60 hover:scale-105 transition"
-          aria-label="Talk"
-        >
-          <Mic className="w-7 h-7" />
-        </button>
-        <button
-          onClick={handleEnd}
-          className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20"
-          aria-label="End call"
-        >
-          <Phone className="w-5 h-5 rotate-[135deg]" />
-        </button>
+      {/* Input area */}
+      <div
+        className="px-4 pb-6 pt-3 border-t"
+        style={{ background: "var(--comp-header-bg)", borderColor: "var(--comp-border)" }}
+      >
+        <div className="max-w-2xl mx-auto">
+          <div
+            className="flex items-end gap-2 rounded-2xl border px-3.5 py-2.5"
+            style={{ background: "var(--comp-input-bg)", borderColor: "var(--comp-border)" }}
+          >
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message… (Enter to send)"
+              rows={1}
+              disabled={sending}
+              className="flex-1 resize-none bg-transparent text-sm outline-none leading-relaxed"
+              style={{
+                color: "var(--comp-text)",
+                maxHeight: "120px",
+                overflowY: "auto",
+              }}
+              aria-label="Message input"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!input.trim() || sending}
+              aria-label="Send message"
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-opacity comp-btn-primary disabled:opacity-40 shrink-0"
+            >
+              {sending ? (
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 text-white" />
+              )}
+            </button>
+          </div>
+
+          {/* HIPAA disclaimer */}
+          <p className="text-center text-[11px] mt-2.5" style={{ color: "var(--comp-faint)" }}>
+            <ShieldCheck className="w-3 h-3 inline mr-1 opacity-70" />
+            Conversations are private and secure. For emergencies, call 911.
+          </p>
+        </div>
       </div>
+
+      {/* Companion CSS variables scoped to this page */}
+      <style>{`
+        .companion-bg {
+          background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+        }
+        :root {
+          --comp-text: #e8eaf6;
+          --comp-muted: #9fa8da;
+          --comp-faint: #5c6bc0;
+          --comp-accent: #6c63ff;
+          --comp-green: #4caf50;
+          --comp-border: rgba(108, 99, 255, 0.2);
+          --comp-header-bg: rgba(15, 15, 26, 0.85);
+          --comp-bubble-agent: rgba(255, 255, 255, 0.06);
+          --comp-input-bg: rgba(255, 255, 255, 0.05);
+          --comp-notice-bg: rgba(108, 99, 255, 0.1);
+          --comp-end-btn-bg: rgba(239, 68, 68, 0.12);
+          --comp-end-btn-color: #f87171;
+          --comp-error-bg: rgba(239, 68, 68, 0.1);
+          --comp-error-color: #f87171;
+          --comp-error-border: rgba(239, 68, 68, 0.25);
+        }
+        .comp-card {
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(108, 99, 255, 0.2);
+          backdrop-filter: blur(24px);
+        }
+        .comp-avatar {
+          background: linear-gradient(135deg, #6c63ff, #a855f7);
+        }
+        .comp-btn-primary {
+          background: linear-gradient(135deg, #6c63ff, #a855f7);
+        }
+      `}</style>
     </div>
   );
 };

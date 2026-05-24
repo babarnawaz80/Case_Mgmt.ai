@@ -1,0 +1,261 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "individuals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "assigned_case_manager", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "individuals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "enrollment_status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progress_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individualId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progress_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "authorId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progress_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individualId", "order": "ASCENDING" },
+        { "fieldPath": "progressDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progress_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "progressDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progress_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "authorId", "order": "ASCENDING" },
+        { "fieldPath": "progressDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contact_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "referrals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "care_plans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monitoring_forms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visit_summaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "visit_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incident_reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "incident_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "managed_documents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "workflows",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "workflow_tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "due_date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "oncall_log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "completion_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eligibility_verifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "verification_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "assigned_staff",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individual_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "reportedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "individualId", "order": "ASCENDING" },
+        { "fieldPath": "reportedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "reportedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "dismissed", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "assignedTo", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progress_notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "progressDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "conversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "conversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "conversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "organizationId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "audit_log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,20 +1,29 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { integrations as seedIntegrations, type IntegrationDef } from "@/data/settings";
-import { cn } from "@/lib/utils";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { integrations as DEFAULT_INTEGRATIONS, type IntegrationDef } from "@/data/settings";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  CreditCard, Activity, Share2, MapPin, Landmark, MessageSquare, Video, Plug, Plus,
-  CheckCircle2, ExternalLink, Copy, RefreshCw, Trash2, type LucideIcon,
+  CreditCard,
+  Activity,
+  Share2,
+  MapPin,
+  Landmark,
+  MessageSquare,
+  Video,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  X,
+  ChevronRight,
+  Loader2,
+  Settings2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const ICONS: Record<string, LucideIcon> = {
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   "credit-card": CreditCard,
   activity: Activity,
   "share-2": Share2,
@@ -24,412 +33,453 @@ const ICONS: Record<string, LucideIcon> = {
   video: Video,
 };
 
-// Per-integration field specs for the Connect / Configure dialog
-const INTEGRATION_FIELDS: Record<string, { label: string; placeholder: string; type?: string; defaultValue?: string }[]> = {
-  "idd-billing": [
-    { label: "API endpoint", placeholder: "https://api.iddbilling.ai/v2", defaultValue: "https://api.iddbilling.ai/v2" },
-    { label: "API key", placeholder: "iddb_live_••••••••••••", type: "password", defaultValue: "iddb_live_8x2k••••••••" },
-    { label: "Organization ID", placeholder: "org_xxx", defaultValue: "org_carroll_md" },
-  ],
-  intellectability: [
-    { label: "Account email", placeholder: "you@org.com", type: "email" },
-    { label: "API token", placeholder: "Paste token from Intellectability portal", type: "password" },
-    { label: "Sync interval (hours)", placeholder: "24", type: "number", defaultValue: "24" },
-  ],
-  fhir: [
-    { label: "FHIR base URL", placeholder: "https://fhir.state.md.gov/r4", defaultValue: "https://fhir.state.md.gov/r4" },
-    { label: "Client ID", placeholder: "smart-app-xxx", defaultValue: "icm-prod-md" },
-    { label: "Client secret", placeholder: "••••••••", type: "password", defaultValue: "•••• •••• •••• 4f21" },
-  ],
-  evv: [
-    { label: "Provider NPI", placeholder: "10-digit NPI" },
-    { label: "State EVV aggregator", placeholder: "e.g. Sandata, HHAeXchange" },
-  ],
-  ltss: [
-    { label: "State system", placeholder: "LTSS Maryland / Pega VA" },
-    { label: "SFTP host", placeholder: "sftp.ltssmaryland.org" },
-    { label: "Username", placeholder: "service account" },
-    { label: "Password", placeholder: "••••••••", type: "password" },
-  ],
-  sms: [
-    { label: "Twilio Account SID", placeholder: "AC••••••••••••••••••••••••" },
-    { label: "Auth token", placeholder: "••••••••", type: "password" },
-    { label: "From number", placeholder: "+14105551234" },
-  ],
-  telehealth: [
-    { label: "Provider", placeholder: "Zoom or Microsoft Teams", defaultValue: "Zoom" },
-    { label: "OAuth client ID", placeholder: "xxx.apps" },
-    { label: "OAuth client secret", placeholder: "••••••••", type: "password" },
-  ],
+function statusMeta(status: IntegrationDef["status"]) {
+  switch (status) {
+    case "connected":
+      return {
+        tone: "bg-icm-green-soft text-icm-green ring-icm-green/20",
+        icon: CheckCircle2,
+        label: "Connected",
+      };
+    case "error":
+      return {
+        tone: "bg-icm-red-soft text-icm-red ring-icm-red/20",
+        icon: AlertCircle,
+        label: "Error",
+      };
+    case "coming_soon":
+      return {
+        tone: "bg-icm-bg text-icm-text-dim ring-icm-border",
+        icon: Clock,
+        label: "Coming soon",
+      };
+    default:
+      return {
+        tone: "bg-icm-bg text-icm-text-dim ring-icm-border",
+        icon: X,
+        label: "Not connected",
+      };
+  }
+}
+
+const CATEGORY_LABELS: Record<IntegrationDef["category"], string> = {
+  billing: "Billing & Revenue Cycle",
+  clinical: "Clinical Systems",
+  interop: "Interoperability",
+  comm: "Communication",
+  sso: "Identity & SSO",
+  state: "State Systems",
 };
 
-const SettingsIntegrations = () => {
-  const [items, setItems] = useState<IntegrationDef[]>(seedIntegrations);
-  const [active, setActive] = useState<IntegrationDef | null>(null);
-  const [showApiDialog, setShowApiDialog] = useState(false);
-  const [showSso, setShowSso] = useState<string | null>(null);
+const CATEGORIES: IntegrationDef["category"][] = [
+  "billing",
+  "clinical",
+  "interop",
+  "comm",
+  "sso",
+  "state",
+];
 
-  const setStatus = (id: string, status: IntegrationDef["status"]) =>
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+interface IntegrationState {
+  id: string;
+  status: IntegrationDef["status"];
+  apiKey?: string;
+  webhookUrl?: string;
+  notes?: string;
+}
+
+interface ConfigModal {
+  integration: IntegrationDef;
+  state: IntegrationState;
+}
+
+const SettingsIntegrations = () => {
+  const { userProfile } = useAuth();
+  const orgId = userProfile?.organizationId;
+
+  const [intStates, setIntStates] = useState<Record<string, IntegrationState>>({});
+  const [loading, setLoading] = useState(true);
+  const [configModal, setConfigModal] = useState<ConfigModal | null>(null);
+  const [filter, setFilter] = useState<IntegrationDef["category"] | "all">("all");
+
+  useEffect(() => {
+    if (!orgId) return;
+    setLoading(true);
+    getDoc(doc(db, "organizations", orgId))
+      .then((snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setIntStates(d.integrations ?? {});
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load integrations:", err);
+        toast.error("Failed to load integrations");
+      })
+      .finally(() => setLoading(false));
+  }, [orgId]);
+
+  const getState = (id: string): IntegrationState => {
+    return (
+      intStates[id] ?? {
+        id,
+        status: DEFAULT_INTEGRATIONS.find((i) => i.id === id)?.status ?? "not_connected",
+      }
+    );
+  };
+
+  const handleSaveConfig = async (id: string, newState: IntegrationState) => {
+    if (!orgId) return;
+    const updated = { ...intStates, [id]: newState };
+    try {
+      await updateDoc(doc(db, "organizations", orgId), {
+        integrations: updated,
+        updatedAt: new Date(),
+      });
+      setIntStates(updated);
+      toast.success("Integration saved", { description: `Settings for ${DEFAULT_INTEGRATIONS.find((i) => i.id === id)?.name ?? id} updated.` });
+      setConfigModal(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save integration");
+    }
+  };
+
+  const handleDisconnect = async (id: string) => {
+    if (!orgId) return;
+    const updated = { ...intStates, [id]: { id, status: "not_connected" as const } };
+    try {
+      await updateDoc(doc(db, "organizations", orgId), {
+        integrations: updated,
+        updatedAt: new Date(),
+      });
+      setIntStates(updated);
+      toast.success("Integration disconnected");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to disconnect integration");
+    }
+  };
+
+  const connectedCount = DEFAULT_INTEGRATIONS.filter(
+    (i) => (getState(i.id).status ?? i.status) === "connected"
+  ).length;
+
+  const byCategory = CATEGORIES.filter((cat) => {
+    if (filter !== "all" && cat !== filter) return false;
+    return DEFAULT_INTEGRATIONS.some((i) => i.category === cat);
+  });
+
+  const filteredIntegrations = DEFAULT_INTEGRATIONS.filter(
+    (i) => filter === "all" || i.category === filter
+  );
 
   return (
-    <SettingsLayout title="Integrations" subtitle="Connect CaseManagement.AI with external systems">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {items.map((i) => (
-          <IntegrationCard key={i.id} integration={i} onOpen={() => setActive(i)} />
-        ))}
-      </div>
+    <SettingsLayout
+      title="Integrations"
+      subtitle="Connect CaseManagement.AI to external systems, clearinghouses, and state platforms."
+    >
+      {/* Summary */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <span className="px-2.5 py-1 rounded-xl bg-icm-green-soft text-icm-green text-[11.5px] font-geist font-semibold ring-1 ring-icm-green/20">
+          {connectedCount} connected
+        </span>
+        <span className="px-2.5 py-1 rounded-xl bg-icm-bg text-icm-text-dim text-[11.5px] font-geist font-semibold ring-1 ring-icm-border">
+          {DEFAULT_INTEGRATIONS.length - connectedCount} available
+        </span>
 
-      {/* SSO */}
-      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="font-manrope font-bold text-[14px] text-icm-text">Single Sign-On (SSO)</p>
-            <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
-              SAML 2.0 and OIDC supported. Test before rolling out.
-            </p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <SsoRow label="SAML 2.0" onConfigure={() => setShowSso("SAML 2.0")} />
-          <SsoRow label="OIDC" onConfigure={() => setShowSso("OIDC")} />
-        </div>
-        <button
-          onClick={() => toast.success("SSO connection test passed", { description: "SAML 2.0 endpoint reachable in 142ms." })}
-          className="mt-3 h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold hover:border-icm-border-strong"
-        >
-          Test SSO connection
-        </button>
-      </div>
-
-      {/* API access */}
-      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="font-manrope font-bold text-[14px] text-icm-text">API access</p>
-            <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
-              Manage API keys and webhook endpoints
-            </p>
-          </div>
-          <button
-            onClick={() => setShowApiDialog(true)}
-            className="h-8 px-2.5 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Generate API key
-          </button>
-        </div>
-        <div className="rounded-xl border border-icm-border overflow-hidden">
-          <table className="w-full text-[12px] font-geist">
-            <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
-              <tr>
-                <th className="text-left px-3 py-2 font-semibold">Key name</th>
-                <th className="text-left px-3 py-2 font-semibold">Created</th>
-                <th className="text-left px-3 py-2 font-semibold">Last used</th>
-                <th className="text-left px-3 py-2 font-semibold">Scopes</th>
-                <th className="text-right px-3 py-2 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { name: "Billing.AI integration", created: "01/15/2025", used: "Today, 8:00 AM", scopes: "Full access" },
-                { name: "FHIR data exchange", created: "02/01/2025", used: "Today, 7:30 AM", scopes: "Read individuals, Write notes" },
-              ].map((k) => (
-                <tr key={k.name} className="border-t border-icm-border">
-                  <td className="px-3 py-2 text-icm-text font-medium">{k.name}</td>
-                  <td className="px-3 py-2 text-icm-text-dim font-mono text-[11px]">{k.created}</td>
-                  <td className="px-3 py-2 text-icm-text-dim font-mono text-[11px]">{k.used}</td>
-                  <td className="px-3 py-2 text-icm-text-dim">{k.scopes}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => toast.success("Key rotated", { description: `${k.name} rotated. Old key valid for 24h.` })}
-                      className="h-7 px-2 rounded-md text-icm-text-dim hover:text-icm-text hover:bg-icm-bg text-[11px] inline-flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3" /> Rotate
-                    </button>
-                    <button
-                      onClick={() => toast("Revoke confirmed", { description: `${k.name} disabled.` })}
-                      className="h-7 px-2 rounded-md text-icm-red hover:bg-icm-red-soft text-[11px] inline-flex items-center gap-1 ml-1"
-                    >
-                      <Trash2 className="w-3 h-3" /> Revoke
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="ml-auto flex flex-wrap gap-1">
+          <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>
+          {CATEGORIES.filter((c) => DEFAULT_INTEGRATIONS.some((i) => i.category === c)).map((c) => (
+            <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)}>
+              {CATEGORY_LABELS[c]}
+            </FilterChip>
+          ))}
         </div>
       </div>
 
-      {/* Integration Connect/Configure dialog */}
-      <IntegrationDialog
-        integration={active}
-        onClose={() => setActive(null)}
-        onConnect={(id) => {
-          setStatus(id, "connected");
-          toast.success(`${active?.name} connected`, { description: "Credentials saved. Initial sync started." });
-          setActive(null);
-        }}
-        onDisconnect={(id) => {
-          setStatus(id, "not_connected");
-          toast(`${active?.name} disconnected`, { description: "Credentials removed." });
-          setActive(null);
-        }}
-        onSave={() => {
-          toast.success(`${active?.name} configuration saved`);
-          setActive(null);
-        }}
-      />
+      {/* Integration cards */}
+      {loading ? (
+        <IntegrationsSkeleton />
+      ) : (
+        <div className="space-y-4">
+          {byCategory.map((cat) => {
+            const items = filteredIntegrations.filter((i) => i.category === cat);
+            if (!items.length) return null;
+            return (
+              <div key={cat}>
+                <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">
+                  {CATEGORY_LABELS[cat]}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {items.map((integration) => {
+                    const st = getState(integration.id);
+                    const resolvedStatus = st.status;
+                    const meta = statusMeta(resolvedStatus);
+                    const Icon = ICON_MAP[integration.iconKey] ?? CreditCard;
+                    const StatusIcon = meta.icon;
+                    const isComingSoon = resolvedStatus === "coming_soon";
+                    const isConnected = resolvedStatus === "connected";
 
-      {/* API key dialog */}
-      <Dialog open={showApiDialog} onOpenChange={setShowApiDialog}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>Generate API key</DialogTitle>
-            <DialogDescription>Name the key and choose its scopes. You'll see the secret once.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-1">
-            <div className="space-y-1.5">
-              <Label className="text-[11.5px]">Key name</Label>
-              <Input placeholder="e.g. State reporting export" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[11.5px]">Scopes</Label>
-              <div className="space-y-1.5 rounded-lg border border-icm-border p-2.5">
-                {["Read individuals", "Write notes", "Read billing", "Webhook delivery"].map((s) => (
-                  <label key={s} className="flex items-center gap-2 text-[12px] text-icm-text">
-                    <input type="checkbox" defaultChecked={s.startsWith("Read")} className="rounded" />
-                    {s}
-                  </label>
-                ))}
+                    return (
+                      <div
+                        key={integration.id}
+                        className={cn(
+                          "rounded-xl border bg-icm-panel p-4 flex gap-3",
+                          isConnected
+                            ? "border-icm-green/30"
+                            : "border-icm-border",
+                          isComingSoon && "opacity-70"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-xl ring-1 flex items-center justify-center shrink-0",
+                            isConnected
+                              ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+                              : "bg-icm-bg text-icm-text-dim ring-icm-border"
+                          )}
+                        >
+                          <Icon className="w-5 h-5" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-manrope font-bold text-[13.5px] text-icm-text">
+                              {integration.name}
+                            </h3>
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1",
+                                meta.tone
+                              )}
+                            >
+                              <StatusIcon className="w-2.5 h-2.5" />
+                              {meta.label}
+                            </span>
+                          </div>
+                          <p className="text-[11.5px] font-geist text-icm-text-dim mt-1 leading-snug">
+                            {integration.description}
+                          </p>
+
+                          <div className="flex items-center gap-2 mt-3">
+                            {!isComingSoon && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    setConfigModal({ integration, state: st })
+                                  }
+                                  className={cn(
+                                    "h-7 px-2.5 rounded-lg text-[11px] font-geist font-semibold inline-flex items-center gap-1",
+                                    isConnected
+                                      ? "border border-icm-border bg-icm-panel text-icm-text-dim hover:border-icm-border-strong"
+                                      : "bg-teal-600 text-white hover:bg-teal-700"
+                                  )}
+                                >
+                                  <Settings2 className="w-3 h-3" />
+                                  {isConnected ? "Configure" : "Connect"}
+                                </button>
+                                {isConnected && (
+                                  <button
+                                    onClick={() => handleDisconnect(integration.id)}
+                                    className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-red text-[11px] font-geist font-semibold hover:border-icm-red/30"
+                                  >
+                                    Disconnect
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            {isComingSoon && (
+                              <button
+                                onClick={() => toast("Waitlist notification registered")}
+                                className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text-dim text-[11px] font-geist font-semibold inline-flex items-center gap-1"
+                              >
+                                <ChevronRight className="w-3 h-3" />
+                                Notify me
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <button onClick={() => setShowApiDialog(false)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-semibold">Cancel</button>
-            <button
-              onClick={() => {
-                setShowApiDialog(false);
-                toast.success("API key created", { description: "icm_live_x82k••••••••  · copy now, it won't be shown again." });
-              }}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold"
-            >
-              Generate key
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            );
+          })}
+        </div>
+      )}
 
-      {/* SSO dialog */}
-      <Dialog open={!!showSso} onOpenChange={(o) => !o && setShowSso(null)}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>Configure {showSso}</DialogTitle>
-            <DialogDescription>Provide your identity provider details.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-1">
-            {showSso === "SAML 2.0" ? (
-              <>
-                <FieldRow label="Identity provider entity ID" placeholder="https://idp.example.com/saml" />
-                <FieldRow label="SSO URL" placeholder="https://idp.example.com/sso" />
-                <FieldRow label="X.509 certificate" placeholder="-----BEGIN CERTIFICATE-----" />
-              </>
-            ) : (
-              <>
-                <FieldRow label="Issuer URL" placeholder="https://login.example.com" />
-                <FieldRow label="Client ID" placeholder="icm-prod" />
-                <FieldRow label="Client secret" placeholder="••••••••" type="password" />
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <button onClick={() => setShowSso(null)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-semibold">Cancel</button>
-            <button
-              onClick={() => {
-                toast.success(`${showSso} configured`);
-                setShowSso(null);
-              }}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold"
-            >
-              Save
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Config Modal */}
+      {configModal && (
+        <IntegrationConfigModal
+          integration={configModal.integration}
+          initialState={configModal.state}
+          onSave={handleSaveConfig}
+          onClose={() => setConfigModal(null)}
+        />
+      )}
     </SettingsLayout>
   );
 };
 
-function IntegrationCard({ integration, onOpen }: { integration: IntegrationDef; onOpen: () => void }) {
-  const Icon = ICONS[integration.iconKey] ?? Plug;
-  const statusMap = {
-    connected: { label: "Connected", cls: "bg-icm-green-soft text-icm-green ring-icm-green/20" },
-    not_connected: { label: "Not connected", cls: "bg-icm-bg text-icm-text-dim ring-icm-border" },
-    error: { label: "Error", cls: "bg-icm-red-soft text-icm-red ring-icm-red/20" },
-    coming_soon: { label: "Coming soon", cls: "bg-icm-bg text-icm-text-faint ring-icm-border" },
-  } as const;
-  const s = statusMap[integration.status];
-  return (
-    <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20 flex items-center justify-center">
-          <Icon className="w-5 h-5" />
-        </div>
-        <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1", s.cls)}>
-          {s.label}
-        </span>
-      </div>
-      <p className="font-manrope font-bold text-[14px] text-icm-text">{integration.name}</p>
-      <p className="text-[11.5px] font-geist text-icm-text-dim mt-1 leading-relaxed">{integration.description}</p>
-      <button
-        onClick={onOpen}
-        className="mt-3 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold hover:border-icm-border-strong transition-colors"
-      >
-        {integration.status === "connected"
-          ? "Configure"
-          : integration.status === "coming_soon"
-            ? "Learn more"
-            : "Connect"}
-      </button>
-    </div>
-  );
-}
-
-function IntegrationDialog({
+function IntegrationConfigModal({
   integration,
-  onClose,
-  onConnect,
-  onDisconnect,
+  initialState,
   onSave,
+  onClose,
 }: {
-  integration: IntegrationDef | null;
+  integration: IntegrationDef;
+  initialState: IntegrationState;
+  onSave: (id: string, state: IntegrationState) => Promise<void>;
   onClose: () => void;
-  onConnect: (id: string) => void;
-  onDisconnect: (id: string) => void;
-  onSave: () => void;
 }) {
-  const isComingSoon = integration?.status === "coming_soon";
-  const isConnected = integration?.status === "connected";
-  const fields = integration ? INTEGRATION_FIELDS[integration.id] ?? [] : [];
+  const [apiKey, setApiKey] = useState(initialState.apiKey ?? "");
+  const [webhookUrl, setWebhookUrl] = useState(initialState.webhookUrl ?? "");
+  const [notes, setNotes] = useState(initialState.notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(integration.id, {
+      id: integration.id,
+      status: apiKey.trim() ? "connected" : "not_connected",
+      apiKey: apiKey.trim() || undefined,
+      webhookUrl: webhookUrl.trim() || undefined,
+      notes: notes.trim() || undefined,
+    });
+    setSaving(false);
+  };
+
+  const Icon = ICON_MAP[integration.iconKey] ?? CreditCard;
 
   return (
-    <Dialog open={!!integration} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[560px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {integration?.name}
-            {isConnected && <CheckCircle2 className="w-4 h-4 text-icm-green" />}
-          </DialogTitle>
-          <DialogDescription>{integration?.description}</DialogDescription>
-        </DialogHeader>
-
-        {isComingSoon ? (
-          <div className="space-y-3 py-2">
-            <div className="rounded-lg bg-icm-bg p-3 text-[12px] text-icm-text-dim">
-              This integration is on the roadmap. We'll notify your admins when it ships.
-            </div>
-            <FieldRow label="Notify email" placeholder="admin@org.com" type="email" />
-            <label className="flex items-center justify-between rounded-lg border border-icm-border p-2.5">
-              <span className="text-[12px] text-icm-text">Join the early access program</span>
-              <Switch defaultChecked />
-            </label>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="rounded-2xl bg-icm-panel border border-icm-border shadow-elevated w-full max-w-[520px]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-icm-border">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-icm-bg border border-icm-border flex items-center justify-center">
+              <Icon className="w-4 h-4 text-icm-text-dim" />
+            </span>
+            <h2 className="font-manrope font-bold text-[15px] text-icm-text">
+              {integration.name}
+            </h2>
           </div>
-        ) : (
-          <div className="space-y-3 py-1">
-            {fields.length === 0 && (
-              <div className="rounded-lg bg-icm-bg p-3 text-[12px] text-icm-text-dim">
-                No configuration fields required for this integration.
-              </div>
-            )}
-            {fields.map((f) => (
-              <FieldRow key={f.label} {...f} />
-            ))}
-            {isConnected && (
-              <div className="rounded-lg bg-icm-green-soft/40 ring-1 ring-icm-green/20 p-2.5 text-[11.5px] text-icm-text flex items-center justify-between">
-                <span>Last sync: Today, 8:00 AM · 142 records updated</span>
-                <button
-                  onClick={() => toast.success("Sync started")}
-                  className="text-icm-green font-semibold inline-flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3 h-3" /> Sync now
-                </button>
-              </div>
-            )}
-            <a
-              href="#"
-              onClick={(e) => { e.preventDefault(); toast("Docs would open in a new tab"); }}
-              className="text-[11.5px] text-icm-accent inline-flex items-center gap-1 hover:underline"
-            >
-              <ExternalLink className="w-3 h-3" /> View {integration?.name} setup docs
-            </a>
-          </div>
-        )}
-
-        <DialogFooter className="gap-2">
-          {isConnected && (
-            <button
-              onClick={() => integration && onDisconnect(integration.id)}
-              className="h-9 px-3 rounded-xl border border-icm-red/30 text-icm-red text-[12px] font-semibold mr-auto"
-            >
-              Disconnect
-            </button>
-          )}
-          <button onClick={onClose} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-semibold">
-            {isComingSoon ? "Close" : "Cancel"}
-          </button>
-          {!isComingSoon && (
-            <button
-              onClick={() => integration && (isConnected ? onSave() : onConnect(integration.id))}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold"
-            >
-              {isConnected ? "Save changes" : "Connect"}
-            </button>
-          )}
-          {isComingSoon && (
-            <button
-              onClick={() => { toast.success("You're on the list"); onClose(); }}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold"
-            >
-              Notify me
-            </button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function FieldRow({ label, placeholder, type, defaultValue }: { label: string; placeholder: string; type?: string; defaultValue?: string }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-[11.5px]">{label}</Label>
-      <div className="flex gap-1.5">
-        <Input type={type} placeholder={placeholder} defaultValue={defaultValue} />
-        {defaultValue && (
           <button
-            type="button"
-            onClick={() => { navigator.clipboard?.writeText(defaultValue); toast("Copied"); }}
-            className="h-9 px-2 rounded-md border border-icm-border text-icm-text-dim hover:text-icm-text"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
           >
-            <Copy className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
-        )}
+        </div>
+
+        <div className="p-4 space-y-3">
+          <p className="text-[12px] font-geist text-icm-text-dim">{integration.description}</p>
+
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              API Key / Token
+            </label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Paste your API key here..."
+              className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong"
+            />
+          </div>
+
+          {(integration.category === "billing" || integration.category === "clinical") && (
+            <div>
+              <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+                Webhook URL (optional)
+              </label>
+              <input
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder="https://..."
+                className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-border-strong"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Notes
+            </label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Internal notes about this integration..."
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text resize-none focus:outline-none focus:border-icm-border-strong"
+            />
+          </div>
+
+          <div className="rounded-lg border border-icm-border bg-icm-bg p-2.5 text-[10.5px] font-geist text-icm-text-dim leading-snug">
+            API keys are stored encrypted in Firestore. Never share them publicly.
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 px-4 pb-4">
+          <button
+            onClick={onClose}
+            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Save & Connect
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function SsoRow({ label, onConfigure }: { label: string; onConfigure: () => void }) {
+function IntegrationsSkeleton() {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[12px] font-geist text-icm-text">{label}</span>
-      <button
-        onClick={onConfigure}
-        className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11px] font-geist font-semibold hover:border-icm-border-strong"
-      >
-        Configure
-      </button>
+    <div className="space-y-4 animate-pulse">
+      {[2, 2, 3].map((n, gi) => (
+        <div key={gi}>
+          <div className="h-4 w-32 rounded bg-icm-border mb-2" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[...Array(n)].map((_, i) => (
+              <div key={i} className="h-32 rounded-xl border border-icm-border bg-icm-panel" />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "h-7 px-2.5 rounded-xl text-[11px] font-geist font-semibold transition-colors",
+        active
+          ? "bg-icm-text text-icm-panel"
+          : "border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text"
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

@@ -5,6 +5,7 @@ import {
   FileText, DollarSign, ClipboardList, Search, StickyNote, FileCheck, Workflow,
   Bell, Calendar, FolderOpen, Heart, Users, AlertTriangle,
   Building2, GraduationCap, Send, Tag, Shield, ArrowRight, X,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
@@ -43,6 +44,7 @@ const modules = [
   { title: "My Sites", icon: Building2, url: "", category: "operations" },
   { title: "People Supported", icon: Users, url: "/people", category: "care" },
   { title: "Authorizations", icon: Send, url: "/billing", category: "operations" },
+  { title: "Caseload Reports", icon: BarChart3, url: "/reports", category: "operations" },
   { title: "Training", icon: GraduationCap, url: "", category: "operations" },
   { title: "Plan of Correction", icon: Shield, url: "", category: "operations" },
   { title: "SnapTag", icon: Tag, url: "", category: "care" },

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, CalendarPlus, MapPin, Users, Bell, Link2, Wifi, WifiOff, CheckCircle2, Clock } from "lucide-react";
+import { ChevronLeft, CalendarPlus, MapPin, Users, Bell, Link2, Wifi, WifiOff, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
+import { useIndividual, riskAvatarClass } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
 
 const VISIT_TYPES = [
@@ -60,7 +60,7 @@ const PersonVisitScheduler = () => {
   const { id } = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
 
   const today = new Date().toISOString().slice(0, 10);
   const [visitType, setVisitType] = useState(search.get("type") || VISIT_TYPES[0]);
@@ -68,7 +68,7 @@ const PersonVisitScheduler = () => {
   const [startTime, setStartTime] = useState("10:00");
   const [duration, setDuration] = useState("60");
   const [location, setLocation] = useState(LOCATIONS[0]);
-  const [address, setAddress] = useState((person as any)?.address || "");
+  const [address, setAddress] = useState("");
   const [staffIds, setStaffIds] = useState<string[]>(["u1"]);
   const [linkedGoalId, setLinkedGoalId] = useState("goal-1");
   const [linkedTaskId, setLinkedTaskId] = useState("task-monitoring");
@@ -91,7 +91,8 @@ const PersonVisitScheduler = () => {
     return scheduled.filter(v => v.date === date && Math.abs(parseInt(v.startTime.replace(":","")) - parseInt(startTime.replace(":",""))) < 100);
   }, [scheduled, date, startTime]);
 
-  if (!person) return <ICMShell title="Schedule Visit" showAIPanel={false}><p className="p-6">Person not found.</p></ICMShell>;
+  if (loading) return <ICMShell title="Schedule Visit" showAIPanel={false}><div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim"><Loader2 className="w-5 h-5 animate-spin" /><span className="text-[13px] font-geist">Loading…</span></div></ICMShell>;
+  if (!individual) return <ICMShell title="Schedule Visit" showAIPanel={false}><p className="p-6">Person not found.</p></ICMShell>;
 
   const toggleStaff = (sid: string) => setStaffIds(s => s.includes(sid) ? s.filter(x => x !== sid) : [...s, sid]);
   const toggleChannel = (c: string) => setNotifyChannels(s => s.includes(c) ? s.filter(x => x !== c) : [...s, c]);
@@ -118,16 +119,16 @@ const PersonVisitScheduler = () => {
   return (
     <ICMShell title="Schedule In-Home Visit" showAIPanel={false}>
       <div className="space-y-5">
-        <button onClick={() => navigate(`/people/${person.id}/visit-summary`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/visit-summary`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Schedule Visit
+          People · {individual.last_name}, {individual.first_name} · Schedule Visit
         </button>
 
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
-          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>{initials(person)}</div>
-          <div className="flex-1">
-            <div className="font-manrope font-extrabold text-[16px] text-icm-text">{person.lastName}, {person.firstName}</div>
-            <div className="text-[11.5px] text-icm-text-dim">{person.county} · {person.age}y · {(person as any).program ?? "Program"}</div>
+          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>{(individual.first_name[0] ?? "") + (individual.last_name[0] ?? "")}</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-manrope font-extrabold text-[16px] text-icm-text">{individual.last_name}, {individual.first_name}</div>
+            <div className="text-[11.5px] text-icm-text-dim">{individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}</div>
           </div>
           <div className={`inline-flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11.5px] font-medium border ${online ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-amber-300 bg-amber-50 text-amber-700"}`}>
             {online ? <><Wifi className="w-3.5 h-3.5" /> Online — auto-sync</> : <><WifiOff className="w-3.5 h-3.5" /> Offline — save locally</>}
@@ -213,7 +214,7 @@ const PersonVisitScheduler = () => {
             </div>
 
             <div className="flex justify-end gap-2">
-              <button onClick={()=>navigate(`/people/${person.id}/visit-summary`)} className="h-10 px-4 rounded-xl border border-icm-border text-[13px]">Cancel</button>
+              <button onClick={()=>navigate(`/people/${individual.id}/visit-summary`)} className="h-10 px-4 rounded-xl border border-icm-border text-[13px]">Cancel</button>
               <button onClick={submit} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Schedule visit</button>
             </div>
           </div>

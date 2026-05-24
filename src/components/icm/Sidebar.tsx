@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavItem {
   title: string;
@@ -50,8 +51,15 @@ export function ICMSidebar() {
   const loc = useLocation();
   const navigate = useNavigate();
   const { role } = useRole();
+  const { userProfile } = useAuth();
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
+
+  function getInitials() {
+    const f = userProfile?.firstName?.[0] ?? "";
+    const l = userProfile?.lastName?.[0] ?? "";
+    return (f + l).toUpperCase() || "?";
+  }
 
   function badgeFor(item: NavItem): {
     count: number;
@@ -124,11 +132,21 @@ export function ICMSidebar() {
         })}
       </nav>
       <button
-        onClick={() => navigate("/settings")}
-        className="w-9 h-9 rounded-full bg-icm-bg border border-icm-border flex items-center justify-center text-icm-text-dim mt-2 hover:text-icm-text hover:border-icm-border-strong transition-colors"
-        title="Profile & Settings"
+        onClick={() => navigate("/my-profile")}
+        className="w-9 h-9 rounded-full overflow-hidden border-2 border-icm-border hover:border-icm-accent transition-colors mt-2 shrink-0"
+        title="My Profile"
       >
-        <User className="w-4 h-4" />
+        {userProfile?.photoURL ? (
+          <img
+            src={userProfile.photoURL}
+            alt={userProfile.displayName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-icm-accent-soft flex items-center justify-center text-icm-accent text-[10px] font-geist font-bold">
+            {getInitials()}
+          </div>
+        )}
       </button>
     </aside>
   );

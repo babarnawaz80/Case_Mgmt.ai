@@ -12,47 +12,20 @@ import {
   Trash2,
   X,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, initials, riskAvatarClass, type AISuggestion } from "@/data/people";
+import { useIndividual, initials, riskAvatarClass, type Individual } from "@/hooks/useIndividuals";
+import { useReferrals } from "@/hooks/useFirestore";
 import {
   REFERRAL_TYPES,
   REFERRAL_STATUSES,
   daysOpenTone,
-  getReferralsForPerson,
   lastConversation,
   statusTone,
   summarize,
   type ReferralStatus,
 } from "@/data/referrals";
-
-const referralSuggestions: AISuggestion[] = [
-  {
-    tone: "urgent",
-    label: "Urgent",
-    body: "Employment referral created today has no response yet. I found 3 providers accepting new clients in Carroll County.",
-    cta: "Select provider",
-  },
-  {
-    tone: "insight",
-    label: "Insight",
-    body: "Joseph has expressed employment interest in 3 sessions over the past 2 months. Add as a Care Plan goal if not already present.",
-    cta: "Add to Care Plan",
-  },
-  {
-    tone: "insight",
-    label: "Insight",
-    body: "Transportation to medical appointments was mentioned in the last visit summary. A transportation referral may support medical compliance.",
-    cta: "Create referral",
-  },
-  {
-    tone: "good",
-    label: "Good news",
-    body: "Benefits assistance referral from 2023 resulted in successful SSI enrollment. Joseph has maintained continuous Medicaid eligibility.",
-    cta: "View referral history",
-  },
-];
 
 const statusToneClass: Record<string, string> = {
   green: "bg-icm-green-soft text-icm-green ring-icm-green/20",
@@ -71,9 +44,63 @@ const daysToneClass: Record<string, string> = {
 const PersonReferrals = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const all = getReferralsForPerson(id ?? "");
-  const sum = summarize(all);
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: dbReferrals, loading: referralsLoading } = useReferrals(id);
+
+  const all = useMemo(() => {
+    return dbReferrals.map((r: any) => {
+      let daysOpen = r.daysOpen || 0;
+      if (!daysOpen && r.date) {
+        const [m, d, y] = r.date.split("/").map(Number);
+        if (m) {
+          const dt = new Date(y, m - 1, d);
+          daysOpen = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 86400000));
+        }
+      }
+      return {
+        id: r.id,
+        personId: r.individual_id,
+        date: r.date || "—",
+        type: r.referral_type || r.type || "—",
+        priority: r.priority || "Routine",
+        reason: r.reason || "—",
+        sourceOfNeed: r.sourceOfNeed || "Case manager recommendation",
+        linkedGoalId: r.linkedGoalId,
+        linkedGoalLabel: r.linkedGoalLabel,
+        urgencyDate: r.urgencyDate,
+        providerId: r.providerId,
+        providerName: r.referred_to || r.providerName || "—",
+        providerPhone: r.providerPhone,
+        providerAddress: r.providerAddress,
+        providerEmail: r.providerEmail,
+        acceptsMedicaid: !!r.acceptsMedicaid,
+        referralMethod: r.referralMethod,
+        contactDate: r.contactDate,
+        contactPerson: r.contactPerson,
+        referenceNumber: r.referenceNumber,
+        infoShared: r.infoShared || [],
+        consentDocumented: !!r.consentDocumented,
+        consentDate: r.consentDate,
+        consentMethod: r.consentMethod,
+        expectedTimeframe: r.expectedTimeframe,
+        followUpDate: r.followUpDate,
+        assignedTo: r.referred_by || r.assignedTo || "—",
+        notes: r.notes || "",
+        status: r.status || "Pending Response",
+        daysOpen,
+        lastActivity: r.lastActivity || r.date || "—",
+        closeReason: r.closeReason,
+        outcomeNotes: r.outcomeNotes,
+        serviceStartDate: r.serviceStartDate,
+        aiPrefilled: !!r.aiPrefilled,
+        timeline: r.timeline || [],
+        attachments: r.attachments || [],
+        conversation: r.conversation || [],
+      };
+    });
+  }, [dbReferrals]);
+
+  const sum = useMemo(() => summarize(all), [all]);
 
   const [typeFilter, setTypeFilter] = useState<"All" | string>("All");
   const [statusFilter, setStatusFilter] = useState<"All" | ReferralStatus>("All");
@@ -87,7 +114,20 @@ const PersonReferrals = () => {
     });
   }, [all, typeFilter, statusFilter]);
 
-  if (!person) {
+  const loading = individualLoading || referralsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Referrals" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="Referrals" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -99,19 +139,10 @@ const PersonReferrals = () => {
   const create = () => navigate(`/people/${id}/referrals/new`);
 
   return (
-    <ICMShell
-      title="Referrals"
-      rightPanel={
-        <PersonAIPanel
-          person={person}
-          suggestions={referralSuggestions}
-          intro={`${referralSuggestions.length} suggestions for ${person.firstName}.`}
-        />
-      }
-    >
+    <ICMShell title="Referrals" showAIPanel={false}>
       <div className="space-y-5">
         {/* Person header */}
-        <PersonHeader person={person} navigate={navigate} />
+        <PersonHeader individual={individual} navigate={navigate} />
 
         {/* Title row */}
         <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -138,9 +169,9 @@ const PersonReferrals = () => {
             <Sparkles className="w-3.5 h-3.5 text-icm-accent mt-0.5" />
             <div className="min-w-0 flex-1">
               <p className="text-[12.5px] font-geist text-icm-text">
-                <span className="font-semibold">{person.firstName} mentioned interest in employment support</span>{" "}
+                <span className="font-semibold">{individual.first_name} may benefit from a community referral</span>{" "}
                 <span className="text-icm-text-dim">
-                  during the 04/27/2026 session. I found 3 supported employment providers in Carroll County.
+                  based on recent notes. Review care plan goals and create referrals to support active goals.
                 </span>
               </p>
               <div className="flex gap-2 mt-2">
@@ -176,7 +207,7 @@ const PersonReferrals = () => {
               No referrals yet
             </h2>
             <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
-              Track referrals to community resources and services to ensure {person.firstName} is connected to
+              Track referrals to community resources and services to ensure {individual.first_name} is connected to
               everything they need.
             </p>
             <div className="flex gap-2">
@@ -315,7 +346,7 @@ const PersonReferrals = () => {
                             <IconBtn icon={Eye} onClick={() => open(r.id)} />
                             <IconBtn icon={Pencil} onClick={() => open(r.id)} />
                             <IconBtn icon={Printer} onClick={() => window.print()} />
-                            <IconBtn icon={Trash2} onClick={() => toast(`Withdraw referral ${r.id}?`, { action: { label: "Withdraw", onClick: () => toast.success(`Referral ${r.id} withdrawn — audit entry created`) } })} />
+                            <IconBtn icon={Trash2} onClick={() => toast(`Withdraw referral ${r.id}?`, { action: { label: "Withdraw", onClick: () => toast.success(`Referral ${r.id} withdrawn`) } })} />
                           </div>
                         </td>
                       </tr>
@@ -331,12 +362,11 @@ const PersonReferrals = () => {
   );
 };
 
-function PersonHeader({ person, navigate }: { person: ReturnType<typeof getPerson>; navigate: any }) {
-  if (!person) return null;
+function PersonHeader({ individual, navigate }: { individual: Individual; navigate: any }) {
   return (
     <div className="space-y-2">
       <button
-        onClick={() => navigate(`/people/${person.id}/echart`)}
+        onClick={() => navigate(`/people/${individual.id}/echart`)}
         className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
       >
         <ChevronLeft className="w-3.5 h-3.5" />
@@ -344,16 +374,16 @@ function PersonHeader({ person, navigate }: { person: ReturnType<typeof getPerso
       </button>
       <div className="flex items-center gap-3">
         <div
-          className={`w-10 h-10 rounded-lg ring-2 flex items-center justify-center font-semibold text-[13px] ${riskAvatarClass(person.riskScore)}`}
+          className={`w-10 h-10 rounded-lg ring-2 flex items-center justify-center font-semibold text-[13px] ${riskAvatarClass(individual.risk_score)}`}
         >
-          {initials(person)}
+          {initials(individual)}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-manrope font-bold text-[15px] text-icm-text leading-tight">
-            {person.firstName} {person.lastName}
+            {individual.first_name} {individual.last_name}
           </p>
           <p className="text-[11.5px] text-icm-text-dim">
-            People → {person.firstName} {person.lastName} → Referrals
+            People → {individual.first_name} {individual.last_name} → Referrals
           </p>
         </div>
       </div>
@@ -398,7 +428,6 @@ function IconBtn({ icon: Icon, onClick }: { icon: any; onClick: () => void }) {
 }
 
 function timeAgo(dateStr: string): string {
-  // Accepts "MM/DD/YYYY" or "MM/DD/YYYY h:mm AM/PM"
   const datePart = dateStr.split(" ")[0];
   const [m, d, y] = datePart.split("/").map((n) => parseInt(n, 10));
   if (!m || !d || !y) return dateStr;
@@ -416,4 +445,3 @@ function timeAgo(dateStr: string): string {
 }
 
 export default PersonReferrals;
-

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   Upload,
   Camera,
@@ -35,13 +35,18 @@ import {
   folderTone,
 } from "@/data/documents";
 import { cn } from "@/lib/utils";
-import { demoToast, demoSuccess } from "@/lib/demoToast";
+import { toast } from "sonner";
+import { storage, db } from "@/lib/firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DocumentVaultProps {
   folders: Folder[];
   documents: DocumentRecord[];
   scope: "individual" | "org";
   scopeLabel: string; // e.g. "Joseph Brown · Document vault"
+  activePersonId?: string | null;
 }
 
 function fileIcon(ext: FileExt): LucideIcon {
@@ -105,7 +110,8 @@ function AIStatusBadge({ status }: { status: DocumentRecord["aiStatus"] }) {
   );
 }
 
-export function DocumentVault({ folders, documents, scope, scopeLabel }: DocumentVaultProps) {
+export function DocumentVault({ folders, documents, scope, scopeLabel, activePersonId }: DocumentVaultProps) {
+  const { userProfile } = useAuth();
   const [activeFolder, setActiveFolder] = useState<string | "all">("all");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
@@ -113,6 +119,58 @@ export function DocumentVault({ folders, documents, scope, scopeLabel }: Documen
   const [showScan, setShowScan] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length || !userProfile?.organizationId) return;
+
+    for (const file of files) {
+      const storagePath = `organizations/${userProfile.organizationId}/documents/${activePersonId ?? 'general'}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      const task = uploadBytesResumable(storageRef, file);
+
+      setUploadProgress(0);
+      await new Promise<void>((resolve) => {
+        task.on(
+          'state_changed',
+          (snapshot) => {
+            setUploadProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+          },
+          (error) => {
+            console.error('Upload error:', error);
+            toast.error('Upload failed', { description: error.message });
+            setUploadProgress(null);
+            resolve();
+          },
+          async () => {
+            const downloadURL = await getDownloadURL(task.snapshot.ref);
+            await addDoc(collection(db, 'documents'), {
+              name: file.name,
+              mime: file.type || 'application/octet-stream',
+              size: file.size,
+              downloadURL,
+              storagePath,
+              organizationId: userProfile.organizationId,
+              individualId: activePersonId ?? null,
+              uploadedBy: userProfile.displayName ?? 'Unknown',
+              uploadedByUid: userProfile.uid,
+              uploadedAt: serverTimestamp(),
+              type: 'file',
+              parentId: null,
+              aiIndexed: false,
+            });
+            setUploadProgress(null);
+            toast.success('Document uploaded', { description: `${file.name} is ready.` });
+            resolve();
+          }
+        );
+      });
+    }
+    e.target.value = '';
+    setShowUpload(false);
+  };
 
   const visible = useMemo(() => {
     let list = documents;
@@ -294,7 +352,12 @@ export function DocumentVault({ folders, documents, scope, scopeLabel }: Documen
 
       {/* Modals */}
       {showUpload && (
-        <UploadModal folders={folders} onClose={() => setShowUpload(false)} />
+        <UploadModal
+          folders={folders}
+          onClose={() => setShowUpload(false)}
+          onBrowse={() => fileInputRef.current?.click()}
+          uploadProgress={uploadProgress}
+        />
       )}
       {showScan && <ScanModal onClose={() => setShowScan(false)} />}
       {showNewFolder && <NewFolderModal onClose={() => setShowNewFolder(false)} />}
@@ -306,6 +369,15 @@ export function DocumentVault({ folders, documents, scope, scopeLabel }: Documen
           onClose={() => setPreviewId(null)}
         />
       )}
+      {/* Hidden file input for real upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        multiple
+        accept="*/*"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }
@@ -477,7 +549,17 @@ function DocumentTable({
 
 // ---- Modals -----------------------------------------------------------------
 
-function UploadModal({ folders, onClose }: { folders: Folder[]; onClose: () => void }) {
+function UploadModal({
+  folders,
+  onClose,
+  onBrowse,
+  uploadProgress,
+}: {
+  folders: Folder[];
+  onClose: () => void;
+  onBrowse: () => void;
+  uploadProgress: number | null;
+}) {
   return (
     <ModalShell title="Upload Documents" onClose={onClose} width={560}>
       <div className="rounded-xl border-2 border-dashed border-icm-border bg-icm-bg p-10 text-center">
@@ -489,13 +571,28 @@ function UploadModal({ folders, onClose }: { folders: Folder[]; onClose: () => v
           PDF, PNG, JPG, JPEG, TIFF, DOC, DOCX, XLS, XLSX, TXT — max 50MB per file
         </p>
         <button
-          onClick={() => demoToast("File browser")}
-          className="mt-4 h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
+          onClick={onBrowse}
+          disabled={uploadProgress !== null}
+          className="mt-4 h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Upload className="w-3.5 h-3.5" />
           Browse files
         </button>
       </div>
+      {uploadProgress !== null && (
+        <div className="mt-3">
+          <div className="flex justify-between text-[11px] font-geist text-icm-text-dim mb-1">
+            <span>Uploading…</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-icm-bg overflow-hidden">
+            <div
+              className="h-full bg-icm-accent rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
       <div className="mt-3 px-3 py-2 rounded-xl bg-icm-accent-soft ring-1 ring-icm-accent/20 text-[11.5px] font-geist text-icm-text flex items-start gap-1.5">
         <Sparkles className="w-3.5 h-3.5 text-icm-accent mt-0.5 shrink-0" />
         AI will detect document type, suggest a folder, and extract key fields automatically.
@@ -515,15 +612,10 @@ function UploadModal({ folders, onClose }: { folders: Folder[]; onClose: () => v
       <div className="flex justify-end gap-2 mt-4">
         <button
           onClick={onClose}
-          className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold"
+          disabled={uploadProgress !== null}
+          className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold disabled:opacity-50"
         >
           Cancel
-        </button>
-        <button
-          onClick={() => { demoSuccess("Document uploaded", "AI is indexing now."); onClose(); }}
-          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
-        >
-          Upload
         </button>
       </div>
     </ModalShell>
@@ -535,7 +627,7 @@ function ScanModal({ onClose }: { onClose: () => void }) {
     <ModalShell title="Scan Document" onClose={onClose} width={560}>
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={() => { demoToast("Camera capture coming soon"); }}
+          onClick={() => { toast.info("Camera capture coming soon"); }}
           className="rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-border-strong transition-colors"
         >
           <div className="w-10 h-10 rounded-lg bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20 flex items-center justify-center">
@@ -548,7 +640,7 @@ function ScanModal({ onClose }: { onClose: () => void }) {
           </p>
         </button>
         <button
-          onClick={() => { demoToast("Scan upload coming soon"); }}
+          onClick={() => { toast.info("Scan upload coming soon"); }}
           className="rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-border-strong transition-colors"
         >
           <div className="w-10 h-10 rounded-lg bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 flex items-center justify-center">
@@ -635,7 +727,7 @@ function NewFolderModal({ onClose }: { onClose: () => void }) {
           Cancel
         </button>
         <button
-          onClick={() => { demoSuccess("Folder created"); onClose(); }}
+          onClick={() => { toast.success("Folder created"); onClose(); }}
           className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
         >
           Create
@@ -699,7 +791,7 @@ function PreviewPanel({
             <button
               key={label}
               title={label}
-              onClick={() => demoToast(`${label} ${doc.name}`)}
+              onClick={() => toast.info(`${label} coming soon`)}
               className="h-8 w-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
             >
               <I className="w-4 h-4" />
@@ -746,7 +838,7 @@ function PreviewPanel({
                   {doc.aiSummary}
                 </p>
                 <button
-                  onClick={() => demoToast(`Ask AI about "${doc.name}"`)}
+                  onClick={() => toast.info(`Ask AI about "${doc.name}" coming soon`)}
                   className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent inline-flex items-center gap-1 hover:underline"
                 >
                   <Sparkles className="w-3 h-3" />

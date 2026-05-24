@@ -1,17 +1,16 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft, Sparkles, Check, ArrowRight, X, AlertTriangle, CheckCircle2,
+  ChevronLeft, Sparkles, Check, ArrowRight, X, AlertTriangle, CheckCircle2, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import {
-  getWorkflow, completeStep, completeWorkflow, terminateWorkflow,
   progressFraction, TERMINATION_REASONS,
-  type WorkflowStep, type StepStatus,
+  type StepStatus,
 } from "@/data/workflows";
-import type { AISuggestion } from "@/data/people";
+import { useWorkflow, updateWorkflow, type WorkflowRecord, type WorkflowStep } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 
 const moduleRoute = (personId: string, slug?: string) => {
   if (!slug) return "";
@@ -31,10 +30,8 @@ const moduleRoute = (personId: string, slug?: string) => {
 const PersonWorkflowDetail = () => {
   const { id, workflowId } = useParams<{ id: string; workflowId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const wf = getWorkflow(workflowId ?? "");
-  const [, force] = useState(0);
-  const refresh = () => force((n) => n + 1);
+  const { individual, loading } = useIndividual(id);
+  const { data: wf, loading: workflowLoading } = useWorkflow(workflowId);
 
   const [completing, setCompleting] = useState<WorkflowStep | null>(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
@@ -44,37 +41,38 @@ const PersonWorkflowDetail = () => {
 
   const allDone = useMemo(() => wf ? wf.steps.every((s) => s.status === "Completed") : false, [wf]);
 
-  if (!person || !wf) {
+  if (loading || workflowLoading) {
+    return (
+      <ICMShell title="Workflow" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual || !wf) {
     return <ICMShell title="Workflow" showAIPanel={false}><p className="text-[13px] text-icm-text-dim font-geist">Workflow not found.</p></ICMShell>;
   }
 
   const { done, total } = progressFraction(wf);
   const pct = total === 0 ? 0 : (done / total) * 100;
 
-  const stepSuggestions: AISuggestion[] = wf.steps
-    .filter((s) => s.status !== "Completed" && s.aiDraftReady)
-    .slice(0, 3)
-    .map((s) => ({
-      tone: s.status === "Overdue" ? "urgent" : "insight",
-      label: s.status === "Overdue" ? "Urgent" : "Insight",
-      body: s.aiDraftBody ?? `AI draft ready for step ${s.number}: ${s.title}.`,
-      cta: s.linkedModuleLabel ? `Open ${s.linkedModuleLabel}` : "Open step",
-    }));
-
   return (
-    <ICMShell title="Workflow" rightPanel={<PersonAIPanel person={person} suggestions={stepSuggestions} intro={`AI is staging content for ${stepSuggestions.length} steps.`} />}>
+    <ICMShell title="Workflow" showAIPanel={false}>
       <div className="space-y-5">
-        <button onClick={() => navigate(`/people/${person.id}/workflow-manager`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/workflow-manager`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
           Workflow Manager
         </button>
 
         {/* Person mini-header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex items-center gap-3 flex-wrap">
-          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-mono text-[12px] font-bold ${riskAvatarClass(person.riskScore)}`}>{initials(person)}</div>
+          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-mono text-[12px] font-bold ${riskAvatarClass(individual.risk_score)}`}>{initials(individual)}</div>
           <div className="min-w-0 flex-1">
-            <p className="font-manrope font-bold text-[13.5px] text-icm-text">{person.lastName}, {person.firstName}</p>
-            <p className="text-[11px] font-mono text-icm-text-dim">ID #{person.id} · {person.county}</p>
+            <p className="font-manrope font-bold text-[13.5px] text-icm-text">{individual.last_name}, {individual.first_name}</p>
+            <p className="text-[11px] font-mono text-icm-text-dim">ID #{individual.id.slice(0,8)} · {individual.county ?? "—"}</p>
           </div>
         </div>
 
@@ -155,7 +153,7 @@ const PersonWorkflowDetail = () => {
         {/* Steps */}
         <div className="space-y-3">
           {wf.steps.map((s) => (
-            <StepCard key={s.id} step={s} personId={person.id} disabled={wf.status !== "Active"} onComplete={() => setCompleting(s)} />
+            <StepCard key={s.id} step={s} personId={individual.id} disabled={wf.status !== "Active"} onComplete={() => setCompleting(s)} />
           ))}
         </div>
       </div>
@@ -164,12 +162,36 @@ const PersonWorkflowDetail = () => {
       {completing && (
         <StepCompletionModal
           step={completing}
-          personId={person.id}
+          personId={individual.id}
           onClose={() => setCompleting(null)}
-          onConfirm={(notes) => {
-            completeStep(wf.id, completing.id, notes);
+          onConfirm={async (notes) => {
+            if (!wf) return;
+            const updatedSteps = wf.steps.map((s) => {
+              if (s.id === completing.id) {
+                return {
+                  ...s,
+                  status: "Completed" as const,
+                  completedAt: new Date().toLocaleDateString("en-US"),
+                  completionNotes: notes,
+                };
+              }
+              return s;
+            });
+            const firstPendingIdx = updatedSteps.findIndex((s) => s.status === "Pending");
+            if (firstPendingIdx !== -1) {
+              updatedSteps[firstPendingIdx] = {
+                ...updatedSteps[firstPendingIdx],
+                status: "In Progress" as const,
+              };
+            }
+            await updateWorkflow(wf.id, { steps: updatedSteps });
+            await writeAudit('workflow_task_updated', 'workflow', wf.id, {
+              individualId: id ?? '',
+              action: 'step_completed',
+              stepTitle: completing.title,
+              stepNotes: notes ?? ''
+            });
             setCompleting(null);
-            refresh();
           }}
         />
       )}
@@ -189,7 +211,18 @@ const PersonWorkflowDetail = () => {
             </label>
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => setConfirmComplete(false)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] text-icm-text-dim hover:text-icm-text">Cancel</button>
-              <button disabled={!confirmCompleteAck} onClick={() => { completeWorkflow(wf.id); setConfirmComplete(false); refresh(); }} className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-50">Complete</button>
+              <button disabled={!confirmCompleteAck} onClick={async () => {
+                if (!wf) return;
+                await updateWorkflow(wf.id, {
+                  status: "Completed",
+                  completedDate: new Date().toLocaleDateString("en-US"),
+                });
+                await writeAudit('workflow_task_updated', 'workflow', wf.id, {
+                  individualId: id ?? '',
+                  action: 'workflow_completed'
+                });
+                setConfirmComplete(false);
+              }} className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-50">Complete</button>
             </div>
           </div>
         </div>
@@ -199,7 +232,20 @@ const PersonWorkflowDetail = () => {
       {terminating && (
         <TerminateModal
           onClose={() => setTerminating(false)}
-          onConfirm={(reason, notes) => { terminateWorkflow(wf.id, reason, notes); setTerminating(false); refresh(); }}
+          onConfirm={async (reason, notes) => {
+            if (!wf) return;
+            await updateWorkflow(wf.id, {
+              status: "Terminated",
+              terminationReason: reason,
+              terminationNotes: notes,
+            });
+            await writeAudit('workflow_task_updated', 'workflow', wf.id, {
+              individualId: id ?? '',
+              action: 'workflow_terminated',
+              reason
+            });
+            setTerminating(false);
+          }}
         />
       )}
     </ICMShell>

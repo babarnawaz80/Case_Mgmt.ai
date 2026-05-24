@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
-
 import {
   Search,
   Plus,
@@ -14,51 +13,62 @@ import {
   ClipboardList,
   MapPin,
   User,
+  Loader2,
+  FileUp,
 } from "lucide-react";
+import { ImportWizardModal } from "@/components/ImportWizardModal";
 import {
-  people,
-  flagStyles,
-  riskAvatarClass,
+  useIndividuals,
   riskScoreClass,
+  riskAvatarClass,
+  riskTier,
   initials,
-  type Person,
-} from "@/data/people";
+  statusLabel,
+  calcAge,
+  type Individual,
+} from "@/hooks/useIndividuals";
 
-type StatusFilter = "All" | "Active" | "Pending" | "Discharged";
+type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending";
 type RiskFilter = "All" | "High" | "Review" | "Standard";
 
 const PeopleSupported = () => {
   const navigate = useNavigate();
+  const { individuals, loading, error } = useIndividuals();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("All");
   const [risk, setRisk] = useState<RiskFilter>("All");
   const [county, setCounty] = useState("All");
+  const [showImport, setShowImport] = useState(false);
 
   const counties = useMemo(
-    () => ["All", ...Array.from(new Set(people.map((p) => p.county)))],
-    [],
+    () => ["All", ...Array.from(new Set(individuals.map((p) => p.county ?? "").filter(Boolean)))],
+    [individuals],
   );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return people.filter((p) => {
+    return individuals.filter((p) => {
+      const fullName = `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`;
       const matchQ =
         !q ||
-        `${p.firstName} ${p.lastName} ${p.nickname ?? ""}`.toLowerCase().includes(q) ||
+        fullName.toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q) ||
-        p.county.toLowerCase().includes(q);
-      const matchStatus = status === "All" || p.status === status;
+        (p.county ?? "").toLowerCase().includes(q) ||
+        (p.medicaid_id ?? "").toLowerCase().includes(q);
+      const matchStatus =
+        status === "All" || statusLabel(p.enrollment_status) === status;
       const matchCounty = county === "All" || p.county === county;
       const matchRisk =
         risk === "All" ||
-        (risk === "High" && (p.riskScore ?? 0) >= 60) ||
-        (risk === "Review" && (p.riskScore ?? 0) >= 35 && (p.riskScore ?? 0) < 60) ||
-        (risk === "Standard" && (p.riskScore ?? 0) < 35);
+        (risk === "High" && riskTier(p.risk_score) === "high") ||
+        (risk === "Review" && riskTier(p.risk_score) === "review") ||
+        (risk === "Standard" && riskTier(p.risk_score) === "standard");
       return matchQ && matchStatus && matchCounty && matchRisk;
     });
-  }, [query, status, risk, county]);
+  }, [query, status, risk, county, individuals]);
 
-  const flagged = filtered.filter((p) => p.aiFlag).length;
+  const highRiskCount = individuals.filter(p => riskTier(p.risk_score) === "high").length;
+  const alertCount = individuals.filter(p => (p.alerts?.length ?? 0) > 0 || (p.open_incidents ?? 0) > 0).length;
 
   return (
     <ICMShell title="People Supported" showAIPanel={false}>
@@ -78,15 +88,15 @@ const PeopleSupported = () => {
               People Supported
             </h1>
             <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
-              {people.length} individuals · {flagged} flagged by AI today
+              {loading ? "Loading…" : `${individuals.length} individuals · ${alertCount} need attention`}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => alert("Export CSV (mock)")}
-              className="h-9 px-3.5 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
+              onClick={() => setShowImport(true)}
+              className="h-9 px-3.5 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-medium flex items-center gap-1.5 hover:border-icm-border-strong transition-colors"
             >
-              <Download className="w-3.5 h-3.5" /> Export
+              <FileUp className="w-3.5 h-3.5" /> Import
             </button>
             <button
               onClick={() => navigate("/people/new")}
@@ -104,14 +114,14 @@ const PeopleSupported = () => {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, ID, or county…"
+              placeholder="Search by name, Medicaid ID, or county…"
               className="w-full h-9 pl-9 pr-3 rounded-xl bg-icm-panel border border-icm-border text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/40 transition-colors"
             />
           </div>
           <FilterSelect
             value={status}
             onChange={(v) => setStatus(v as StatusFilter)}
-            options={["All", "Active", "Pending", "Discharged"]}
+            options={["All", "Active", "Transition", "Pending", "Discharged"]}
             label="Status"
           />
           <FilterSelect
@@ -130,35 +140,71 @@ const PeopleSupported = () => {
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-              <span className="font-semibold">AI reviewed your caseload.</span>{" "}
+              <span className="font-semibold">Your live caseload.</span>{" "}
               <span className="text-icm-text-dim">
-                {flagged} {flagged === 1 ? "individual needs" : "individuals need"} attention today.
+                {loading ? "Loading individuals…" : `${highRiskCount} high-risk · ${alertCount} need attention.`}
               </span>
             </p>
           </div>
-          <button className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0">
-            View all flags →
-          </button>
         </div>
 
+        {/* Loading / error states */}
+        {loading && (
+          <div className="space-y-2.5">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-xl border border-icm-border bg-icm-panel p-4 flex flex-wrap items-center gap-4 animate-pulse">
+                <div className="w-12 h-12 bg-slate-100 rounded-xl shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-40 bg-slate-100 rounded" />
+                  <div className="h-3.5 w-60 bg-slate-100/60 rounded" />
+                </div>
+                <div className="h-8 w-20 bg-slate-100 rounded-lg hidden lg:block" />
+                <div className="h-8 w-14 bg-slate-100 rounded-lg hidden md:block" />
+                <div className="h-8 w-16 bg-slate-100 rounded-lg hidden md:block" />
+                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                  <div className="h-8 w-20 bg-slate-100 rounded-lg" />
+                  <div className="h-8 w-24 bg-slate-100 rounded-lg" />
+                  <div className="h-8 w-16 bg-slate-100 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12.5px] text-red-700 font-geist">
+            Error loading individuals: {error}
+          </div>
+        )}
+
         {/* People rows */}
-        <div className="space-y-2.5">
-          {filtered.map((p) => (
-            <PersonRow
-              key={p.id}
-              person={p}
-              onOpen={() => navigate(`/people/${p.id}/echart`)}
-              onOpenFaceSheet={() => navigate(`/people/${p.id}/facesheet`)}
-              onOpenProfile={() => navigate(`/people/${p.id}/profile`)}
-            />
-          ))}
-          {filtered.length === 0 && (
-            <div className="rounded-xl border border-dashed border-icm-border bg-icm-panel py-12 text-center">
-              <p className="text-[13px] text-icm-text-dim font-geist">No individuals match your filters.</p>
-            </div>
-          )}
-        </div>
+        {!loading && (
+          <div className="space-y-2.5">
+            {filtered.map((p) => (
+              <PersonRow
+                key={p.id}
+                person={p}
+                onOpen={() => navigate(`/people/${p.id}/echart`)}
+                onOpenFaceSheet={() => navigate(`/people/${p.id}/facesheet`)}
+                onOpenProfile={() => navigate(`/people/${p.id}/profile`)}
+              />
+            ))}
+            {filtered.length === 0 && (
+              <div className="rounded-xl border border-dashed border-icm-border bg-icm-panel py-12 text-center">
+                <p className="text-[13px] text-icm-text-dim font-geist">
+                  {individuals.length === 0 ? "No individuals assigned to your account yet." : "No individuals match your filters."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      {showImport && (
+        <ImportWizardModal
+          type="individuals"
+          onClose={() => setShowImport(false)}
+          onComplete={() => setShowImport(false)}
+        />
+      )}
     </ICMShell>
   );
 };
@@ -192,82 +238,75 @@ function FilterSelect({
   );
 }
 
-function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person: Person; onOpen: () => void; onOpenFaceSheet: () => void; onOpenProfile: () => void }) {
-  const flag = person.aiFlag;
-  const flagStyle = flag ? flagStyles[flag.tone] : null;
+function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: {
+  person: Individual;
+  onOpen: () => void;
+  onOpenFaceSheet: () => void;
+  onOpenProfile: () => void;
+}) {
+  const age = calcAge(person.dob);
+  const status = statusLabel(person.enrollment_status);
 
   return (
     <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
-      {/* Avatar */}
-      <PersonAvatar person={person} size={48} shape="rounded" />
-
+      {/* Avatar — initials + risk color */}
+      <div
+        className={`w-12 h-12 rounded-xl flex items-center justify-center text-[13px] font-bold shrink-0 ${riskAvatarClass(person.risk_score)}`}
+      >
+        {initials(person)}
+      </div>
 
       {/* Identity */}
       <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-tight font-semibold text-[14px] text-icm-text truncate">
-            {person.lastName}, {person.firstName}
-            {person.nickname && (
-              <span className="font-normal text-icm-text-dim"> ({person.nickname})</span>
+            {person.last_name}, {person.first_name}
+            {person.preferred_name && person.preferred_name !== person.first_name && (
+              <span className="font-normal text-icm-text-dim"> ({person.preferred_name})</span>
             )}
           </h3>
-          {flag && flagStyle && (
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${flagStyle.bg} ${flagStyle.text} ${flagStyle.ring}`}
-              title={flag.detail}
-            >
+          {(person.alerts?.length ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-red-50 text-red-600 ring-red-200">
               <Sparkles className="w-2.5 h-2.5" />
-              {flag.label}
+              Needs Attention
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 text-[11.5px] text-icm-text-dim font-geist mt-1 flex-wrap">
           <span className="font-mono">
-            {person.gender} · {person.age}y · {person.dob}
+            {person.gender ?? "—"} · {age !== null ? `${age}y` : "—"} · {person.dob ?? "—"}
           </span>
-          <span className="text-icm-text-faint hidden sm:inline">·</span>
-          <span className="hidden sm:inline">Adm {person.admittedOn}</span>
-          <span className="text-icm-text-faint">·</span>
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="w-3 h-3" />
-            {person.county}
-          </span>
+          {person.county && (
+            <>
+              <span className="text-icm-text-faint hidden sm:inline">·</span>
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {person.county}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Service contact */}
+      {/* Program */}
       <div className="hidden lg:block min-w-[150px] text-right">
-        <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">
-          Service Contact
-        </p>
-        <p className="text-[12px] text-icm-text font-geist mt-0.5 truncate">
-          {person.serviceContact ?? "—"}
-        </p>
+        <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">Program</p>
+        <p className="text-[12px] text-icm-text font-geist mt-0.5 truncate">{person.program ?? "—"}</p>
       </div>
 
-      {/* Risk */}
-      {person.riskScore !== undefined && (
+      {/* Risk score */}
+      {person.risk_score !== undefined && (
         <div className="hidden md:block text-right shrink-0">
-          <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">
-            Risk
-          </p>
-          <p className={`font-mono font-bold text-[16px] leading-tight ${riskScoreClass(person.riskScore)}`}>
-            {person.riskScore}
+          <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">Risk</p>
+          <p className={`font-mono font-bold text-[16px] leading-tight ${riskScoreClass(person.risk_score)}`}>
+            {person.risk_score}
           </p>
         </div>
       )}
 
       {/* Status */}
       <div className="hidden md:block shrink-0">
-        <StatusPill status={person.status} />
-      </div>
-
-      {/* Updated */}
-      <div className="hidden xl:block text-right shrink-0">
-        <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">
-          Updated
-        </p>
-        <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">{person.updatedOn}</p>
+        <StatusPill status={person.enrollment_status} />
       </div>
 
       {/* Actions */}
@@ -287,7 +326,6 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
         <button
           onClick={onOpenProfile}
           className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
-          title="Open Profile"
         >
           <User className="w-3 h-3" /> Profile
         </button>
@@ -296,19 +334,19 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: { person:
   );
 }
 
-function StatusPill({ status }: { status: Person["status"] }) {
+function StatusPill({ status }: { status: Individual["enrollment_status"] }) {
   const cls =
-    status === "Active"
+    status === "active"
       ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
-      : status === "Pending"
+      : status === "pending"
       ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"
+      : status === "transition"
+      ? "bg-blue-50 text-blue-600 ring-blue-200"
       : "bg-icm-bg text-icm-text-dim ring-icm-border";
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${cls}`}
-    >
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 ${cls}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {status}
+      {statusLabel(status)}
     </span>
   );
 }

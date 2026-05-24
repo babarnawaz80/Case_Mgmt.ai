@@ -1,62 +1,124 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft, Sparkles, Plus, X, ArrowRight, Siren, ShieldCheck, FileDown, Filter,
+  ChevronLeft, Sparkles, Plus, X, ArrowRight, Siren, ShieldCheck, FileDown, Filter, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
-import {
-  getIncidentsForPerson, typeBreakdown,
-  type IncidentRecord, type IncidentStatus, type IncidentStageId,
-} from "@/data/incidents";
-import type { AISuggestion } from "@/data/people";
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useIncidentReports } from "@/hooks/useFirestore";
 
-const incidentSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Incident 99225 is at Step 1 of 5. Filed 08/01/2023. No follow-up steps have been completed. This is significantly overdue.", cta: "Continue incident" },
-  { tone: "urgent", label: "Urgent", body: "Incident 99225 classification is Abuse — Financial. State reporting requirements may apply. Generate the SC Packet when ready.", cta: "Generate SC Packet" },
-  { tone: "insight", label: "Insight", body: "No new incidents have been reported for Joseph in the past 8 months. Behavioral changes noted in recent sessions may warrant monitoring.", cta: "View monitoring notes" },
-  { tone: "good", label: "Good news", body: "Joseph has had only 1 reported incident since admission in 2022. Incident rate is well below caseload average.", cta: "View patterns" },
-];
+type IncidentStatus = "Open" | "In Progress" | "Pending Review" | "Closed" | "Void";
+type IncidentStageId = 1 | 2 | 3 | 4 | 5;
+
+interface IncidentRecord {
+  id: string;
+  incidentTypes: string[];
+  classification: "Critical" | "Significant" | "Minor" | "Unknown";
+  status: IncidentStatus;
+  currentStage: IncidentStageId;
+  personName: string;
+  incidentDate: string;
+  incidentTime: string;
+  lastUpdatedBy: string;
+  lastUpdatedAt: string;
+}
+
+function typeBreakdown(records: IncidentRecord[]): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>();
+  for (const r of records) {
+    for (const t of r.incidentTypes) {
+      map.set(t, (map.get(t) ?? 0) + 1);
+    }
+  }
+  return Array.from(map.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+
 
 type Tab = "List" | "Patterns";
 
 const PersonIncidentReporting = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: dbIncidents, loading: incidentsLoading } = useIncidentReports(id);
   const [tab, setTab] = useState<Tab>("List");
   const [showFilters, setShowFilters] = useState(false);
   const [showSCModal, setShowSCModal] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  const all = getIncidentsForPerson(id ?? "");
-  const open = all.filter((i) => i.status !== "Closed" && i.status !== "Void");
+  const all = useMemo(() => {
+    return dbIncidents.map((i: any) => ({
+      id: i.id,
+      personId: i.individual_id,
+      personName: i.individual_name || (individual ? `${individual.last_name}, ${individual.first_name}` : "—"),
+      incidentDate: i.incident_date || i.incidentDate || "—",
+      incidentTime: i.incident_time || i.incidentTime || "—",
+      programSite: i.programSite || i.program_site || "—",
+      location: i.location || "—",
+      incidentTypes: i.incident_types || i.incidentTypes || [],
+      classification: i.classification || "Unknown",
+      staffOnDuty: i.staff_on_duty || i.staffOnDuty || [],
+      personResponsible: i.person_responsible || i.personResponsible || "—",
+      description: i.description || "",
+      immediateActions: i.immediateActions || i.immediate_actions || "",
+      medicalRequired: !!(i.medical_required || i.medicalRequired),
+      hospitalized: !!(i.hospitalized),
+      stateNotified: !!(i.state_notified || i.stateNotified),
+      committeeNotified: !!(i.committee_notified || i.committeeNotified),
+      guardianNotified: !!(i.guardian_notified || i.guardianNotified),
+      currentStage: i.current_stage || i.currentStage || 1,
+      stageStatuses: i.stage_statuses || i.stageStatuses || { 1: "Complete", 2: "Current", 3: "Pending", 4: "Pending", 5: "Pending" },
+      notifications: i.notifications || [],
+      contributingFactors: i.contributing_factors || i.contributingFactors || [],
+      actionItems: i.action_items || i.actionItems || [],
+      status: i.status || "Open",
+      createdAt: i.created_at || i.createdAt || "—",
+      lastUpdatedBy: i.last_updated_by || i.lastUpdatedBy || "—",
+      lastUpdatedAt: i.last_updated_at || i.lastUpdatedAt || "—",
+    }));
+  }, [dbIncidents, individual]);
 
-  if (!person) {
+  const open = useMemo(() => {
+    return all.filter((i) => i.status !== "Closed" && i.status !== "Void");
+  }, [all]);
+
+  const loading = individualLoading || incidentsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Incident Reporting" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return <ICMShell title="Incident Reporting" showAIPanel={false}><p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p></ICMShell>;
   }
 
   return (
-    <ICMShell
-      title="Incident Reporting"
-      rightPanel={<PersonAIPanel person={person} suggestions={incidentSuggestions} intro={`${incidentSuggestions.length} incident-related suggestions for ${person.firstName}.`} />}
-    >
+    <ICMShell title="Incident Reporting" showAIPanel={false}>
       <div className="space-y-5">
-        <button onClick={() => navigate(`/people/${person.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Incident Reporting
+          People · {individual.last_name}, {individual.first_name} · Incident Reporting
         </button>
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
-          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>{initials(person)}</div>
+          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>{initials(individual)}</div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">{person.lastName}, {person.firstName}</h2>
-            <p className="text-[11.5px] font-mono text-icm-text-dim">{person.gender} · {person.age}y · {person.county} · ID #{person.id}</p>
+            <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">{individual.last_name}, {individual.first_name}</h2>
+            <p className="text-[11.5px] font-mono text-icm-text-dim">{individual.gender ?? "—"} · {individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}</p>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />{person.status}
+            <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />{individual.enrollment_status}
           </span>
         </div>
 
@@ -69,7 +131,7 @@ const PersonIncidentReporting = () => {
             <button onClick={() => setShowSCModal(true)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-geist text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <FileDown className="w-3.5 h-3.5" /> Generate SC Packet
             </button>
-            <button onClick={() => navigate(`/people/${person.id}/incident-reporting/new`)} className="h-9 px-3 rounded-xl bg-icm-red text-white text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button onClick={() => navigate(`/people/${individual.id}/incident-reporting/new`)} className="h-9 px-3 rounded-xl bg-icm-red text-white text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
               <Siren className="w-3.5 h-3.5" /> Report an Incident
             </button>
           </div>
@@ -81,12 +143,12 @@ const PersonIncidentReporting = () => {
             <div className="flex items-center gap-2.5 min-w-0">
               <Siren className="w-5 h-5 text-icm-red shrink-0" />
               <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                <span className="font-semibold">{person.firstName} has {open.length} open incident{open.length === 1 ? "" : "s"} (ID {open.map((i) => i.id).join(", ")}) at Step {open[0].currentStage} of 5.</span>{" "}
+                <span className="font-semibold">{individual.first_name} has {open.length} open incident{open.length === 1 ? "" : "s"} (ID {open.map((i) => i.id).join(", ")}) at Step {open[0].currentStage} of 5.</span>{" "}
                 <span className="text-icm-text-dim">Initial report was filed {open[0].incidentDate}. This incident requires follow-up documentation.</span>
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button onClick={() => navigate(`/people/${person.id}/incident-reporting/${open[0].id}`)} className="text-[11.5px] font-geist font-semibold text-icm-red hover:underline">View incident →</button>
+              <button onClick={() => navigate(`/people/${individual.id}/incident-reporting/${open[0].id}`)} className="text-[11.5px] font-geist font-semibold text-icm-red hover:underline">View incident →</button>
               <button onClick={() => setBannerDismissed(true)} className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
             </div>
           </div>
@@ -127,7 +189,7 @@ const PersonIncidentReporting = () => {
 
             {/* Table or empty */}
             {all.length === 0 ? (
-              <EmptyState onReport={() => navigate(`/people/${person.id}/incident-reporting/new`)} />
+              <EmptyState onReport={() => navigate(`/people/${individual.id}/incident-reporting/new`)} />
             ) : (
               <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
                 <div className="overflow-x-auto">
@@ -141,7 +203,7 @@ const PersonIncidentReporting = () => {
                     </thead>
                     <tbody className="divide-y divide-icm-border">
                       {all.map((inc) => (
-                        <tr key={inc.id} onClick={() => navigate(`/people/${person.id}/incident-reporting/${inc.id}`)} className="hover:bg-icm-bg/40 cursor-pointer transition-colors">
+                        <tr key={inc.id} onClick={() => navigate(`/people/${individual.id}/incident-reporting/${inc.id}`)} className="hover:bg-icm-bg/40 cursor-pointer transition-colors">
                           <td className="px-4 py-3 font-mono text-icm-text-dim">{inc.id}</td>
                           <td className="px-4 py-3 font-mono text-icm-text">{inc.incidentDate} {inc.incidentTime}</td>
                           <td className="px-4 py-3 text-icm-text">{inc.incidentTypes.join(", ")}</td>
@@ -164,7 +226,7 @@ const PersonIncidentReporting = () => {
           </>
         )}
 
-        {tab === "Patterns" && <PatternsTab records={all} />}
+        {tab === "Patterns" && <PatternsTab records={all as IncidentRecord[]} />}
       </div>
 
       {showSCModal && (

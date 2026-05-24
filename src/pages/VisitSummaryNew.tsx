@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Save, FileSignature, Printer, FileText,
-  Search, Check, ChevronDown,
+  Search, Check, ChevronDown, Loader2
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { people } from "@/data/people";
+import { useIndividuals, type Individual } from "@/hooks/useIndividuals";
 
 /**
  * Universal "New Visit Summary" entry shown when a user clicks Visit Summary
@@ -16,6 +16,7 @@ import { people } from "@/data/people";
 const VisitSummaryNew = () => {
   const navigate = useNavigate();
   const today = new Date().toLocaleDateString("en-US");
+  const { individuals, loading } = useIndividuals();
 
   return (
     <ICMShell title="Visit Summary" showAIPanel={false}>
@@ -78,6 +79,8 @@ const VisitSummaryNew = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Person Supported" required>
               <PersonSearchSelect
+                individuals={individuals}
+                loading={loading}
                 onSelect={(id) => navigate(`/people/${id}/visit-summary/new`)}
               />
             </Field>
@@ -126,7 +129,15 @@ function DisabledPlaceholder({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PersonSearchSelect({ onSelect }: { onSelect: (id: string) => void }) {
+function PersonSearchSelect({ 
+  individuals, 
+  loading, 
+  onSelect 
+}: { 
+  individuals: Individual[]; 
+  loading: boolean; 
+  onSelect: (id: string) => void 
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pickedName, setPickedName] = useState("");
@@ -141,8 +152,8 @@ function PersonSearchSelect({ onSelect }: { onSelect: (id: string) => void }) {
   }, []);
 
   const q = query.trim().toLowerCase();
-  const options = people
-    .map((p) => ({ id: p.id, name: `${p.lastName}, ${p.firstName}`, sub: p.county }))
+  const options = individuals
+    .map((p) => ({ id: p.id, name: `${p.last_name}, ${p.first_name}`, sub: p.county ?? "—" }))
     .filter((o) => !q || o.name.toLowerCase().includes(q));
 
   return (
@@ -152,7 +163,8 @@ function PersonSearchSelect({ onSelect }: { onSelect: (id: string) => void }) {
         onClick={() => setOpen((o) => !o)}
         className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist focus:outline-none focus:border-icm-accent flex items-center justify-between text-left"
       >
-        <span className={pickedName ? "text-icm-text" : "text-icm-text-faint"}>
+        <span className={pickedName ? "text-icm-text" : "text-icm-text-faint inline-flex items-center gap-1.5"}>
+          {loading && <Loader2 className="w-3 h-3 animate-spin text-icm-accent shrink-0" />}
           {pickedName || "Select the individual this visit summary is for…"}
         </span>
         <ChevronDown className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
@@ -170,7 +182,12 @@ function PersonSearchSelect({ onSelect }: { onSelect: (id: string) => void }) {
             />
           </div>
           <div className="max-h-[260px] overflow-y-auto py-1">
-            {options.length === 0 ? (
+            {loading ? (
+              <div className="px-3 py-2 text-[12px] text-icm-text-faint flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-icm-accent" />
+                Loading caseload…
+              </div>
+            ) : options.length === 0 ? (
               <div className="px-3 py-2 text-[12px] text-icm-text-faint">No matches.</div>
             ) : (
               options.map((o) => (

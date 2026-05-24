@@ -39,6 +39,11 @@ const SettingsUserDetail = () => {
   const [provider, setProvider] = useState(initialProvider);
   const [enrollments, setEnrollments] = useState<StaffStateEnrollment[]>(initialProvider.enrollments);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editFirst, setEditFirst] = useState(user?.firstName ?? "");
+  const [editLast, setEditLast] = useState(user?.lastName ?? "");
+  const [editEmail, setEditEmail] = useState(user?.email ?? "");
+  const [editTitle, setEditTitle] = useState(user?.title ?? "");
   const supervisors = useMemo(
     () => orgUsers.filter((u) => u.role === "supervisor" || u.role === "admin"),
     []
@@ -97,9 +102,26 @@ const SettingsUserDetail = () => {
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-manrope font-bold text-[18px] text-icm-text">
-              {user.firstName} {user.lastName}
-            </h2>
+            {editMode ? (
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  value={editFirst}
+                  onChange={(e) => setEditFirst(e.target.value)}
+                  className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[15px] font-manrope font-bold text-icm-text focus:outline-none focus:border-icm-accent w-36"
+                  placeholder="First name"
+                />
+                <input
+                  value={editLast}
+                  onChange={(e) => setEditLast(e.target.value)}
+                  className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[15px] font-manrope font-bold text-icm-text focus:outline-none focus:border-icm-accent w-36"
+                  placeholder="Last name"
+                />
+              </div>
+            ) : (
+              <h2 className="font-manrope font-bold text-[18px] text-icm-text">
+                {user.firstName} {user.lastName}
+              </h2>
+            )}
             <span
               className={cn(
                 "px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1",
@@ -117,21 +139,64 @@ const SettingsUserDetail = () => {
               {user.status}
             </span>
           </div>
-          <p className="text-[12px] font-geist text-icm-text-dim mt-1">
-            {user.title ?? "—"} · {user.email}
-          </p>
+          {editMode ? (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              <input
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="h-8 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent flex-1 min-w-[180px]"
+                placeholder="Email"
+              />
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="h-8 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent flex-1 min-w-[140px]"
+                placeholder="Title / Credential"
+              />
+            </div>
+          ) : (
+            <p className="text-[12px] font-geist text-icm-text-dim mt-1">
+              {user.title ?? "—"} · {user.email}
+            </p>
+          )}
           <p className="text-[11px] font-mono text-icm-text-faint mt-0.5">
             Last login: {user.lastLogin}
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => demoToast(`Edit ${user.firstName} ${user.lastName}`)}
-            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Edit
-          </button>
+          {editMode ? (
+            <>
+              <button
+                onClick={() => {
+                  demoSuccess(`${editFirst} ${editLast} profile saved`);
+                  setEditMode(false);
+                }}
+                className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setEditFirst(user.firstName);
+                  setEditLast(user.lastName);
+                  setEditEmail(user.email);
+                  setEditTitle(user.title ?? "");
+                  setEditMode(false);
+                }}
+                className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setEditMode(true)}
+              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
           <button
             onClick={() => demoToast("More user actions")}
             className="h-9 w-9 rounded-xl border border-icm-border bg-icm-panel text-icm-text-dim flex items-center justify-center hover:border-icm-border-strong"

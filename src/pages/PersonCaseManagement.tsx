@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft,
   ChevronDown,
   RefreshCw,
   Sparkles,
@@ -12,15 +11,13 @@ import {
   X,
   ArrowRight,
   GitBranch,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
-
-import type { AISuggestion } from "@/data/people";
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useWorkflows } from "@/hooks/useFirestore";
 import {
-  getWorkflowsForPerson,
   progressFraction,
   workflowProgressTone,
 } from "@/data/workflows";
@@ -122,26 +119,6 @@ const overdueDays: Record<string, number> = {
   t6: 25,
 };
 
-const moduleSuggestions: AISuggestion[] = [
-  {
-    tone: "urgent",
-    label: "Urgent",
-    body: "3 tasks are overdue. Longest overdue: 'Schedule quarterly visit' at 76 days. Want me to draft the visit summary and contact note?",
-    cta: "Generate drafts",
-  },
-  {
-    tone: "insight",
-    label: "Insight",
-    body: "MA redetermination typically takes 2–3 weeks. Based on Joseph's renewal date, you should start the process by May 10.",
-    cta: "Add reminder",
-  },
-  {
-    tone: "insight",
-    label: "Insight",
-    body: "Annual ISP review is 25 days overdue. I pulled last year's ISP and drafted updated goal language based on recent monitoring notes.",
-    cta: "Review draft",
-  },
-];
 
 const statusOrder: Record<TaskStatus, number> = {
   Overdue: 0,
@@ -154,7 +131,8 @@ const statusOrder: Record<TaskStatus, number> = {
 const PersonCaseManagement = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
+  const { data: workflowsData, loading: workflowsLoading } = useWorkflows(id);
 
   const [groups] = useState<Group[]>(seedGroups);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -162,9 +140,9 @@ const PersonCaseManagement = () => {
   const [pullOpen, setPullOpen] = useState(false);
   const [completeTask, setCompleteTask] = useState<Task | null>(null);
 
-  const personWorkflows = getWorkflowsForPerson(id ?? "").filter(
-    (w) => w.status === "Active",
-  );
+  const personWorkflows = useMemo(() => {
+    return (workflowsData || []).filter((w) => w.status === "Active");
+  }, [workflowsData]);
 
   const summary = useMemo(() => {
     const all = groups.flatMap((g) => g.tasks);
@@ -176,7 +154,17 @@ const PersonCaseManagement = () => {
     };
   }, [groups]);
 
-  if (!person) {
+  if (loading || workflowsLoading) {
+    return (
+      <ICMShell title="Case Management" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+  if (!individual) {
     return (
       <ICMShell title="Case Management" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -202,21 +190,15 @@ const PersonCaseManagement = () => {
   return (
     <ICMShell
       title="Case Management"
-      rightPanel={
-        <PersonAIPanel
-          person={person}
-          suggestions={moduleSuggestions}
-          intro={`I'm tracking ${moduleSuggestions.length} items on ${person.firstName}'s case management board.`}
-        />
-      }
+      showAIPanel={false}
     >
       <div className="space-y-5">
         <Breadcrumbs
-          backTo={`/people/${person.id}/echart`}
+          backTo={`/people/${individual.id}/echart`}
           backLabel="eChart"
           items={[
             { label: "People Supported", to: "/people" },
-            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+            { label: `${individual.first_name} ${individual.last_name}`, to: `/people/${individual.id}/echart` },
             { label: "Case Management" },
           ]}
         />
@@ -226,25 +208,25 @@ const PersonCaseManagement = () => {
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
           <div
             className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(
-              person.riskScore,
+              individual.risk_score,
             )}`}
           >
-            {initials(person)}
+            {initials(individual)}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">
-              {person.lastName}, {person.firstName}
-              {person.nickname && (
-                <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
+              {individual.last_name}, {individual.first_name}
+              {individual.preferred_name && (
+                <span className="font-medium text-icm-text-dim"> ({individual.preferred_name})</span>
               )}
             </h2>
             <p className="text-[11.5px] font-mono text-icm-text-dim">
-              {person.gender} · {person.age}y · {person.county} · ID #{person.id}
+              {individual.gender ?? "—"} · {individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}
             </p>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
             <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
-            {person.status}
+            {individual.enrollment_status}
           </span>
         </div>
 
@@ -362,7 +344,7 @@ const PersonCaseManagement = () => {
                         <button
                           onClick={() =>
                             navigate(
-                              `/people/${person.id}/workflow-manager/${w.id}`,
+                              `/people/${individual.id}/workflow-manager/${w.id}`,
                             )
                           }
                           className="w-full px-4 py-3 flex items-center gap-3 hover:bg-icm-bg/60 transition-colors text-left"
@@ -500,7 +482,7 @@ const PersonCaseManagement = () => {
               </div>
               <p className="text-[12px] text-icm-text font-geist leading-relaxed">
                 AI has pre-filled this form based on recent notes and{" "}
-                <span className="font-semibold">{person.firstName}</span>'s history. Review
+                <span className="font-semibold">{individual.first_name}</span>'s history. Review
                 before saving.
               </p>
             </div>
@@ -525,7 +507,7 @@ const PersonCaseManagement = () => {
                   const slug = completeTask.linksTo!.slug;
                   const label = completeTask.linksTo!.label;
                   setCompleteTask(null);
-                  navigate(`/people/${person.id}/module/${slug}`);
+                  navigate(`/people/${individual.id}/module/${slug}`);
                   // Note: a real impl would pre-fill the destination module form.
                   void label;
                 }}

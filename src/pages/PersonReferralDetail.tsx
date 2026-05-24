@@ -15,15 +15,14 @@ import {
   Pencil,
   FileText,
   Paperclip,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
+import { useReferrals, updateReferral } from "@/hooks/useFirestore";
 import {
-  addConversationEntry,
-  getReferral,
   REFERRAL_STATUSES,
   statusTone,
-  updateReferralStatus,
   type ConversationEntry,
   type ConversationKind,
   type ReferralStatus,
@@ -48,13 +47,78 @@ const convoBadge: Record<ConversationKind, { label: string; cls: string; icon: s
 const PersonReferralDetail = () => {
   const { id, referralId } = useParams<{ id: string; referralId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const referral = getReferral(referralId ?? "");
-  const [tick, setTick] = useState(0);
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: dbReferrals, loading: referralsLoading } = useReferrals(id);
   const [showUpdate, setShowUpdate] = useState(false);
   const [logging, setLogging] = useState(false);
 
-  if (!person || !referral) {
+  const referral = useMemo(() => {
+    const r = dbReferrals.find((ref) => ref.id === referralId);
+    if (!r) return undefined;
+    let daysOpen = r.daysOpen || 0;
+    if (!daysOpen && r.date) {
+      const [m, d, y] = r.date.split("/").map(Number);
+      if (m) {
+        const dt = new Date(y, m - 1, d);
+        daysOpen = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 86400000));
+      }
+    }
+    return {
+      id: r.id,
+      personId: r.individual_id || r.personId,
+      date: r.date || "—",
+      type: r.referral_type || r.type || "—",
+      priority: r.priority || "Routine",
+      reason: r.reason || "—",
+      sourceOfNeed: r.sourceOfNeed || "Case manager recommendation",
+      linkedGoalId: r.linkedGoalId,
+      linkedGoalLabel: r.linkedGoalLabel,
+      urgencyDate: r.urgencyDate,
+      providerId: r.providerId,
+      providerName: r.referred_to || r.providerName || "—",
+      providerPhone: r.providerPhone,
+      providerAddress: r.providerAddress,
+      providerEmail: r.providerEmail,
+      acceptsMedicaid: !!r.acceptsMedicaid,
+      referralMethod: r.referralMethod,
+      contactDate: r.contactDate,
+      contactPerson: r.contactPerson,
+      referenceNumber: r.referenceNumber,
+      infoShared: r.infoShared || [],
+      consentDocumented: !!r.consentDocumented,
+      consentDate: r.consentDate,
+      consentMethod: r.consentMethod,
+      expectedTimeframe: r.expectedTimeframe,
+      followUpDate: r.followUpDate,
+      assignedTo: r.referred_by || r.assignedTo || "—",
+      notes: r.notes || "",
+      status: r.status || "Pending Response",
+      daysOpen,
+      lastActivity: r.lastActivity || r.date || "—",
+      closeReason: r.closeReason,
+      outcomeNotes: r.outcomeNotes,
+      serviceStartDate: r.serviceStartDate,
+      aiPrefilled: !!r.aiPrefilled,
+      timeline: r.timeline || [],
+      attachments: r.attachments || [],
+      conversation: r.conversation || [],
+    };
+  }, [dbReferrals, referralId]);
+
+  const loading = individualLoading || referralsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Referral" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual || !referral) {
     return (
       <ICMShell title="Referral" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Referral not found.</p>
@@ -63,38 +127,43 @@ const PersonReferralDetail = () => {
   }
 
   const tone = statusTone(referral.status);
-  const isPending = referral.status === "Pending Response" || referral.status === "Submitted";
+  const isPending = referral.status === "Pending Response" || referral.status === "Submitted" || referral.status === "pending";
 
-  const markStatus = (status: ReferralStatus, label: string) => {
+  const markStatus = async (status: ReferralStatus, label: string) => {
     const today = new Date();
     const fmt = `${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}/${today.getFullYear()}`;
-    updateReferralStatus(
-      referral.id,
-      status,
-      {
-        id: `t-${Date.now()}`,
-        date: fmt,
-        type: status === "Connected" ? "accepted" : "declined",
-        title: `Status updated to ${status}`,
-        by: "Kathy Adams",
-      },
-      {},
-    );
-    addConversationEntry(referral.id, {
+    const newEvent = {
+      id: `t-${Date.now()}`,
+      date: fmt,
+      type: status === "Connected" ? "accepted" : "declined",
+      title: `Status updated to ${status}`,
+      by: "Kathy Adams",
+    };
+    const newConvo = {
       id: `c-${Date.now()}`,
-      type: "status",
+      type: "status" as const,
       by: "Kathy Adams",
       initials: "KA",
       date: `${fmt}`,
       message: `Referral marked as ${label}.`,
-    });
-    setTick((t) => t + 1);
-    toast.success(`Referral marked as ${label}`);
+    };
+    try {
+      await updateReferral(referral.id, {
+        status: status,
+        lastActivity: fmt,
+        timeline: [...referral.timeline, newEvent] as any,
+        conversation: [...referral.conversation, newConvo] as any,
+      });
+      toast.success(`Referral marked as ${label}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update status");
+    }
   };
 
   const downloadPdf = () =>
     toast.success(
-      `Referral PDF downloaded — ${person.firstName} ${person.lastName} · ${referral.type} · ${referral.date}`,
+      `Referral PDF downloaded — ${individual.first_name} ${individual.last_name} · ${referral.type} · ${referral.date}`,
     );
 
   return (
@@ -129,7 +198,7 @@ const PersonReferralDetail = () => {
               {referral.providerName}
             </h1>
             <p className="text-[12px] text-icm-text-dim mt-0.5">
-              {person.firstName} {person.lastName} · Created {referral.date} · Assigned to {referral.assignedTo}
+              {individual.first_name} {individual.last_name} · Created {referral.date} · Assigned to {referral.assignedTo}
             </p>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -194,7 +263,7 @@ const PersonReferralDetail = () => {
           {/* LEFT — Referral details */}
           <div className="space-y-3 min-w-0">
             <InfoCard title="Individual">
-              <Row k="Name" v={`${person.firstName} ${person.lastName}`} />
+              <Row k="Name" v={`${individual.first_name} ${individual.last_name}`} />
               <Row k="Date" v={referral.date} />
               <Row k="Type" v={referral.type} />
               <Row k="Priority" v={referral.priority} />
@@ -368,11 +437,17 @@ const PersonReferralDetail = () => {
                 ) : (
                   <LogCommunicationForm
                     onCancel={() => setLogging(false)}
-                    onSave={(entry) => {
-                      addConversationEntry(referral.id, entry);
-                      setLogging(false);
-                      setTick((t) => t + 1);
-                      toast.success("Communication logged");
+                    onSave={async (entry) => {
+                      try {
+                        await updateReferral(referral.id, {
+                          conversation: [...referral.conversation, entry] as any,
+                        });
+                        setLogging(false);
+                        toast.success("Communication logged");
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Failed to log communication");
+                      }
                     }}
                   />
                 )}
@@ -386,10 +461,20 @@ const PersonReferralDetail = () => {
         <UpdateStatusModal
           currentStatus={referral.status}
           onClose={() => setShowUpdate(false)}
-          onSave={(newStatus, event, extras) => {
-            updateReferralStatus(referral.id, newStatus, event, extras);
-            setShowUpdate(false);
-            setTick((t) => t + 1);
+          onSave={async (newStatus, event, extras) => {
+            try {
+              await updateReferral(referral.id, {
+                status: newStatus,
+                lastActivity: event.date.split(" ")[0],
+                timeline: [...referral.timeline, event] as any,
+                ...extras,
+              });
+              setShowUpdate(false);
+              toast.success("Referral status updated successfully");
+            } catch (err) {
+              console.error(err);
+              toast.error("Failed to update status");
+            }
           }}
         />
       )}

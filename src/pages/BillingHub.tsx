@@ -9,64 +9,45 @@ import {
   Send,
   X,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-type AiStatus = "passed" | "attention" | "pending";
-type BillStatus = "ready" | "hold" | "pending" | "submitted";
-
-type Claim = {
-  id: string;
-  individual: string;
-  dos: string;
-  code: string;
-  units: number;
-  payer: string;
-  auth: string;
-  ai: AiStatus;
-  billing: BillStatus;
-};
-
-const CLAIMS: Claim[] = [
-  { id: "c1", individual: "Brown, Joseph", dos: "04/27/2026", code: "T2022", units: 3, payer: "IHCP", auth: "SA-2026-001", ai: "passed", billing: "ready" },
-  { id: "c2", individual: "Brown, Joseph", dos: "04/15/2026", code: "T2022", units: 2, payer: "IHCP", auth: "SA-2026-001", ai: "passed", billing: "ready" },
-  { id: "c3", individual: "Langston, Travis", dos: "04/27/2026", code: "T2022", units: 4, payer: "Anthem Indiana", auth: "SA-2026-002", ai: "passed", billing: "ready" },
-  { id: "c4", individual: "Langston, Travis", dos: "04/09/2026", code: "T2022", units: 3, payer: "Anthem Indiana", auth: "SA-2026-002", ai: "attention", billing: "hold" },
-  { id: "c5", individual: "Walker, Ashley", dos: "04/20/2026", code: "T2023", units: 2, payer: "IHCP", auth: "SA-2026-003", ai: "attention", billing: "hold" },
-  { id: "c6", individual: "Raza, Mohsin", dos: "04/18/2026", code: "T2022", units: 4, payer: "MHS", auth: "SA-2026-004", ai: "pending", billing: "pending" },
-  { id: "c7", individual: "Brown, Joseph", dos: "03/30/2026", code: "T2022", units: 3, payer: "IHCP", auth: "SA-2026-001", ai: "passed", billing: "submitted" },
-  { id: "c8", individual: "Langston, Travis", dos: "03/15/2026", code: "T2022", units: 2, payer: "Anthem", auth: "SA-2026-002", ai: "passed", billing: "submitted" },
-];
+import { useBillingClaims, useBillingSummary, updateClaimStatus } from "@/hooks/useBillingClaims";
+import type { BillingClaim } from "@/hooks/useBillingClaims";
 
 type TabKey = "all" | "pending" | "ready" | "attention" | "submitted" | "denied";
+
 
 const BillingHub = () => {
   const [tab, setTab] = useState<TabKey>("all");
   const [autoScrub, setAutoScrub] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [drawerClaim, setDrawerClaim] = useState<Claim | null>(null);
+  const [drawerClaim, setDrawerClaim] = useState<BillingClaim | null>(null);
+
+  const { claims, loading } = useBillingClaims();
+  const { ready: readyCount, attention: attentionCount, submitted: submittedCount, pending: pendingCount, denied: deniedCount } = useBillingSummary();
 
   const filtered = useMemo(() => {
     switch (tab) {
-      case "pending": return CLAIMS.filter((c) => c.ai === "pending");
-      case "ready": return CLAIMS.filter((c) => c.billing === "ready");
-      case "attention": return CLAIMS.filter((c) => c.ai === "attention");
-      case "submitted": return CLAIMS.filter((c) => c.billing === "submitted");
-      case "denied": return [];
-      default: return CLAIMS;
+      case "pending": return claims.filter((c) => c.aiStatus === "pending");
+      case "ready": return claims.filter((c) => c.billingStatus === "ready");
+      case "attention": return claims.filter((c) => c.aiStatus === "attention");
+      case "submitted": return claims.filter((c) => c.billingStatus === "submitted");
+      case "denied": return claims.filter((c) => c.billingStatus === "denied");
+      default: return claims;
     }
-  }, [tab]);
+  }, [tab, claims]);
 
-  const hasReady = filtered.some((c) => c.billing === "ready");
+  const hasReady = filtered.some((c) => c.billingStatus === "ready");
 
   const tabs: { key: TabKey; label: string; count?: number }[] = [
-    { key: "all", label: "All Claims" },
-    { key: "pending", label: "Pending Scrub", count: 4 },
-    { key: "ready", label: "Ready to Submit", count: 12 },
-    { key: "attention", label: "Needs Attention", count: 2 },
-    { key: "submitted", label: "Submitted" },
-    { key: "denied", label: "Denied" },
+    { key: "all", label: "All Claims", count: claims.length },
+    { key: "pending", label: "Pending Scrub", count: pendingCount },
+    { key: "ready", label: "Ready to Submit", count: readyCount },
+    { key: "attention", label: "Needs Attention", count: attentionCount },
+    { key: "submitted", label: "Submitted", count: submittedCount },
+    { key: "denied", label: "Denied", count: deniedCount },
   ];
 
   return (
@@ -89,10 +70,10 @@ const BillingHub = () => {
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Clock} tone="gray" value="4" label="Pending Scrub" sub="Awaiting AI review" />
-          <StatCard icon={CheckCircle2} tone="green" value="12" label="Scrub Passed" sub="Ready to submit" />
-          <StatCard icon={AlertTriangle} tone="amber" value="2" label="Needs Attention" sub="Action required" />
-          <StatCard icon={Send} tone="blue" value="28" label="Submitted This Month" sub="Via IDD Billing.AI" />
+          <StatCard icon={Clock} tone="gray" value={String(pendingCount)} label="Pending Scrub" sub="Awaiting AI review" />
+          <StatCard icon={CheckCircle2} tone="green" value={String(readyCount)} label="Scrub Passed" sub="Ready to submit" />
+          <StatCard icon={AlertTriangle} tone="amber" value={String(attentionCount)} label="Needs Attention" sub="Action required" />
+          <StatCard icon={Send} tone="blue" value={String(submittedCount)} label="Submitted" sub="This session" />
         </div>
 
         {/* AI Scrub Agent banner */}

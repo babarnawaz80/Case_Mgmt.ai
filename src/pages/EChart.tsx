@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { demoToast } from "@/lib/demoToast";
 import { PreVisitModal } from "@/components/visit/PreVisitModal";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import { useRole } from "@/contexts/RoleContext";
+import { useIndividual, calcAge, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useEChartCounts } from "@/hooks/useEChartCounts";
 import {
   CheckSquare,
   FileHeart,
@@ -39,15 +40,11 @@ import {
   Activity,
   AlertCircle,
   MapPin,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
-import {
-  getPerson,
-  initials,
-  riskAvatarClass,
-} from "@/data/people";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { PersonAvatar } from "@/components/icm/PersonAvatar";
+import { CompanionLinkCard } from "@/components/icm/CompanionLinkCard";
 
 
 type Category = "Documentation" | "Care" | "Operations";
@@ -140,12 +137,36 @@ const CATEGORY_META: Record<
 const EChart = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
   const { role } = useRole();
   const [showPreVisit, setShowPreVisit] = useState(false);
   const [filter, setFilter] = useState<"All" | Category>("All");
+  const liveCounts = useEChartCounts(id);
 
-  if (!person) {
+  // ALL hooks must be called before any early returns (Rules of Hooks)
+  const visibleTiles = ALL_TILES.filter(
+    (t) => !t.roles || t.roles.includes(role as "admin" | "case_manager" | "billing" | "supervisor"),
+  );
+  const filtered = filter === "All" ? visibleTiles : visibleTiles.filter((t) => t.category === filter);
+  const grouped = useMemo(() => {
+    const order: Category[] = ["Documentation", "Care", "Operations"];
+    return order
+      .map((cat) => ({ cat, tiles: filtered.filter((t) => t.category === cat) }))
+      .filter((g) => g.tiles.length > 0);
+  }, [filtered]);
+
+  if (loading) {
+    return (
+      <ICMShell title="eChart" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading eChart…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="eChart" showAIPanel={false}>
         <div className="rounded-xl border border-icm-border bg-icm-panel p-12 text-center">
@@ -161,33 +182,23 @@ const EChart = () => {
     );
   }
 
-  const visibleTiles = ALL_TILES.filter(
-    (t) => !t.roles || t.roles.includes(role as "admin" | "case_manager" | "billing" | "supervisor"),
-  );
+  // Derived values (safe — individual is guaranteed non-null here)
+  const age = calcAge(individual.dob);
+  const riskClass = riskAvatarClass(individual.risk_score);
+  const personInitials = initials(individual);
+  const allergies = "Document in Face Sheet";
+  const specialInstructions = individual.diagnosis ?? "See care plan for details";
 
-  const filtered = filter === "All" ? visibleTiles : visibleTiles.filter((t) => t.category === filter);
-
-  const grouped = useMemo(() => {
-    const order: Category[] = ["Documentation", "Care", "Operations"];
-    return order
-      .map((cat) => ({ cat, tiles: filtered.filter((t) => t.category === cat) }))
-      .filter((g) => g.tiles.length > 0);
-  }, [filtered]);
-
-  // Compact header metrics — hard-coded demo values mapped to the mock person.
-  const allergies = person.allergies ?? "Penicillin · Peanuts";
-  const specialInstructions =
-    person.specialInstructions ?? "Requires 1:1 staffing during community outings · No driving";
 
   return (
-    <ICMShell title="eChart" rightPanel={<PersonAIPanel person={person} />}>
+    <ICMShell title="eChart" showAIPanel={false}>
       <div className="space-y-4">
         <Breadcrumbs
           backTo="/people"
           backLabel="People Supported"
           items={[
             { label: "People Supported", to: "/people" },
-            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/profile` },
+            { label: `${individual.first_name} ${individual.last_name}`, to: `/people/${individual.id}/profile` },
             { label: "eChart" },
           ]}
         />
@@ -199,9 +210,11 @@ const EChart = () => {
               {/* LEFT — avatar + identity */}
               <div className="flex items-start gap-3 sm:gap-4 shrink-0 w-full sm:w-[280px]">
                 <div className="flex flex-col items-center gap-2 shrink-0">
-                  <PersonAvatar person={person} size={64} shape="circle" className="text-[18px]" />
+                  <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center font-mono text-[20px] font-bold ${riskClass}`}>
+                    {personInitials}
+                  </div>
                   <button
-                    onClick={() => navigate(`/people/${person.id}/profile`)}
+                    onClick={() => navigate(`/people/${individual.id}/profile`)}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-icm-border bg-icm-bg hover:bg-icm-panel hover:border-icm-accent/40 text-[10.5px] font-geist font-semibold text-icm-text transition-colors"
                   >
                     <User className="w-3 h-3 text-icm-accent" />
@@ -211,22 +224,21 @@ const EChart = () => {
 
                 <div className="min-w-0 flex-1">
                   <h1 className="font-manrope font-extrabold text-[20px] sm:text-[22px] text-icm-text tracking-tight leading-tight break-words">
-                    {person.lastName}, {person.firstName}
-                    {person.nickname && (
-                      <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>
+                    {individual.last_name}, {individual.first_name}
+                    {individual.preferred_name && (
+                      <span className="font-medium text-icm-text-dim"> ({individual.preferred_name})</span>
                     )}
                   </h1>
                   <p className="text-[12px] font-geist text-icm-text-dim mt-1 leading-snug">
-                    {person.gender} · {person.age} years · {person.dob}
+                    {individual.gender ?? "—"} · {age !== null ? `${age} years` : "—"} · {individual.dob ?? "—"}
                   </p>
                   <p className="text-[12px] font-geist text-icm-text-dim mt-0.5 inline-flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-icm-red shrink-0" />
-                    {person.county}
+                    {individual.county ?? "—"}
                   </p>
                   <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    <StatusChip tone="green" label={person.status} />
+                    <StatusChip tone="green" label={individual.enrollment_status} />
                     <StatusChip tone="accent" label="eChart" />
-                    <StatusChip tone="amber" label="Manage Programs" />
                   </div>
                 </div>
               </div>
@@ -263,14 +275,19 @@ const EChart = () => {
 
             {/* Metric strip */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-5 pt-5 border-t border-icm-border">
-              <Metric label="PCP STATUS" value="On track" valueClass="text-icm-green" foot="Reviewed Apr 12" />
-              <Metric label="RISK SCORE" value="22" valueClass="text-icm-green" foot="Low · ↓ 4 pts" />
-              <Metric label="LAST VISIT" value="2 days ago" valueClass="text-icm-text" foot="K. Vargas · 45m" />
-              <Metric label="NEXT ISP" value="May 22" valueClass="text-icm-accent" foot="in 24 days" />
-              <Metric label="OPEN GOALS" value="4" valueClass="text-purple-600" foot="2 progressing" />
-              <Metric label="ASSIGNED STAFF" value="5" valueClass="text-icm-text" foot="J. Thollander lead" />
+              <Metric label="RISK SCORE" value={individual.risk_score?.toString() ?? "—"} valueClass={individual.risk_score && individual.risk_score >= 60 ? "text-icm-red" : individual.risk_score && individual.risk_score >= 35 ? "text-icm-amber" : "text-icm-green"} foot={individual.level_of_care ?? "Standard"} />
+              <Metric label="LAST VISIT" value={individual.last_visit_date ?? "—"} valueClass="text-icm-text" foot="See visit summary" />
+              <Metric label="NEXT VISIT" value={individual.next_visit_date ?? "—"} valueClass="text-icm-accent" foot="Scheduled" />
+              <Metric label="OPEN TASKS" value={individual.open_tasks?.toString() ?? "0"} valueClass="text-purple-600" foot="See workflow" />
+              <Metric label="INCIDENTS" value={individual.open_incidents?.toString() ?? "0"} valueClass={individual.open_incidents ? "text-icm-red" : "text-icm-text"} foot="Open" />
+              <Metric label="COMPLIANCE" value={individual.monitoring_compliance_pct ? `${individual.monitoring_compliance_pct}%` : "—"} valueClass="text-icm-green" foot="Monitoring" />
             </div>
           </div>
+        </div>
+
+        {/* AI Care Companion link card */}
+        <div className="px-0 pb-1">
+          <CompanionLinkCard individual={individual} />
         </div>
 
         {/* Filter pills */}
@@ -300,19 +317,20 @@ const EChart = () => {
         {grouped.map(({ cat, tiles }) => (
           <section key={cat} className="space-y-2.5">
             <div className="flex items-center gap-2 border-t border-icm-border pt-3">
-              <span className="font-manrope font-normal text-[14px] text-icm-text-dim">
-                {cat}
-              </span>
-              <span className="text-[11px] font-geist text-icm-text-faint">
-                {tiles.length} modules
-              </span>
+              <span className="font-manrope font-normal text-[14px] text-icm-text-dim">{cat}</span>
+              <span className="text-[11px] font-geist text-icm-text-faint">{tiles.length} modules</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {tiles.map((t) => (
                 <ModuleTileCard
                   key={t.slug}
-                  tile={t}
-                  onOpen={() => navigate(`/people/${person.id}/${t.route}`)}
+                  tile={{
+                    ...t,
+                    count: liveCounts[t.slug] !== undefined
+                      ? liveCounts[t.slug]
+                      : t.count,
+                  }}
+                  onOpen={() => navigate(`/people/${individual.id}/${t.route}`)}
                 />
         ))}
             </div>
@@ -323,8 +341,8 @@ const EChart = () => {
       <PreVisitModal
         open={showPreVisit}
         onClose={() => setShowPreVisit(false)}
-        personId={person.id}
-        personName={`${person.firstName} ${person.lastName}`}
+        personId={individual.id}
+        personName={`${individual.first_name} ${individual.last_name}`}
       />
     </ICMShell>
   );

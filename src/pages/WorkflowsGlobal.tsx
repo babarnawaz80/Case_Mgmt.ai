@@ -1,22 +1,42 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowRight, GitBranch } from "lucide-react";
+import { Sparkles, ArrowRight, GitBranch, Loader2 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
-  getAllWorkflows, globalSummary, progressFraction, workflowProgressTone,
-  type WorkflowRecord, type WorkflowStatus,
+  progressFraction, workflowProgressTone,
+  type WorkflowStatus,
 } from "@/data/workflows";
+import { useAllWorkflows, type WorkflowRecord } from "@/hooks/useFirestore";
 
 const WorkflowsGlobal = () => {
   const navigate = useNavigate();
-  const summary = globalSummary();
+  const { data: allWorkflows, loading } = useAllWorkflows();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState<WorkflowStatus | "All">("Active");
 
-  const all = getAllWorkflows();
-  const types = Array.from(new Set(all.map((w) => w.title)));
+  const all = useMemo(() => allWorkflows || [], [allWorkflows]);
+
+  const summary = useMemo(() => {
+    const active = all.filter((w) => w.status === "Active");
+    const overdue = active.filter((w) => w.steps && w.steps.some((s) => s.status === "Overdue")).length;
+    const dueThisWeek = active.filter((w) => {
+      const nextDue = w.steps && w.steps.find((s) => s.status !== "Completed");
+      return nextDue?.dueDate && /04\/(2[5-9]|3[01])|05\/0[1-2]/.test(nextDue.dueDate);
+    }).length;
+    const completedThisMonth = all.filter((w) => w.status === "Completed").length;
+    return {
+      totalActive: active.length,
+      overdue,
+      dueThisWeek,
+      completedThisMonth,
+    };
+  }, [all]);
+
+  const types = useMemo(() => {
+    return Array.from(new Set(all.map((w) => w.title)));
+  }, [all]);
 
   const filtered = useMemo(() => {
     return all.filter((w) => {
@@ -26,6 +46,17 @@ const WorkflowsGlobal = () => {
       return true;
     });
   }, [all, search, typeFilter, statusFilter]);
+
+  if (loading) {
+    return (
+      <ICMShell title="Workflows" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   return (
     <ICMShell title="Workflows" showAIPanel={false}>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -35,7 +35,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { people as SEED_PEOPLE } from "@/data/people";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  collection, addDoc, serverTimestamp, doc, getDoc,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const COUNTIES = [
   "Adams","Allen","Bartholomew","Benton","Blackford","Boone","Brown","Carroll","Cass","Clark",
@@ -49,6 +53,74 @@ const COUNTIES = [
   "Union","Vermillion","Vigo","Wabash","Warren","Warrick","Washington","Wayne","Wells",
   "White","Whitley",
 ];
+
+const STATES = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" }
+];
+
+function formatPhoneNumber(value: string): string {
+  const cleaned = value.replace(/\D/g, "");
+  const truncated = cleaned.slice(0, 10);
+  const match = truncated.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+  if (!match) return truncated;
+  const [, p1, p2, p3] = match;
+  if (truncated.length <= 3) {
+    return p1;
+  }
+  if (truncated.length <= 6) {
+    return `(${p1}) ${p2}`;
+  }
+  return `(${p1}) ${p2}-${p3}`;
+}
 
 const PROGRAM_REGIONS = [
   "Region 1 - Northwest", "Region 2 - North Central", "Region 3 - Northeast",
@@ -147,6 +219,7 @@ interface IntakeData {
   consentPhoto: boolean;
   consentInfoSharing: boolean;
   consentSignedDate: string;
+  consentFile: string | null;
 
   emergencyName1: string;
   emergencyPhone1: string;
@@ -174,6 +247,11 @@ interface IntakeData {
   programRegion: string;
   notes: string;
   duplicateAcknowledged: boolean;
+
+  // Enrolled State, County, Program
+  enrollmentState: string;
+  enrollmentCounty: string;
+  enrolledProgram: string;
 }
 
 const EMPTY: IntakeData = {
@@ -181,10 +259,10 @@ const EMPTY: IntakeData = {
   dob: "", gender: "", pronouns: "", primaryLanguage: "English", needsInterpreter: false,
   race: "", ethnicity: "", maritalStatus: "Single",
   medicaidId: "", ssnLast4: "", bddsId: "", mrn: `MRN-${Math.floor(10000 + Math.random() * 89999)}`,
-  street: "", city: "", state: "", zip: "", county: "", residenceType: "Family Home",
+  street: "", city: "", state: "IN", zip: "", county: "", residenceType: "Family Home",
   phone: "", email: "", preferredContact: "phone",
   hasGuardian: false, guardianName: "", guardianRelationship: "", guardianAuthority: "", guardianPhone: "", guardianEmail: "",
-  consentHIPAA: false, consentServices: false, consentPhoto: false, consentInfoSharing: false, consentSignedDate: "",
+  consentHIPAA: false, consentServices: false, consentPhoto: false, consentInfoSharing: false, consentSignedDate: "", consentFile: null,
   emergencyName1: "", emergencyPhone1: "", emergencyRelationship1: "",
   emergencyName2: "", emergencyPhone2: "", emergencyRelationship2: "",
   eligibilityStatus: "", primaryDiagnosis: "", diagnosisOnsetBefore22: false, lonScore: "", eligibilityLetterFile: null,
@@ -192,6 +270,9 @@ const EMPTY: IntakeData = {
   programStartDate: "", supportCoordinator: "", supervisor: "", serviceLine: "",
   authorizationNumber: "", monitoringSchedules: ["monthly", "quarterly-visit"],
   programRegion: "", notes: "", duplicateAcknowledged: false,
+  enrollmentState: "",
+  enrollmentCounty: "",
+  enrolledProgram: "",
 };
 
 function addDays(d: Date, n: number) {
@@ -279,8 +360,38 @@ function generateInitialTasks(data: IntakeData, participantId: string) {
 
 export default function NewParticipantIntake() {
   const navigate = useNavigate();
+  const { currentUser, userProfile } = useAuth();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<IntakeData>(EMPTY);
+  const [submitting, setSubmitting] = useState(false);
+
+  interface ProgramSetting {
+    id: string;
+    name: string;
+    code: string;
+    payer: string;
+    active: boolean;
+  }
+
+  const [organizationPrograms, setOrganizationPrograms] = useState<ProgramSetting[]>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(false);
+
+  useEffect(() => {
+    if (!userProfile?.organizationId) return;
+    setLoadingPrograms(true);
+    getDoc(doc(db, "organizations", userProfile.organizationId))
+      .then((snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          const list = ((d.programs as ProgramSetting[]) ?? []).filter((p) => p.active);
+          setOrganizationPrograms(list);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load organization programs:", err);
+      })
+      .finally(() => setLoadingPrograms(false));
+  }, [userProfile?.organizationId]);
 
   function update<K extends keyof IntakeData>(key: K, value: IntakeData[K]) {
     setData((d) => ({ ...d, [key]: value }));
@@ -302,26 +413,13 @@ export default function NewParticipantIntake() {
     }));
   }
 
-  // Duplicate / participant matching
+  // Duplicate / participant matching (local draft cache only — real check done at submit)
   const duplicates = useMemo(() => {
     const fn = data.firstName.trim().toLowerCase();
     const ln = data.lastName.trim().toLowerCase();
     const dob = data.dob;
     const mid = data.medicaidId.trim();
     if (!fn && !ln && !dob && !mid) return [] as Array<{ id: string; name: string; reason: string; meta: string }>;
-
-    const fromSeed = SEED_PEOPLE.map((p) => {
-      const reasons: string[] = [];
-      if (fn && p.firstName.toLowerCase() === fn && ln && p.lastName.toLowerCase() === ln) reasons.push("Name match");
-      else if (fn && ln && p.firstName.toLowerCase().startsWith(fn) && p.lastName.toLowerCase().startsWith(ln)) reasons.push("Partial name match");
-      if (dob && p.dob && (p.dob === dob || normalizeDob(p.dob) === dob)) reasons.push("DOB match");
-      return reasons.length ? {
-        id: p.id,
-        name: `${p.firstName} ${p.lastName}`,
-        reason: reasons.join(" · "),
-        meta: `${p.county} County · DOB ${p.dob}`,
-      } : null;
-    }).filter(Boolean) as Array<{ id: string; name: string; reason: string; meta: string }>;
 
     const intakes: Array<any> = JSON.parse(localStorage.getItem("icm.intakes") ?? "[]");
     const fromIntakes = intakes.map((p) => {
@@ -337,49 +435,153 @@ export default function NewParticipantIntake() {
       } : null;
     }).filter(Boolean) as Array<{ id: string; name: string; reason: string; meta: string }>;
 
-    return [...fromIntakes, ...fromSeed].slice(0, 4);
+    return fromIntakes.slice(0, 4);
   }, [data.firstName, data.lastName, data.dob, data.medicaidId]);
 
-  function submit() {
-    const stored = JSON.parse(localStorage.getItem("icm.intakes") ?? "[]");
-    const id = `new-${Date.now()}`;
-    stored.unshift({ id, ...data, createdAt: new Date().toISOString() });
-    localStorage.setItem("icm.intakes", JSON.stringify(stored));
+  async function submit() {
+    setSubmitting(true);
+    try {
+      const orgId = userProfile?.organizationId ?? "demo";
+      const authorId = currentUser?.uid ?? "unknown";
+      const authorName = userProfile?.displayName ?? userProfile?.email ?? data.supportCoordinator ?? "Unknown";
 
-    // Generate and persist initial tasks (6.3)
-    const tasks = generateInitialTasks(data, id);
-    const existing = JSON.parse(localStorage.getItem("icm.tasks") ?? "[]");
-    localStorage.setItem("icm.tasks", JSON.stringify([...tasks, ...existing]));
+      // Build the individual document
+      const individualDoc = {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        middle_name: data.middleName,
+        preferred_name: data.preferredName,
+        dob: data.dob,
+        gender: data.gender,
+        pronouns: data.pronouns,
+        primary_language: data.primaryLanguage,
+        needs_interpreter: data.needsInterpreter,
+        race: data.race,
+        ethnicity: data.ethnicity,
+        marital_status: data.maritalStatus,
+        medicaid_id: data.medicaidId,
+        ssn_last4: data.ssnLast4,
+        secondary_id: data.bddsId,
+        mrn: data.mrn,
+        address: {
+          street: data.street,
+          city: data.city,
+          state: data.state,
+          zip: data.zip,
+        },
+        county: data.county,
+        residence_type: data.residenceType,
+        phone: data.phone,
+        email: data.email,
+        preferred_contact: data.preferredContact,
+        has_guardian: data.hasGuardian,
+        guardian: data.hasGuardian ? {
+          name: data.guardianName,
+          relationship: data.guardianRelationship,
+          authority: data.guardianAuthority,
+          phone: data.guardianPhone,
+          email: data.guardianEmail,
+        } : null,
+        consent: {
+          hipaa: data.consentHIPAA,
+          services: data.consentServices,
+          photo: data.consentPhoto,
+          info_sharing: data.consentInfoSharing,
+          signed_date: data.consentSignedDate,
+          consent_file: data.consentFile,
+        },
+        emergency_contacts: [
+          data.emergencyName1 ? { name: data.emergencyName1, phone: data.emergencyPhone1, relationship: data.emergencyRelationship1 } : null,
+          data.emergencyName2 ? { name: data.emergencyName2, phone: data.emergencyPhone2, relationship: data.emergencyRelationship2 } : null,
+        ].filter(Boolean),
+        eligibility_status: data.eligibilityStatus,
+        diagnosis: data.primaryDiagnosis,
+        diagnosis_onset_before_22: data.diagnosisOnsetBefore22,
+        lon_score: data.lonScore,
+        programs: data.programs,
+        waiver_effective_date: data.waiverEffectiveDate,
+        program: data.enrolledProgram,
+        enrollment_state: data.enrollmentState,
+        enrollment_county: data.enrollmentCounty,
+        program_start_date: data.programStartDate,
+        assigned_case_manager: data.supportCoordinator,
+        supervisor: data.supervisor,
+        service_line: data.serviceLine,
+        authorization_number: data.authorizationNumber,
+        monitoring_schedules: data.monitoringSchedules,
+        program_region: data.programRegion,
+        notes: data.notes,
+        enrollment_status: "active",
+        risk_score: 5, // default — set by first assessment
+        organizationId: orgId,
+        createdBy: authorId,
+        createdByName: authorName,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
 
-    // Audit
-    const audit = JSON.parse(localStorage.getItem("icm.audit") ?? "[]");
-    audit.unshift({
-      id: `aud-${Date.now()}`,
-      ts: new Date().toISOString(),
-      actor: data.supportCoordinator || "Kathy (Care Manager)",
-      action: "Created participant record + enrolled in program",
-      target: `${data.firstName} ${data.lastName}`,
-      category: "create",
-      details: `Programs: ${data.programs.join(", ")} · Supervisor: ${data.supervisor}`,
-    });
-    audit.unshift({
-      id: `aud-${Date.now()+1}`,
-      ts: new Date().toISOString(),
-      actor: "System",
-      action: `Generated ${tasks.length} initial tasks`,
-      target: `${data.firstName} ${data.lastName}`,
-      category: "ai",
-      details: tasks.map(t => t.title).join("; "),
-    });
-    localStorage.setItem("icm.audit", JSON.stringify(audit));
+      const individualRef = await addDoc(collection(db, "individuals"), individualDoc);
+      const newId = individualRef.id;
 
-    toast.success(`${data.firstName} ${data.lastName} enrolled`, {
-      description: `${tasks.length} initial tasks created · routed to ${data.supervisor || "supervisor"} for review`,
-    });
-    navigate("/people");
+      // Create initial follow-up tasks in Firestore
+      const initialTasks = generateInitialTasks(data, newId);
+      const taskPromises = initialTasks.map((t) =>
+        addDoc(collection(db, "tasks"), {
+          title: t.title,
+          individualId: newId,
+          individualName: `${data.firstName} ${data.lastName}`,
+          dueDate: t.dueDate,
+          status: t.status === "skipped" ? "open" : "open",
+          priority: "medium",
+          type: t.category,
+          assignedTo: authorId,
+          organizationId: orgId,
+          category: t.category,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      );
+      await Promise.all(taskPromises);
+
+      // Audit log entry
+      await addDoc(collection(db, "audit_log"), {
+        actorId: authorId,
+        actorName: authorName,
+        action: "participant_intake_created",
+        targetId: newId,
+        targetName: `${data.firstName} ${data.lastName}`,
+        organizationId: orgId,
+        details: `Programs: ${data.programs.join(", ")} · Supervisor: ${data.supervisor} · ${initialTasks.length} tasks created`,
+        createdAt: serverTimestamp(),
+      });
+
+      toast.success(`${data.firstName} ${data.lastName} enrolled`, {
+        description: `${initialTasks.length} initial tasks created · saved to Firestore`,
+      });
+      navigate(`/people/${newId}/echart`);
+    } catch (err: any) {
+      console.error("[intake] Firestore save failed:", err);
+      toast.error("Failed to save intake", {
+        description: err?.message ?? "Please try again or contact support.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const stepKey = STEPS[step].key;
+
+  useEffect(() => {
+    if (stepKey === "enrollment") {
+      if (!data.enrollmentState && data.state) {
+        update("enrollmentState", data.state);
+      }
+      if (!data.enrollmentCounty && data.county) {
+        update("enrollmentCounty", data.county);
+      }
+    }
+  }, [stepKey, data.state, data.county, data.enrollmentState, data.enrollmentCounty]);
+
   const hasUnacknowledgedDup = duplicates.length > 0 && !data.duplicateAcknowledged;
   const canNext = (() => {
     if (stepKey === "demographics") return Boolean(data.firstName && data.lastName && data.dob && data.gender && !hasUnacknowledgedDup);
@@ -390,7 +592,8 @@ export default function NewParticipantIntake() {
     if (stepKey === "eligibility") return Boolean(data.eligibilityStatus && data.programs.length > 0);
     if (stepKey === "enrollment") return Boolean(
       data.programStartDate && data.supportCoordinator && data.supervisor &&
-      data.serviceLine && data.monitoringSchedules.length > 0
+      data.serviceLine && data.monitoringSchedules.length > 0 &&
+      data.enrollmentState && data.enrollmentCounty && data.enrolledProgram
     );
     return true;
   })();
@@ -594,18 +797,40 @@ export default function NewParticipantIntake() {
                   <Input value={data.city} onChange={(e) => update("city", e.target.value)} />
                 </Field>
                 <Field label="State">
-                  <Input value={data.state} onChange={(e) => update("state", e.target.value)} placeholder="2-letter code" maxLength={2} />
+                  <Select value={data.state} onValueChange={(v) => {
+                    update("state", v);
+                    if (v !== "IN") {
+                      update("county", "");
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select state…" /></SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {STATES.map((s) => (
+                        <SelectItem key={s.code} value={s.code}>
+                          {s.name} ({s.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field label="ZIP" required>
                   <Input value={data.zip} onChange={(e) => update("zip", e.target.value.replace(/\D/g, "").slice(0, 5))} />
                 </Field>
                 <Field label="County" required hint="County of residence">
-                  <Select value={data.county} onValueChange={(v) => update("county", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select county…" /></SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {COUNTIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  {data.state === "IN" ? (
+                    <Select value={data.county} onValueChange={(v) => update("county", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select county…" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {COUNTIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      value={data.county}
+                      onChange={(e) => update("county", e.target.value)}
+                      placeholder="Enter county…"
+                    />
+                  )}
                 </Field>
                 <Field label="Residence Type" colSpan={2}>
                   <Select value={data.residenceType} onValueChange={(v) => update("residenceType", v)}>
@@ -625,7 +850,7 @@ export default function NewParticipantIntake() {
             <Section title="Contact Preferences & Guardian">
               <Grid>
                 <Field label="Phone" hint="Mobile preferred">
-                  <Input value={data.phone} onChange={(e) => update("phone", e.target.value)} placeholder="(555) 555-0100" />
+                  <Input value={data.phone} onChange={(e) => update("phone", formatPhoneNumber(e.target.value))} placeholder="(555) 555-0100" />
                 </Field>
                 <Field label="Email">
                   <Input type="email" value={data.email} onChange={(e) => update("email", e.target.value)} />
@@ -679,7 +904,7 @@ export default function NewParticipantIntake() {
                       </Select>
                     </Field>
                     <Field label="Phone">
-                      <Input value={data.guardianPhone} onChange={(e) => update("guardianPhone", e.target.value)} />
+                      <Input value={data.guardianPhone} onChange={(e) => update("guardianPhone", formatPhoneNumber(e.target.value))} placeholder="(555) 555-0100" />
                     </Field>
                     <Field label="Email" colSpan={2}>
                       <Input type="email" value={data.guardianEmail} onChange={(e) => update("guardianEmail", e.target.value)} />
@@ -702,10 +927,29 @@ export default function NewParticipantIntake() {
                 <ConsentRow checked={data.consentPhoto} onCheck={(v) => update("consentPhoto", v)}
                   label="Photo / media release" />
               </div>
-              <div className="mt-4 max-w-xs">
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Consent signed date" required>
                   <Input type="date" value={data.consentSignedDate} onChange={(e) => update("consentSignedDate", e.target.value)} />
                 </Field>
+                <div className="flex flex-col justify-end">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                    Upload Signed Consent Documents
+                  </Label>
+                  <label className="flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 border-dashed border-border hover:border-primary/40 cursor-pointer transition-colors bg-muted/10 h-10">
+                    <Upload className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11.5px] font-medium truncate text-foreground">
+                        {data.consentFile ?? "Upload signed consent form (PDF, Image)"}
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => update("consentFile", e.target.files?.[0]?.name ?? null)}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="mt-6 pt-6 border-t border-border">
@@ -770,7 +1014,10 @@ export default function NewParticipantIntake() {
                   Program / Waiver Eligibility <span className="text-destructive">*</span>
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                  {PROGRAMS.map((w) => {
+                  {(organizationPrograms.length > 0
+                    ? organizationPrograms.map((p) => ({ id: p.id, label: p.name }))
+                    : PROGRAMS
+                  ).map((w) => {
                     const on = data.programs.includes(w.id);
                     return (
                       <button
@@ -825,6 +1072,54 @@ export default function NewParticipantIntake() {
                 Fields below reflect the active configuration.
               </p>
               <Grid>
+                <Field label="State of Enrollment" required>
+                  <Select value={data.enrollmentState} onValueChange={(v) => {
+                    update("enrollmentState", v);
+                    if (v !== "IN") {
+                      update("enrollmentCounty", "");
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select state…" /></SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {STATES.map((s) => (
+                        <SelectItem key={s.code} value={s.code}>
+                          {s.name} ({s.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="County of Enrollment" required>
+                  {data.enrollmentState === "IN" ? (
+                    <Select value={data.enrollmentCounty} onValueChange={(v) => update("enrollmentCounty", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select county…" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {COUNTIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      value={data.enrollmentCounty}
+                      onChange={(e) => update("enrollmentCounty", e.target.value)}
+                      placeholder="Enter county…"
+                    />
+                  )}
+                </Field>
+                <Field label="Enrolled Program" required>
+                  <Select value={data.enrolledProgram} onValueChange={(v) => update("enrolledProgram", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select program…" /></SelectTrigger>
+                    <SelectContent>
+                      {(organizationPrograms.length > 0
+                        ? organizationPrograms.map((p) => ({ id: p.id, label: p.name, code: p.code }))
+                        : PROGRAMS.map((p) => ({ id: p.id, label: p.label, code: "" }))
+                      ).map((p) => (
+                        <SelectItem key={p.id} value={p.label}>
+                          {p.label} {p.code ? `(${p.code})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <Field label="Program Start Date" required>
                   <Input type="date" value={data.programStartDate} onChange={(e) => update("programStartDate", e.target.value)} />
                 </Field>
@@ -929,14 +1224,22 @@ export default function NewParticipantIntake() {
                 <KV k="HIPAA" v={data.consentHIPAA ? "Acknowledged" : "—"} />
                 <KV k="Services" v={data.consentServices ? "Granted" : "—"} />
                 <KV k="Signed" v={data.consentSignedDate} />
+                <KV k="Consent File" v={data.consentFile ?? "Not uploaded"} />
               </ReviewBlock>
               <ReviewBlock title="Eligibility & Programs">
                 <KV k="Status" v={data.eligibilityStatus} />
-                <KV k="Programs" v={data.programs.map((id) => PROGRAMS.find((w) => w.id === id)?.label).filter(Boolean).join(", ") || "—"} />
+                <KV k="Programs" v={data.programs.map((id) => {
+                  const activeProgramsList = organizationPrograms.length > 0 
+                    ? organizationPrograms.map(p => ({ id: p.id, label: p.name }))
+                    : PROGRAMS;
+                  return activeProgramsList.find((w) => w.id === id)?.label;
+                }).filter(Boolean).join(", ") || "—"} />
                 <KV k="LON" v={data.lonScore || "—"} />
                 <KV k="Eligibility doc" v={data.eligibilityLetterFile ?? "Not uploaded"} />
               </ReviewBlock>
               <ReviewBlock title="Enrollment">
+                <KV k="Enrolled Program" v={data.enrolledProgram || "—"} />
+                <KV k="Enrolled State / County" v={data.enrollmentState && data.enrollmentCounty ? `${data.enrollmentCounty}, ${data.enrollmentState}` : "—"} />
                 <KV k="Start Date" v={data.programStartDate} />
                 <KV k="Service Line" v={data.serviceLine} />
                 <KV k="Support Coordinator" v={data.supportCoordinator} />
@@ -1006,9 +1309,12 @@ export default function NewParticipantIntake() {
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={submit} className="bg-gradient-to-r from-primary to-icm-accent">
-              <Check className="w-4 h-4 mr-1" />
-              Submit Intake & Generate Tasks
+            <Button onClick={submit} disabled={submitting} className="bg-gradient-to-r from-primary to-icm-accent">
+              {submitting ? (
+                <><span className="w-4 h-4 mr-1 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />Saving…</>
+              ) : (
+                <><Check className="w-4 h-4 mr-1" />Submit Intake &amp; Generate Tasks</>
+              )}
             </Button>
           )}
         </div>
@@ -1073,7 +1379,7 @@ function EmergencyContact({ n, name, phone, rel, onChange }: { n: number; name: 
         <Input value={name} onChange={(e) => onChange("name", e.target.value)} />
       </Field>
       <Field label="Phone">
-        <Input value={phone} onChange={(e) => onChange("phone", e.target.value)} />
+        <Input value={phone} onChange={(e) => onChange("phone", formatPhoneNumber(e.target.value))} placeholder="(555) 555-0100" />
       </Field>
       <Field label="Relationship">
         <Input value={rel} onChange={(e) => onChange("rel", e.target.value)} placeholder="Mother, Brother, Friend…" />

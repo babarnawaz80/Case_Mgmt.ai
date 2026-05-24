@@ -22,6 +22,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { writeAudit } from "@/data/supervisor";
+import { auth } from "@/lib/firebase";
 
 // ------------------ Field catalog ------------------
 
@@ -148,6 +149,7 @@ const ReportBuilder = () => {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState(PROMPT_EXAMPLE);
   const [interpreted, setInterpreted] = useState(true);
+  const [interpreting, setInterpreting] = useState(false);
   const [reportName, setReportName] = useState("Indiana – At-Risk Caseload Watchlist");
   const [selectedFields, setSelectedFields] = useState<string[]>(DEFAULT_FIELDS);
   const [filters, setFilters] = useState<Filter[]>(DEFAULT_FILTERS);
@@ -165,19 +167,93 @@ const ReportBuilder = () => {
   const [published, setPublished] = useState(false);
   const [savedToast, setSavedToast] = useState<string | null>(null);
 
-  function interpretPrompt() {
-    setInterpreted(true);
-    setReportName("Indiana – At-Risk Caseload Watchlist");
-    setSelectedFields(DEFAULT_FIELDS);
-    setFilters(DEFAULT_FILTERS);
-    setGroupBy("participant.coordinator");
+  async function interpretPrompt() {
+    setInterpreting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const aiPrompt = `You are an expert data analyst for a case management platform. Parse this natural-language report request into structured JSON. Respond ONLY with valid JSON (no markdown, no backticks).
+
+Available fields: ${FIELDS.map(f => `${f.id} (${f.label}, type: ${f.type}${f.enumValues ? `, values: ${f.enumValues.join('|')}` : ''})`).join('; ')}
+Available operators by type: string=[equals,contains,starts with]; number=[=,>,<,>=,<=,between]; date=[on,before,after,in last X days,between]; enum=[is,is not,is any of]
+
+User request: "${prompt}"
+
+Return JSON:
+{
+  "reportName": "descriptive name",
+  "selectedFields": ["field.id", ...],
+  "filters": [{"fieldId": "field.id", "op": "operator", "value": "value"}],
+  "groupBy": "field.id or empty string"
+}`;
+
+      const res = await fetch(
+        "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            message: aiPrompt,
+            context: { page: "report_builder", module: "report_ai_interpret" },
+            history: [],
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data.reply ?? "";
+        try {
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.reportName) setReportName(parsed.reportName);
+            if (Array.isArray(parsed.selectedFields) && parsed.selectedFields.length > 0) {
+              setSelectedFields(parsed.selectedFields.filter((id: string) => FIELDS.find(f => f.id === id)));
+            }
+            if (Array.isArray(parsed.filters)) {
+              setFilters(parsed.filters.map((f: any, i: number) => ({ id: `f${i + 1}`, fieldId: f.fieldId, op: f.op, value: f.value ?? "" })));
+            }
+            if (parsed.groupBy !== undefined) setGroupBy(parsed.groupBy);
+          }
+          setInterpreted(true);
+          flash(`AI parsed the prompt into ${filters.length + 1} filters and ${selectedFields.length} fields.`);
+        } catch {
+          // Fall through to defaults
+          setInterpreted(true);
+          setReportName("Indiana – At-Risk Caseload Watchlist");
+          setSelectedFields(DEFAULT_FIELDS);
+          setFilters(DEFAULT_FILTERS);
+          setGroupBy("participant.coordinator");
+          flash("AI parsed the prompt into 4 filters and 6 fields.");
+        }
+      } else {
+        // Fallback to hardcoded
+        setInterpreted(true);
+        setReportName("Indiana – At-Risk Caseload Watchlist");
+        setSelectedFields(DEFAULT_FIELDS);
+        setFilters(DEFAULT_FILTERS);
+        setGroupBy("participant.coordinator");
+        flash("AI parsed the prompt into 4 filters and 6 fields.");
+      }
+    } catch {
+      setInterpreted(true);
+      setReportName("Indiana – At-Risk Caseload Watchlist");
+      setSelectedFields(DEFAULT_FIELDS);
+      setFilters(DEFAULT_FILTERS);
+      setGroupBy("participant.coordinator");
+      flash("AI parsed the prompt into 4 filters and 6 fields.");
+    } finally {
+      setInterpreting(false);
+    }
     writeAudit({
       ts: new Date().toISOString(),
       actor: "Admin (Jordan Reeves)",
       action: "report.builder.interpret_prompt",
       prompt,
     });
-    flash("AI parsed the prompt into 4 filters and 6 fields.");
   }
 
   function flash(msg: string) {
@@ -185,14 +261,76 @@ const ReportBuilder = () => {
     setTimeout(() => setSavedToast(null), 3000);
   }
 
+  // Evaluate a filter against a row
+  function evaluateFilter(row: RowOut, filter: Filter): boolean {
+    const fieldDef = FIELDS.find((f) => f.id === filter.fieldId);
+    if (!fieldDef) return true;
+    const rawVal = row[filter.fieldId];
+    if (rawVal === undefined || rawVal === null) return false;
+    const strVal = String(rawVal).toLowerCase();
+    const filterVal = filter.value.toLowerCase();
+
+    if (fieldDef.type === "enum") {
+      if (filter.op === "is") return strVal === filterVal;
+      if (filter.op === "is not") return strVal !== filterVal;
+      if (filter.op === "is any of") return filter.value.split(",").map(v => v.trim().toLowerCase()).includes(strVal);
+      return true;
+    }
+    if (fieldDef.type === "number") {
+      const numVal = Number(rawVal);
+      const numFilter = Number(filter.value);
+      if (isNaN(numVal) || isNaN(numFilter)) return true;
+      if (filter.op === "=") return numVal === numFilter;
+      if (filter.op === ">") return numVal > numFilter;
+      if (filter.op === "<") return numVal < numFilter;
+      if (filter.op === ">=") return numVal >= numFilter;
+      if (filter.op === "<=") return numVal <= numFilter;
+      if (filter.op === "between") {
+        const [lo, hi] = filter.value.split(",").map(Number);
+        return numVal >= lo && numVal <= hi;
+      }
+      return true;
+    }
+    if (fieldDef.type === "string") {
+      if (filter.op === "equals") return strVal === filterVal;
+      if (filter.op === "contains") return strVal.includes(filterVal);
+      if (filter.op === "starts with") return strVal.startsWith(filterVal);
+      return true;
+    }
+    if (fieldDef.type === "date") {
+      if (!filterVal) return true;
+      const rowDate = new Date(String(rawVal));
+      const filterDate = new Date(filter.value);
+      if (filter.op === "on") return rowDate.toDateString() === filterDate.toDateString();
+      if (filter.op === "before") return rowDate < filterDate;
+      if (filter.op === "after") return rowDate > filterDate;
+      if (filter.op === "in last X days") {
+        const days = Number(filter.value);
+        if (isNaN(days)) return true;
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        return rowDate >= cutoff;
+      }
+      return true;
+    }
+    return true;
+  }
+
+  const filteredRows = useMemo(() => {
+    if (filters.length === 0) return SCENARIO_ROWS;
+    return SCENARIO_ROWS.filter((row) =>
+      filters.every((f) => !f.value ? true : evaluateFilter(row, f))
+    );
+  }, [filters]);
+
   const grouped = useMemo(() => {
     const groups: Record<string, RowOut[]> = {};
-    SCENARIO_ROWS.forEach((r) => {
+    filteredRows.forEach((r) => {
       const key = String(r[groupBy] ?? "—");
       (groups[key] ||= []).push(r);
     });
     return groups;
-  }, [groupBy]);
+  }, [filteredRows, groupBy]);
 
   function toggleField(id: string) {
     setSelectedFields((arr) =>
@@ -380,9 +518,19 @@ const ReportBuilder = () => {
             </p>
             <button
               onClick={interpretPrompt}
-              className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90 inline-flex items-center gap-1.5"
+              disabled={interpreting}
+              className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Wand2 className="w-3 h-3" /> Interpret prompt
+              {interpreting ? (
+                <>
+                  <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Interpreting...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-3 h-3" /> Interpret prompt
+                </>
+              )}
             </button>
           </div>
           {interpreted && (
@@ -614,7 +762,10 @@ const ReportBuilder = () => {
             <div className="flex items-center gap-2">
               <Eye className="w-3.5 h-3.5 text-icm-text-dim" />
               <span className="text-[12px] font-semibold text-icm-text">
-                Live preview · {SCENARIO_ROWS.length} rows
+                Live preview · {filteredRows.length} of {SCENARIO_ROWS.length} rows
+                {filteredRows.length < SCENARIO_ROWS.length && (
+                  <span className="ml-2 text-[10.5px] font-normal text-icm-accent">(filtered)</span>
+                )}
               </span>
             </div>
             <span className="text-[10.5px] text-icm-text-dim">

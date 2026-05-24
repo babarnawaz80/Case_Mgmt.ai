@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,10 +14,11 @@ import { cn } from "@/lib/utils";
 import { useRole } from "@/contexts/RoleContext";
 import { toast } from "@/hooks/use-toast";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { people } from "@/data/people";
+import { useIndividuals } from "@/hooks/useIndividuals";
 
 export default function LifePlanBoard() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { individuals } = useIndividuals();
   const [agents, setAgents] = useState<RuntimeAgent[]>([...mockRuntimeAgents]);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -28,7 +29,9 @@ export default function LifePlanBoard() {
     agent.engineName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activePeopleCount = people.filter((p) => p.status === "Active").length;
+  const activePeopleCount = useMemo(() => {
+    return individuals.filter((p) => p.enrollment_status === "active").length;
+  }, [individuals]);
   const pendingDraftStatuses = new Set(["draft_pending_review", "draft_updated"]);
   const pendingDraftsByAgent = mockDraftRuns.reduce((acc, draft) => {
     if (pendingDraftStatuses.has(draft.status)) acc[draft.agentId] = (acc[draft.agentId] || 0) + 1;

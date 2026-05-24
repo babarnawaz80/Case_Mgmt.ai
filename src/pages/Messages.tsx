@@ -25,11 +25,15 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { cn } from "@/lib/utils";
 import { useMessages } from "@/hooks/useMessages";
 import {
+  useFirestoreConversations,
+  useConversationMessages,
+  sendFSMessage,
+} from "@/hooks/useFirestoreMessages";
+import { useAuth } from "@/contexts/AuthContext";
+import {
   CURRENT_USER_ID,
   allStaff,
   staffById,
-  conversationDisplayName,
-  conversationOtherMember,
   roleAvatarTone,
   roleLabel,
   type ChatMessage,
@@ -37,6 +41,30 @@ import {
   type LinkedRecord,
   type StaffMember,
 } from "@/data/messages";
+
+// Shadow these functions to check for pre-resolved properties first (for Firestore threads)
+function conversationDisplayName(c: Conversation): string {
+  if ((c as any).displayName) return (c as any).displayName;
+  
+  if (c.type === "group") {
+    if (c.groupName) return c.groupName;
+    const others = c.memberIds
+      .filter((id) => id !== CURRENT_USER_ID)
+      .map((id) => staffById[id]?.name.split(" ")[0])
+      .filter(Boolean);
+    return others.join(", ");
+  }
+  const otherId = c.memberIds.find((id) => id !== CURRENT_USER_ID);
+  return otherId ? staffById[otherId]?.name ?? "Unknown" : "Unknown";
+}
+
+function conversationOtherMember(c: Conversation): StaffMember | null {
+  if ((c as any).otherMember) return (c as any).otherMember;
+  
+  if (c.type !== "direct") return null;
+  const otherId = c.memberIds.find((id) => id !== CURRENT_USER_ID);
+  return otherId ? staffById[otherId] ?? null : null;
+}
 
 type ListTab = "all" | "direct" | "groups" | "unread";
 
@@ -53,9 +81,85 @@ const Messages = () => {
     renameGroup,
   } = useMessages();
 
+  // ── Firestore integration (additive, non-breaking) ───────────────────────
+  const { currentUser, userProfile } = useAuth();
+  const {
+    conversations: fsConversations,
+    totalUnread: fsTotalUnread,
+  } = useFirestoreConversations();
+
+  // Map live Firestore conversations into the unified Conversation interface
+  const combinedConversations = useMemo(() => {
+    const fsMapped: Conversation[] = fsConversations.map((c) => {
+      const otherId = c.members.find((m) => m !== currentUser?.uid) ?? "supervisor";
+      const otherName = c.memberNames[otherId] ?? "Supervisor Account";
+      const initials = otherName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+      const otherMember: StaffMember = {
+        id: otherId,
+        name: otherName,
+        initials,
+        role: "supervisor",
+        title: "Supervisor",
+        online: true,
+      };
+
+      let timeStr = "Just now";
+      if (c.lastMessageAt && typeof c.lastMessageAt === "object" && "seconds" in c.lastMessageAt) {
+        const date = new Date((c.lastMessageAt as any).seconds * 1000);
+        timeStr = date.toLocaleDateString() === new Date().toLocaleDateString()
+          ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+
+      return {
+        id: c.id,
+        type: c.type,
+        memberIds: c.members,
+        groupName: c.type === "group" ? (c.name ?? "Group Conversation") : undefined,
+        lastPreview: c.lastMessage || "Conversation started",
+        lastTimestamp: timeStr,
+        lastWasYou: c.lastMessageBy === currentUser?.uid,
+        unread: c.unreadCounts[currentUser?.uid ?? ""] ?? 0,
+        // Injected properties for shadowing functions
+        isFirestore: true,
+        displayName: c.type === "group" ? (c.name ?? "Group Conversation") : otherName,
+        otherMember: c.type === "direct" ? otherMember : undefined,
+        memberNames: c.memberNames,
+      } as any;
+    });
+
+    const seenIds = new Set<string>();
+    const result: Conversation[] = [];
+
+    fsMapped.forEach((c) => {
+      seenIds.add(c.id);
+      result.push(c);
+    });
+
+    // Only include mock conversations if the user has NO Firestore conversations yet
+    // (i.e., brand new account with no real threads started). Once any real
+    // Firestore conversation exists, we show Firestore-only so messages persist.
+    if (fsMapped.length === 0) {
+      conversations.forEach((c) => {
+        if (!seenIds.has(c.id)) {
+          result.push(c);
+        }
+      });
+    }
+
+    return result;
+  }, [fsConversations, conversations, currentUser?.uid]);
+
+  // Combined unread badge count
+  const totalUnreadDisplay = unreadTotal + fsTotalUnread;
+
   // Selected conversation
-  const initialId = searchParams.get("c") ?? conversations[0]?.id ?? null;
+  const initialId = searchParams.get("c") ?? combinedConversations[0]?.id ?? null;
   const [activeId, setActiveIdRaw] = useState<string | null>(initialId);
+
+  // useConversationMessages subscribes to Firestore for the active thread
+  const { messages: _fsMessages } = useConversationMessages(activeId);
   function setActiveId(id: string | null) {
     setActiveIdRaw(id);
     if (id) setSearchParams({ c: id }, { replace: true });
@@ -63,21 +167,56 @@ const Messages = () => {
   }
 
   const active = useMemo(
-    () => conversations.find((c) => c.id === activeId) ?? null,
-    [conversations, activeId]
+    () => combinedConversations.find((c) => c.id === activeId) ?? null,
+    [combinedConversations, activeId]
   );
+
+  // Map Firestore or mock messages cleanly for bubble rendering
+  const activeConversationMessages = useMemo(() => {
+    if (!activeId) return [];
+    const isFS = fsConversations.some((c) => c.id === activeId);
+    if (isFS && _fsMessages.length > 0) {
+      return _fsMessages.map((m) => {
+        let timeStr = "Just now";
+        if (m.createdAt && typeof m.createdAt === "object" && "seconds" in m.createdAt) {
+          const date = new Date((m.createdAt as any).seconds * 1000);
+          timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        return {
+          id: m.id,
+          conversationId: m.conversationId,
+          authorId: m.senderId === currentUser?.uid ? "you" : m.senderId,
+          authorName: m.senderName, // Injected for dynamic initials fallback
+          kind: "text" as const,
+          text: m.body,
+          timestamp: timeStr,
+          dayBucket: "today" as const,
+          dayLabel: "Today",
+        };
+      });
+    }
+    return messagesForConversation(activeId);
+  }, [activeId, _fsMessages, messagesForConversation, fsConversations, currentUser?.uid]);
 
   // Mark active as read when opened
   useEffect(() => {
-    if (active && active.unread > 0) markConversationRead(active.id);
-  }, [active, markConversationRead]);
+    if (active && active.unread > 0) {
+      if ((active as any).isFirestore && currentUser?.uid) {
+        import("@/hooks/useFirestoreMessages").then((m) => {
+          m.markConversationRead(active.id, currentUser.uid);
+        });
+      } else {
+        markConversationRead(active.id);
+      }
+    }
+  }, [active, currentUser?.uid, markConversationRead]);
 
   // Tabs and search in left panel
   const [listTab, setListTab] = useState<ListTab>("all");
   const [listSearch, setListSearch] = useState("");
 
   const filteredConversations = useMemo(() => {
-    let list = conversations.slice();
+    let list = combinedConversations.slice();
     if (listTab === "direct") list = list.filter((c) => c.type === "direct");
     else if (listTab === "groups") list = list.filter((c) => c.type === "group");
     else if (listTab === "unread") list = list.filter((c) => c.unread > 0);
@@ -90,7 +229,7 @@ const Messages = () => {
       );
     }
     return list;
-  }, [conversations, listTab, listSearch]);
+  }, [combinedConversations, listTab, listSearch]);
 
   // Composer state
   const [draft, setDraft] = useState("");
@@ -100,6 +239,8 @@ const Messages = () => {
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [renameMode, setRenameMode] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [inConvoSearch, setInConvoSearch] = useState(false);
+  const [inConvoQuery, setInConvoQuery] = useState("");
 
   // New message modal
   const [newOpen, setNewOpen] = useState(false);
@@ -109,26 +250,49 @@ const Messages = () => {
     const text = draft.trim();
     if (!text && !draftLinked) return;
 
-    if (draftLinked) {
-      // First send the text (if any) then the linked record card
-      if (text) sendMessage(active.id, { kind: "text", text });
-      sendMessage(active.id, {
-        kind: "linked_record",
-        linkedRecord: draftLinked,
-      });
-    } else if (text.startsWith("@AI ") || text.startsWith("/ai ")) {
-      // AI prompt -> send as user, then AI summary reply
-      sendMessage(active.id, { kind: "text", text });
-      const prompt = text.replace(/^(@AI |\/ai )/, "");
-      setTimeout(() => {
-        sendMessage(active.id, {
-          kind: "ai_summary",
-          aiTitle: `Here's a quick summary based on "${prompt}". I cross-referenced recent records and surfaced the most relevant findings.`,
-          aiHref: "/dashboard",
-        });
-      }, 350);
+    const isFS = (active as any).isFirestore;
+
+    if (isFS) {
+      if (text) {
+        sendFSMessage(
+          active.id,
+          currentUser?.uid ?? "",
+          userProfile?.displayName ?? currentUser?.email ?? "Me",
+          text
+        ).catch((err) => console.error("[Messages] Failed to send Firestore message:", err));
+      }
     } else {
-      sendMessage(active.id, { kind: "text", text });
+      if (draftLinked) {
+        // First send the text (if any) then the linked record card
+        if (text) sendMessage(active.id, { kind: "text", text });
+        sendMessage(active.id, {
+          kind: "linked_record",
+          linkedRecord: draftLinked,
+        });
+      } else if (text.startsWith("@AI ") || text.startsWith("/ai ")) {
+        // AI prompt -> send as user, then AI summary reply
+        sendMessage(active.id, { kind: "text", text });
+        const prompt = text.replace(/^(@AI |\/ai )/, "");
+        setTimeout(() => {
+          sendMessage(active.id, {
+            kind: "ai_summary",
+            aiTitle: `Here's a quick summary based on "${prompt}". I cross-referenced recent records and surfaced the most relevant findings.`,
+            aiHref: "/dashboard",
+          });
+        }, 350);
+      } else {
+        sendMessage(active.id, { kind: "text", text });
+      }
+
+      // ── Firestore side-effect: mirror plain-text messages to Firestore ────
+      if (text) {
+        sendFSMessage(
+          active.id,
+          currentUser?.uid ?? "",
+          userProfile?.displayName ?? currentUser?.email ?? "Me",
+          text
+        ).catch(() => {});
+      }
     }
 
     setDraft("");
@@ -150,7 +314,7 @@ const Messages = () => {
               <p className="font-manrope font-bold text-[15px] text-icm-text">
                 Messages
               </p>
-              {unreadTotal > 0 && (
+              {totalUnreadDisplay > 0 && (
                 <button
                   onClick={markAllRead}
                   className="text-[10.5px] font-geist font-semibold text-icm-accent hover:underline"
@@ -200,6 +364,13 @@ const Messages = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {/* Live Firestore threads indicator */}
+            {fsConversations.length > 0 && (
+              <div className="px-3 py-1.5 text-[10px] font-geist text-icm-text-faint border-b border-icm-border flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-icm-green animate-pulse" />
+                {fsConversations.length} live thread{fsConversations.length !== 1 ? "s" : ""} from Firestore
+              </div>
+            )}
             {filteredConversations.length === 0 ? (
               <p className="px-3 py-6 text-[12px] font-geist text-icm-text-dim text-center">
                 No conversations
@@ -210,6 +381,7 @@ const Messages = () => {
                   key={c.id}
                   conversation={c}
                   active={c.id === activeId}
+                  currentUid={currentUser?.uid ?? ""}
                   onClick={() => setActiveId(c.id)}
                 />
               ))
@@ -229,7 +401,8 @@ const Messages = () => {
           ) : (
             <ActiveConversation
               conversation={active}
-              messages={messagesForConversation(active.id)}
+              messages={activeConversationMessages}
+              currentUid={currentUser?.uid ?? ""}
               draft={draft}
               setDraft={setDraft}
               draftLinked={draftLinked}
@@ -250,6 +423,10 @@ const Messages = () => {
                 renameGroup(active.id, val);
                 setRenameMode(false);
               }}
+              inConvoSearch={inConvoSearch}
+              setInConvoSearch={setInConvoSearch}
+              inConvoQuery={inConvoQuery}
+              setInConvoQuery={setInConvoQuery}
             />
           )}
         </section>
@@ -278,10 +455,12 @@ const Messages = () => {
 function ConversationRow({
   conversation,
   active,
+  currentUid,
   onClick,
 }: {
   conversation: Conversation;
   active: boolean;
+  currentUid: string;
   onClick: () => void;
 }) {
   const name = conversationDisplayName(conversation);
@@ -291,9 +470,16 @@ function ConversationRow({
   // Build avatar
   const avatarMembers = isGroup
     ? conversation.memberIds
-        .filter((id) => id !== CURRENT_USER_ID)
+        .filter((id) => id !== (conversation.isFirestore ? currentUid : CURRENT_USER_ID))
         .slice(0, 3)
-        .map((id) => staffById[id])
+        .map((id) => staffById[id] ?? {
+          id,
+          name: (conversation as any).memberNames?.[id] ?? "User",
+          initials: ((conversation as any).memberNames?.[id] ?? "U").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+          role: "supervisor" as const,
+          title: "User",
+          online: true,
+        })
     : null;
 
   return (
@@ -312,7 +498,7 @@ function ConversationRow({
             <span
               key={m.id}
               className={cn(
-                "absolute w-6 h-6 rounded-full ring-1 ring-icm-panel flex items-center justify-center text-[9px] font-geist font-bold",
+                "absolute w-6 h-6 rounded-lg ring-1 ring-icm-panel flex items-center justify-center text-[9px] font-geist font-bold",
                 roleAvatarTone(m.role)
               )}
               style={{ left: i * 8, top: i * 4, zIndex: 3 - i }}
@@ -406,6 +592,7 @@ function EmptyConversation({ onNew }: { onNew: () => void }) {
 interface ActiveConversationProps {
   conversation: Conversation;
   messages: ChatMessage[];
+  currentUid: string;
   draft: string;
   setDraft: (v: string) => void;
   draftLinked: LinkedRecord | null;
@@ -423,11 +610,16 @@ interface ActiveConversationProps {
   setRenameValue: (v: string) => void;
   onRename: (v: string) => void;
   onBack?: () => void;
+  inConvoSearch: boolean;
+  setInConvoSearch: (v: boolean) => void;
+  inConvoQuery: string;
+  setInConvoQuery: (v: string) => void;
 }
 
 function ActiveConversation({
   conversation,
   messages,
+  currentUid,
   draft,
   setDraft,
   draftLinked,
@@ -445,6 +637,10 @@ function ActiveConversation({
   setRenameValue,
   onRename,
   onBack,
+  inConvoSearch,
+  setInConvoSearch,
+  inConvoQuery,
+  setInConvoQuery,
 }: ActiveConversationProps) {
   const isGroup = conversation.type === "group";
   const other = conversationOtherMember(conversation);
@@ -455,16 +651,23 @@ function ActiveConversation({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length, conversation.id]);
 
+  // Filter messages by in-conversation search query
+  const displayMessages = useMemo(() => {
+    if (!inConvoSearch || !inConvoQuery.trim()) return messages;
+    const q = inConvoQuery.trim().toLowerCase();
+    return messages.filter((m) => (m.text ?? "").toLowerCase().includes(q));
+  }, [messages, inConvoSearch, inConvoQuery]);
+
   // Group messages by day for date separators
   const grouped = useMemo(() => {
     const out: { label: string; items: ChatMessage[] }[] = [];
-    messages.forEach((m) => {
+    displayMessages.forEach((m) => {
       const last = out[out.length - 1];
       if (last && last.label === m.dayLabel) last.items.push(m);
       else out.push({ label: m.dayLabel, items: [m] });
     });
     return out;
-  }, [messages]);
+  }, [displayMessages]);
 
   return (
     <>
@@ -483,10 +686,17 @@ function ActiveConversation({
         {isGroup ? (
           <div className="relative w-10 h-10 shrink-0">
             {conversation.memberIds
-              .filter((id) => id !== CURRENT_USER_ID)
+              .filter((id) => id !== (conversation.isFirestore ? currentUid : CURRENT_USER_ID))
               .slice(0, 3)
               .map((id, i) => {
-                const m = staffById[id];
+                const m = staffById[id] ?? {
+                  id,
+                  name: (conversation as any).memberNames?.[id] ?? "User",
+                  initials: ((conversation as any).memberNames?.[id] ?? "U").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+                  role: "supervisor" as const,
+                  title: "User",
+                  online: true,
+                };
                 return (
                   <span
                     key={id}
@@ -556,9 +766,15 @@ function ActiveConversation({
           </p>
         </div>
         <button
-          onClick={() => demoToast("In-conversation search")}
-          className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
-          title="Search in conversation"
+          onClick={() => {
+            setInConvoSearch(!inConvoSearch);
+            setInConvoQuery("");
+          }}
+          className={cn(
+            "w-8 h-8 rounded-lg hover:bg-icm-bg flex items-center justify-center",
+            inConvoSearch ? "bg-icm-accent text-white" : "text-icm-text-dim"
+          )}
+          title={inConvoSearch ? "Close search" : "Search in conversation"}
         >
           <Search className="w-4 h-4" />
         </button>
@@ -584,6 +800,31 @@ function ActiveConversation({
           </div>
         )}
       </header>
+
+      {/* In-conversation search bar */}
+      {inConvoSearch && (
+        <div className="px-3 py-2 border-b border-icm-border bg-icm-panel flex items-center gap-2">
+          <Search className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
+          <input
+            autoFocus
+            value={inConvoQuery}
+            onChange={(e) => setInConvoQuery(e.target.value)}
+            placeholder="Search messages…"
+            className="flex-1 bg-transparent text-[12.5px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none"
+          />
+          {inConvoQuery.trim() && (
+            <span className="text-[11px] font-geist text-icm-text-faint shrink-0">
+              {displayMessages.length} result{displayMessages.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <button
+            onClick={() => { setInConvoSearch(false); setInConvoQuery(""); }}
+            className="w-6 h-6 rounded-md hover:bg-icm-bg text-icm-text-dim flex items-center justify-center shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Thread */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-5">
@@ -745,8 +986,15 @@ function MessageBubble({
   message: ChatMessage;
   showAuthor: boolean;
 }) {
-  const isMe = message.authorId === CURRENT_USER_ID;
-  const author = staffById[message.authorId];
+  const isMe = message.authorId === CURRENT_USER_ID || message.authorId === "you";
+  const author = staffById[message.authorId] ?? {
+    id: message.authorId,
+    name: (message as any).authorName ?? "Supervisor",
+    initials: ((message as any).authorName ?? "S").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+    role: "supervisor" as const,
+    title: "Supervisor",
+    online: true,
+  };
 
   if (message.kind === "system") {
     return (
@@ -955,7 +1203,7 @@ function MentionPicker({
         >
           <span
             className={cn(
-              "w-6 h-6 rounded-full ring-1 flex items-center justify-center text-[9px] font-geist font-bold",
+              "w-6 h-6 rounded-lg ring-1 flex items-center justify-center text-[9px] font-geist font-bold",
               roleAvatarTone(s.role)
             )}
           >
@@ -1125,7 +1373,7 @@ function NewMessageModal({
                   >
                     <span
                       className={cn(
-                        "w-6 h-6 rounded-full ring-1 flex items-center justify-center text-[9px] font-geist font-bold",
+                        "w-6 h-6 rounded-lg ring-1 flex items-center justify-center text-[9px] font-geist font-bold",
                         roleAvatarTone(s.role)
                       )}
                     >

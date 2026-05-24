@@ -1,0 +1,755 @@
+/**
+ * useFirestore.ts
+ * Generic real-time Firestore hooks for all individual-scoped sub-collections.
+ * Each hook returns { data, loading, error } with real-time onSnapshot updates.
+ */
+import { useState, useEffect } from "react";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  type DocumentData,
+  type QueryConstraint,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+// ─── Generic sub-collection hook ────────────────────────────────────────────
+
+function useSubCollection<T>(
+  individualId: string | undefined,
+  collectionName: string,
+  orderField = "created_at",
+  orderDir: "asc" | "desc" = "desc",
+  extraConstraints: QueryConstraint[] = []
+) {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!individualId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const constraints: QueryConstraint[] = [
+      where("individual_id", "==", individualId),
+      orderBy(orderField, orderDir),
+      ...extraConstraints,
+    ];
+    const q = query(collection(db, collectionName), ...constraints);
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(`[${collectionName}]`, err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [individualId, collectionName, orderField, orderDir]);
+
+  return { data, loading, error };
+}
+
+// ─── Generic collection hook (unscoped, for global views) ───────────────────
+
+export function useCollection<T>(
+  collectionName: string,
+  orderField = "created_at",
+  orderDir: "asc" | "desc" = "desc",
+  extraConstraints: QueryConstraint[] = []
+) {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const constraints: QueryConstraint[] = [
+      orderBy(orderField, orderDir),
+      ...extraConstraints,
+    ];
+    const q = query(collection(db, collectionName), ...constraints);
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(`[${collectionName}]`, err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [collectionName, orderField, orderDir]);
+
+  return { data, loading, error };
+}
+
+// ─── Contact Notes ────────────────────────────────────────────────────────────
+
+export interface ContactNote {
+  id: string;
+  individual_id: string;
+  individual_name?: string;
+  author_uid: string;
+  author_name: string;
+  date: string;
+  activityType?: string;
+  contactType?: string;
+  billable?: boolean;
+  nonBillableReason?: string;
+  startTime?: string;
+  endTime?: string;
+  purpose?: string;
+  background?: string;
+  present?: string;
+  details?: string;
+  issues?: string;
+  nextSteps?: string;
+  status: "draft" | "submitted" | "signed";
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useContactNotes(individualId: string | undefined) {
+  return useSubCollection<ContactNote>(individualId, "contact_notes", "date", "desc");
+}
+
+// ─── Referrals ────────────────────────────────────────────────────────────────
+
+export interface Referral {
+  id: string;
+  individual_id: string;
+  individual_name?: string;
+  referral_type: string;
+  referred_to: string;
+  referred_by: string;
+  referred_by_uid?: string;
+  date: string;
+  priority?: "routine" | "urgent" | "emergency";
+  status: "pending" | "in_progress" | "completed" | "declined";
+  notes?: string;
+  outcome?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useReferrals(individualId: string | undefined) {
+  return useSubCollection<Referral>(individualId, "referrals", "date", "desc");
+}
+
+export async function addReferral(
+  data: Omit<Referral, "id" | "created_at" | "updated_at">
+) {
+  return addDoc(collection(db, "referrals"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateReferral(id: string, data: Partial<Referral>) {
+  return updateDoc(doc(db, "referrals", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+// ─── Care Plans ───────────────────────────────────────────────────────────────
+
+export interface CarePlan {
+  id: string;
+  individual_id: string;
+  title: string;
+  plan_type?: string;
+  status: "draft" | "active" | "archived";
+  effective_date?: string;
+  review_date?: string;
+  goals?: CarePlanGoal[];
+  author_uid?: string;
+  author_name?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export interface CarePlanGoal {
+  id: string;
+  goal: string;
+  priority?: "high" | "medium" | "low";
+  target_date?: string;
+  progress?: "not_started" | "in_progress" | "achieved" | "discontinued";
+  interventions?: string[];
+}
+
+export function useCarePlans(individualId: string | undefined) {
+  return useSubCollection<CarePlan>(individualId, "care_plans", "created_at", "desc");
+}
+
+// ─── Monitoring Forms ─────────────────────────────────────────────────────────
+
+export interface MonitoringFormRecord {
+  id: string;
+  individual_id: string;
+  type: "Monthly" | "Quarterly" | "Annually";
+  status: "Draft" | "In Progress" | "Submitted";
+  active: "Active" | "Inactive";
+  due_date?: string;
+  submitted_date?: string;
+  updated_by?: string;
+  updated_on?: string;
+  sections?: Record<string, unknown>;
+  author_uid?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useMonitoringForms(individualId: string | undefined) {
+  return useSubCollection<MonitoringFormRecord>(
+    individualId,
+    "monitoring_forms",
+    "created_at",
+    "desc"
+  );
+}
+
+// ─── Visit Summaries ──────────────────────────────────────────────────────────
+
+export interface VisitSummaryRecord {
+  id: string;
+  individual_id: string;
+  individual_name?: string;
+  visit_date: string;
+  start_time?: string;
+  end_time?: string;
+  location?: string;
+  purpose_of_support?: string;
+  what_went_well?: string;
+  what_is_not_working?: string;
+  goals_addressed?: string[];
+  next_steps?: string;
+  status: "draft" | "submitted" | "signed";
+  author_uid?: string;
+  author_name?: string;
+  updated_by?: string;
+  updated_on?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useVisitSummaries(individualId: string | undefined) {
+  return useSubCollection<VisitSummaryRecord>(
+    individualId,
+    "visit_summaries",
+    "visit_date",
+    "desc"
+  );
+}
+
+export async function addVisitSummary(
+  data: Omit<VisitSummaryRecord, "id" | "created_at" | "updated_at">
+) {
+  return addDoc(collection(db, "visit_summaries"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+// ─── Incident Reports ─────────────────────────────────────────────────────────
+
+export interface IncidentReport {
+  id: string;
+  individual_id: string;
+  individual_name?: string;
+  incident_date: string;
+  incident_time?: string;
+  location?: string;
+  incident_types?: string[];
+  description?: string;
+  classification?: "Critical" | "Significant" | "Minor" | "Unknown";
+  current_stage?: number;
+  status: "Open" | "In Progress" | "Pending Review" | "Closed" | "Void";
+  person_responsible?: string;
+  staff_on_duty?: string;
+  reported_by_uid?: string;
+  reported_by_name?: string;
+  last_updated_by?: string;
+  last_updated_at?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useIncidentReports(individualId: string | undefined) {
+  return useSubCollection<IncidentReport>(
+    individualId,
+    "incident_reports",
+    "incident_date",
+    "desc"
+  );
+}
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+export interface ManagedDocument {
+  id: string;
+  individual_id: string;
+  name: string;
+  category?: string;
+  file_url?: string;
+  file_type?: string;
+  file_size_kb?: number;
+  uploaded_by?: string;
+  uploaded_by_uid?: string;
+  expiration_date?: string;
+  status?: "current" | "expired" | "pending";
+  notes?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useManagedDocuments(individualId: string | undefined) {
+  return useSubCollection<ManagedDocument>(
+    individualId,
+    "managed_documents",
+    "created_at",
+    "desc"
+  );
+}
+
+// ─── Workflows & Workflow Tasks ───────────────────────────────────────────────
+
+export interface WorkflowStep {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  status: "Pending" | "In Progress" | "Completed" | "Overdue";
+  dueDate?: string;
+  staffResponsible?: string;
+  linkedModuleSlug?: string;
+  linkedModuleLabel?: string;
+  aiDraftReady?: boolean;
+  aiDraftBody?: string;
+  completedAt?: string;
+  completionNotes?: string;
+}
+
+export interface WorkflowRecord {
+  id: string;
+  personId: string;
+  personName: string;
+  individual_id?: string;
+  individual_name?: string;
+  title: string;
+  triggerDate: string;
+  dueDate?: string;
+  createdOn: string;
+  status: "Active" | "Completed" | "Terminated";
+  steps: WorkflowStep[];
+  notes?: string;
+  terminationReason?: string;
+  terminationNotes?: string;
+  completedDate?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useWorkflows(individualId: string | undefined) {
+  return useSubCollection<WorkflowRecord>(individualId, "workflows", "created_at", "desc");
+}
+
+export function useWorkflow(workflowId: string | undefined) {
+  const [data, setData] = useState<WorkflowRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!workflowId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsub = onSnapshot(
+      doc(db, "workflows", workflowId),
+      (snap) => {
+        if (snap.exists()) {
+          setData({ id: snap.id, ...snap.data() } as WorkflowRecord);
+        } else {
+          setData(null);
+        }
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(`[workflow]`, err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [workflowId]);
+
+  return { data, loading, error };
+}
+
+export function useAllWorkflows() {
+  return useCollection<WorkflowRecord>("workflows", "created_at", "desc");
+}
+
+export async function addWorkflow(data: Omit<WorkflowRecord, "id" | "created_at" | "updated_at">) {
+  return addDoc(collection(db, "workflows"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateWorkflow(id: string, data: Partial<WorkflowRecord>) {
+  return updateDoc(doc(db, "workflows", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export interface WorkflowTask {
+  id: string;
+  individual_id: string;
+  title: string;
+  description?: string;
+  category?: string;
+  priority?: "high" | "medium" | "low";
+  status: "open" | "in_progress" | "completed" | "cancelled";
+  due_date?: string;
+  assigned_to_uid?: string;
+  assigned_to_name?: string;
+  completed_at?: unknown;
+  completed_by?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useWorkflowTasks(individualId: string | undefined) {
+  return useSubCollection<WorkflowTask>(
+    individualId,
+    "workflow_tasks",
+    "due_date",
+    "asc"
+  );
+}
+
+export async function addWorkflowTask(
+  data: Omit<WorkflowTask, "id" | "created_at" | "updated_at">
+) {
+  return addDoc(collection(db, "workflow_tasks"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateWorkflowTask(id: string, data: Partial<WorkflowTask>) {
+  return updateDoc(doc(db, "workflow_tasks", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+// ─── On-Call Log ──────────────────────────────────────────────────────────────
+
+export interface OnCallEntry {
+  id: string;
+  individual_id: string;
+  individual_name?: string;
+  date: string;
+  time?: string;
+  caller?: string;
+  call_type?: string;
+  description?: string;
+  action_taken?: string;
+  follow_up_required?: boolean;
+  follow_up_notes?: string;
+  author_uid?: string;
+  author_name?: string;
+  created_at?: unknown;
+}
+
+export function useOnCallLog(individualId: string | undefined) {
+  return useSubCollection<OnCallEntry>(individualId, "oncall_log", "date", "desc");
+}
+
+export function useAllOnCallLogs() {
+  return useCollection<OnCallEntry>("oncall_log", "date", "desc");
+}
+
+export async function addOnCallLog(data: Omit<OnCallEntry, "id" | "created_at">) {
+  return addDoc(collection(db, "oncall_log"), {
+    ...data,
+    created_at: serverTimestamp(),
+  });
+}
+
+// ─── Trainings ────────────────────────────────────────────────────────────────
+
+export interface Training {
+  id: string;
+  individual_id: string;
+  title: string;
+  category?: string;
+  provider?: string;
+  completion_date?: string;
+  expiration_date?: string;
+  status: "completed" | "in_progress" | "overdue" | "scheduled";
+  hours?: number;
+  certificate_url?: string;
+  notes?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function useTrainings(individualId: string | undefined) {
+  return useSubCollection<Training>(individualId, "trainings", "completion_date", "desc");
+}
+
+// ─── Eligibility Verifications ────────────────────────────────────────────────
+
+export interface FundingSource {
+  id: string;
+  type: "Medicare" | "State funding" | "County funding" | "Private insurance" | "Self-pay" | "Other";
+  policyNumber?: string;
+  effectiveDate?: string;
+  renewalDate?: string;
+  status?: string;
+  notes?: string;
+}
+
+export interface EligibilityVerification {
+  id: string;
+  individual_id: string;
+  verification_date: string;
+  payer?: string;
+  medicaid_id?: string;
+  eligible?: boolean;
+  coverage_start?: string;
+  coverage_end?: string;
+  plan_name?: string;
+  managed_care_org?: string;
+  verified_by?: string;
+  notes?: string;
+  created_at?: unknown;
+  // Comprehensive compatibility fields
+  maStatus: "MA Eligible — Active"
+    | "MA Eligible — Renewal Pending"
+    | "MA Eligible — Pending Approval"
+    | "MA Ineligible — Suspended"
+    | "MA Ineligible — Terminated"
+    | "MA Ineligible — Not Found"
+    | "Unknown — Verification Needed";
+  maNumber?: string;
+  maType?: "Waiver Related" | "SSI Related" | "Medicare/Medicaid Dual" | "Spend-Down" | "Other";
+  ssiOrNoRedetermination?: boolean;
+  verificationDate?: string;
+  effectiveDate?: string;
+  applicationDate?: string;
+  renewalDate?: string;
+  redeterminationDate?: string;
+  documentType?: string;
+  documentName?: string;
+  documentUploadedOn?: string;
+  recordStatus: "Active" | "Pending" | "Inactive" | "Draft";
+  updatedBy: string;
+  updatedOn: string;
+  fundingSources?: FundingSource[];
+  aiFields?: Record<string, string>;
+}
+
+export function useEligibilityVerification(verificationId: string | undefined) {
+  const [data, setData] = useState<EligibilityVerification | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!verificationId || verificationId === "new") {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsub = onSnapshot(
+      doc(db, "eligibility_verifications", verificationId),
+      (snap) => {
+        if (snap.exists()) {
+          setData({ id: snap.id, ...snap.data() } as EligibilityVerification);
+        } else {
+          setData(null);
+        }
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(`[eligibility_verification]`, err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [verificationId]);
+
+  return { data, loading, error };
+}
+
+export function useEligibilityVerifications(individualId: string | undefined) {
+  return useSubCollection<EligibilityVerification>(
+    individualId,
+    "eligibility_verifications",
+    "verification_date",
+    "desc"
+  );
+}
+
+// ─── Assigned Staff ───────────────────────────────────────────────────────────
+
+export interface AssignedStaffMember {
+  id: string;
+  individual_id: string;
+  staff_uid?: string;
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  start_date?: string;
+  end_date?: string;
+  primary?: boolean;
+  status: "active" | "inactive";
+  created_at?: unknown;
+}
+
+export function useAssignedStaff(individualId: string | undefined) {
+  return useSubCollection<AssignedStaffMember>(
+    individualId,
+    "assigned_staff",
+    "created_at",
+    "asc"
+  );
+}
+
+// ─── Firestore Action Helpers ──────────────────────────────────────────────────
+
+export async function addCarePlan(data: any) {
+  return addDoc(collection(db, "care_plans"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateCarePlan(id: string, data: any) {
+  return updateDoc(doc(db, "care_plans", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function addMonitoringForm(data: any) {
+  return addDoc(collection(db, "monitoring_forms"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateMonitoringForm(id: string, data: any) {
+  return updateDoc(doc(db, "monitoring_forms", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function addIncidentReport(data: any) {
+  return addDoc(collection(db, "incident_reports"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateIncidentReport(id: string, data: any) {
+  return updateDoc(doc(db, "incident_reports", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function addEligibilityVerification(data: any) {
+  return addDoc(collection(db, "eligibility_verifications"), {
+    ...data,
+    created_at: serverTimestamp(),
+  });
+}
+
+export async function updateEligibilityVerification(id: string, data: any) {
+  return updateDoc(doc(db, "eligibility_verifications", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function addOnCallEntry(data: any) {
+  return addDoc(collection(db, "oncall_log"), {
+    ...data,
+    created_at: serverTimestamp(),
+  });
+}
+
+export async function updateOnCallEntry(id: string, data: any) {
+  return updateDoc(doc(db, "oncall_log", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function addTraining(data: any) {
+  return addDoc(collection(db, "trainings"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateTraining(id: string, data: any) {
+  return updateDoc(doc(db, "trainings", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function addAssignedStaff(data: any) {
+  return addDoc(collection(db, "assigned_staff"), {
+    ...data,
+    created_at: serverTimestamp(),
+  });
+}
+
+export async function updateAssignedStaff(id: string, data: any) {
+  return updateDoc(doc(db, "assigned_staff", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+

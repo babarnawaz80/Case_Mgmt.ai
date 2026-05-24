@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
 import {
   ChevronLeft,
   Plus,
@@ -10,8 +9,9 @@ import {
   Search,
   Activity,
   X,
+  Loader2,
 } from "lucide-react";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import {
   listAssessments,
   listInstruments,
@@ -25,11 +25,22 @@ type Tab = (typeof tabs)[number];
 export default function PersonAssessments() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
   const [tab, setTab] = useState<Tab>("assessments");
   const [showSelector, setShowSelector] = useState(false);
 
-  if (!person) {
+  if (loading) {
+    return (
+      <ICMShell title="Assessments" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="Assessments" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim">Person not found.</p>
@@ -37,14 +48,14 @@ export default function PersonAssessments() {
     );
   }
 
-  const items = listAssessments(person.id);
-  const instruments = listInstruments(person.id);
+  const items = listAssessments(individual.id);
+  const instruments = listInstruments(individual.id);
 
   return (
-    <ICMShell title="Assessments" rightPanel={<PersonAIPanel person={person} />}>
+    <ICMShell title="Assessments" showAIPanel={false}>
       <div className="space-y-5">
         <button
-          onClick={() => navigate(`/people/${person.id}/echart`)}
+          onClick={() => navigate(`/people/${individual.id}/echart`)}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -57,7 +68,7 @@ export default function PersonAssessments() {
               Assessments
             </h1>
             <p className="text-[12.5px] text-icm-text-dim mt-1 font-geist">
-              {person.firstName} {person.lastName} · ID #{person.id}
+              {individual.first_name} {individual.last_name} · ID #{individual.id.slice(0, 8)}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -99,7 +110,7 @@ export default function PersonAssessments() {
                   No assessments yet
                 </h3>
                 <p className="text-[12.5px] text-icm-text-dim mt-1">
-                  Complete {person.firstName}'s first assessment to establish a
+                  Complete {individual.first_name}'s first assessment to establish a
                   baseline for service planning and authorization.
                 </p>
                 <button
@@ -117,7 +128,7 @@ export default function PersonAssessments() {
               return (
                 <button
                   key={a.id}
-                  onClick={() => navigate(`/people/${person.id}/assessments/${a.id}`)}
+                  onClick={() => navigate(`/people/${individual.id}/assessments/${a.id}`)}
                   className="w-full text-left rounded-xl border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong hover:shadow-elevated flex items-center gap-4"
                 >
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
@@ -206,7 +217,7 @@ export default function PersonAssessments() {
                 </h3>
               </div>
               <p className="text-[11.5px] text-icm-text-dim font-geist">
-                {person.firstName}'s HRST score: <span className="font-mono">2 (2022)</span> ·
+                {individual.first_name}'s HRST score: <span className="font-mono">2 (2022)</span> ·
                 no recent score on file. Annual HRST update is overdue.
               </p>
             </div>
@@ -216,12 +227,12 @@ export default function PersonAssessments() {
 
       {showSelector && (
         <TemplateSelector
-          personId={person.id}
+          personId={individual.id}
           onClose={() => setShowSelector(false)}
           onSelect={(tplId, withPrefill) => {
             const newId = `A-${Date.now().toString().slice(-4)}`;
             navigate(
-              `/people/${person.id}/assessments/new?template=${tplId}&prefill=${withPrefill ? 1 : 0}&aid=${newId}`,
+              `/people/${individual.id}/assessments/new?template=${tplId}&prefill=${withPrefill ? 1 : 0}&aid=${newId}`,
             );
           }}
         />

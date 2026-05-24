@@ -1,36 +1,30 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft, Sparkles, Check, X, AlertTriangle, FileDown, Plus, Trash2, ShieldAlert, CheckCircle2,
+  ChevronLeft, Sparkles, Check, X, AlertTriangle, FileDown, Plus, Trash2, ShieldAlert, CheckCircle2, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
+import { useIndividual, riskAvatarClass, initials, type Individual } from "@/hooks/useIndividuals";
+import { useIncidentReports, addIncidentReport, updateIncidentReport } from "@/hooks/useFirestore";
 import {
-  getIncident, createIncident, updateIncident, suggestedClassification, classificationLocked,
+  suggestedClassification, classificationLocked,
   INCIDENT_TYPES, CLASSIFICATIONS, PERSON_RESPONSIBLE, CONTRIBUTING_FACTORS, STAGE_LABELS,
   type IncidentRecord, type IncidentStageId, type NotificationRow, type ActionItem,
 } from "@/data/incidents";
-import type { AISuggestion } from "@/data/people";
-
-const detailSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Stage 2 (Notification Log) requires Standing Committee notification. This is past the standard 72-hour window.", cta: "Add notification" },
-  { tone: "insight", label: "Insight", body: "I drafted a corrective action plan based on the contributing factors selected.", cta: "Review draft" },
-];
+import { toast } from "sonner";
 
 const PersonIncidentReportingDetail = () => {
   const { id, incidentId } = useParams<{ id: string; incidentId: string }>();
   const navigate = useNavigate();
   const isNew = incidentId === "new";
-  const person = getPerson(id ?? "");
-  const [, force] = useState(0);
-  const refresh = () => force((n) => n + 1);
+  const { individual: person, loading: personLoading } = useIndividual(id);
+  const { data: dbIncidents, loading: incidentsLoading } = useIncidentReports(id);
 
   // Local form state for new incident (Step 1 wizard)
   const [draft, setDraft] = useState<Partial<IncidentRecord>>(() => ({
     incidentDate: new Date().toLocaleDateString("en-US"),
     incidentTime: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-    programSite: person?.county ?? "",
+    programSite: "",
     incidentTypes: [],
     classification: "Unknown",
     staffOnDuty: [],
@@ -44,21 +38,184 @@ const PersonIncidentReportingDetail = () => {
   }));
   const [aiPrefilled] = useState<Set<string>>(new Set(["description", "immediateActions"])); // simulated prefill chips
 
-  const wf = !isNew ? getIncident(incidentId ?? "") : undefined;
-  const [activeStage, setActiveStage] = useState<IncidentStageId>(wf?.currentStage ?? 1);
+  const wf = useMemo(() => {
+    if (isNew) return undefined;
+    const raw = dbIncidents.find((i) => i.id === incidentId);
+    if (!raw) return undefined;
+    return {
+      id: raw.id,
+      personId: raw.individual_id || raw.personId,
+      personName: raw.individual_name || raw.personName || (person ? `${person.last_name}, ${person.first_name}` : "—"),
+      incidentDate: raw.incident_date || raw.incidentDate || "—",
+      incidentTime: raw.incident_time || raw.incidentTime || "—",
+      programSite: raw.program_site || raw.programSite || "—",
+      location: raw.location || "—",
+      incidentTypes: raw.incident_types || raw.incidentTypes || [],
+      classification: raw.classification || "Unknown",
+      staffOnDuty: raw.staff_on_duty || raw.staffOnDuty || [],
+      personResponsible: raw.person_responsible || raw.personResponsible || "—",
+      description: raw.description || "",
+      immediateActions: raw.immediate_actions || raw.immediateActions || "",
+      medicalRequired: !!(raw.medical_required || raw.medicalRequired),
+      hospitalized: !!(raw.hospitalized),
+      stateNotified: !!(raw.state_notified || raw.stateNotified),
+      committeeNotified: !!(raw.committee_notified || raw.committeeNotified),
+      guardianNotified: !!(raw.guardian_notified || raw.guardianNotified),
+      currentStage: raw.current_stage || raw.currentStage || 1,
+      stageStatuses: raw.stage_statuses || raw.stageStatuses || { 1: "Complete", 2: "Current", 3: "Pending", 4: "Pending", 5: "Pending" },
+      notifications: raw.notifications || [],
+      contributingFactors: raw.contributing_factors || raw.contributingFactors || [],
+      actionItems: raw.action_items || raw.actionItems || [],
+      status: raw.status || "Open",
+      createdAt: raw.created_at || raw.createdAt || "—",
+      lastUpdatedBy: raw.last_updated_by || raw.lastUpdatedBy || "—",
+      lastUpdatedAt: raw.last_updated_at || raw.lastUpdatedAt || "—",
+    };
+  }, [dbIncidents, incidentId, isNew, person]);
+
+  const [activeStage, setActiveStage] = useState<IncidentStageId>(1);
+
+  // Sync active stage with loaded incident status
+  useMemo(() => {
+    if (wf?.currentStage) {
+      setActiveStage(wf.currentStage);
+    }
+  }, [wf?.currentStage]);
+
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeAck, setCloseAck] = useState(false);
+
+  const handleUpdateIncident = async (patch: Partial<IncidentRecord>) => {
+    if (!wf) return;
+    const mapped: any = {};
+    if (patch.status !== undefined) mapped.status = patch.status;
+    if (patch.voided !== undefined) mapped.voided = patch.voided;
+    if (patch.closedAt !== undefined) {
+      mapped.closedAt = patch.closedAt;
+      mapped.closed_at = patch.closedAt;
+    }
+    if (patch.stageStatuses !== undefined) {
+      mapped.stageStatuses = patch.stageStatuses;
+      mapped.stage_statuses = patch.stageStatuses;
+    }
+    if (patch.currentStage !== undefined) {
+      mapped.currentStage = patch.currentStage;
+      mapped.current_stage = patch.currentStage;
+    }
+    if (patch.notifications !== undefined) mapped.notifications = patch.notifications;
+    if (patch.investigationFindings !== undefined) {
+      mapped.investigationFindings = patch.investigationFindings;
+      mapped.investigation_findings = patch.investigationFindings;
+    }
+    if (patch.contributingFactors !== undefined) {
+      mapped.contributingFactors = patch.contributingFactors;
+      mapped.contributing_factors = patch.contributingFactors;
+    }
+    if (patch.preventable !== undefined) mapped.preventable = patch.preventable;
+    if (patch.correctiveActionRequired !== undefined) {
+      mapped.correctiveActionRequired = patch.correctiveActionRequired;
+      mapped.corrective_action_required = patch.correctiveActionRequired;
+    }
+    if (patch.correctiveActionPlan !== undefined) {
+      mapped.correctiveActionPlan = patch.correctiveActionPlan;
+      mapped.corrective_action_plan = patch.correctiveActionPlan;
+    }
+    if (patch.actionItems !== undefined) {
+      mapped.actionItems = patch.actionItems;
+      mapped.action_items = patch.actionItems;
+    }
+    if (patch.finalDetermination !== undefined) {
+      mapped.finalDetermination = patch.finalDetermination;
+      mapped.final_determination = patch.finalDetermination;
+    }
+    if (patch.finalNarrative !== undefined) {
+      mapped.finalNarrative = patch.finalNarrative;
+      mapped.final_narrative = patch.finalNarrative;
+    }
+    if (patch.lessonsLearned !== undefined) {
+      mapped.lessonsLearned = patch.lessonsLearned;
+      mapped.lessons_learned = patch.lessonsLearned;
+    }
+
+    mapped.last_updated_by = "Kathy Adams";
+    mapped.last_updated_at = new Date().toLocaleString("en-US") + " CDT";
+    mapped.lastUpdatedBy = "Kathy Adams";
+    mapped.lastUpdatedAt = new Date().toLocaleString("en-US") + " CDT";
+
+    try {
+      await updateIncidentReport(wf.id, mapped);
+      toast.success("Incident report updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update incident report");
+    }
+  };
+
+  const handleCreateIncident = async () => {
+    if (!person) return;
+    try {
+      const newReport = {
+        individual_id: person.id,
+        individual_name: `${person.last_name}, ${person.first_name}`,
+        incident_date: draft.incidentDate || new Date().toLocaleDateString("en-US"),
+        incident_time: draft.incidentTime || new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+        program_site: draft.programSite || person.county || "—",
+        location: draft.location || "",
+        incident_types: draft.incidentTypes || [],
+        classification: draft.classification || suggestedClassification(draft.incidentTypes || []),
+        staff_on_duty: draft.staffOnDuty || [],
+        person_responsible: draft.personResponsible || "Unknown",
+        description: draft.description || "",
+        immediate_actions: draft.immediateActions || "",
+        medical_required: !!draft.medicalRequired,
+        hospitalized: !!draft.hospitalized,
+        state_notified: !!draft.stateNotified,
+        committee_notified: !!draft.committeeNotified,
+        guardian_notified: !!draft.guardianNotified,
+        current_stage: 2,
+        stage_statuses: { 1: "Complete", 2: "Current", 3: "Pending", 4: "Pending", 5: "Pending" },
+        notifications: [
+          { id: "n1", party: "State Agency", required: true },
+          { id: "n2", party: "Standing Committee", required: true },
+          { id: "n3", party: "Guardian/Family", required: true },
+          { id: "n4", party: "Supervisor", required: true },
+        ],
+        contributing_factors: [],
+        action_items: [],
+        status: "Open",
+        last_updated_by: "Kathy Adams",
+        last_updated_at: new Date().toLocaleString("en-US") + " CDT",
+      };
+      
+      const docRef = await addIncidentReport(newReport);
+      toast.success("Initial incident report filed successfully!");
+      navigate(`/people/${person.id}/incident-reporting/${docRef.id}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create incident report");
+    }
+  };
+
+  const loading = personLoading || incidentsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Incident" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   if (!person) {
     return <ICMShell title="Incident" showAIPanel={false}><p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p></ICMShell>;
   }
 
   if (isNew) {
-    return <NewIncidentWizard person={person} draft={draft} setDraft={setDraft} aiPrefilled={aiPrefilled} onCancel={() => navigate(`/people/${person.id}/incident-reporting`)} onSubmit={() => {
-      const created = createIncident({ ...draft, personId: person.id, personName: `${person.lastName}, ${person.firstName}` });
-      navigate(`/people/${person.id}/incident-reporting/${created.id}`);
-    }} />;
+    return <NewIncidentWizard person={person} draft={draft} setDraft={setDraft} aiPrefilled={aiPrefilled} onCancel={() => navigate(`/people/${person.id}/incident-reporting`)} onSubmit={handleCreateIncident} />;
   }
 
   if (!wf) {
@@ -68,7 +225,7 @@ const PersonIncidentReportingDetail = () => {
   const allStagesComplete = ([1, 2, 3, 4] as IncidentStageId[]).every((s) => wf.stageStatuses[s] === "Complete") && !!wf.finalNarrative;
 
   return (
-    <ICMShell title="Incident" rightPanel={<PersonAIPanel person={person} suggestions={detailSuggestions} intro="2 incident-related suggestions." />}>
+    <ICMShell title="Incident" showAIPanel={false}>
       <div className="space-y-5">
         <button onClick={() => navigate(`/people/${person.id}/incident-reporting`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" /> Incident Reports
@@ -131,16 +288,16 @@ const PersonIncidentReportingDetail = () => {
 
           <div className="space-y-4">
             {activeStage === 1 && <Stage1View wf={wf} />}
-            {activeStage === 2 && <Stage2View wf={wf} onChange={refresh} />}
-            {activeStage === 3 && <Stage3View wf={wf} onChange={refresh} />}
-            {activeStage === 4 && <Stage4View wf={wf} onChange={refresh} />}
-            {activeStage === 5 && <Stage5View wf={wf} onClose={() => setShowCloseModal(true)} onChange={refresh} canClose={allStagesComplete && wf.status !== "Closed"} />}
+            {activeStage === 2 && <Stage2View wf={wf} onUpdate={handleUpdateIncident} onChange={() => {}} />}
+            {activeStage === 3 && <Stage3View wf={wf} onUpdate={handleUpdateIncident} onChange={() => {}} />}
+            {activeStage === 4 && <Stage4View wf={wf} onUpdate={handleUpdateIncident} onChange={() => {}} />}
+            {activeStage === 5 && <Stage5View wf={wf} onClose={() => setShowCloseModal(true)} onUpdate={handleUpdateIncident} onChange={() => {}} canClose={allStagesComplete && wf.status !== "Closed"} />}
           </div>
         </div>
       </div>
 
       {showVoidModal && (
-        <ConfirmModal title="Void this incident?" message="Voiding is permanent and creates an audit record." confirmLabel="Void" tone="red" onClose={() => setShowVoidModal(false)} onConfirm={() => { updateIncident(wf.id, { status: "Void", voided: true }); setShowVoidModal(false); refresh(); }} />
+        <ConfirmModal title="Void this incident?" message="Voiding is permanent and creates an audit record." confirmLabel="Void" tone="red" onClose={() => setShowVoidModal(false)} onConfirm={() => { handleUpdateIncident({ status: "Void", voided: true }); setShowVoidModal(false); }} />
       )}
 
       {showCloseModal && (
@@ -154,7 +311,7 @@ const PersonIncidentReportingDetail = () => {
             </label>
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => setShowCloseModal(false)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] text-icm-text-dim hover:text-icm-text">Cancel</button>
-              <button disabled={!closeAck} onClick={() => { updateIncident(wf.id, { status: "Closed", closedAt: new Date().toLocaleDateString("en-US"), stageStatuses: { 1: "Complete", 2: "Complete", 3: "Complete", 4: "Complete", 5: "Complete" } }); setShowCloseModal(false); refresh(); }} className="h-9 px-4 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-50">Close incident</button>
+              <button disabled={!closeAck} onClick={() => { handleUpdateIncident({ status: "Closed", closedAt: new Date().toLocaleDateString("en-US"), stageStatuses: { 1: "Complete", 2: "Complete", 3: "Complete", 4: "Complete", 5: "Complete" } }); setShowCloseModal(false); }} className="h-9 px-4 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-50">Close incident</button>
             </div>
           </div>
         </div>
@@ -166,7 +323,7 @@ const PersonIncidentReportingDetail = () => {
 // ----- New incident wizard (Step 1) -----
 
 function NewIncidentWizard({ person, draft, setDraft, aiPrefilled, onCancel, onSubmit }: {
-  person: ReturnType<typeof getPerson>;
+  person: Individual;
   draft: Partial<IncidentRecord>;
   setDraft: React.Dispatch<React.SetStateAction<Partial<IncidentRecord>>>;
   aiPrefilled: Set<string>;
@@ -208,7 +365,7 @@ function NewIncidentWizard({ person, draft, setDraft, aiPrefilled, onCancel, onS
         <SectionCard title="Incident Details">
           <Grid>
             <Field label="Person Supported" required>
-              <input disabled value={`${person.lastName}, ${person.firstName}`} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] text-icm-text" />
+              <input disabled value={`${person.last_name}, ${person.first_name}`} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] text-icm-text" />
             </Field>
             <Field label="Incident Date" required>
               <input value={draft.incidentDate ?? ""} onChange={(e) => setDraft((d) => ({ ...d, incidentDate: e.target.value }))} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text font-mono" />
@@ -331,9 +488,9 @@ function Stage1View({ wf }: { wf: IncidentRecord }) {
   );
 }
 
-function Stage2View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void }) {
+function Stage2View({ wf, onUpdate, onChange }: { wf: IncidentRecord; onUpdate: (patch: Partial<IncidentRecord>) => void; onChange: () => void }) {
   const [rows, setRows] = useState<NotificationRow[]>(wf.notifications);
-  const update = (next: NotificationRow[]) => { setRows(next); updateIncident(wf.id, { notifications: next }); onChange(); };
+  const update = (next: NotificationRow[]) => { setRows(next); onUpdate({ notifications: next }); onChange(); };
 
   return (
     <SectionCard title="Stage 2 · Notification Log">
@@ -365,18 +522,18 @@ function Stage2View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void
       </div>
       <button onClick={() => update([...rows, { id: `n${Date.now()}`, party: "Other" }])} className="mt-3 h-8 px-3 rounded-xl border border-icm-border text-[11.5px] text-icm-text inline-flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Add notification</button>
 
-      <StageActions wf={wf} stage={2} onChange={onChange} />
+      <StageActions wf={wf} stage={2} onUpdate={onUpdate} onChange={onChange} />
     </SectionCard>
   );
 }
 
-function Stage3View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void }) {
+function Stage3View({ wf, onUpdate, onChange }: { wf: IncidentRecord; onUpdate: (patch: Partial<IncidentRecord>) => void; onChange: () => void }) {
   const [findings, setFindings] = useState(wf.investigationFindings ?? "");
   const [factors, setFactors] = useState<string[]>(wf.contributingFactors);
   const [preventable, setPreventable] = useState<IncidentRecord["preventable"]>(wf.preventable);
   const [correctiveRequired, setCorrectiveRequired] = useState(!!wf.correctiveActionRequired);
 
-  const persist = () => { updateIncident(wf.id, { investigationFindings: findings, contributingFactors: factors, preventable, correctiveActionRequired: correctiveRequired }); onChange(); };
+  const persist = () => { onUpdate({ investigationFindings: findings, contributingFactors: factors, preventable, correctiveActionRequired: correctiveRequired }); onChange(); };
 
   return (
     <SectionCard title="Stage 3 · Investigation">
@@ -393,7 +550,7 @@ function Stage3View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void
           {CONTRIBUTING_FACTORS.map((f) => {
             const selected = factors.includes(f);
             return (
-              <button key={f} type="button" onClick={() => { const next = selected ? factors.filter((x) => x !== f) : [...factors, f]; setFactors(next); updateIncident(wf.id, { contributingFactors: next }); onChange(); }} className={`px-2 py-1 rounded-full text-[10.5px] font-geist font-medium ring-1 transition-colors ${selected ? "bg-icm-text text-icm-panel ring-icm-text" : "bg-icm-bg text-icm-text-dim ring-icm-border hover:text-icm-text"}`}>
+              <button key={f} type="button" onClick={() => { const next = selected ? factors.filter((x) => x !== f) : [...factors, f]; setFactors(next); onUpdate({ contributingFactors: next }); onChange(); }} className={`px-2 py-1 rounded-full text-[10.5px] font-geist font-medium ring-1 transition-colors ${selected ? "bg-icm-text text-icm-panel ring-icm-text" : "bg-icm-bg text-icm-text-dim ring-icm-border hover:text-icm-text"}`}>
                 {f}
               </button>
             );
@@ -402,26 +559,26 @@ function Stage3View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void
       </Field>
       <Grid>
         <Field label="Was this incident preventable?">
-          <select value={preventable ?? ""} onChange={(e) => { setPreventable(e.target.value as IncidentRecord["preventable"]); persist(); }} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text">
+          <select value={preventable ?? ""} onChange={(e) => { setPreventable(e.target.value as IncidentRecord["preventable"]); onUpdate({ preventable: e.target.value as IncidentRecord["preventable"] }); onChange(); }} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text">
             <option value="">—</option>
             <option>Yes</option><option>No</option><option>Unknown</option>
           </select>
         </Field>
         <Field label="Corrective action required?">
-          <Toggle value={correctiveRequired} onChange={(v) => { setCorrectiveRequired(v); updateIncident(wf.id, { correctiveActionRequired: v }); onChange(); }} />
+          <Toggle value={correctiveRequired} onChange={(v) => { setCorrectiveRequired(v); onUpdate({ correctiveActionRequired: v }); onChange(); }} />
         </Field>
       </Grid>
-      <StageActions wf={wf} stage={3} onChange={onChange} disabled={!findings.trim()} />
+      <StageActions wf={wf} stage={3} onUpdate={onUpdate} onChange={onChange} disabled={!findings.trim()} />
     </SectionCard>
   );
 }
 
-function Stage4View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void }) {
+function Stage4View({ wf, onUpdate, onChange }: { wf: IncidentRecord; onUpdate: (patch: Partial<IncidentRecord>) => void; onChange: () => void }) {
   const [plan, setPlan] = useState(wf.correctiveActionPlan ?? "");
   const [items, setItems] = useState<ActionItem[]>(wf.actionItems);
 
-  const persistPlan = () => { updateIncident(wf.id, { correctiveActionPlan: plan }); onChange(); };
-  const updateItems = (next: ActionItem[]) => { setItems(next); updateIncident(wf.id, { actionItems: next }); onChange(); };
+  const persistPlan = () => { onUpdate({ correctiveActionPlan: plan }); onChange(); };
+  const updateItems = (next: ActionItem[]) => { setItems(next); onUpdate({ actionItems: next }); onChange(); };
 
   return (
     <SectionCard title="Stage 4 · Resolution / Corrective Action">
@@ -454,22 +611,22 @@ function Stage4View({ wf, onChange }: { wf: IncidentRecord; onChange: () => void
       </div>
       <button onClick={() => updateItems([...items, { id: `a${Date.now()}`, action: "", status: "Pending" }])} className="mt-3 h-8 px-3 rounded-xl border border-icm-border text-[11.5px] text-icm-text inline-flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Add action item</button>
 
-      <StageActions wf={wf} stage={4} onChange={onChange} />
+      <StageActions wf={wf} stage={4} onUpdate={onUpdate} onChange={onChange} />
     </SectionCard>
   );
 }
 
-function Stage5View({ wf, onClose, onChange, canClose }: { wf: IncidentRecord; onClose: () => void; onChange: () => void; canClose: boolean }) {
+function Stage5View({ wf, onClose, onUpdate, onChange, canClose }: { wf: IncidentRecord; onClose: () => void; onUpdate: (patch: Partial<IncidentRecord>) => void; onChange: () => void; canClose: boolean }) {
   const [det, setDet] = useState(wf.finalDetermination);
   const [narr, setNarr] = useState(wf.finalNarrative ?? "");
   const [lessons, setLessons] = useState(wf.lessonsLearned ?? "");
-  const persist = () => { updateIncident(wf.id, { finalDetermination: det, finalNarrative: narr, lessonsLearned: lessons }); onChange(); };
+  const persist = () => { onUpdate({ finalDetermination: det, finalNarrative: narr, lessonsLearned: lessons }); onChange(); };
 
   return (
     <SectionCard title="Stage 5 · Final Review">
       <Grid>
         <Field label="Final determination">
-          <select value={det ?? ""} onChange={(e) => { setDet(e.target.value as IncidentRecord["finalDetermination"]); persist(); }} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text">
+          <select value={det ?? ""} onChange={(e) => { setDet(e.target.value as IncidentRecord["finalDetermination"]); onUpdate({ finalDetermination: e.target.value as IncidentRecord["finalDetermination"] }); onChange(); }} className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text">
             <option value="">—</option>
             <option>Substantiated</option><option>Unsubstantiated</option><option>Unable to determine</option><option>Withdrawn</option><option>Other</option>
           </select>
@@ -499,7 +656,7 @@ function Stage5View({ wf, onClose, onChange, canClose }: { wf: IncidentRecord; o
 
 // ----- Shared -----
 
-function StageActions({ wf, stage, onChange, disabled }: { wf: IncidentRecord; stage: IncidentStageId; onChange: () => void; disabled?: boolean }) {
+function StageActions({ wf, stage, onUpdate, onChange, disabled }: { wf: IncidentRecord; stage: IncidentStageId; onUpdate: (patch: Partial<IncidentRecord>) => void; onChange: () => void; disabled?: boolean }) {
   const isCurrent = wf.currentStage === stage && wf.stageStatuses[stage] === "Current";
   if (!isCurrent) return null;
   return (
@@ -508,7 +665,7 @@ function StageActions({ wf, stage, onChange, disabled }: { wf: IncidentRecord; s
         const nextStage = (stage + 1) as IncidentStageId;
         const nextStatuses = { ...wf.stageStatuses, [stage]: "Complete" as const };
         if (nextStage <= 5) nextStatuses[nextStage] = "Current";
-        updateIncident(wf.id, { stageStatuses: nextStatuses, currentStage: nextStage <= 5 ? nextStage : 5 });
+        onUpdate({ stageStatuses: nextStatuses, currentStage: nextStage <= 5 ? nextStage : 5 });
         onChange();
       }} className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5">
         <Check className="w-3.5 h-3.5" /> Mark stage complete

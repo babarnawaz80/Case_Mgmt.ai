@@ -304,7 +304,7 @@ const VirtualVisit = () => {
           <div className="flex-1 rounded-xl bg-gradient-to-br from-[#1f2937] via-[#111827] to-[#0b1220] relative overflow-hidden">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl font-manrope font-bold mx-auto mb-3 ring-2 ring-white/15">
+                <div className="w-24 h-24 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-2xl font-manrope font-bold mx-auto mb-3 ring-2 ring-white/15">
                   LB
                 </div>
                 <p className="text-white/80 font-geist text-[14px]">Linda Brown</p>
@@ -317,7 +317,7 @@ const VirtualVisit = () => {
             {/* Self view */}
             <div className="absolute bottom-3 right-3 w-40 h-28 rounded-lg bg-gradient-to-br from-[#374151] to-[#1f2937] ring-1 ring-white/15 overflow-hidden flex items-center justify-center">
               <div className="text-center">
-                <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white text-[11px] font-manrope font-bold mx-auto">
+                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white text-[11px] font-manrope font-bold mx-auto">
                   KA
                 </div>
                 <p className="text-white/70 text-[10px] font-geist mt-1">You</p>
@@ -582,7 +582,7 @@ function ParticipantTile({
       }`}
     >
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center text-white text-[14px] font-manrope font-bold">
+        <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center text-white text-[14px] font-manrope font-bold">
           {initials}
         </div>
       </div>

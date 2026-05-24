@@ -1,8 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { ChevronLeft, Sparkles } from "lucide-react";
-import { getPerson } from "@/data/people";
+import { ChevronLeft, Sparkles, Loader2 } from "lucide-react";
+import { useIndividual } from "@/hooks/useIndividuals";
 
 // Pretty-print "monitoring-form" -> "Monitoring Form"
 function prettySlug(slug: string): string {
@@ -15,10 +14,21 @@ function prettySlug(slug: string): string {
 const PersonModule = () => {
   const { id, slug } = useParams<{ id: string; slug: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
   const moduleName = prettySlug(slug ?? "module");
 
-  if (!person) {
+  if (loading) {
+    return (
+      <ICMShell title={moduleName} showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title={moduleName} showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -27,14 +37,14 @@ const PersonModule = () => {
   }
 
   return (
-    <ICMShell title={moduleName} rightPanel={<PersonAIPanel person={person} />}>
+    <ICMShell title={moduleName} showAIPanel={false}>
       <div className="space-y-5">
         <button
-          onClick={() => navigate(`/people/${person.id}/echart`)}
+          onClick={() => navigate(`/people/${individual.id}/echart`)}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
-          {person.lastName}, {person.firstName} · eChart
+          {individual.last_name}, {individual.first_name} · eChart
         </button>
 
         <div>
@@ -42,7 +52,7 @@ const PersonModule = () => {
             {moduleName}
           </h1>
           <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
-            For {person.lastName}, {person.firstName} · ID #{person.id}
+            For {individual.last_name}, {individual.first_name} · ID #{individual.id.slice(0, 8)}
           </p>
         </div>
 
@@ -56,7 +66,7 @@ const PersonModule = () => {
           </h2>
           <p className="text-[12.5px] text-icm-text-dim font-geist mt-2 max-w-md mx-auto leading-relaxed">
             Want me to start a draft based on what I know about{" "}
-            <span className="font-semibold text-icm-text">{person.firstName}</span>?
+            <span className="font-semibold text-icm-text">{individual.first_name}</span>?
           </p>
           <div className="flex items-center justify-center gap-2 mt-5">
             <button className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90">

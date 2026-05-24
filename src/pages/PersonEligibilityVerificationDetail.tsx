@@ -1,27 +1,26 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ChevronLeft, Sparkles, Save, Printer, Upload, X, AlertTriangle,
-  CheckCircle2, FileText, ShieldCheck, History, Plus, Trash2,
+  CheckCircle2, FileText, ShieldCheck, History, Plus, Trash2, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
 import {
-  getEligibilityRecord, buildAIPreFilledEligibility, getEligibilityForPerson,
+  buildAIPreFilledEligibility,
   daysUntil, complianceToneFor,
-  type EligibilityVerification, type MAStatus, type MAType, type RecordStatus,
-  type FundingSource,
+  type MAStatus, type MAType, type RecordStatus,
 } from "@/data/eligibility";
-import type { AISuggestion } from "@/data/people";
-
-const eligibilitySuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "MA redetermination is overdue. Start renewal immediately to prevent service lapse.", cta: "Start renewal" },
-  { tone: "insight", label: "Insight", body: "Upload a current MA verification screenshot from the state portal to refresh the record.", cta: "Upload" },
-  { tone: "insight", label: "Insight", body: "Adding an accurate redetermination date enables automatic compliance tracking.", cta: "Update field" },
-  { tone: "good", label: "Good news", body: "Continuous Medicaid eligibility since 09/01/2022 — no lapses on file.", cta: "View history" },
-];
+import {
+  useEligibilityVerification,
+  useEligibilityVerifications,
+  addEligibilityVerification,
+  updateEligibilityVerification,
+  type EligibilityVerification,
+  type FundingSource
+} from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 
 const MA_STATUS_OPTIONS: MAStatus[] = [
   "MA Eligible — Active",
@@ -37,22 +36,43 @@ const MA_TYPE_OPTIONS: MAType[] = ["Waiver Related", "SSI Related", "Medicare/Me
 const PersonEligibilityVerificationDetail = () => {
   const { id, verificationId } = useParams<{ id: string; verificationId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-
+  const { individual, loading } = useIndividual(id);
+  const { data: dbRecord, loading: recordLoading } = useEligibilityVerification(verificationId);
   const isNew = verificationId === "new";
-  const initial = useMemo<EligibilityVerification | undefined>(() => {
-    if (!person) return undefined;
-    if (isNew) return buildAIPreFilledEligibility(person.id);
-    return getEligibilityRecord(verificationId ?? "");
-  }, [person, isNew, verificationId]);
 
-  const [form, setForm] = useState<EligibilityVerification | undefined>(initial);
+  const [form, setForm] = useState<EligibilityVerification | undefined>(undefined);
+  const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [showAIBanner, setShowAIBanner] = useState(true);
   const [docProcessing, setDocProcessing] = useState<"idle" | "processing" | "done">("idle");
   const [reminderCreated, setReminderCreated] = useState(false);
   const [showFundingForm, setShowFundingForm] = useState(false);
 
-  if (!person || !form) {
+  useEffect(() => {
+    if (initialized) return;
+    if (loading || recordLoading) return;
+
+    if (isNew && individual) {
+      setForm(buildAIPreFilledEligibility(individual.id) as unknown as EligibilityVerification);
+      setInitialized(true);
+    } else if (dbRecord) {
+      setForm(dbRecord);
+      setInitialized(true);
+    }
+  }, [loading, recordLoading, individual, dbRecord, isNew, initialized]);
+
+  if (loading || recordLoading || (verificationId !== "new" && !initialized)) {
+    return (
+      <ICMShell title="Eligibility Verification" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual || !form) {
     return (
       <ICMShell title="Eligibility Verification" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Record not found.</p>
@@ -91,13 +111,59 @@ const PersonEligibilityVerificationDetail = () => {
     setDocProcessing("idle");
   };
 
+  const handleSave = async () => {
+    if (!form || !individual) return;
+    try {
+      setSaving(true);
+      const now = new Date();
+      const updatedOnStr = now.toLocaleDateString("en-US");
+      const updatedByStr = "Kathy Martinez";
+
+      const payload = {
+        ...form,
+        individual_id: individual.id,
+        individual_name: `${individual.first_name} ${individual.last_name}`,
+        updatedBy: updatedByStr,
+        updatedOn: updatedOnStr,
+        recordStatus: "Active" as const,
+      };
+
+      let docId = verificationId ?? '';
+
+      if (isNew) {
+        const { id: _, ...cleanPayload } = payload;
+        const docRef = await addEligibilityVerification(cleanPayload);
+        docId = docRef.id;
+        await writeAudit('eligibility_verified', 'eligibility', docId, {
+          individualId: individual.id,
+          maStatus: form.maStatus
+        });
+        toast.success("Eligibility record created", { description: `MA status: ${form.maStatus}` });
+        navigate(`/people/${individual.id}/eligibility-verification`);
+      } else {
+        await updateEligibilityVerification(docId, payload);
+        await writeAudit('eligibility_verified', 'eligibility', docId, {
+          individualId: individual.id,
+          maStatus: form.maStatus,
+          action: 'eligibility_updated'
+        });
+        toast.success("Eligibility record updated", { description: `MA status: ${form.maStatus}` });
+      }
+    } catch (err) {
+      console.error("Failed to save eligibility verification:", err);
+      toast.error("Failed to save record");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <ICMShell title="Eligibility Verification" rightPanel={<PersonAIPanel person={person} suggestions={eligibilitySuggestions} intro={`${eligibilitySuggestions.length} suggestions for ${person.firstName}.`} />}>
+    <ICMShell title="Eligibility Verification" showAIPanel={false}>
       <div className="space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <button onClick={() => navigate(`/people/${person.id}/eligibility-verification`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text mb-2">
+            <button onClick={() => navigate(`/people/${individual.id}/eligibility-verification`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text mb-2">
               <ChevronLeft className="w-3.5 h-3.5" />
               Eligibility Verifications
             </button>
@@ -113,12 +179,12 @@ const PersonEligibilityVerificationDetail = () => {
               </span>
             </div>
             <h1 className="font-manrope text-[24px] font-extrabold text-icm-text leading-tight tracking-[-0.02em] mt-2">
-              {person.lastName}, {person.firstName}
+              {individual.last_name}, {individual.first_name}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => toast.success("Eligibility record saved", { description: `MA status: ${form.maStatus}` })} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
-              <Save className="w-3.5 h-3.5" /> Save
+            <button onClick={handleSave} disabled={saving} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-50">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
             </button>
             <button onClick={() => window.print()} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Printer className="w-3.5 h-3.5" /> Print
@@ -140,7 +206,7 @@ const PersonEligibilityVerificationDetail = () => {
                   {overdue ? "Medicaid renewal is overdue." : "Medicaid tracking active."}
                 </span>{" "}
                 <span className="text-icm-text-dim">
-                  I've pre-filled known fields from {person.firstName}'s profile. Upload the verification document when available.
+                  I've pre-filled known fields from {individual.first_name}'s profile. Upload the verification document when available.
                 </span>
               </p>
             </div>
@@ -324,7 +390,7 @@ const PersonEligibilityVerificationDetail = () => {
 
         {/* HISTORY TIMELINE */}
         <Section title="Eligibility History" titleIcon={<History className="w-4 h-4 text-icm-text-dim" />}>
-          <Timeline personId={person.id} />
+          <Timeline personId={individual.id} />
         </Section>
       </div>
     </ICMShell>
@@ -455,7 +521,18 @@ function FundingSourceForm({ onAdd, onCancel }: { onAdd: (fs: FundingSource) => 
 }
 
 function Timeline({ personId }: { personId: string }) {
-  const records = getEligibilityForPerson(personId);
+  const { data: eligibilityRecords, loading } = useEligibilityVerifications(personId);
+  const records = eligibilityRecords || [];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6 gap-2 text-[12px] font-geist text-icm-text-dim">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span>Loading history…</span>
+      </div>
+    );
+  }
+
   if (records.length === 0) {
     return <p className="text-[12px] font-geist text-icm-text-dim">No history yet.</p>;
   }

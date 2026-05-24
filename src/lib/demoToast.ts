@@ -1,12 +1,12 @@
 import { toast } from "sonner";
 
 /**
- * Used for demo-mode buttons that don't yet have real behavior wired.
- * Keeps the UI feeling alive without surfacing console errors.
+ * Used for controls that are UI-complete but don't have a backend
+ * action wired yet. Shows a neutral informational toast.
  */
 export function demoToast(label?: string) {
-  toast(label ?? "Available in next demo build", {
-    description: "This control is part of the roadmap and will be enabled soon.",
+  toast(label ?? "Action noted", {
+    description: "This feature will be fully active in an upcoming update.",
   });
 }
 

@@ -1,20 +1,31 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson } from "@/data/people";
+import { Loader2 } from "lucide-react";
+import { useIndividual } from "@/hooks/useIndividuals";
 import { getProfile } from "@/data/profiles";
 import { MonitorsBaselines } from "@/components/profile/MonitorsBaselines";
 
 const PersonMonitorsBaselines = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const profile = person ? getProfile(person.id) : null;
+  const { individual, loading } = useIndividual(id);
+  const profile = individual ? getProfile(individual.id) : null;
 
-  if (!person || !profile) {
+  if (loading) {
     return (
-      <ICMShell title="Monitors & Baselines" showAIPanel={false}>
+      <ICMShell title="Monitors &amp; Baselines" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual || !profile) {
+    return (
+      <ICMShell title="Monitors &amp; Baselines" showAIPanel={false}>
         <div className="rounded-xl border border-icm-border bg-icm-panel p-12 text-center">
           <p className="text-[14px] text-icm-text-dim font-geist">Person not found.</p>
           <button
@@ -29,14 +40,14 @@ const PersonMonitorsBaselines = () => {
   }
 
   return (
-    <ICMShell title="Monitors & Baselines" rightPanel={<PersonAIPanel person={person} />}>
+    <ICMShell title="Monitors &amp; Baselines" showAIPanel={false}>
       <div className="space-y-4">
         <Breadcrumbs
-          backTo={`/people/${person.id}/echart`}
+          backTo={`/people/${individual.id}/echart`}
           backLabel="eChart"
           items={[
             { label: "People Supported", to: "/people" },
-            { label: `${person.firstName} ${person.lastName}`, to: `/people/${person.id}/echart` },
+            { label: `${individual.first_name} ${individual.last_name}`, to: `/people/${individual.id}/echart` },
             { label: "Monitors & Baselines" },
           ]}
         />

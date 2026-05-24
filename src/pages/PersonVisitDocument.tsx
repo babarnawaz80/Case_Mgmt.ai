@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
+import { useIndividual, riskAvatarClass } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
 
 const SERVICE_CODES = [
@@ -69,7 +69,7 @@ const PersonVisitDocument = () => {
   const { id } = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [docId] = useState(() => `vd-${Date.now()}`);
@@ -105,7 +105,8 @@ const PersonVisitDocument = () => {
   }, [startedAt, endedAt, now]);
   const units = Math.max(1, Math.ceil(elapsedMin / svc.unitMinutes));
 
-  if (!person) return <ICMShell title="Document Visit" showAIPanel={false}><p className="p-6">Person not found.</p></ICMShell>;
+  if (loading) return <ICMShell title="Document Visit" showAIPanel={false}><div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim"><Loader2 className="w-5 h-5 animate-spin" /><span className="text-[13px] font-geist">Loading…</span></div></ICMShell>;
+  if (!individual) return <ICMShell title="Document Visit" showAIPanel={false}><p className="p-6">Person not found.</p></ICMShell>;
 
   const start = () => { setStartedAt(new Date().toISOString()); toast.success("Visit started. Timer running."); };
   const stop = () => { setEndedAt(new Date().toISOString()); toast.success("Visit ended."); };
@@ -169,7 +170,7 @@ const PersonVisitDocument = () => {
       persistDoc(doc);
       // Persist to global exceptions queue
       const queue = JSON.parse(localStorage.getItem("icm.exceptions") || "[]");
-      queue.push({ id: `exc-${Date.now()}`, docId: doc.id, personId: id, personName: `${person.lastName}, ${person.firstName}`, createdAt: new Date().toISOString(), createdBy: doc.createdBy, errors: errs, status: "Open", serviceCode, units: doc.units });
+      queue.push({ id: `exc-${Date.now()}`, docId: doc.id, personId: id, personName: `${individual.last_name}, ${individual.first_name}`, createdAt: new Date().toISOString(), createdBy: doc.createdBy, errors: errs, status: "Open", serviceCode, units: doc.units });
       localStorage.setItem("icm.exceptions", JSON.stringify(queue));
       writeAudit({ ts: new Date().toISOString(), action: "Visit note FAILED validation", entity: doc.id, personId: id, by: doc.createdBy, detail: `${blocking.length} blocking error(s): ${blocking.map(e=>e.code).join(", ")}` });
       toast.error(`${blocking.length} validation error${blocking.length>1?"s":""}. Sent to Exception Queue.`);
@@ -179,23 +180,23 @@ const PersonVisitDocument = () => {
     persistDoc(doc);
     writeAudit({ ts: doc.submittedAt!, action: "Visit note submitted for supervisor review", entity: doc.id, personId: id, by: doc.createdBy, detail: `${serviceCode} · ${doc.units} units` });
     toast.success("Submitted for supervisor review.");
-    setTimeout(() => navigate(`/people/${person.id}/visit-summary`), 700);
+    setTimeout(() => navigate(`/people/${individual.id}/visit-summary`), 700);
   };
 
   return (
     <ICMShell title="Document Visit (Mobile)" showAIPanel={false}>
       <div className="space-y-4 max-w-3xl mx-auto">
-        <button onClick={() => navigate(`/people/${person.id}/visit-summary`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/visit-summary`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Document Visit
+          People · {individual.last_name}, {individual.first_name} · Document Visit
         </button>
 
         <div className="rounded-2xl border border-icm-border bg-icm-panel p-4">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>{initials(person)}</div>
+            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>{(individual.first_name[0] ?? "") + (individual.last_name[0] ?? "")}</div>
             <div className="flex-1 min-w-0">
-              <div className="font-manrope font-extrabold text-[16px] text-icm-text truncate">{person.lastName}, {person.firstName}</div>
-              <div className="text-[11.5px] text-icm-text-dim">{person.county} · ID #{person.id}</div>
+              <div className="font-manrope font-extrabold text-[16px] text-icm-text truncate">{individual.last_name}, {individual.first_name}</div>
+              <div className="text-[11.5px] text-icm-text-dim">{individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}</div>
             </div>
             <div className="flex flex-col items-end gap-1">
               <span className="inline-flex items-center gap-1 px-2 h-6 rounded-md text-[11px] bg-blue-50 text-blue-700 border border-blue-200"><Smartphone className="w-3 h-3" /> Field</span>
@@ -250,7 +251,23 @@ const PersonVisitDocument = () => {
           <textarea value={narrative} onChange={e=>setNarrative(e.target.value)} rows={6} placeholder="Describe the visit: who was present, what was discussed, progress toward goals, observations, follow-ups…" className="w-full rounded-md border border-icm-border bg-white px-3 py-2 text-[13px] leading-relaxed" />
           <div className="flex justify-between text-[11px] text-icm-text-dim">
             <span>{narrative.trim().length} characters · minimum 20 required</span>
-            <button type="button" className="text-blue-700 hover:underline">✨ Draft from ambient session</button>
+            <button
+              type="button"
+              onClick={() => {
+                setNarrative(`Discussed quarterly service review. Robert expressed continued satisfaction with day program. Employment exploration to be added to next PCISP. Behavioral changes at home (sleeping less, evening agitation) reported by primary caregiver to be monitored. Follow-up with behavioral support team planned within 2 weeks.`);
+                if (!startedAt) {
+                  // Pre-fill a realistic 47-minute visit
+                  const start = new Date(Date.now() - 47 * 60000).toISOString();
+                  const end = new Date().toISOString();
+                  setStartedAt(start);
+                  setEndedAt(end);
+                }
+                toast.success("✨ Note narrative and billing times pre-filled from ambient session (04/27/2026)");
+              }}
+              className="text-blue-700 hover:underline"
+            >
+              ✨ Draft from ambient session
+            </button>
           </div>
         </div>
 
@@ -309,7 +326,7 @@ const PersonVisitDocument = () => {
           </div>
           <label className="flex items-start gap-2 text-[12.5px] text-icm-text cursor-pointer">
             <input type="checkbox" checked={attested} onChange={e=>setAttested(e.target.checked)} className="mt-0.5" />
-            <span>I attest that the information documented above is accurate and reflects the services delivered to {person.firstName} on this date.</span>
+            <span>I attest that the information documented above is accurate and reflects the services delivered to {individual.first_name} on this date.</span>
           </label>
         </div>
 

@@ -4,6 +4,13 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/casemanagement-logo.png";
 import heroImg from "@/assets/login-hero.jpg";
+import { signIn, resetPassword } from "@/lib/auth";
+import { useAuth } from "@/contexts/AuthContext";
+import { auth, db } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup, MultiFactorError } from "firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { isMFAError, getMFAResolver } from "@/lib/mfa";
+import { MFAVerifyModal } from "@/components/auth/MFAVerifyModal";
 
 const GoogleLogo = () => (
   <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -48,48 +55,118 @@ const heroImage = heroImg;
 
 export default function Login() {
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading, isPlatformAdmin } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState<"microsoft" | "google" | "email" | null>(null);
+  const [loading, setLoading] = useState<"email" | "google" | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [mfaResolver, setMfaResolver] = useState<import("firebase/auth").MultiFactorResolver | null>(null);
 
-  // If already signed in (demo session persisted), skip the login screen.
+  // If already authenticated, redirect to the correct area
   useEffect(() => {
-    try {
-      if (localStorage.getItem("cm_ai_demo_user")) {
-        navigate("/home", { replace: true });
-      }
-    } catch {}
-  }, [navigate]);
+    if (!isLoading && isAuthenticated) {
+      navigate(isPlatformAdmin ? "/super-admin" : "/home", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, isPlatformAdmin, navigate]);
 
-  const finishSignIn = (provider: "microsoft" | "google" | "email") => {
-    setLoading(provider);
-    toast.success(
-      provider === "email"
-        ? "Signing you in…"
-        : `Signing in with ${provider === "microsoft" ? "Microsoft" : "Google"}…`,
-      { description: "Demo mode — no credentials required." }
-    );
-    setTimeout(() => {
-      try {
-        localStorage.setItem(
-          "cm_ai_demo_user",
-          JSON.stringify({
-            provider,
-            name: "Jordan Reyes",
-            email: "jordan.reyes@casemanagement.ai",
-            loggedInAt: new Date().toISOString(),
-          })
-        );
-      } catch {}
-      navigate("/home");
-    }, 900);
-  };
-
-  const handleEmailSignIn = (e: React.FormEvent) => {
+  const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    finishSignIn("email");
+    setLoading("email");
+    try {
+      await signIn(email, password);
+      // AuthContext detects auth change → navigates automatically
+    } catch (error: any) {
+      if (isMFAError(error)) {
+        // User has MFA enrolled — show SMS challenge modal
+        setMfaResolver(getMFAResolver(error as MultiFactorError));
+        setLoading(null);
+      } else {
+        toast.error((error as Error).message);
+        setLoading(null);
+      }
+    }
   };
+
+  const handleGoogleSignIn = async () => {
+    setLoading("google");
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Auto-provision Firestore user profile on first Google sign-in
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        const nameParts = (user.displayName ?? "").split(" ");
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          first_name: nameParts[0] ?? "",
+          last_name: nameParts.slice(1).join(" ") ?? "",
+          role: "case_manager",
+          organizationId: "org-1",
+          createdAt: serverTimestamp(),
+          authProvider: "google",
+        });
+      }
+      // AuthContext will detect auth change and navigate automatically
+    } catch (error: any) {
+      if (isMFAError(error)) {
+        setMfaResolver(getMFAResolver(error as MultiFactorError));
+        setLoading(null);
+      } else if (error?.code !== "auth/popup-closed-by-user") {
+        toast.error("Google sign-in failed. Please try again.");
+        setLoading(null);
+      } else {
+        setLoading(null);
+      }
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast.error("Enter your email address first, then click Reset Password.");
+      return;
+    }
+    try {
+      await resetPassword(email);
+      setResetSent(true);
+      toast.success("Password reset email sent!", {
+        description: "Check your inbox and follow the link to reset your password.",
+      });
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
+  // Show loading spinner while checking auth state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#faf7ff] via-white to-[#eef0ff]">
+        <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+      </div>
+    );
+  }
 
   return (
+    <>
+      {/* MFA SMS Challenge Modal — shown when user has MFA enrolled */}
+      {mfaResolver && (
+        <MFAVerifyModal
+          resolver={mfaResolver}
+          onSuccess={() => {
+            setMfaResolver(null);
+            // AuthContext will detect auth change → navigate to /home
+          }}
+          onCancel={() => {
+            setMfaResolver(null);
+            setLoading(null);
+          }}
+        />
+      )}
     <div className="min-h-screen w-full flex bg-gradient-to-br from-[#faf7ff] via-white to-[#eef0ff] font-inter">
       {/* Left: form column */}
       <section className="relative flex-1 flex items-center justify-center px-6 py-10">
@@ -132,9 +209,13 @@ export default function Login() {
                 <input
                   type="email"
                   name="email"
+                  id="login-email"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@organization.com"
                   className="w-full bg-transparent outline-none px-4 h-12 text-[14.5px] text-slate-800 placeholder:text-slate-400"
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -147,9 +228,13 @@ export default function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
+                  id="login-password"
                   required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   className="w-full bg-transparent outline-none px-4 pr-12 h-12 text-[14.5px] text-slate-800 placeholder:text-slate-400"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -169,10 +254,11 @@ export default function Login() {
               </label>
               <button
                 type="button"
-                onClick={() => toast("Reset password link sent (demo).")}
-                className="text-violet-600 hover:underline font-medium"
+                onClick={handleResetPassword}
+                disabled={resetSent}
+                className="text-violet-600 hover:underline font-medium disabled:opacity-50"
               >
-                Reset password
+                {resetSent ? "Email sent ✓" : "Reset password"}
               </button>
             </div>
 
@@ -201,19 +287,17 @@ export default function Login() {
 
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => finishSignIn("microsoft")}
+              type="button"
+              onClick={() => toast.info("Microsoft SSO coming soon.", { description: "Use email/password to sign in for now." })}
               disabled={loading !== null}
               className="flex items-center justify-center gap-2 h-12 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-60"
             >
-              {loading === "microsoft" ? (
-                <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
-              ) : (
-                <MicrosoftLogo />
-              )}
+              <MicrosoftLogo />
               <span className="text-[13.5px] font-semibold text-slate-800">Microsoft</span>
             </button>
             <button
-              onClick={() => finishSignIn("google")}
+              type="button"
+              onClick={handleGoogleSignIn}
               disabled={loading !== null}
               className="flex items-center justify-center gap-2 h-12 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-60"
             >
@@ -222,7 +306,9 @@ export default function Login() {
               ) : (
                 <GoogleLogo />
               )}
-              <span className="text-[13.5px] font-semibold text-slate-800">Google</span>
+              <span className="text-[13.5px] font-semibold text-slate-800">
+                {loading === "google" ? "Signing in…" : "Google"}
+              </span>
             </button>
           </div>
 
@@ -277,5 +363,6 @@ export default function Login() {
         </div>
       </section>
     </div>
+    </>
   );
 }

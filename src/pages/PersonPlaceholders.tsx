@@ -42,15 +42,15 @@ export function makePersonPlaceholder(slug: keyof typeof SPECS) {
   };
 }
 
-export const PersonCareTracker = makePersonPlaceholder("care-tracker");
+export { default as PersonCareTracker } from "./PersonCareTracker";
 export const PersonMeetingNotes = makePersonPlaceholder("meeting-notes");
 export const PersonCommunications = makePersonPlaceholder("communications");
 export const PersonServices = makePersonPlaceholder("services");
-export const PersonEmployment = makePersonPlaceholder("employment");
+export { default as PersonEmployment } from "./PersonEmployment";
 export const PersonAssignedStaff = makePersonPlaceholder("assigned-staff");
 export { default as PersonManagedDocuments } from "./PersonManagedDocuments";
 export const PersonOnCall = makePersonPlaceholder("oncall");
-export const PersonTrainings = makePersonPlaceholder("trainings");
-export const PersonServicePlan = makePersonPlaceholder("service-plan");
+export { default as PersonTrainings } from "./PersonTrainings";
+export { default as PersonServicePlan } from "./PersonServicePlan";
 export const PersonBillingSummary = makePersonPlaceholder("billing");
-export const PersonESignature = makePersonPlaceholder("esignature");
+export { default as PersonESignature } from "./PersonESignature";

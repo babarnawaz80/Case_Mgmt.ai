@@ -21,8 +21,11 @@ import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useAIPanel } from "@/contexts/AIPanelContext";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useFirestoreNotifications } from "@/hooks/useFirestoreNotifications";
 import { useMessages } from "@/hooks/useMessages";
+import { useFirestoreConversations } from "@/hooks/useFirestoreMessages";
 import { cn } from "@/lib/utils";
+import { openCommandPalette } from "@/components/CommandPalette";
 
 interface TopbarProps {
   title?: string;
@@ -39,7 +42,7 @@ const topNavItems: TopNavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
   { title: "Messages", url: "/messages", icon: MessageSquare },
-  { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
+  { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
 ];
 
@@ -56,16 +59,20 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const { isAdmin, role } = useRole();
   const { toggle: toggleAI, open: aiOpen } = useAIPanel();
   const { unreadAlerts, unreadMentions } = useNotifications();
+  const { unreadCount: fsUnread } = useFirestoreNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
+  const { totalUnread: fsMessagesUnread } = useFirestoreConversations();
+
+  // Use Firestore unread count if > 0, otherwise fall back to mock counts
+  const totalUnread = fsUnread > 0 ? fsUnread : (unreadAlerts + unreadMentions);
+  const totalMessagesUnread = unreadMessages + fsMessagesUnread;
 
   function badgeFor(item: TopNavItem): { count: number; tone: "red" | "amber" | "accent" } | null {
     if (item.url === "/my-work") {
-      const unread = unreadAlerts + unreadMentions;
-      if (OVERDUE_TASK_COUNT > 0) return { count: OVERDUE_TASK_COUNT, tone: "red" };
-      if (unread > 0) return { count: unread, tone: "accent" };
+      if (totalUnread > 0) return { count: totalUnread, tone: "accent" };
       return null;
     }
-    if (item.url === "/messages" && unreadMessages > 0) return { count: unreadMessages, tone: "red" };
+    if (item.url === "/messages" && totalMessagesUnread > 0) return { count: totalMessagesUnread, tone: "red" };
     return null;
   }
 
@@ -173,7 +180,9 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint" />
           <input
             placeholder="Search people, notes, modules…"
-            className="w-[200px] xl:w-[240px] h-9 pl-8 pr-12 rounded-xl bg-icm-bg border border-icm-border text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/40 focus:bg-icm-panel transition-colors"
+            readOnly
+            onClick={openCommandPalette}
+            className="w-[200px] xl:w-[240px] h-9 pl-8 pr-12 rounded-xl bg-icm-bg border border-icm-border text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/40 focus:bg-icm-panel transition-colors cursor-pointer"
           />
           <kbd className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-mono text-icm-text-faint border border-icm-border bg-icm-panel">
             ⌘K
@@ -182,7 +191,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
         {/* Mobile-only search icon */}
         <button
-          onClick={() => demoToast("Mobile search")}
+          onClick={openCommandPalette}
           className="md:hidden h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors"
           aria-label="Search"
         >

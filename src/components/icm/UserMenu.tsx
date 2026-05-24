@@ -11,13 +11,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRole } from "@/contexts/RoleContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { logOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import employeePhoto from "@/assets/employee-kathy.jpg";
 
 export function UserMenu() {
   const navigate = useNavigate();
   const { isAdmin } = useRole();
+  const { currentUser, userProfile } = useAuth();
   const [clockedIn, setClockedIn] = useState<string | null>(() => localStorage.getItem("icm.clockedInAt"));
+
+  const displayName = userProfile?.displayName || currentUser?.displayName || "User";
+  const displayEmail = userProfile?.email || currentUser?.email || "";
+  const displayRole = userProfile?.role ? userProfile.role.replace("_", " ") : "Staff";
 
   useEffect(() => {
     if (clockedIn) localStorage.setItem("icm.clockedInAt", clockedIn);
@@ -38,15 +45,21 @@ export function UserMenu() {
     toast.success("Clocked out", { description: `Shift logged: ${Math.floor(mins / 60)}h ${mins % 60}m` });
   };
 
-  const handleSignOut = () => {
-    toast("Signed out", { description: "Returning to login." });
-    setTimeout(() => navigate("/login"), 400);
+  const handleSignOut = async () => {
+    try {
+      await logOut();
+      // Don't manually navigate — ProtectedRoute detects auth cleared
+      // and redirects to /login automatically, avoiding the race condition
+      toast("Signed out", { description: "See you next time." });
+    } catch (err) {
+      toast.error("Sign out failed", { description: "Please try again." });
+    }
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors">
+        <button className="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors" aria-label="User menu — account and sign out">
           <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft">
             <img
               src={employeePhoto}
@@ -65,12 +78,13 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
-          <div className="w-10 h-10 rounded-lg overflow-hidden border border-icm-accent/20">
-            <img src={employeePhoto} alt="Kathy Adams" width={40} height={40} className="w-full h-full object-cover" />
+          <div className="w-10 h-10 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft flex items-center justify-center text-icm-accent font-bold text-sm">
+            {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold leading-tight">Kathy Adams</p>
-            <p className="text-[11px] text-muted-foreground truncate">kathy@icaremanager.com</p>
+            <p className="text-[13px] font-semibold leading-tight">{displayName}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{displayEmail}</p>
+            <p className="text-[10px] text-muted-foreground capitalize">{displayRole}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

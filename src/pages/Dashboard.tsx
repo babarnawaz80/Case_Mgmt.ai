@@ -1,11 +1,16 @@
-import { ICMShell } from "@/components/icm/ICMShell";
+// Dashboard — restored to match original Lovable/GitHub design exactly
+// GreetingBanner + HeroRow (3 KPI cards + 1 donut meter) + DonutRow (4 donuts) + QuickActions
+// Uses live Firestore hooks instead of static mock data
 
+import { ICMShell } from "@/components/icm/ICMShell";
 import { Donut } from "@/components/icm/charts";
-import { people, initials, riskAvatarClass, type Person } from "@/data/people";
-import { globalIncidentSummary } from "@/data/incidents";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useIndividuals, riskTier, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useAllProgressNotes } from "@/hooks/useProgressNotes";
+import { useIncidentSummary } from "@/hooks/useIncidents";
 import {
   Sun,
   Users,
@@ -13,22 +18,13 @@ import {
   CreditCard,
   FileText,
   ClipboardList,
-  ClipboardCheck,
-  StickyNote,
   Heart,
-  Shield,
   Phone,
   GraduationCap,
-  Briefcase,
-  CheckSquare,
-  Calendar,
-  CalendarCheck,
   Folder,
   PhoneCall,
   UserCheck,
   PenTool,
-  BarChart3,
-  Receipt,
   ArrowRight,
   Search,
   X,
@@ -36,7 +32,7 @@ import {
 } from "lucide-react";
 
 /* ============================================================
-   Greeting banner — IDDBilling-inspired
+   Greeting banner
 ============================================================ */
 function GreetingBanner({ name }: { name: string }) {
   const hour = new Date().getHours();
@@ -71,7 +67,7 @@ function GreetingBanner({ name }: { name: string }) {
 }
 
 /* ============================================================
-   Hero KPI cards — large pastel, IDDBilling-style
+   Hero KPI cards — large pastel
 ============================================================ */
 interface HeroKpi {
   label: string;
@@ -140,94 +136,71 @@ function HeroKpiCard({ kpi }: { kpi: HeroKpi }) {
       <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
         {kpi.cta} <ArrowRight className="w-3 h-3" />
       </span>
-      {/* Decorative circle */}
       <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
     </NavLink>
   );
 }
 
-/* Hero meter card — donut-based, matches HeroKpiCard pastel styling */
+/* Hero meter card — donut-based */
 interface HeroMeter {
   label: string;
-  value: number; // 0-100
+  value: number;
   centerLabel: string;
   sub: string;
   icon: LucideIcon;
   to: string;
   cta: string;
-  tone: "blue" | "amber" | "emerald" | "rose";
+  tone: "rose";
   donutColor: string;
 }
 
-const METER_TONES: Record<HeroMeter["tone"], { bg: string; ring: string; iconBg: string; iconText: string }> = {
-  blue: {
-    bg: "bg-gradient-to-br from-[hsl(210,90%,97%)] to-[hsl(210,80%,92%)]",
-    ring: "ring-[hsl(210,80%,80%)]/40",
-    iconBg: "bg-white/70",
-    iconText: "text-icm-accent",
-  },
-  amber: {
-    bg: "bg-gradient-to-br from-[hsl(28,100%,97%)] to-[hsl(20,90%,93%)]",
-    ring: "ring-[hsl(28,90%,80%)]/40",
-    iconBg: "bg-white/70",
-    iconText: "text-icm-amber",
-  },
-  emerald: {
-    bg: "bg-gradient-to-br from-[hsl(155,70%,96%)] to-[hsl(155,60%,90%)]",
-    ring: "ring-[hsl(155,60%,75%)]/40",
-    iconBg: "bg-white/70",
-    iconText: "text-icm-green",
-  },
-  rose: {
-    bg: "bg-gradient-to-br from-[hsl(350,90%,97%)] to-[hsl(350,80%,92%)]",
-    ring: "ring-[hsl(350,80%,80%)]/40",
-    iconBg: "bg-white/70",
-    iconText: "text-icm-red",
-  },
-};
-
 function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
-  const t = METER_TONES[kpi.tone];
   const Icon = kpi.icon;
   return (
     <NavLink
       to={kpi.to}
-      className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
+      className="relative overflow-hidden rounded-2xl ring-1 ring-[hsl(0,80%,80%)]/40 bg-gradient-to-br from-[hsl(0,90%,97%)] to-[hsl(0,80%,93%)] p-5 group hover:shadow-elevated transition-all block"
     >
       <div className="flex items-start justify-between">
-        <div className={`w-10 h-10 rounded-xl ${t.iconBg} flex items-center justify-center`}>
-          <Icon className={`w-5 h-5 ${t.iconText}`} />
-        </div>
-        <div className="relative">
-          <Donut value={kpi.value} size={64} stroke={7} color={kpi.donutColor} />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-mono font-bold text-[12px] text-icm-text">{kpi.centerLabel}</span>
-          </div>
+        <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-icm-red" />
         </div>
       </div>
       <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">
         {kpi.label}
       </p>
-      <p className="text-[12px] text-icm-text-dim mt-1 font-geist">{kpi.sub}</p>
-      <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
-        {kpi.cta} <ArrowRight className="w-3 h-3" />
-      </span>
+      <div className="flex items-center gap-4 mt-2">
+        <div className="relative shrink-0">
+          <Donut value={kpi.value} size={72} stroke={8} color={kpi.donutColor} />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono font-bold text-[13px] text-icm-text">{kpi.centerLabel}</span>
+          </div>
+        </div>
+        <div>
+          <p className="text-[12px] text-icm-text-dim font-geist">{kpi.sub}</p>
+          <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-2 group-hover:gap-2 transition-all">
+            {kpi.cta} <ArrowRight className="w-3 h-3" />
+          </span>
+        </div>
+      </div>
       <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
     </NavLink>
   );
 }
 
 function HeroRow() {
-  const census = people.length;
-  const activeCensus = people.filter((p) => p.status === "Active").length;
-  const highRisk = people.filter((p) => (p.riskScore ?? 0) >= 60).length;
-  const reviewRisk = people.filter((p) => (p.riskScore ?? 0) >= 35 && (p.riskScore ?? 0) < 60).length;
+  const { individuals } = useIndividuals();
+  const census = individuals.length;
+  const activeCensus = individuals.filter((p) => p.enrollment_status === "active").length;
+  const highRisk = individuals.filter((p) => riskTier(p.risk_score) === "high").length;
+  const reviewRisk = individuals.filter((p) => riskTier(p.risk_score) === "review").length;
   const attentionCount = highRisk + reviewRisk;
-  const incidentSummary = globalIncidentSummary();
+  const incidentSummary = useIncidentSummary();
+
   const kpis: HeroKpi[] = [
     {
       label: "Census",
-      value: census.toString(),
+      value: census > 0 ? census.toString() : "—",
       sub: `${activeCensus} active · ${census - activeCensus} inactive/pending`,
       icon: Users,
       to: "/people",
@@ -254,17 +227,19 @@ function HeroRow() {
       trend: { value: "+1.4%", positive: true },
     },
   ];
+
   const attention: HeroMeter = {
     label: "People Needing Attention",
-    value: (attentionCount / census) * 100,
+    value: census > 0 ? (attentionCount / census) * 100 : 0,
     centerLabel: `${attentionCount}/${census}`,
-    sub: `${highRisk} high-risk · ${reviewRisk} review`,
+    sub: `${highRisk} high-risk · ${reviewRisk} need review`,
     icon: AlertTriangle,
     to: "/people",
     cta: "View Watchlist",
     tone: "rose",
     donutColor: "hsl(var(--icm-red))",
   };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {kpis.map((k) => (
@@ -276,7 +251,7 @@ function HeroRow() {
 }
 
 /* ============================================================
-   Compliance donut row — 4 cards, IDDBilling-style
+   Compliance donut row — 4 cards
 ============================================================ */
 interface DonutKpi {
   title: string;
@@ -329,61 +304,103 @@ function DonutCard({ kpi }: { kpi: DonutKpi }) {
 }
 
 function DonutRow() {
+  const { individuals, loading: indLoading } = useIndividuals();
+  const { notes, loading: notesLoading } = useAllProgressNotes();
+  const loading = indLoading || notesLoading;
+
+  const metrics = useMemo(() => {
+    const total = individuals.length;
+    if (total === 0) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. ISP On-Time: pcp_due_date is still in the future (or today) — plan not yet expired
+    const ispOnTime = individuals.filter((p) => {
+      if (!p.pcp_due_date) return false;
+      return new Date(p.pcp_due_date) >= today;
+    }).length;
+
+    // 2. Visit Compliance: last_visit_date within the last 30 days
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const visitCompliant = individuals.filter((p) => {
+      if (!p.last_visit_date) return false;
+      return new Date(p.last_visit_date) >= thirtyDaysAgo;
+    }).length;
+
+    // 3. Documentation: individual has at least 1 progress note in our fetched set
+    const individualsWithNotes = new Set(notes.map((n) => n.individualId));
+    const documented = individuals.filter((p) => individualsWithNotes.has(p.id)).length;
+
+    // 4. Care Plans Active: enrollment_status === 'active'
+    const carePlansActive = individuals.filter((p) => p.enrollment_status === "active").length;
+
+    const pct = (n: number) =>
+      total > 0 ? Math.round((n / total) * 100) : 0;
+
+    return {
+      ispOnTime: { n: ispOnTime, pct: pct(ispOnTime) },
+      visitCompliance: { n: visitCompliant, pct: pct(visitCompliant) },
+      documentation: { n: documented, pct: pct(documented) },
+      carePlansActive: { n: carePlansActive, pct: pct(carePlansActive) },
+      total,
+    };
+  }, [individuals, notes]);
+
+  const dash = "—";
+
   const items: DonutKpi[] = [
     {
-      title: "PCP Compliance",
-      subtitle: "Person-Centered Plans",
-      value: 84.2,
-      centerLabel: "84%",
+      title: "ISP On-Time",
+      subtitle: "Active care plans",
+      value: loading || !metrics ? 0 : metrics.ispOnTime.pct,
+      centerLabel: loading ? dash : !metrics ? "0%" : `${metrics.ispOnTime.pct}%`,
       color: "hsl(var(--icm-green))",
       to: "/documentation/care-plans",
-      legend: [
-        { label: "On Track", value: "78%", dot: "bg-icm-green" },
-        { label: "Off Track", value: "12%", dot: "bg-icm-amber" },
-        { label: "Out of Comp.", value: "10%", dot: "bg-icm-red" },
+      legend: loading || !metrics ? undefined : [
+        { label: "On-Time", value: metrics.ispOnTime.n, dot: "bg-icm-green" },
+        { label: "Overdue/Missing", value: metrics.total - metrics.ispOnTime.n, dot: "bg-icm-red" },
       ],
     },
     {
-      title: "Services",
-      subtitle: "Care Tracker coverage",
-      value: 87,
-      centerLabel: "87%",
+      title: "Visit Compliance",
+      subtitle: "Note in last 30 days",
+      value: loading || !metrics ? 0 : metrics.visitCompliance.pct,
+      centerLabel: loading ? dash : !metrics ? "0%" : `${metrics.visitCompliance.pct}%`,
       color: "hsl(var(--icm-accent))",
       to: "/documentation",
-      legend: [
-        { label: "Delivered", value: 412, dot: "bg-icm-accent" },
-        { label: "Missed", value: 18, dot: "bg-icm-red" },
-        { label: "Pending", value: 42, dot: "bg-icm-amber" },
+      legend: loading || !metrics ? undefined : [
+        { label: "Compliant", value: metrics.visitCompliance.n, dot: "bg-icm-accent" },
+        { label: "Missing", value: metrics.total - metrics.visitCompliance.n, dot: "bg-icm-red" },
       ],
     },
     {
-      title: "My Work",
-      subtitle: "Task breakdown",
-      value: 64,
-      centerLabel: "14",
+      title: "Documentation",
+      subtitle: "Has ≥1 progress note",
+      value: loading || !metrics ? 0 : metrics.documentation.pct,
+      centerLabel: loading ? dash : !metrics ? "0%" : `${metrics.documentation.pct}%`,
       color: "hsl(var(--icm-amber))",
-      to: "/my-work",
-      legend: [
-        { label: "Open", value: 8, dot: "bg-icm-accent" },
-        { label: "Past Due", value: 3, dot: "bg-icm-red" },
-        { label: "In Progress", value: 2, dot: "bg-icm-amber" },
-        { label: "Completed", value: 1, dot: "bg-icm-green" },
+      to: "/documentation",
+      legend: loading || !metrics ? undefined : [
+        { label: "Documented", value: metrics.documentation.n, dot: "bg-icm-green" },
+        { label: "No Notes", value: metrics.total - metrics.documentation.n, dot: "bg-icm-amber" },
       ],
     },
     {
-      title: "ISP Reviews",
-      subtitle: "Next 30 days",
-      value: 72,
-      centerLabel: "72%",
+      title: "Care Plans Active",
+      subtitle: "Enrollment status",
+      value: loading || !metrics ? 0 : metrics.carePlansActive.pct,
+      centerLabel: loading ? dash : !metrics ? "0%" : `${metrics.carePlansActive.pct}%`,
       color: "hsl(270,60%,58%)",
-      to: "/documentation/care-plans",
-      legend: [
-        { label: "Due Soon", value: 6, dot: "bg-icm-amber" },
-        { label: "Overdue", value: 1, dot: "bg-icm-red" },
-        { label: "Complete", value: 22, dot: "bg-icm-green" },
+      to: "/people",
+      legend: loading || !metrics ? undefined : [
+        { label: "Active", value: metrics.carePlansActive.n, dot: "bg-icm-green" },
+        { label: "Inactive", value: metrics.total - metrics.carePlansActive.n, dot: "bg-icm-red" },
       ],
     },
   ];
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {items.map((k) => (
@@ -395,9 +412,8 @@ function DonutRow() {
 
 /* ============================================================
    Quick Actions grid — color-banded tiles
-   Combines legacy iCM color tiles + IDDBilling Quick Actions
 ============================================================ */
-type ActionCategory = "Documentation" | "Operations" | "Care" | "Schedule";
+type ActionCategory = "Documentation" | "Operations" | "Care";
 
 interface ActionTile {
   label: string;
@@ -405,14 +421,10 @@ interface ActionTile {
   to: string;
   category: ActionCategory;
   count?: number;
-  /** When set, clicking the tile opens an individual picker, then routes to formRoute(personId). */
   formRoute?: (personId: string) => string;
 }
 
-const ACTION_TONES: Record<
-  ActionCategory,
-  { bg: string; hover: string; ring: string; iconBg: string }
-> = {
+const ACTION_TONES: Record<ActionCategory, { bg: string; hover: string; ring: string; iconBg: string }> = {
   Documentation: {
     bg: "bg-[hsl(210,85%,55%)]",
     hover: "hover:bg-[hsl(210,85%,50%)]",
@@ -431,29 +443,17 @@ const ACTION_TONES: Record<
     ring: "ring-[hsl(270,55%,48%)]/30",
     iconBg: "bg-white/15",
   },
-  Schedule: {
-    bg: "bg-[hsl(158,60%,42%)]",
-    hover: "hover:bg-[hsl(158,60%,37%)]",
-    ring: "ring-[hsl(158,60%,32%)]/30",
-    iconBg: "bg-white/15",
-  },
 };
 
 const ACTIONS: ActionTile[] = [
-  // Documentation (blue) — these open an individual picker first, then load the
-  // exact same form used inside each person's eChart.
   { label: "Contact Note", icon: FileText, to: "/modules/contact-note", category: "Documentation", count: 24 },
-  { label: "Progress Note", icon: PenTool, to: "/progress-note", category: "Documentation", count: 14 },
-  { label: "Visit Summary", icon: CalendarCheck, to: "/visit-summary", category: "Documentation", count: 6 },
+  { label: "Progress Note", icon: PenTool, to: "/progress-note", category: "Documentation", count: 14, formRoute: (id) => `/people/${id}/progress-note` },
+  { label: "Visit Summary", icon: ClipboardList, to: "/documentation", category: "Documentation", count: 6, formRoute: (id) => `/people/${id}/visit-summary` },
   { label: "Monitoring Form", icon: ClipboardList, to: "/documentation", category: "Documentation", count: 4, formRoute: (id) => `/people/${id}/monitoring-form` },
-
-  // Operations (orange)
   { label: "Managed Documents", icon: Folder, to: "/documents", category: "Operations", count: 8 },
   { label: "On Call Log", icon: PhoneCall, to: "/oncall-log", category: "Operations", count: 3 },
   { label: "Training", icon: GraduationCap, to: "/settings", category: "Operations", count: 4 },
   { label: "Leads", icon: Phone, to: "/leads", category: "Operations" },
-
-  // Care (purple)
   { label: "Assigned Staff", icon: UserCheck, to: "/settings/users", category: "Care", count: 12 },
   { label: "Referrals", icon: Phone, to: "/referrals", category: "Care" },
   { label: "Team", icon: Heart, to: "/settings/users", category: "Care" },
@@ -520,7 +520,6 @@ function QuickActions() {
         })}
       </div>
 
-      {/* Category legend */}
       <div className="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-icm-border">
         {(["Documentation", "Operations", "Care"] as ActionCategory[]).map((cat) => (
           <div key={cat} className="flex items-center gap-1.5">
@@ -554,16 +553,17 @@ function IndividualPickerModal({
   onClose: () => void;
   onSelect: (personId: string) => void;
 }) {
+  const { individuals } = useIndividuals();
   const [q, setQ] = useState("");
   const list = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const active = people.filter((p) => p.status === "Active");
-    const fullName = (p: Person) => `${p.firstName} ${p.lastName}`;
+    const active = individuals.filter((p) => p.enrollment_status === "active");
+    const fullName = (p: typeof individuals[0]) => `${p.first_name} ${p.last_name}`;
     if (!term) return active.slice(0, 60);
     return active
       .filter((p) => fullName(p).toLowerCase().includes(term) || p.id.toLowerCase().includes(term))
       .slice(0, 60);
-  }, [q]);
+  }, [individuals, q]);
 
   return (
     <div
@@ -581,11 +581,7 @@ function IndividualPickerModal({
               Select the individual this {title.toLowerCase()} is for
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Close"
-          >
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -616,14 +612,14 @@ function IndividualPickerModal({
               <div
                 className={cn(
                   "w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold",
-                  riskAvatarClass(p.riskScore)
+                  riskAvatarClass(p.risk_score)
                 )}
               >
                 {initials(p)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[12.5px] font-medium text-foreground truncate">
-                  {p.firstName} {p.lastName}
+                  {p.first_name} {p.last_name}
                 </p>
                 <p className="text-[10.5px] font-mono text-muted-foreground truncate">{p.id}</p>
               </div>
@@ -637,18 +633,18 @@ function IndividualPickerModal({
 }
 
 /* ============================================================
-   Dashboard composition
+   Dashboard composition — identical to original Lovable design
 ============================================================ */
 const Dashboard = () => {
+  const { userProfile, currentUser } = useAuth();
+  const firstName = userProfile?.firstName || currentUser?.displayName?.split(" ")[0] || "Kathy";
+
   return (
     <ICMShell title="iCM Dashboard">
       <div className="space-y-5">
-        <GreetingBanner name="Kathy" />
+        <GreetingBanner name={firstName} />
         <HeroRow />
         <DonutRow />
-
-
-
         <QuickActions />
       </div>
     </ICMShell>

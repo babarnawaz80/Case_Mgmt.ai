@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { PhoneCall, Search, ChevronDown, Check, Save, X } from "lucide-react";
+import { PhoneCall, Search, ChevronDown, Check, Save, X, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { people } from "@/data/people";
+import { useIndividuals } from "@/hooks/useIndividuals";
 import type {
   OnCallCategory,
   OnCallStatus,
   OnCallUrgency,
   CallerType,
 } from "@/data/onCallLogs";
+import { addOnCallLog } from "@/hooks/useFirestore";
+import { writeAudit } from "@/lib/auditService";
 
 const categories: OnCallCategory[] = [
   "Medical",
@@ -84,6 +86,7 @@ function PersonSearchSelect({
   value: string;
   onChange: (id: string) => void;
 }) {
+  const { individuals, loading } = useIndividuals();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -97,12 +100,12 @@ function PersonSearchSelect({
   }, []);
 
   const q = query.trim().toLowerCase();
-  const options = people
-    .map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}`, sub: p.county }))
+  const options = individuals
+    .map((p) => ({ id: p.id, name: `${p.first_name} ${p.last_name}`, sub: p.county ?? "—" }))
     .filter((o) => !q || o.name.toLowerCase().includes(q));
 
-  const selected = people.find((p) => p.id === value);
-  const display = selected ? `${selected.firstName} ${selected.lastName}` : "";
+  const selected = individuals.find((p) => p.id === value);
+  const display = selected ? `${selected.first_name} ${selected.last_name}` : "";
 
   return (
     <div ref={ref} className="relative">
@@ -111,7 +114,8 @@ function PersonSearchSelect({
         onClick={() => setOpen((o) => !o)}
         className={`${inputCls} flex items-center justify-between text-left`}
       >
-        <span className={display ? "text-icm-text" : "text-icm-text-faint"}>
+        <span className={display ? "text-icm-text" : "text-icm-text-faint inline-flex items-center gap-1.5"}>
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-icm-accent shrink-0" />}
           {display || "Search individual… (optional)"}
         </span>
         <ChevronDown className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
@@ -142,7 +146,12 @@ function PersonSearchSelect({
                 Clear selection
               </button>
             )}
-            {options.length === 0 ? (
+            {loading ? (
+              <div className="px-3 py-2 text-[12px] text-icm-text-faint flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-icm-accent" />
+                Loading caseload…
+              </div>
+            ) : options.length === 0 ? (
               <div className="px-3 py-2 text-[12px] text-icm-text-faint">No matches.</div>
             ) : (
               options.map((o) => {
@@ -176,6 +185,7 @@ function PersonSearchSelect({
 
 const OnCallLogNew = () => {
   const navigate = useNavigate();
+  const { individuals } = useIndividuals();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const nowTime = now.toTimeString().slice(0, 5);
@@ -204,22 +214,63 @@ const OnCallLogNew = () => {
     notes: "",
   });
 
+  const [submitting, setSubmitting] = useState(false);
+
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  const handleSave = (asDraft = false) => {
+  const handleSave = async (asDraft = false) => {
     if (!form.callerName.trim() || !form.callerPhone.trim() || !form.reason.trim()) {
       toast({
         title: "Missing required fields",
         description: "Caller name, phone number, and reason for call are required.",
+        variant: "destructive",
       });
       return;
     }
-    toast({
-      title: asDraft ? "Draft saved" : "On-call log saved",
-      description: `Call from ${form.callerName} recorded.`,
-    });
-    navigate("/oncall-log");
+    setSubmitting(true);
+    try {
+      const selectedPerson = individuals.find(p => p.id === form.personId);
+      const docRef = await addOnCallLog({
+        individual_id: form.personId || "unspecified",
+        individual_name: selectedPerson ? `${selectedPerson.first_name} ${selectedPerson.last_name}` : "Unspecified",
+        date: form.callDate,
+        time: form.callStartTime || "—",
+        caller: form.callerName,
+        call_type: form.callerType,
+        description: form.reason,
+        action_taken: form.actionTaken,
+        follow_up_required: form.followUpRequired,
+        follow_up_notes: form.followUpDue ? `Due ${form.followUpDue} by ${form.followUpBy}` : "—",
+        author_name: "Kathy Adams",
+        category: form.category,
+        urgency: form.urgency,
+        status: asDraft ? "Open" : "Resolved",
+        caller_phone: form.callerPhone,
+        notes: form.notes,
+        supervisor_notified: form.supervisorNotified,
+        supervisor_name: form.supervisorName,
+      } as any);
+
+      await writeAudit('create_note', 'oncall_log', docRef.id, {
+        individualId: form.personId || "unspecified",
+        noteType: "oncall",
+      });
+
+      toast({
+        title: asDraft ? "Draft saved" : "On-call log saved",
+        description: `Call from ${form.callerName} recorded.`,
+      });
+      navigate("/oncall-log");
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: (err as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -254,15 +305,17 @@ const OnCallLogNew = () => {
             </button>
             <button
               onClick={() => handleSave(true)}
-              className="h-9 px-3.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text flex items-center gap-1.5"
+              disabled={submitting}
+              className="h-9 px-3.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text flex items-center gap-1.5 disabled:opacity-40"
             >
               Save Draft
             </button>
             <button
               onClick={() => handleSave(false)}
-              className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700"
+              disabled={submitting}
+              className="h-9 px-3.5 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700 disabled:opacity-40"
             >
-              <Save className="w-3.5 h-3.5" /> Submit Log
+              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Submit Log
             </button>
           </div>
         </div>

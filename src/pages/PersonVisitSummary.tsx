@@ -1,24 +1,15 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck, Smartphone } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck, Smartphone, Loader2 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
-import { getVisitSummariesForPerson, type VisitStatus } from "@/data/visitSummaries";
-import type { AISuggestion } from "@/data/people";
-
-const visitSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Last visit was 5 months ago. Joseph's quarterly requirement means this is overdue. I pre-filled a visit summary from the 04/27 ambient session. 3 minutes to complete.", cta: "Open pre-filled form" },
-  { tone: "insight", label: "Insight", body: "Next visit must be scheduled by 07/27/2026 to remain compliant. Want me to suggest available times on your calendar?", cta: "Schedule visit" },
-  { tone: "insight", label: "Insight", body: "What is Not Working: behavioral changes were flagged in 2 recent sessions. This should be documented in today's visit summary.", cta: "Add to form" },
-  { tone: "good", label: "Good news", body: "Joseph has had consistent visit documentation for the past 8 months. Compliance rate: 100% for in-person visits.", cta: "View history" },
-];
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useVisitSummaries } from "@/hooks/useFirestore";
 
 const PersonVisitSummary = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const allVisits = getVisitSummariesForPerson(id ?? "");
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: allVisits, loading: visitsLoading } = useVisitSummaries(id);
 
   const [updatedByFilter, setUpdatedByFilter] = useState<"All" | "Me">("All");
   const [fromDate, setFromDate] = useState("");
@@ -26,12 +17,25 @@ const PersonVisitSummary = () => {
 
   const filtered = useMemo(() => {
     return allVisits.filter(v => {
-      if (updatedByFilter === "Me" && v.updatedBy !== "Babar Nawaz CM") return false;
+      if (updatedByFilter === "Me" && v.updated_by !== "Babar Nawaz CM") return false;
       return true;
     });
   }, [allVisits, updatedByFilter]);
 
-  if (!person) {
+  const loading = individualLoading || visitsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Visit Summary" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="Visit Summary" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -44,14 +48,14 @@ const PersonVisitSummary = () => {
 
   if (allVisits.length === 0) {
     return (
-      <ICMShell title="Visit Summary" rightPanel={<PersonAIPanel person={person} suggestions={visitSuggestions} intro={`${visitSuggestions.length} suggestions for ${person.firstName}.`} />}>
+      <ICMShell title="Visit Summary" showAIPanel={false}>
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
             <CalendarCheck className="w-7 h-7 text-icm-text-faint" />
           </div>
           <h2 className="font-manrope font-extrabold text-[20px] text-icm-text mb-1">No visit summaries yet</h2>
           <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
-            Document {person.firstName}'s first visit or let AI draft one from a recent ambient session.
+            Document {individual.first_name}'s first visit or let AI draft one from a recent ambient session.
           </p>
           <div className="flex gap-2">
             <button onClick={newVisit} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
@@ -67,30 +71,30 @@ const PersonVisitSummary = () => {
   }
 
   return (
-    <ICMShell title="Visit Summary" rightPanel={<PersonAIPanel person={person} suggestions={visitSuggestions} intro={`${visitSuggestions.length} suggestions for ${person.firstName}.`} />}>
+    <ICMShell title="Visit Summary" showAIPanel={false}>
       <div className="space-y-5">
-        <button onClick={() => navigate(`/people/${person.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Visit Summary
+          People · {individual.last_name}, {individual.first_name} · Visit Summary
         </button>
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
-          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>
-            {initials(person)}
+          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>
+            {initials(individual)}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">
-              {person.lastName}, {person.firstName}
-              {person.nickname && <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>}
+              {individual.last_name}, {individual.first_name}
+              {individual.preferred_name && <span className="font-medium text-icm-text-dim"> ({individual.preferred_name})</span>}
             </h2>
             <p className="text-[11.5px] font-mono text-icm-text-dim">
-              {person.gender} · {person.age}y · {person.county} · ID #{person.id}
+              {individual.gender ?? "—"} · {individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}
             </p>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
             <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
-            {person.status}
+            {individual.enrollment_status}
           </span>
         </div>
 
@@ -104,10 +108,10 @@ const PersonVisitSummary = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate(`/people/${person.id}/visit-summary/schedule`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => navigate(`/people/${individual.id}/visit-summary/schedule`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
               <CalendarCheck className="w-3.5 h-3.5" /> Schedule visit
             </button>
-            <button onClick={() => navigate(`/people/${person.id}/visit-summary/document`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
+            <button onClick={() => navigate(`/people/${individual.id}/visit-summary/document`)} className="h-9 px-3 rounded-xl border border-icm-border bg-white text-[12px] font-geist font-medium hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Smartphone className="w-3.5 h-3.5" /> Document visit (mobile)
             </button>
             <button onClick={newVisit} className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
@@ -123,9 +127,9 @@ const PersonVisitSummary = () => {
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-              <span className="font-semibold">Last visit was on 11/24/2024.</span>{" "}
+              <span className="font-semibold">Last visit was on {individual.last_visit_date ?? "N/A"}.</span>{" "}
               <span className="text-icm-text-dim">
-                Based on {person.firstName}'s quarterly visit requirement, next visit is due by 02/24/2025 — this is overdue. I pre-filled this form from the 04/27/2026 ambient session.
+                Based on {individual.first_name}'s quarterly visit requirement, next visit is due soon. Let AI draft a pre-filled form.
               </span>
             </p>
           </div>
@@ -162,11 +166,11 @@ const PersonVisitSummary = () => {
               <tbody className="divide-y divide-icm-border">
                 {filtered.map((v) => (
                   <tr key={v.id} onClick={() => openVisit(v.id)} className="hover:bg-icm-bg/40 cursor-pointer transition-colors">
-                    <td className="px-4 py-3 font-mono text-icm-text">{v.visitDate}</td>
-                    <td className="px-4 py-3">{person.lastName}, {person.firstName}</td>
-                    <td className="px-4 py-3 text-icm-text-dim">{v.purposeOfSupport ?? <span className="text-icm-text-faint">—</span>}</td>
-                    <td className="px-4 py-3 text-icm-text-dim">{v.updatedBy}</td>
-                    <td className="px-4 py-3 font-mono text-icm-text-dim">{v.updatedOn}</td>
+                    <td className="px-4 py-3 font-mono text-icm-text">{v.visit_date || v.visitDate}</td>
+                    <td className="px-4 py-3">{individual.last_name}, {individual.first_name}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">{v.purpose_of_support || v.purposeOfSupport || <span className="text-icm-text-faint">—</span>}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">{v.updated_by || v.updatedBy || v.author_name || "Kathy Martinez"}</td>
+                    <td className="px-4 py-3 font-mono text-icm-text-dim">{v.updated_on || v.updatedOn || new Date(v.created_at?.seconds * 1000 || Date.now()).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => openVisit(v.id)} className="p-1.5 rounded hover:bg-icm-bg text-icm-accent" title="View"><Eye className="w-3.5 h-3.5" /></button>

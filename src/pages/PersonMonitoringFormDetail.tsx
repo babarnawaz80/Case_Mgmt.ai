@@ -1,22 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, X, Save, Printer, CheckCircle2, AlertTriangle,
   FileText, Heart, ListChecks, Users, ShieldCheck, AlertCircle, Phone,
-  Activity, Smile, Plus,
+  Activity, Smile, Plus, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson } from "@/data/people";
-import { getForm, aiPrefilledDraft, type MonitoringForm, type YesNoAnswer, type GoalProgress, type RecommendedAction } from "@/data/monitoringForms";
-import type { AISuggestion } from "@/data/people";
-
-const formSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Quarterly monitoring form due in 7 days. I pre-filled 18 of 22 questions from recent notes.", cta: "Open pre-filled form" },
-  { tone: "insight", label: "Insight", body: "Section 6 (Health & Welfare): behavioral changes were noted in 2 recent sessions.", cta: "Review section" },
-  { tone: "insight", label: "Insight", body: "3 recommended actions from last quarter were not completed. Add them to this review?", cta: "Add to form" },
-  { tone: "good", label: "Good news", body: "Service satisfaction has been consistently positive across last 3 reviews.", cta: "View history" },
-];
+import { useIndividual } from "@/hooks/useIndividuals";
+import { useMonitoringForms, addMonitoringForm, updateMonitoringForm } from "@/hooks/useFirestore";
+import { aiPrefilledDraft, type YesNoAnswer, type GoalProgress, type RecommendedAction } from "@/data/monitoringForms";
+import { toast } from "sonner";
 
 type SectionKey = "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "s8" | "s9" | "s10";
 
@@ -36,19 +29,29 @@ const SECTIONS: { key: SectionKey; num: number; title: string; icon: typeof File
 const PersonMonitoringFormDetail = () => {
   const { id, formId } = useParams<{ id: string; formId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: allForms, loading: formsLoading } = useMonitoringForms(id);
 
   const isNew = formId === "new";
-  const initial = useMemo<MonitoringForm | undefined>(() => {
+  const initial = useMemo<any>(() => {
+    if (!individual) return undefined;
     if (isNew && id) return aiPrefilledDraft(id);
-    return getForm(formId ?? "");
-  }, [formId, id, isNew]);
+    return allForms.find((f: any) => f.id === formId);
+  }, [formId, id, isNew, allForms, individual]);
 
-  const [form, setForm] = useState<MonitoringForm | undefined>(initial);
+  const [form, setForm] = useState<any>(undefined);
   const [aiBanner, setAiBanner] = useState(true);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (initial && !form) {
+      setForm(initial);
+    }
+  }, [initial, form]);
+
+  const loading = individualLoading || formsLoading;
 
   // Completion status per section (computed before any early return to keep hook order stable)
   const completion = useMemo(() => {
@@ -65,7 +68,18 @@ const PersonMonitoringFormDetail = () => {
     return { s1: 1, s2, s3, s4, s5, s6, s7, s8, s9, s10 };
   }, [form]);
 
-  if (!person || !form) {
+  if (loading) {
+    return (
+      <ICMShell title="Monitoring Form" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual || !form) {
     return (
       <ICMShell title="Monitoring Form" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Form not found.</p>
@@ -92,10 +106,56 @@ const PersonMonitoringFormDetail = () => {
   const sectionsComplete = Object.values(completion).filter(p => p >= 1).length;
   const sectionsSkipped = Object.values(completion).filter(p => p === 0).length;
 
-  const submit = () => {
-    setSubmitted(true);
-    setSubmitOpen(false);
-    setForm(prev => prev ? { ...prev, status: "Submitted" } : prev);
+  const handleSave = async (status = "Draft") => {
+    if (!form || !individual) return;
+    try {
+      const formData = {
+        individual_id: id,
+        type: form.type || "Quarterly",
+        status: status,
+        active: form.active || "Active",
+        dueDate: form.dueDate || new Date().toISOString().split("T")[0],
+        submitted_date: status === "Submitted" ? new Date().toISOString().split("T")[0] : "",
+        updated_by: "Kathy Martinez",
+        updated_on: new Date().toLocaleDateString(),
+        s2_circumstances: form.s2_circumstances || [],
+        s3_satisfaction: form.s3_satisfaction || [],
+        s4_progress: form.s4_progress || [],
+        s5_choice: form.s5_choice || [],
+        s6_health: form.s6_health || [],
+        s6_riskScore: form.s6_riskScore || 0,
+        s6_riskSource: form.s6_riskSource || "Manual entry",
+        s7_emergency: form.s7_emergency || [],
+        s7_backupSummary: form.s7_backupSummary || {},
+        s8_incidents: form.s8_incidents || [],
+        s9_recommendedActions: form.s9_recommendedActions || [],
+        s10_contacts: form.s10_contacts || []
+      };
+
+      if (isNew) {
+        const docRef = await addMonitoringForm(formData);
+        toast.success("Monitoring form draft created!");
+        navigate(`/people/${id}/monitoring-form/${docRef.id}`);
+      } else {
+        await updateMonitoringForm(formId, formData);
+        toast.success("Monitoring form draft saved!");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save monitoring form");
+    }
+  };
+
+  const handleFormSubmit = async () => {
+    if (!form || !individual) return;
+    try {
+      await handleSave("Submitted");
+      setSubmitted(true);
+      setSubmitOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit monitoring form");
+    }
   };
 
   const statusToneClass =
@@ -104,10 +164,10 @@ const PersonMonitoringFormDetail = () => {
     : "bg-icm-accent-soft text-icm-accent ring-icm-accent/20";
 
   return (
-    <ICMShell title="Monitoring Form" rightPanel={<PersonAIPanel person={person} suggestions={formSuggestions} intro={`I'm tracking ${formSuggestions.length} items on this review.`} />}>
+    <ICMShell title="Monitoring Form" showAIPanel={false}>
       <div className="space-y-5">
         {/* Back */}
-        <button onClick={() => navigate(`/people/${person.id}/monitoring-form`)} className="inline-flex items-center gap-1.5 text-[14px] font-geist font-bold text-icm-text hover:text-icm-accent">
+        <button onClick={() => navigate(`/people/${individual.id}/monitoring-form`)} className="inline-flex items-center gap-1.5 text-[14px] font-geist font-bold text-icm-text hover:text-icm-accent">
           <ChevronLeft className="w-4 h-4" /> Monitoring Forms
         </button>
 
@@ -128,7 +188,7 @@ const PersonMonitoringFormDetail = () => {
           <div className="ml-auto flex items-center gap-2">
             {!readOnly && (
               <>
-                <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+                <button onClick={() => handleSave("In Progress")} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
                 <button onClick={() => setSubmitOpen(true)} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
@@ -150,7 +210,7 @@ const PersonMonitoringFormDetail = () => {
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                I pre-filled <span className="font-semibold">sections 1–4</span> based on {person.firstName}'s recent contact notes, visit summaries, and risk flags. All AI content is labeled. Review and edit before submitting.
+                I pre-filled <span className="font-semibold">sections 1–4</span> based on {individual.first_name}'s recent contact notes, visit summaries, and risk flags. All AI content is labeled. Review and edit before submitting.
               </p>
             </div>
             <button onClick={() => setAiBanner(false)} className="text-icm-text-dim hover:text-icm-text shrink-0">
@@ -167,7 +227,7 @@ const PersonMonitoringFormDetail = () => {
 
         {submitted && (
           <div className="rounded-xl border border-icm-green/20 bg-icm-green-soft px-4 py-3 text-[12.5px] text-icm-text">
-            <span className="font-semibold text-icm-green">Monitoring form submitted.</span> I've updated {person.firstName}'s compliance status. Next quarterly review due: <span className="font-mono">07/26/2026</span>.
+            <span className="font-semibold text-icm-green">Monitoring form submitted.</span> I've updated {individual.first_name}'s compliance status. Next quarterly review due: <span className="font-mono">07/26/2026</span>.
           </div>
         )}
 
@@ -325,8 +385,8 @@ const PersonMonitoringFormDetail = () => {
                   <YesNoQ key={q.id} q={q} readOnly={readOnly} onChange={(patch) => updateAnswer("s8_incidents", q.id, patch)} />
                 ))}
                 {form.s8_incidents.find(q => q.id === "i1")?.answer === "Yes" && (
-                  <button onClick={() => navigate(`/people/${person.id}/module/incident-reporting`)} className="text-[12px] text-icm-accent hover:underline">
-                    View incident reports for {person.firstName} →
+                  <button onClick={() => navigate(`/people/${individual.id}/module/incident-reporting`)} className="text-[12px] text-icm-accent hover:underline">
+                    View incident reports for {individual.first_name} →
                   </button>
                 )}
               </div>
@@ -413,7 +473,7 @@ const PersonMonitoringFormDetail = () => {
               <button onClick={() => setSubmitOpen(false)} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">
                 Go back and review
               </button>
-              <button onClick={submit} disabled={!confirmReviewed} className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={handleFormSubmit} disabled={!confirmReviewed} className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
                 Submit
               </button>
             </div>

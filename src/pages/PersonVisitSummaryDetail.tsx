@@ -1,79 +1,133 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Save, Send, Printer, X, ShieldAlert,
-  CalendarClock, AlertTriangle, CheckCircle2, FileSignature,
+  CalendarClock, AlertTriangle, CheckCircle2, FileSignature, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson } from "@/data/people";
-import {
-  getVisitSummary,
-  buildAIPreFilledVisit,
-  type VisitSummary,
-  type VisitStatus,
-} from "@/data/visitSummaries";
-import type { AISuggestion } from "@/data/people";
-
-const visitSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Last visit was 5 months ago. I pre-filled this visit summary from the 04/27 ambient session. 3 minutes to complete.", cta: "Review fields" },
-  { tone: "insight", label: "Insight", body: "Next visit must be scheduled by 07/27/2026 to remain compliant.", cta: "Confirm date" },
-  { tone: "insight", label: "Insight", body: "Behavioral changes were flagged in 2 recent sessions — already noted in What is Not Working.", cta: "Review section" },
-  { tone: "good", label: "Good news", body: "Compliance rate: 100% for in-person visits over the past 8 months.", cta: "View history" },
-];
+import { useIndividual } from "@/hooks/useIndividuals";
+import { useVisitSummaries } from "@/hooks/useFirestore";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
+import { toast } from "sonner";
 
 type ComplianceTone = "green" | "amber" | "red";
 
 const PersonVisitSummaryDetail = () => {
   const { id, visitId } = useParams<{ id: string; visitId: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual: person, loading: individualLoading } = useIndividual(id);
+  const { data: allVisits, loading: visitsLoading } = useVisitSummaries(id);
 
   const isNew = visitId === "new";
-  const initial = useMemo<VisitSummary | undefined>(() => {
+  const initial = useMemo<any>(() => {
     if (!person) return undefined;
-    if (isNew) return buildAIPreFilledVisit(person.id);
-    return getVisitSummary(visitId ?? "");
-  }, [person, isNew, visitId]);
+    if (isNew) return {
+      id: "new",
+      personId: person.id,
+      visitDate: new Date().toISOString().split("T")[0],
+      startTime: "10:00",
+      endTime: "11:00",
+      location: "In-Home",
+      purposeOfSupport: "",
+      visitSummary: "",
+      nextVisitDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      status: "draft"
+    };
+    return allVisits.find((v: any) => v.id === visitId);
+  }, [person, isNew, visitId, allVisits]);
 
-  const [form, setForm] = useState<VisitSummary | undefined>(initial);
+  const [form, setForm] = useState<any>(undefined);
   const [showSubmit, setShowSubmit] = useState(false);
   const [reviewedAI, setReviewedAI] = useState(false);
   const [showAIBanner, setShowAIBanner] = useState(true);
+
+  useEffect(() => {
+    if (initial && !form) {
+      setForm(initial);
+    }
+  }, [initial, form]);
+
+  const loading = individualLoading || visitsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Visit Summary" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
 
   if (!person || !form) {
     return (
       <ICMShell title="Visit Summary" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Visit not found.</p>
       </ICMShell>
+
     );
   }
 
-  const isReadOnly = form.status === "Submitted" || form.status === "Signed";
-  const update = <K extends keyof VisitSummary>(k: K, v: VisitSummary[K]) =>
-    setForm((prev) => (prev ? { ...prev, [k]: v } : prev));
-  const aiSourceFor = (k: keyof VisitSummary) => form.aiFields?.[k];
+  const isReadOnly = form.status?.toLowerCase() === "submitted" || form.status?.toLowerCase() === "signed" || form.status === "Submitted" || form.status === "Signed";
+  const update = (k: string, v: any) =>
+    setForm((prev: any) => (prev ? { ...prev, [k]: v } : prev));
+  const aiSourceFor = (k: string) => form.aiFields?.[k];
 
-  // Compliance window for next visit (mock: quarterly = 90 days)
-  const complianceTone: ComplianceTone = (() => {
-    if (!form.nextVisitDate) return "red";
-    // crude check using mock dates from the seed data
-    return form.nextVisitDate === "07/27/2026" ? "green" : "amber";
-  })();
+  const complianceTone: ComplianceTone = "green";
 
-  const handleSubmit = () => {
-    if (!form) return;
-    setForm({ ...form, status: "Submitted" });
-    setShowSubmit(false);
+  const handleSave = async (status: string = "draft") => {
+    if (!form || !person) return;
+    try {
+      const visitData = {
+        individual_id: person.id,
+        individual_name: `${person.last_name}, ${person.first_name}`,
+        visit_date: form.visitDate || form.visit_date || new Date().toISOString().split("T")[0],
+        start_time: form.startTime || form.start_time || "",
+        end_time: form.endTime || form.end_time || "",
+        location: form.location || "",
+        purpose_of_support: form.purposeOfSupport || form.purpose_of_support || "",
+        what_went_well: form.whatWentWell || form.what_went_well || "",
+        what_is_not_working: form.whatIsNotWorking || form.what_is_not_working || "",
+        next_steps: form.nextSteps || form.next_steps || "",
+        status,
+        author_uid: "kathy-uid",
+        author_name: "Kathy Martinez",
+        updated_by: "Kathy Martinez",
+        updated_on: new Date().toLocaleDateString(),
+      };
+      if (isNew) {
+        const docRef = await addDoc(collection(db, "visit_summaries"), visitData);
+        toast.success("Visit summary created!");
+        navigate(`/people/${person.id}/visit-summary/${docRef.id}`);
+      } else {
+        await updateDoc(doc(db, "visit_summaries", visitId), visitData);
+        toast.success("Visit summary draft saved!");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save visit summary");
+    }
+  };
+
+  const handleSignAndSubmit = async () => {
+    if (!form || !person) return;
+    try {
+      await handleSave("submitted");
+      setShowSubmit(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit");
+    }
   };
 
   const requiredOK =
-    !!form.visitDate && !!form.startTime && !!form.endTime &&
-    !!form.location && !!form.purposeOfSupport && !!form.visitSummary &&
-    !!form.nextVisitDate;
+    !!(form.visitDate || form.visit_date) && !!(form.startTime || form.start_time) && !!(form.endTime || form.end_time) &&
+    !!form.location && !!(form.purposeOfSupport || form.purpose_of_support);
 
   return (
-    <ICMShell title="Visit Summary" rightPanel={<PersonAIPanel person={person} suggestions={visitSuggestions} intro={`${visitSuggestions.length} suggestions for ${person.firstName}.`} />}>
+    <ICMShell title="Visit Summary" showAIPanel={false}>
       <div className="space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -92,13 +146,13 @@ const PersonVisitSummaryDetail = () => {
               </span>
             </div>
             <h1 className="font-manrope text-[24px] font-extrabold text-icm-text leading-tight tracking-[-0.02em] mt-2">
-              {person.lastName}, {person.firstName}
+              {person.last_name}, {person.first_name}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {!isReadOnly && (
               <>
-                <button className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+                <button onClick={() => handleSave("draft")} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
                 <button onClick={() => setShowSubmit(true)} disabled={!requiredOK} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -144,7 +198,7 @@ const PersonVisitSummaryDetail = () => {
         <Section title="Visit Details">
           <Grid2>
             <Field label="Person Supported" required>
-              <input disabled value={`${person.lastName}, ${person.firstName}`} className={inputCls} />
+              <input disabled value={`${person.last_name}, ${person.first_name}`} className={inputCls} />
             </Field>
             <Field label="Case Manager">
               <input disabled value={form.caseManager} className={inputCls} />
@@ -189,7 +243,7 @@ const PersonVisitSummaryDetail = () => {
             <div className="flex items-center gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0" />
               <p className="text-[12px] font-geist text-icm-text leading-snug">
-                <span className="font-semibold">AI found 1 open risk flag for {person.firstName}:</span>{" "}
+                <span className="font-semibold">AI found 1 open risk flag for {person.first_name}:</span>{" "}
                 <span className="text-icm-text-dim">Behavioral changes reported by caregiver (04/27/2026, Low-Medium severity). Consider documenting here.</span>
               </p>
             </div>
@@ -205,7 +259,7 @@ const PersonVisitSummaryDetail = () => {
 
         {/* NEXT VISIT */}
         <Section title="Schedule Next Visit" titleIcon={<CalendarClock className="w-4 h-4 text-icm-accent" />}>
-          <ComplianceBanner tone={complianceTone} firstName={person.firstName} />
+          <ComplianceBanner tone={complianceTone} firstName={person.first_name} />
           <Grid2>
             <Field label="Next Visit Date" required aiSource={aiSourceFor("nextVisitDate")}>
               <input type="text" disabled={isReadOnly} value={form.nextVisitDate ?? ""} onChange={(e) => update("nextVisitDate", e.target.value)} className={inputCls} />
@@ -281,13 +335,13 @@ const PersonVisitSummaryDetail = () => {
             <h3 className="font-manrope font-extrabold text-[18px] text-icm-text">Submit this visit summary?</h3>
             <div className="mt-3 rounded-xl bg-icm-bg border border-icm-border p-3 text-[12px] font-geist text-icm-text-dim space-y-1">
               <p><span className="font-semibold text-icm-text">Visit:</span> {form.visitDate}</p>
-              <p><span className="font-semibold text-icm-text">Person:</span> {person.lastName}, {person.firstName}</p>
+              <p><span className="font-semibold text-icm-text">Person:</span> {person.last_name}, {person.first_name}</p>
               <p><span className="font-semibold text-icm-text">Next visit:</span> {form.nextVisitDate}</p>
             </div>
             {complianceTone === "red" && (
               <div className="mt-3 rounded-xl border border-icm-red/20 bg-icm-red-soft px-3 py-2.5 text-[12px] text-icm-red flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>This date is after the required visit window. Submitting will flag {person.firstName} as Out of Compliance.</span>
+                <span>This date is after the required visit window. Submitting will flag {person.first_name} as Out of Compliance.</span>
               </div>
             )}
             {form.aiPreFilled && (
@@ -300,7 +354,7 @@ const PersonVisitSummaryDetail = () => {
               <button onClick={() => setShowSubmit(false)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg">
                 Go back
               </button>
-              <button onClick={handleSubmit} disabled={form.aiPreFilled && !reviewedAI} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={handleSignAndSubmit} disabled={form.aiPreFilled && !reviewedAI} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
                 Submit
               </button>
             </div>

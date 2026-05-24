@@ -1,240 +1,254 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { programs as seedPrograms, operatingStates, type ProgramDef } from "@/data/settings";
-import { Plus, Pencil, Building2, Map as MapIcon, X, Check } from "lucide-react";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Plus, Pencil, Building2, X, Check, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-interface ProgramDraft {
-  id?: string;
+interface Program {
+  id: string;
   name: string;
-  state: string;
-  type: string;
-  fundingSource: string;
-  billingUnit: string;
-  individuals: number;
+  code: string;
+  payer: string;
   active: boolean;
 }
 
-const emptyDraft: ProgramDraft = {
+const emptyProgram: Omit<Program, "id"> = {
   name: "",
-  state: "Maryland",
-  type: "IDD Waiver",
-  fundingSource: "Medicaid",
-  billingUnit: "15 minutes",
-  individuals: 0,
+  code: "",
+  payer: "",
   active: true,
 };
 
-const stateTerminology: Record<string, { individual: string; planAcronym: string; agency: string }> = {
-  MD: {
-    individual: "Person Supported",
-    planAcronym: "PCP (Person-Centered Plan)",
-    agency: "Maryland DDA",
-  },
-  VA: {
-    individual: "Individual",
-    planAcronym: "ISP (Individual Support Plan)",
-    agency: "Virginia DBHDS",
-  },
-};
+type DraftProgram = Omit<Program, "id"> & { id?: string };
+
+const PAYERS = [
+  "Medicaid",
+  "Medicare",
+  "State General Funds",
+  "IHCP",
+  "Private Pay",
+  "Other",
+];
 
 const SettingsPrograms = () => {
-  const [programs, setPrograms] = useState<ProgramDef[]>(seedPrograms);
-  const [draft, setDraft] = useState<ProgramDraft | null>(null);
-  const [stateConfig, setStateConfig] = useState<{ code: string; name: string } | null>(null);
+  const { userProfile } = useAuth();
+  const orgId = userProfile?.organizationId;
 
-  const openAdd = () => setDraft({ ...emptyDraft });
-  const openEdit = (p: ProgramDef) => setDraft({ ...p });
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<DraftProgram | null>(null);
 
-  const savePrograms = () => {
+  // Load programs from Firestore org doc
+  useEffect(() => {
+    if (!orgId) return;
+    setLoading(true);
+    getDoc(doc(db, "organizations", orgId))
+      .then((snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setPrograms((d.programs as Program[]) ?? []);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load programs:", err);
+        toast.error("Failed to load programs");
+      })
+      .finally(() => setLoading(false));
+  }, [orgId]);
+
+  const openAdd = () => setDraft({ ...emptyProgram });
+  const openEdit = (p: Program) => setDraft({ ...p });
+
+  const saveDraft = async () => {
     if (!draft) return;
-    if (!draft.name.trim()) {
-      toast.error("Program name is required");
-      return;
-    }
+    if (!draft.name.trim()) { toast.error("Program name is required"); return; }
+    if (!orgId) return;
+
+    setSaving(true);
+    let newList: Program[];
+
     if (draft.id) {
-      setPrograms((prev) => prev.map((p) => (p.id === draft.id ? { ...p, ...draft } as ProgramDef : p)));
-      toast.success("Program updated", { description: `${draft.name} saved.` });
+      newList = programs.map((p) =>
+        p.id === draft.id ? { ...p, ...draft, id: draft.id as string } : p
+      );
     } else {
-      const id = `prg-${String(programs.length + 1).padStart(3, "0")}`;
-      setPrograms((prev) => [...prev, { ...draft, id } as ProgramDef]);
-      toast.success("Program created", { description: `${draft.name} added.` });
+      const newId = `prg-${Date.now()}`;
+      newList = [...programs, { ...draft, id: newId } as Program];
     }
-    setDraft(null);
+
+    try {
+      await updateDoc(doc(db, "organizations", orgId), {
+        programs: newList,
+        updatedAt: new Date(),
+      });
+      setPrograms(newList);
+      toast.success(draft.id ? "Program updated" : "Program created", {
+        description: `${draft.name} saved.`,
+      });
+      setDraft(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save program");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleActive = async (programId: string) => {
+    if (!orgId) return;
+    const newList = programs.map((p) =>
+      p.id === programId ? { ...p, active: !p.active } : p
+    );
+    try {
+      await updateDoc(doc(db, "organizations", orgId), { programs: newList, updatedAt: new Date() });
+      setPrograms(newList);
+      toast.success("Program status updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update program");
+    }
   };
 
   return (
     <SettingsLayout
       title="Programs & States"
-      subtitle="Configure programs, service categories, and state-specific requirements"
+      subtitle="Configure HCBS waiver programs your organization supports"
       actions={
         <button
           onClick={openAdd}
-          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
+          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
         >
           <Plus className="w-3.5 h-3.5" />
           Add program
         </button>
       }
     >
-      <div className="space-y-3">
-        <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
-          Programs
-        </p>
-        <div className="space-y-2">
-          {programs.map((p) => (
-            <div
-              key={p.id}
-              className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4"
-            >
-              <div className="w-10 h-10 rounded-lg bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20 flex items-center justify-center">
-                <Building2 className="w-4.5 h-4.5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-manrope font-bold text-[14px] text-icm-text">{p.name}</h3>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-bg text-icm-text-dim ring-1 ring-icm-border">
-                    {p.state}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
-                    {p.type}
-                  </span>
-                  {p.active && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
-                      Active
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11.5px] font-geist text-icm-text-dim mt-1">
-                  {p.fundingSource} · {p.billingUnit} · {p.individuals} individuals
-                </p>
-              </div>
+      {loading ? (
+        <ProgramsSkeleton />
+      ) : (
+        <div className="space-y-3">
+          <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+            Programs ({programs.length})
+          </p>
+
+          {programs.length === 0 && (
+            <div className="rounded-xl border-2 border-dashed border-icm-border bg-icm-panel p-8 text-center">
+              <Building2 className="w-8 h-8 text-icm-text-faint mx-auto mb-2" />
+              <p className="text-[13px] font-manrope font-bold text-icm-text">No programs configured</p>
+              <p className="text-[11.5px] text-icm-text-dim mt-1">Add your first HCBS waiver program to get started.</p>
               <button
-                onClick={() => openEdit(p)}
-                className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+                onClick={openAdd}
+                className="mt-3 h-8 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
               >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
+                <Plus className="w-3.5 h-3.5" />
+                Add first program
               </button>
             </div>
-          ))}
-        </div>
+          )}
 
-        <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mt-6">
-          States
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {operatingStates.map((s) => (
-            <div
-              key={s.code}
-              className="rounded-xl border border-icm-border bg-icm-panel p-3 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 flex items-center justify-center">
-                  <MapIcon className="w-4 h-4" />
+          <div className="space-y-2">
+            {programs.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4"
+              >
+                <div className="w-10 h-10 rounded-lg bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20 flex items-center justify-center shrink-0">
+                  <Building2 className="w-4.5 h-4.5" />
                 </div>
-                <div>
-                  <p className="font-manrope font-bold text-[13px] text-icm-text">{s.name}</p>
-                  <p className="text-[11px] font-geist text-icm-text-dim mt-0.5">
-                    Configured · State terminology customized
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-manrope font-bold text-[14px] text-icm-text">{p.name}</h3>
+                    {p.code && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-bg text-icm-text-dim ring-1 ring-icm-border font-mono">
+                        {p.code}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1",
+                        p.active
+                          ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
+                          : "bg-icm-bg text-icm-text-dim ring-icm-border"
+                      )}
+                    >
+                      {p.active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <p className="text-[11.5px] font-geist text-icm-text-dim mt-1">
+                    {p.payer || "No payer set"}
                   </p>
                 </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => toggleActive(p.id)}
+                    className={cn(
+                      "h-8 px-2.5 rounded-lg border text-[11.5px] font-geist font-semibold",
+                      p.active
+                        ? "border-icm-border bg-icm-panel text-icm-text-dim hover:border-icm-border-strong"
+                        : "border-icm-green/30 bg-icm-green-soft text-icm-green hover:border-icm-green/50"
+                    )}
+                  >
+                    {p.active ? "Deactivate" : "Activate"}
+                  </button>
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:border-icm-border-strong"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
+      {draft !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="rounded-2xl bg-icm-panel border border-icm-border shadow-elevated w-full max-w-[520px]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-icm-border">
+              <h2 className="font-manrope font-bold text-[15px] text-icm-text">
+                {draft.id ? "Edit program" : "Add program"}
+              </h2>
               <button
-                onClick={() => setStateConfig(s)}
-                className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-icm-text text-[11.5px] font-geist font-semibold hover:border-icm-border-strong"
+                onClick={() => setDraft(null)}
+                className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center"
               >
-                Configure
+                <X className="w-4 h-4" />
               </button>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Add / Edit Program */}
-      <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>{draft?.id ? "Edit program" : "Add program"}</DialogTitle>
-            <DialogDescription>
-              {draft?.id
-                ? "Update program details. Changes apply to new records."
-                : "Create a new program. You can assign users and individuals after creation."}
-            </DialogDescription>
-          </DialogHeader>
-          {draft && (
-            <div className="space-y-3 py-1">
-              <div className="space-y-1.5">
-                <Label className="text-[11.5px]">Program name</Label>
-                <Input
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  placeholder="e.g. Howard County CCS"
-                />
-              </div>
+            <div className="p-4 space-y-3">
+              <ModalField
+                label="Program Name"
+                value={draft.name}
+                onChange={(v) => setDraft((d) => d && ({ ...d, name: v }))}
+                placeholder="e.g. Howard County CCS"
+              />
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-[11.5px]">State</Label>
-                  <Select value={draft.state} onValueChange={(v) => setDraft({ ...draft, state: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Maryland">Maryland</SelectItem>
-                      <SelectItem value="Virginia">Virginia</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11.5px]">Waiver type</Label>
-                  <Select value={draft.type} onValueChange={(v) => setDraft({ ...draft, type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="IDD Waiver">IDD Waiver</SelectItem>
-                      <SelectItem value="DD Waiver">DD Waiver</SelectItem>
-                      <SelectItem value="Community Pathways">Community Pathways</SelectItem>
-                      <SelectItem value="Family Supports">Family Supports</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11.5px]">Funding source</Label>
-                  <Select value={draft.fundingSource} onValueChange={(v) => setDraft({ ...draft, fundingSource: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Medicaid">Medicaid</SelectItem>
-                      <SelectItem value="State General Funds">State General Funds</SelectItem>
-                      <SelectItem value="Private Pay">Private Pay</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11.5px]">Billing unit</Label>
-                  <Select value={draft.billingUnit} onValueChange={(v) => setDraft({ ...draft, billingUnit: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15 minutes">15 minutes</SelectItem>
-                      <SelectItem value="Per day">Per day</SelectItem>
-                      <SelectItem value="Per visit">Per visit</SelectItem>
-                      <SelectItem value="Per month">Per month</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <ModalField
+                  label="Program Code"
+                  value={draft.code}
+                  onChange={(v) => setDraft((d) => d && ({ ...d, code: v }))}
+                  placeholder="e.g. HC-CCS"
+                />
+                <div>
+                  <ModalLabel>Payer</ModalLabel>
+                  <select
+                    value={draft.payer}
+                    onChange={(e) => setDraft((d) => d && ({ ...d, payer: e.target.value }))}
+                    className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text"
+                  >
+                    <option value="">Select payer...</option>
+                    {PAYERS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-icm-border p-2.5">
@@ -242,83 +256,80 @@ const SettingsPrograms = () => {
                   <p className="text-[12px] font-geist font-semibold text-icm-text">Active</p>
                   <p className="text-[10.5px] text-icm-text-dim">Allow new enrollments and billing.</p>
                 </div>
-                <Switch checked={draft.active} onCheckedChange={(v) => setDraft({ ...draft, active: v })} />
+                <button
+                  onClick={() => setDraft((d) => d && ({ ...d, active: !d.active }))}
+                  className={cn(
+                    "relative w-9 h-5 rounded-full transition-colors",
+                    draft.active ? "bg-icm-accent" : "bg-icm-border"
+                  )}
+                >
+                  <span className={cn("absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform", draft.active && "translate-x-4")} />
+                </button>
               </div>
             </div>
-          )}
-          <DialogFooter>
-            <button
-              onClick={() => setDraft(null)}
-              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
-            >
-              <X className="w-3.5 h-3.5" /> Cancel
-            </button>
-            <button
-              onClick={savePrograms}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
-            >
-              <Check className="w-3.5 h-3.5" /> {draft?.id ? "Save changes" : "Create program"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Configure State */}
-      <Dialog open={!!stateConfig} onOpenChange={(o) => !o && setStateConfig(null)}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>Configure {stateConfig?.name}</DialogTitle>
-            <DialogDescription>
-              State-specific terminology, plan format, and reporting agency.
-            </DialogDescription>
-          </DialogHeader>
-          {stateConfig && (
-            <div className="space-y-3 py-1">
-              {(() => {
-                const cfg = stateTerminology[stateConfig.code] ?? stateTerminology.MD;
-                return (
-                  <>
-                    <div className="space-y-1.5">
-                      <Label className="text-[11.5px]">Person terminology</Label>
-                      <Input defaultValue={cfg.individual} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[11.5px]">Plan format</Label>
-                      <Input defaultValue={cfg.planAcronym} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[11.5px]">Reporting agency</Label>
-                      <Input defaultValue={cfg.agency} />
-                    </div>
-                    <div className="rounded-lg bg-icm-bg p-2.5 text-[11px] text-icm-text-dim">
-                      These overrides cascade through forms, plans, and reports for {stateConfig.name}.
-                    </div>
-                  </>
-                );
-              })()}
+            <div className="flex justify-end gap-2 px-4 pb-4">
+              <button
+                onClick={() => setDraft(null)}
+                className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" /> Cancel
+              </button>
+              <button
+                onClick={saveDraft}
+                disabled={saving}
+                className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {draft.id ? "Save changes" : "Create program"}
+              </button>
             </div>
-          )}
-          <DialogFooter>
-            <button
-              onClick={() => setStateConfig(null)}
-              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                toast.success(`${stateConfig?.name} configuration saved`);
-                setStateConfig(null);
-              }}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
-            >
-              Save configuration
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </SettingsLayout>
   );
 };
+
+function ProgramsSkeleton() {
+  return (
+    <div className="space-y-2 animate-pulse">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="rounded-xl border border-icm-border bg-icm-panel p-4 h-20" />
+      ))}
+    </div>
+  );
+}
+
+function ModalLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+      {children}
+    </label>
+  );
+}
+
+function ModalField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <ModalLabel>{label}</ModalLabel>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-border-strong"
+      />
+    </div>
+  );
+}
 
 export default SettingsPrograms;

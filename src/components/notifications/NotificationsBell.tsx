@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ArrowRight, AlertCircle, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
+import { Bell, ArrowRight, AlertCircle, AlertTriangle, Info, CheckCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
 import {
@@ -9,17 +9,22 @@ import {
   severityTone,
   roleAvatarTone,
 } from "@/data/notifications";
+import {
+  useFirestoreNotifications,
+  type FirestoreNotification,
+  type NotifSeverity,
+} from "@/hooks/useFirestoreNotifications";
 
 export function NotificationsBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"alerts" | "mentions">("alerts");
+  const [tab, setTab] = useState<"live" | "alerts" | "mentions">("live");
   const ref = useRef<HTMLDivElement>(null);
 
   const {
     alerts,
     mentions,
-    unreadTotal,
+    unreadTotal: mockUnreadTotal,
     unreadAlerts,
     unreadMentions,
     markAlertRead,
@@ -27,6 +32,16 @@ export function NotificationsBell() {
     markAllAlertsRead,
     markAllMentionsRead,
   } = useNotifications();
+
+  const {
+    notifications: firestoreNotifs,
+    unreadCount: firestoreUnread,
+    markRead: fsMarkRead,
+    markAllRead: fsMarkAllRead,
+    dismiss: fsDismiss,
+  } = useFirestoreNotifications();
+
+  const unreadTotal = mockUnreadTotal + firestoreUnread;
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -50,12 +65,19 @@ export function NotificationsBell() {
     setOpen(false);
   }
   function viewAll() {
-    navigate(`/my-work?tab=${tab}`);
+    if (tab !== "live") navigate(`/my-work?tab=${tab}`);
     setOpen(false);
   }
   function markAllRead() {
+    if (tab === "live") { void fsMarkAllRead(); return; }
     if (tab === "alerts") markAllAlertsRead();
     else markAllMentionsRead();
+  }
+
+  async function handleFsNotifClick(n: FirestoreNotification) {
+    if (!n.read) await fsMarkRead(n.id);
+    if (n.href) navigate(n.href);
+    setOpen(false);
   }
 
   return (
@@ -88,6 +110,12 @@ export function NotificationsBell() {
           {/* Tabs */}
           <div className="flex items-center border-b border-icm-border">
             <DropdownTab
+              active={tab === "live"}
+              onClick={() => setTab("live")}
+              label="Live"
+              count={firestoreUnread}
+            />
+            <DropdownTab
               active={tab === "alerts"}
               onClick={() => setTab("alerts")}
               label="Alerts"
@@ -102,7 +130,22 @@ export function NotificationsBell() {
           </div>
           {/* Items */}
           <div className="max-h-[400px] overflow-y-auto">
-            {tab === "alerts" ? (
+            {tab === "live" ? (
+              firestoreNotifs.length === 0 ? (
+                <p className="px-3 py-6 text-[12px] font-geist text-icm-text-dim text-center">
+                  No notifications
+                </p>
+              ) : (
+                firestoreNotifs.slice(0, 10).map((n) => (
+                  <LiveNotifRow
+                    key={n.id}
+                    notif={n}
+                    onClick={() => handleFsNotifClick(n)}
+                    onDismiss={(e) => { e.stopPropagation(); void fsDismiss(n.id); }}
+                  />
+                ))
+              )
+            ) : tab === "alerts" ? (
               visibleAlerts.length === 0 ? (
                 <p className="px-3 py-6 text-[12px] font-geist text-icm-text-dim text-center">
                   No alerts
@@ -123,12 +166,14 @@ export function NotificationsBell() {
             )}
           </div>
           {/* Footer */}
-          <button
-            onClick={viewAll}
-            className="w-full px-3 py-2 border-t border-icm-border text-[11.5px] font-geist font-semibold text-icm-accent hover:bg-icm-bg flex items-center justify-center gap-1"
-          >
-            View all notifications <ArrowRight className="w-3 h-3" />
-          </button>
+          {tab !== "live" && (
+            <button
+              onClick={viewAll}
+              className="w-full px-3 py-2 border-t border-icm-border text-[11.5px] font-geist font-semibold text-icm-accent hover:bg-icm-bg flex items-center justify-center gap-1"
+            >
+              View all notifications <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -166,12 +211,59 @@ function DropdownTab({
   );
 }
 
-function SeverityIcon({ severity }: { severity: AlertItem["severity"] }) {
+function SeverityIcon({ severity }: { severity: AlertItem["severity"] | NotifSeverity }) {
   const cls = "w-3.5 h-3.5";
   if (severity === "critical") return <AlertCircle className={cn(cls, "text-icm-red")} />;
   if (severity === "warning") return <AlertTriangle className={cn(cls, "text-icm-amber")} />;
   if (severity === "good") return <CheckCircle2 className={cn(cls, "text-icm-green")} />;
   return <Info className={cn(cls, "text-icm-accent")} />;
+}
+
+function LiveNotifRow({
+  notif,
+  onClick,
+  onDismiss,
+}: {
+  notif: FirestoreNotification;
+  onClick: () => void;
+  onDismiss: (e: React.MouseEvent) => void;
+}) {
+  const severityWrap: Record<NotifSeverity, string> = {
+    critical: "bg-red-50 ring-icm-red/30",
+    warning: "bg-amber-50 ring-icm-amber/30",
+    info: "bg-icm-accent-soft/20 ring-icm-accent/20",
+  };
+  return (
+    <div
+      className={cn(
+        "w-full text-left px-3 py-2.5 border-b border-icm-border last:border-b-0 hover:bg-icm-bg transition-colors flex items-start gap-2.5 group",
+        !notif.read && "bg-icm-accent-soft/30"
+      )}
+    >
+      <button onClick={onClick} className="flex items-start gap-2.5 flex-1 min-w-0 text-left">
+        <span
+          className={cn(
+            "w-7 h-7 rounded-lg ring-1 flex items-center justify-center shrink-0",
+            severityWrap[notif.severity]
+          )}
+        >
+          <SeverityIcon severity={notif.severity} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-geist font-semibold text-icm-text truncate">{notif.title}</p>
+          <p className="text-[11px] font-geist text-icm-text-dim line-clamp-2">{notif.body}</p>
+        </div>
+        {!notif.read && <span className="w-2 h-2 rounded-full bg-icm-accent mt-2 shrink-0" />}
+      </button>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 mt-0.5 h-5 w-5 flex items-center justify-center rounded-md text-icm-text-faint hover:text-icm-text hover:bg-icm-bg opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Dismiss"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 function CompactAlertRow({ alert, onClick }: { alert: AlertItem; onClick: () => void }) {

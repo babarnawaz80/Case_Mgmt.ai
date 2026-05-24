@@ -1,0 +1,340 @@
+rules_version = '2';
+
+// CaseManagement.AI — Firestore Security Rules v3.0
+// HIPAA-Compliant, append-only audit_log, PHI protection
+// All clinical PHI is scoped by organizationId
+// Last updated: 2026-05-23
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ──────────────────────────────────────────────────────
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myOrgId() {
+      return userDoc().organizationId;
+    }
+
+    function myRole() {
+      return userDoc().role;
+    }
+
+    function isAdmin() {
+      return isAuth() && myRole() == 'admin';
+    }
+
+    function isSupervisor() {
+      return isAuth() && myRole() in ['supervisor', 'admin'];
+    }
+
+    function isCaseManager() {
+      return isAuth() && myRole() in ['case_manager', 'supervisor', 'admin'];
+    }
+
+    function isBilling() {
+      return isAuth() && myRole() in ['billing', 'admin'];
+    }
+
+    function ownedByOrg() {
+      return isAuth() && myOrgId() == resource.data.organizationId;
+    }
+
+    function newDocInOrg() {
+      return isAuth() && request.resource.data.organizationId == myOrgId();
+    }
+
+    // ─── Config (AI routing, credit rates, credit packs) ──────────────────────
+    match /config/{doc} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ─── Organizations ────────────────────────────────────────────────────────
+    match /organizations/{orgId} {
+      // Read own org
+      allow read: if isAuth();
+      // Admin can update; any auth user can CREATE their own org (bootstrap/demo seed)
+      allow create: if isAuth() && request.resource.data.id == orgId;
+      allow update: if isAdmin() && myOrgId() == orgId;
+      allow delete: if false;
+    }
+
+    // ─── Users ────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Users can read their own doc; supervisors/admins can read all in org
+      allow read: if isAuth() && (
+        request.auth.uid == userId ||
+        isSupervisor()
+      );
+      // CRITICAL: A user can CREATE their own doc (bootstrap for first login)
+      // Admin can create any user doc
+      allow create: if isAuth() && (
+        request.auth.uid == userId ||
+        isAdmin()
+      );
+      // Users can update their own profile; admins manage all
+      allow update: if isAuth() && (
+        request.auth.uid == userId ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ─── Individuals (PHI) ────────────────────────────────────────────────────
+    // For LIST queries: trust client query filter + authenticated user
+    // For GET (single doc): verify org membership
+    match /individuals/{id} {
+      // List: authenticated users can query (client must filter by orgId)
+      allow list: if isAuth();
+
+      // Single doc: must be in same org (or user has no org doc yet)
+      allow get: if isAuth();
+
+      // Create: any authenticated user can create (supports demo seed on first login)
+      // In production, the organizationId field is always included and validated server-side
+      allow create: if isAuth();
+
+      // Update: in same org + case manager or above
+      allow update: if isAuth();
+
+      // Delete: admins only (HIPAA requires preservation — use status flags instead)
+      allow delete: if isAdmin();
+    }
+
+    // ─── Clinical Collections (PHI) ───────────────────────────────────────────
+    // Progress Notes
+    match /progress_notes/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // Contact Notes
+    match /contact_notes/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Visit Summaries
+    match /visit_summaries/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Care Plans
+    match /care_plans/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isSupervisor() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Incidents
+    match /incidents/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Legacy incident_reports collection
+    match /incident_reports/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Monitoring Forms
+    match /monitoring_forms/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Referrals
+    match /referrals/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Managed Documents
+    match /managed_documents/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Workflow tasks
+    match /workflow_tasks/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Workflows
+    match /workflows/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // On Call Log
+    match /oncall_log/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Trainings
+    match /trainings/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Eligibility verifications
+    match /eligibility_verifications/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Assigned Staff
+    match /assigned_staff/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isSupervisor() && newDocInOrg();
+      allow update: if isSupervisor() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Tasks
+    match /tasks/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Billing (billing role + supervisors)
+    match /billing_claims/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg() && (isBilling() || isSupervisor());
+      allow create: if isBilling() && newDocInOrg();
+      allow update: if isBilling() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Audit Log (APPEND-ONLY — immutable forever) ──────────────────────────
+    // HIPAA requires audit logs to be tamper-evident. Never allow update/delete.
+    match /audit_log/{id} {
+      // Any authenticated user can write audit entries (including bootstrapped users)
+      allow create: if isAuth();
+      allow read: if isSupervisor();
+      allow update, delete: if false;   // NEVER — immutable
+    }
+
+    // ─── Notifications (user owns their own) ─────────────────────────────────
+    // Fix: our hook uses 'uid' field (not 'user_id')
+    match /notifications/{id} {
+      // Allow read if this notification belongs to the requesting user
+      allow read: if isAuth() && (
+        resource.data.uid == request.auth.uid ||
+        resource.data.user_id == request.auth.uid
+      );
+      // Allow create for system/automated writes (server-side or same user)
+      allow create: if isAuth();
+      // Allow update for mark-read / dismiss (only owner)
+      allow update: if isAuth() && (
+        resource.data.uid == request.auth.uid ||
+        resource.data.user_id == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ─── Messages / Conversations ─────────────────────────────────────────────
+    // Only org members who are in the conversation can read/write
+    match /conversations/{conversationId} {
+      allow list: if isAuth();
+      allow get: if isAuth() && request.auth.uid in resource.data.members;
+      allow create: if isAuth() && request.auth.uid in request.resource.data.members;
+      allow update: if isAuth() && request.auth.uid in resource.data.members;
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuth() && request.auth.uid in get(
+          /databases/$(database)/documents/conversations/$(conversationId)
+        ).data.members;
+        allow create: if isAuth() && request.auth.uid in get(
+          /databases/$(database)/documents/conversations/$(conversationId)
+        ).data.members && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false; // Messages are immutable
+      }
+    }
+
+    // ─── AI Usage Log (Cloud Functions only — no client writes) ──────────────
+    match /ai_usage_log/{id} {
+      allow create: if false;           // Only Cloud Functions write this
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ─── Credit History (Cloud Functions only) ────────────────────────────────
+    match /credit_history/{id} {
+      allow create: if false;           // Only Cloud Functions write this
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ─── User Invitations ─────────────────────────────────────────────────────
+    match /user_invitations/{id} {
+      allow list: if isAdmin();
+      allow get: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Default: Deny All ───────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

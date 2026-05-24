@@ -20,12 +20,13 @@ import {
   FileImage,
   File as FileIcon,
   Paperclip,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson } from "@/data/people";
+import { useIndividual } from "@/hooks/useIndividuals";
+import { addReferral } from "@/hooks/useFirestore";
 import {
   REFERRAL_TYPES,
-  addReferral,
   providers,
   suggestProviders,
   type Priority,
@@ -65,7 +66,7 @@ const METHODS = ["Phone call", "Fax", "Email", "Online portal", "Walk-in", "Mail
 const PersonReferralForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
+  const { individual, loading } = useIndividual(id);
 
   // AI-prefill defaults (from ambient session detection)
   const [aiBanner, setAiBanner] = useState(true);
@@ -130,7 +131,18 @@ const PersonReferralForm = () => {
   // Email modal
   const [showEmail, setShowEmail] = useState(false);
 
-  if (!person) {
+  if (loading) {
+    return (
+      <ICMShell title="New Referral" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="New Referral" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -165,33 +177,33 @@ const PersonReferralForm = () => {
     setShowConfirm(true);
   };
 
-  const finalizeSubmit = () => {
-    const newId = `R-${String(Date.now()).slice(-4)}`;
+  const finalizeSubmit = async () => {
     const providerName =
       providerTab === "search" ? selectedProvider!.name : manualProvider.name;
-    const newRef: Referral = {
-      id: newId,
-      personId: id ?? "",
+    const newRef: any = {
+      individual_id: id ?? "",
+      individual_name: `${individual.last_name}, ${individual.first_name}`,
       date: formatDate(date),
-      type,
-      priority,
+      referral_type: type,
+      referred_to: providerName,
+      referred_by: assignedTo,
+      priority: priority.toLowerCase(),
       reason,
       sourceOfNeed: source,
       linkedGoalLabel: linkedGoal || undefined,
       urgencyDate: urgencyDate || undefined,
-      providerId: selectedProvider?.id,
-      providerName,
+      providerId: selectedProvider?.id || "",
       providerPhone:
-        providerTab === "search" ? selectedProvider?.phone : manualProvider.phone,
+        providerTab === "search" ? selectedProvider?.phone || "" : manualProvider.phone,
       providerEmail:
-        providerTab === "search" ? selectedProvider?.email : manualProvider.email,
+        providerTab === "search" ? selectedProvider?.email || "" : manualProvider.email,
       providerAddress:
         providerTab === "search"
-          ? `${selectedProvider?.address}, ${selectedProvider?.city}, ${selectedProvider?.state} ${selectedProvider?.zip}`
+          ? `${selectedProvider?.address || ""}, ${selectedProvider?.city || ""}, ${selectedProvider?.state || ""} ${selectedProvider?.zip || ""}`
           : `${manualProvider.address}, ${manualProvider.city}, ${manualProvider.state} ${manualProvider.zip}`,
       acceptsMedicaid:
         providerTab === "search"
-          ? selectedProvider?.acceptsMedicaid
+          ? !!selectedProvider?.acceptsMedicaid
           : manualProvider.medicaid === "Yes",
       referralMethod,
       contactDate: formatDate(contactDate),
@@ -203,9 +215,8 @@ const PersonReferralForm = () => {
       consentMethod,
       expectedTimeframe: timeframe,
       followUpDate: followUpDate ? formatDate(followUpDate) : undefined,
-      assignedTo,
       notes,
-      status: "Submitted",
+      status: "pending",
       daysOpen: 0,
       lastActivity: formatDate(date),
       timeline: [
@@ -225,10 +236,16 @@ const PersonReferralForm = () => {
           by: assignedTo,
         },
       ],
-      attachments: attachments.length > 0 ? attachments : undefined,
+      attachments: attachments.length > 0 ? attachments : [],
     };
-    addReferral(newRef);
-    navigate(`/people/${id}/referrals/${newId}`);
+    try {
+      const docRef = await addReferral(newRef);
+      toast.success("Referral submitted successfully!");
+      navigate(`/people/${id}/referrals/${docRef.id}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit referral");
+    }
   };
 
   // ---- Attachment helpers ----
@@ -278,7 +295,7 @@ const PersonReferralForm = () => {
 
   const downloadPdf = () => {
     toast.success(
-      `Referral PDF downloaded — ${person.firstName} ${person.lastName} · ${type} · ${formatDate(date)}`,
+      `Referral PDF downloaded — ${individual.first_name} ${individual.last_name} · ${type} · ${formatDate(date)}`,
     );
   };
 
@@ -305,7 +322,7 @@ const PersonReferralForm = () => {
               New Referral
             </h1>
             <p className="text-[12.5px] text-icm-text-dim mt-0.5 font-geist">
-              {person.firstName} {person.lastName} · Status: Draft
+              {individual.first_name} {individual.last_name} · Status: Draft
             </p>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -366,7 +383,7 @@ const PersonReferralForm = () => {
         <Section title="Referral Details">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Individual">
-              <ReadOnly value={`${person.firstName} ${person.lastName}`} />
+              <ReadOnly value={`${individual.first_name} ${individual.last_name}`} />
             </Field>
             <Field label="Referral Date" required>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
@@ -449,7 +466,7 @@ const PersonReferralForm = () => {
                     <p className="text-[12px] font-geist text-icm-text">
                       <span className="font-semibold">AI suggestions</span>{" "}
                       <span className="text-icm-text-dim">
-                        based on {person.firstName}'s county (Carroll) and referral type ({type})
+                        based on {individual.first_name}'s county ({individual.county ?? "—"}) and referral type ({type})
                       </span>
                     </p>
                   </div>
@@ -878,7 +895,7 @@ const PersonReferralForm = () => {
               Submit this referral?
             </h3>
             <p className="text-[12.5px] text-icm-text-dim mb-3">
-              {person.firstName} {person.lastName} · {type} ·{" "}
+              {individual.first_name} {individual.last_name} · {type} ·{" "}
               {providerTab === "search" ? selectedProvider?.name : manualProvider.name}
             </p>
             <p className="text-[11.5px] text-icm-text-faint mb-4">
@@ -907,8 +924,8 @@ const PersonReferralForm = () => {
       {showEmail && (
         <EmailProviderModal
           onClose={() => setShowEmail(false)}
-          personName={`${person.firstName} ${person.lastName}`}
-          personDob={person.dob}
+          personName={`${individual.first_name} ${individual.last_name}`}
+          personDob={individual.dob ?? ""}
           referralType={type}
           priority={priority}
           reason={reason}

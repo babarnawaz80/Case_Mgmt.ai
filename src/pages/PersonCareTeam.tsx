@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft,
   Plus,
   Users,
   Mail,
@@ -15,10 +14,15 @@ import {
   Eye,
   EyeOff,
   X,
+  Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { getPerson } from "@/data/people";
-import { writeAudit } from "@/data/supervisor";
+import { useIndividual } from "@/hooks/useIndividuals";
+import { toast } from "sonner";
+import { writeAudit } from "@/lib/auditService";
+import { useAssignedStaff, addAssignedStaff, updateAssignedStaff } from "@/hooks/useFirestore";
+import { doc, deleteDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 function nameInitials(n: string) {
   return n
@@ -83,11 +87,10 @@ const ROLE_TONE: Record<Role, string> = {
   Other: "bg-icm-bg text-icm-text-dim ring-icm-border",
 };
 
-function seedFor(personId: string): TeamMember[] {
+function seedFor(personId: string): Omit<TeamMember, "id">[] {
   const now = new Date().toISOString();
   return [
     {
-      id: crypto.randomUUID(),
       name: "Margaret Thompson",
       role: "Guardian",
       relationship: "Mother / Legal Guardian",
@@ -102,7 +105,6 @@ function seedFor(personId: string): TeamMember[] {
       addedAt: now,
     },
     {
-      id: crypto.randomUUID(),
       name: "Sarah Chen, LCSW",
       role: "Support Coordinator",
       organization: "Carroll County DDA",
@@ -116,7 +118,6 @@ function seedFor(personId: string): TeamMember[] {
       addedAt: now,
     },
     {
-      id: crypto.randomUUID(),
       name: "David Park",
       role: "Supervisor",
       organization: "Carroll County DDA",
@@ -129,7 +130,6 @@ function seedFor(personId: string): TeamMember[] {
       addedAt: now,
     },
     {
-      id: crypto.randomUUID(),
       name: "Riverside Day Program",
       role: "Provider Contact",
       organization: "Riverside Community Services",
@@ -144,7 +144,6 @@ function seedFor(personId: string): TeamMember[] {
       addedAt: now,
     },
     {
-      id: crypto.randomUUID(),
       name: "Dr. Aaron Patel",
       role: "Behavioral Health",
       organization: "Mid-Atlantic Behavioral Health",
@@ -159,7 +158,6 @@ function seedFor(personId: string): TeamMember[] {
       addedAt: now,
     },
     {
-      id: crypto.randomUUID(),
       name: "Aunt Linda Reyes",
       role: "Natural Support",
       relationship: "Aunt — provides weekend respite",
@@ -174,36 +172,65 @@ function seedFor(personId: string): TeamMember[] {
   ];
 }
 
-function loadTeam(personId: string): TeamMember[] {
-  const key = `icm.care-team.${personId}`;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  const seed = seedFor(personId);
-  localStorage.setItem(key, JSON.stringify(seed));
-  return seed;
-}
-
-function saveTeam(personId: string, list: TeamMember[]) {
-  localStorage.setItem(`icm.care-team.${personId}`, JSON.stringify(list));
-}
-
 const PersonCareTeam = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const personLabel = person ? `${person.lastName}, ${person.firstName}` : "Person";
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: dbTeam, loading: teamLoading } = useAssignedStaff(id);
+  const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
-  const [team, setTeam] = useState<TeamMember[]>(() => loadTeam(id ?? ""));
   const [roleFilter, setRoleFilter] = useState<Role | "All">("All");
   const [showGuardianView, setShowGuardianView] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const team = useMemo(() => {
+    return (dbTeam || []).map((m: any) => ({
+      id: m.id,
+      name: m.name,
+      role: m.role as Role,
+      organization: m.organization,
+      email: m.email,
+      phone: m.phone,
+      commPrefs: m.commPrefs || [],
+      permissions: m.permissions || { read: true, write: false, sign: false },
+      consentLimits: m.consentLimits,
+      visibleToGuardian: m.visibleToGuardian !== false,
+      visibleToParticipant: m.visibleToParticipant !== false,
+      relationship: m.relationship,
+      active: m.active !== false && m.status !== "inactive",
+      addedAt: m.addedAt || new Date().toISOString(),
+    }));
+  }, [dbTeam]);
+
   useEffect(() => {
-    saveTeam(id ?? "", team);
-  }, [team, id]);
+    if (!teamLoading && (dbTeam || []).length === 0 && id) {
+      const seeds = seedFor(id);
+      seeds.forEach(async (m) => {
+        try {
+          await addAssignedStaff({
+            individual_id: id,
+            name: m.name,
+            role: m.role,
+            organization: m.organization || "",
+            email: m.email || "",
+            phone: m.phone || "",
+            commPrefs: m.commPrefs,
+            permissions: m.permissions,
+            consentLimits: m.consentLimits || "",
+            visibleToGuardian: m.visibleToGuardian,
+            visibleToParticipant: m.visibleToParticipant,
+            relationship: m.relationship || "",
+            active: m.active,
+            status: m.active ? "active" : "inactive",
+            addedAt: m.addedAt,
+          });
+        } catch (err) {
+          console.error("Error seeding team member:", err);
+        }
+      });
+    }
+  }, [dbTeam, teamLoading, id]);
 
   const filtered = useMemo(() => {
     let t = team;
@@ -218,31 +245,90 @@ const PersonCareTeam = () => {
     return c;
   }, [team]);
 
-  function remove(memberId: string) {
+  async function remove(memberId: string) {
     const m = team.find((x) => x.id === memberId);
     if (!m) return;
     if (!confirm(`Remove ${m.name} from the care team?`)) return;
-    setTeam((t) => t.filter((x) => x.id !== memberId));
-    writeAudit({
-      ts: new Date().toISOString(),
-      actor: "Sarah Chen, LCSW",
-      action: "care_team.remove",
-      personId: id,
-      target: m.name,
-      role: m.role,
-    });
+    try {
+      await deleteDoc(doc(db, "assigned_staff", memberId));
+      await writeAudit("settings_change", "individual", id ?? "", {
+        action: "care_team.remove",
+        target: m.name,
+        role: m.role,
+      });
+      toast.success(`Removed ${m.name} from care team`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to remove member");
+    }
   }
 
-  function upsert(member: TeamMember, isNew: boolean) {
-    setTeam((t) => (isNew ? [...t, member] : t.map((x) => (x.id === member.id ? member : x))));
-    writeAudit({
-      ts: new Date().toISOString(),
-      actor: "Sarah Chen, LCSW",
-      action: isNew ? "care_team.add" : "care_team.update",
-      personId: id,
-      target: member.name,
-      role: member.role,
-    });
+  async function upsert(member: TeamMember, isNew: boolean) {
+    try {
+      if (isNew) {
+        await addAssignedStaff({
+          individual_id: id,
+          name: member.name,
+          role: member.role,
+          organization: member.organization || "",
+          email: member.email || "",
+          phone: member.phone || "",
+          commPrefs: member.commPrefs,
+          permissions: member.permissions,
+          consentLimits: member.consentLimits || "",
+          visibleToGuardian: member.visibleToGuardian,
+          visibleToParticipant: member.visibleToParticipant,
+          relationship: member.relationship || "",
+          active: member.active,
+          status: member.active ? "active" : "inactive",
+          addedAt: member.addedAt,
+        });
+        await writeAudit("settings_change", "individual", id ?? "", {
+          action: "care_team.add",
+          target: member.name,
+          role: member.role,
+        });
+        toast.success(`Added ${member.name} to care team`);
+      } else {
+        await updateAssignedStaff(member.id, {
+          name: member.name,
+          role: member.role,
+          organization: member.organization || "",
+          email: member.email || "",
+          phone: member.phone || "",
+          commPrefs: member.commPrefs,
+          permissions: member.permissions,
+          consentLimits: member.consentLimits || "",
+          visibleToGuardian: member.visibleToGuardian,
+          visibleToParticipant: member.visibleToParticipant,
+          relationship: member.relationship || "",
+          active: member.active,
+          status: member.active ? "active" : "inactive",
+        });
+        await writeAudit("settings_change", "individual", id ?? "", {
+          action: "care_team.update",
+          target: member.name,
+          role: member.role,
+        });
+        toast.success(`Updated ${member.name}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save changes");
+    }
+  }
+
+  const loading = individualLoading || teamLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Care Team" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
   }
 
   return (
@@ -254,10 +340,10 @@ const PersonCareTeam = () => {
             People
           </button>
           <span className="text-icm-text-faint">›</span>
-          {person && (
+          {individual && (
             <>
               <button
-                onClick={() => navigate(`/people/${person.id}/echart`)}
+                onClick={() => navigate(`/people/${individual.id}/echart`)}
                 className="hover:text-icm-text"
               >
                 {personLabel}
@@ -280,7 +366,7 @@ const PersonCareTeam = () => {
             </div>
             <p className="text-[12px] text-icm-text-dim mt-1">
               Roles, permissions, communication preferences, and consent boundaries for everyone
-              supporting {person?.firstName ?? "this individual"}.
+              supporting {individual?.first_name ?? "this individual"}.
             </p>
           </div>
           <div className="flex items-center gap-2">

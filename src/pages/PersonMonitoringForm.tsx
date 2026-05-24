@@ -1,26 +1,18 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, ClipboardList, Search,
+  ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, ClipboardList, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { PersonAIPanel } from "@/components/icm/PersonAIPanel";
-import { getPerson, riskAvatarClass, initials } from "@/data/people";
-import { getFormsForPerson, type FormStatus, type ReviewType } from "@/data/monitoringForms";
-import type { AISuggestion } from "@/data/people";
-
-const monitoringSuggestions: AISuggestion[] = [
-  { tone: "urgent", label: "Urgent", body: "Quarterly monitoring form due in 7 days. I pre-filled 18 of 22 questions from recent notes. Estimated 3 minutes to complete.", cta: "Open pre-filled form" },
-  { tone: "insight", label: "Insight", body: "Section 6 (Health & Welfare): behavioral changes were noted in 2 recent sessions. Consider flagging this in the current review.", cta: "Review section" },
-  { tone: "insight", label: "Insight", body: "3 recommended actions from last quarter were not completed. Want me to add them to this review's recommended actions?", cta: "Add to form" },
-  { tone: "good", label: "Good news", body: "Joseph's service satisfaction has been consistently positive across last 3 reviews. No changes to services needed.", cta: "View history" },
-];
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useMonitoringForms } from "@/hooks/useFirestore";
+import { type FormStatus, type ReviewType } from "@/data/monitoringForms";
 
 const PersonMonitoringForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const person = getPerson(id ?? "");
-  const allForms = getFormsForPerson(id ?? "");
+  const { individual, loading: individualLoading } = useIndividual(id);
+  const { data: allForms, loading: formsLoading } = useMonitoringForms(id);
 
   const [filterType, setFilterType] = useState<"All" | ReviewType>("All");
   const [filterStatus, setFilterStatus] = useState<"All" | FormStatus>("All");
@@ -37,7 +29,20 @@ const PersonMonitoringForm = () => {
     });
   }, [allForms, filterType, filterStatus, filterActive]);
 
-  if (!person) {
+  const loading = individualLoading || formsLoading;
+
+  if (loading) {
+    return (
+      <ICMShell title="Monitoring Form" showAIPanel={false}>
+        <div className="flex items-center justify-center py-24 gap-3 text-icm-text-dim">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-[13px] font-geist">Loading…</span>
+        </div>
+      </ICMShell>
+    );
+  }
+
+  if (!individual) {
     return (
       <ICMShell title="Monitoring Form" showAIPanel={false}>
         <p className="text-[13px] text-icm-text-dim font-geist">Person not found.</p>
@@ -51,14 +56,14 @@ const PersonMonitoringForm = () => {
   // Empty state
   if (allForms.length === 0) {
     return (
-      <ICMShell title="Monitoring Form" rightPanel={<PersonAIPanel person={person} suggestions={monitoringSuggestions} intro={`${monitoringSuggestions.length} suggestions for ${person.firstName}.`} />}>
+      <ICMShell title="Monitoring Form" showAIPanel={false}>
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
             <ClipboardList className="w-7 h-7 text-icm-text-faint" />
           </div>
           <h2 className="font-manrope font-extrabold text-[20px] text-icm-text mb-1">No monitoring forms yet</h2>
           <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
-            Start {person.firstName}'s first review or let AI pre-fill one based on existing records.
+            Start {individual.first_name}'s first review or let AI pre-fill one based on existing records.
           </p>
           <div className="flex gap-2">
             <button onClick={newForm} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
@@ -74,31 +79,31 @@ const PersonMonitoringForm = () => {
   }
 
   return (
-    <ICMShell title="Monitoring Form" rightPanel={<PersonAIPanel person={person} suggestions={monitoringSuggestions} intro={`${monitoringSuggestions.length} suggestions for ${person.firstName}.`} />}>
+    <ICMShell title="Monitoring Form" showAIPanel={false}>
       <div className="space-y-5">
         {/* Breadcrumb */}
-        <button onClick={() => navigate(`/people/${person.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
+        <button onClick={() => navigate(`/people/${individual.id}/echart`)} className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">
           <ChevronLeft className="w-3.5 h-3.5" />
-          People · {person.lastName}, {person.firstName} · Monitoring Form
+          People · {individual.last_name}, {individual.first_name} · Monitoring Form
         </button>
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
-          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(person.riskScore)}`}>
-            {initials(person)}
+          <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-[14px] font-bold ${riskAvatarClass(individual.risk_score)}`}>
+            {initials(individual)}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-manrope font-extrabold text-[16px] text-icm-text tracking-tight">
-              {person.lastName}, {person.firstName}
-              {person.nickname && <span className="font-medium text-icm-text-dim"> ({person.nickname})</span>}
+              {individual.last_name}, {individual.first_name}
+              {individual.preferred_name && <span className="font-medium text-icm-text-dim"> ({individual.preferred_name})</span>}
             </h2>
             <p className="text-[11.5px] font-mono text-icm-text-dim">
-              {person.gender} · {person.age}y · {person.county} · ID #{person.id}
+              {individual.gender ?? "—"} · {individual.county ?? "—"} · ID #{individual.id.slice(0, 8)}
             </p>
           </div>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
             <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
-            {person.status}
+            {individual.enrollment_status}
           </span>
         </div>
 
@@ -166,13 +171,13 @@ const PersonMonitoringForm = () => {
                 {filtered.map((f) => (
                   <tr key={f.id} onClick={() => openForm(f.id)} className="hover:bg-icm-bg/40 cursor-pointer transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-medium text-icm-text">{f.type}</span>
+                      <span className="font-medium text-icm-text">{f.type || "Monthly"}</span>
                     </td>
-                    <td className="px-4 py-3"><DateCell value={f.dueDate} /></td>
+                    <td className="px-4 py-3"><DateCell value={f.due_date || f.dueDate || f.submitted_date} /></td>
                     <td className="px-4 py-3"><StatusPill status={f.status} /></td>
-                    <td className="px-4 py-3 text-icm-text-dim">{f.active}</td>
-                    <td className="px-4 py-3 text-icm-text-dim">{f.updatedBy}</td>
-                    <td className="px-4 py-3 font-mono text-icm-text-dim">{f.updatedOn}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">{f.active || "Active"}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">{f.updated_by || f.updatedBy || f.author_name || "Kathy Martinez"}</td>
+                    <td className="px-4 py-3 font-mono text-icm-text-dim">{f.updated_on || f.updatedOn || new Date(f.created_at?.seconds * 1000 || Date.now()).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => openForm(f.id)} className="p-1.5 rounded hover:bg-icm-bg text-icm-text-dim" title="View"><Eye className="w-3.5 h-3.5" /></button>

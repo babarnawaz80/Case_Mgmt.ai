@@ -191,7 +191,9 @@ export default function CareAssistant() {
       utterance_end_ms: "1200",
       vad_events: "true",
     });
-    const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params}`, ["token", dgKey]);
+    // Deepgram requires access_token as a query param (NOT as a WebSocket subprotocol)
+    const wsUrl = `wss://api.deepgram.com/v1/listen?${params}&access_token=${encodeURIComponent(dgKey)}`;
+    const ws = new WebSocket(wsUrl);
     dgSocketRef.current = ws;
 
     // Stream mic audio to Deepgram

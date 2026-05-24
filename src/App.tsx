@@ -92,6 +92,8 @@ import SettingsAIUsage from "./pages/settings/SettingsAIUsage";
 import SettingsRiskScore from "./pages/settings/SettingsRiskScore";
 import { RiskScoreProvider, useRiskScore } from "@/contexts/RiskScoreContext";
 import { RiskScoreDrawer } from "@/components/icm/RiskScoreDrawer";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { OrgSettingsProvider } from "@/contexts/OrgSettingsContext";
 import BillingCheckoutSimulation from "./pages/settings/BillingCheckoutSimulation";
 import BillingPortalSimulation from "./pages/settings/BillingPortalSimulation";
 import SettingsImport from "./pages/settings/SettingsImport";
@@ -175,8 +177,10 @@ function GlobalRiskDrawer() {
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
     <RoleProvider>
       <RiskScoreProvider>
+      <OrgSettingsProvider>
       <BillingProvider>
       <TooltipProvider>
         <Toaster />
@@ -365,8 +369,10 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
       </BillingProvider>
+      </OrgSettingsProvider>
       </RiskScoreProvider>
     </RoleProvider>
+    </ThemeProvider>
   </QueryClientProvider>
   </ErrorBoundary>
 );

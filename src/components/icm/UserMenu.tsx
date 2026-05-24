@@ -1,4 +1,4 @@
-import { ChevronDown, User, Settings, Clock, LogOut } from "lucide-react";
+import { ChevronDown, User, Settings, Clock, LogOut, Sun, Moon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,12 +14,14 @@ import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { logOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
 import employeePhoto from "@/assets/employee-kathy.jpg";
 
 export function UserMenu() {
   const navigate = useNavigate();
   const { isAdmin } = useRole();
   const { currentUser, userProfile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [clockedIn, setClockedIn] = useState<string | null>(() => localStorage.getItem("icm.clockedInAt"));
 
   const displayName = userProfile?.displayName || currentUser?.displayName || "User";
@@ -96,6 +98,24 @@ export function UserMenu() {
             <Settings className="w-4 h-4 text-muted-foreground" /> Settings
           </DropdownMenuItem>
         )}
+        {/* Dark / Light mode toggle */}
+        <DropdownMenuItem
+          onClick={toggleTheme}
+          className="gap-2 text-[12.5px] cursor-pointer"
+        >
+          {theme === "dark" ? (
+            <Sun className="w-4 h-4 text-icm-amber" />
+          ) : (
+            <Moon className="w-4 h-4 text-muted-foreground" />
+          )}
+          <span className="flex-1">{theme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}</span>
+          <span className={cn(
+            "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+            theme === "dark" ? "bg-icm-bg text-icm-text-faint" : "bg-icm-accent-soft text-icm-accent"
+          )}>
+            {theme === "dark" ? "DARK" : "LIGHT"}
+          </span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleClockIn}

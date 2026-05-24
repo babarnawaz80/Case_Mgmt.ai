@@ -18,6 +18,7 @@ import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgSettings } from "@/contexts/OrgSettingsContext";
 
 interface NavItem {
   title: string;
@@ -56,6 +57,7 @@ export function ICMSidebar() {
   const { userProfile } = useAuth();
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
+  const { logoUrl, orgName } = useOrgSettings();
 
   function getInitials() {
     const f = userProfile?.firstName?.[0] ?? "";
@@ -87,12 +89,23 @@ export function ICMSidebar() {
 
   return (
     <aside className="w-14 shrink-0 bg-icm-panel border-r border-icm-border flex flex-col items-center py-3">
+      {/* Org logo or default sparkles icon */}
       <NavLink
-        to="/"
-        className="w-9 h-9 rounded-lg bg-icm-text flex items-center justify-center mb-4"
-        title="AI Companion"
+        to="/dashboard"
+        className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center mb-4 shrink-0"
+        title={orgName ?? "Dashboard"}
       >
-        <Sparkles className="w-4 h-4 text-icm-panel" />
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={orgName ?? "Org logo"}
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-lg bg-icm-text flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-icm-panel" />
+          </div>
+        )}
       </NavLink>
       <nav className="flex-1 flex flex-col gap-1">
         {items.map((item) => {

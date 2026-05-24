@@ -9,6 +9,10 @@ import express = require("express");
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 
+// Silently drop undefined fields instead of throwing — prevents crashes when
+// individual documents have optional fields that haven't been set yet.
+admin.firestore().settings({ ignoreUndefinedProperties: true });
+
 // Inject Gemini API key into process environment so ai.ts can read it
 // This ensures the Gemini Developer API is used instead of Vertex AI
 if (!process.env.GEMINI_API_KEY) {

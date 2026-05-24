@@ -134,11 +134,10 @@ async function getOrCreateSession(
     }
   }
 
-  // Create new session
-  const newSession = {
+  // Build session — strip any undefined fields so Firestore doesn't reject them
+  const newSession: Record<string, unknown> = {
     individualId: individual.id,
-    organizationId: individual.organizationId,
-    assigned_case_manager: individual.assigned_case_manager,
+    organizationId: individual.organizationId ?? null,
     companion_token: token,
     session_date: admin.firestore.FieldValue.serverTimestamp(),
     duration_seconds: 0,
@@ -148,6 +147,11 @@ async function getOrCreateSession(
     review_status: "pending_review",
     opened_at: new Date().toISOString(),
   };
+  // Only include assigned_case_manager if it is defined
+  if (individual.assigned_case_manager !== undefined) {
+    newSession.assigned_case_manager = individual.assigned_case_manager ?? null;
+  }
+
   const ref = db.collection(COLLECTIONS.AI_CHECKINS).doc();
   await ref.set(newSession);
   return { sessionRef: ref, sessionData: newSession };

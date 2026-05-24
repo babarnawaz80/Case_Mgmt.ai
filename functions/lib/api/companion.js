@@ -150,6 +150,7 @@ async function findIndividualByToken(token) {
     return Object.assign({ id: snap.docs[0].id }, snap.docs[0].data());
 }
 async function getOrCreateSession(db, session_id, individual, token) {
+    var _a, _b;
     // Try to reuse existing session
     if (session_id && !session_id.startsWith("session_")) {
         const snap = await db.collection(collections_1.COLLECTIONS.AI_CHECKINS).doc(session_id).get();
@@ -157,11 +158,10 @@ async function getOrCreateSession(db, session_id, individual, token) {
             return { sessionRef: snap.ref, sessionData: snap.data() };
         }
     }
-    // Create new session
+    // Build session — strip any undefined fields so Firestore doesn't reject them
     const newSession = {
         individualId: individual.id,
-        organizationId: individual.organizationId,
-        assigned_case_manager: individual.assigned_case_manager,
+        organizationId: (_a = individual.organizationId) !== null && _a !== void 0 ? _a : null,
         companion_token: token,
         session_date: admin.firestore.FieldValue.serverTimestamp(),
         duration_seconds: 0,
@@ -171,6 +171,10 @@ async function getOrCreateSession(db, session_id, individual, token) {
         review_status: "pending_review",
         opened_at: new Date().toISOString(),
     };
+    // Only include assigned_case_manager if it is defined
+    if (individual.assigned_case_manager !== undefined) {
+        newSession.assigned_case_manager = (_b = individual.assigned_case_manager) !== null && _b !== void 0 ? _b : null;
+    }
     const ref = db.collection(collections_1.COLLECTIONS.AI_CHECKINS).doc();
     await ref.set(newSession);
     return { sessionRef: ref, sessionData: newSession };

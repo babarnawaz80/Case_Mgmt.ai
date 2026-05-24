@@ -69,17 +69,17 @@ const PROJECT_ID = process.env.GCLOUD_PROJECT || "casemanagement-ai";
 const LOCATION = "us-central1";
 // Gemini model IDs
 // Gemini Developer API (via API key) uses the short name.
-// Vertex AI uses the full publisher model path format.
+// Vertex AI uses the versioned model name.
 const MODELS = {
-    companion: "gemini-1.5-flash", // Care Companion bot
-    quality: "gemini-1.5-flash", // Documentation & quality checks
-    fast: "gemini-1.5-flash", // Form prefill, daily brief, scribe
+    companion: "gemini-2.0-flash", // Care Companion bot
+    quality: "gemini-2.0-flash", // Documentation & quality checks
+    fast: "gemini-2.0-flash", // Form prefill, daily brief, scribe
 };
-// Vertex AI model names (different naming convention from Gemini Developer API)
+// Vertex AI model names (versioned — required by Vertex AI SDK)
 const VERTEX_MODELS = {
-    companion: "gemini-1.5-flash-001",
-    quality: "gemini-1.5-flash-001",
-    fast: "gemini-1.5-flash-001",
+    companion: "gemini-2.0-flash-001",
+    quality: "gemini-2.0-flash-001",
+    fast: "gemini-2.0-flash-001",
 };
 // Check org is allowed to use AI before making any call
 async function checkOrgAIAccess(organizationId) {

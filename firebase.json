@@ -22,10 +22,6 @@
     ],
     "rewrites": [
       {
-        "source": "/care-assistant/**",
-        "function": "api"
-      },
-      {
         "source": "/api/**",
         "function": "api"
       },

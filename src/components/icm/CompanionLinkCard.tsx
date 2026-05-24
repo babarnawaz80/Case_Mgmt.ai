@@ -22,7 +22,7 @@ interface CompanionLinkCardProps {
   individualId?: string;
 }
 
-const BASE_URL = "https://casemanagement-ai.web.app/care-assistant";
+const BASE_URL = "https://app.casemanagement.ai/care-assistant";
 
 export function CompanionLinkCard({ individual, individualId }: CompanionLinkCardProps) {
   const { currentUser } = useAuth();

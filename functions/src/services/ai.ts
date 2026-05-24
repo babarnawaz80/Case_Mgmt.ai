@@ -119,19 +119,24 @@ export async function generateCompletion(
   }
 
   // Fall back to Vertex AI (requires billing account with Vertex AI access)
-  const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
-  const model: GenerativeModel = vertexAI.getGenerativeModel({
-    model: modelId,
-    generationConfig: { maxOutputTokens: maxTokens, temperature },
-    systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-  });
+  try {
+    const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
+    const model: GenerativeModel = vertexAI.getGenerativeModel({
+      model: modelId,
+      generationConfig: { maxOutputTokens: maxTokens, temperature },
+      systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+    });
 
-  const result = await model.generateContent(fullPrompt);
-  const response = result.response;
-  const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  const inputTokens = response.usageMetadata?.promptTokenCount ?? 0;
-  const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
-  return { text, inputTokens, outputTokens };
+    const result = await model.generateContent(fullPrompt);
+    const response = result.response;
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const inputTokens = response.usageMetadata?.promptTokenCount ?? 0;
+    const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
+    return { text, inputTokens, outputTokens };
+  } catch (err: any) {
+    console.error("[AI] Vertex AI also failed:", err.message ?? err);
+    throw err;
+  }
 }
 
 // Streaming version — for Care Companion bot real-time responses

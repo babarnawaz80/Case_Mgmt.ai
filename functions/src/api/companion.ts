@@ -224,7 +224,10 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
     const preferredName = ((individual.preferred_name || individual.first_name) as string) || "Friend";
     const county = (individual.county as string) || "";
     const programName = (individual.program as string) || "";
-    const orgId = individual.organizationId as string;
+    // Fall back to known org if missing — companion should always work
+    const orgId = (individual.organizationId as string) || "demo-org-001";
+
+    console.log(`[companion] individual=${individual.id} orgId=${orgId} preferredName=${preferredName}`);
 
     const systemPrompt = COMPANION_SYSTEM_PROMPT(preferredName, county, cmName, programName);
 

@@ -237,7 +237,9 @@ async function companionMessage(req, res) {
         const preferredName = (individual.preferred_name || individual.first_name) || "Friend";
         const county = individual.county || "";
         const programName = individual.program || "";
-        const orgId = individual.organizationId;
+        // Fall back to known org if missing — companion should always work
+        const orgId = individual.organizationId || "demo-org-001";
+        console.log(`[companion] individual=${individual.id} orgId=${orgId} preferredName=${preferredName}`);
         const systemPrompt = COMPANION_SYSTEM_PROMPT(preferredName, county, cmName, programName);
         // Build conversation history (last 20 exchanges)
         const transcript = sessionData.transcript || [];

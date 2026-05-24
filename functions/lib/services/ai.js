@@ -116,7 +116,7 @@ async function checkOrgAIAccess(organizationId) {
 }
 // Main generation function — called by all feature functions
 async function generateCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature, options = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
     await checkOrgAIAccess(organizationId);
     const modelId = MODELS[tier];
     const maxTokens = (_a = options.maxTokens) !== null && _a !== void 0 ? _a : 4096;
@@ -146,18 +146,24 @@ async function generateCompletion(systemPrompt, userPrompt, context, tier, organ
         }
     }
     // Fall back to Vertex AI (requires billing account with Vertex AI access)
-    const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
-    const model = vertexAI.getGenerativeModel({
-        model: modelId,
-        generationConfig: { maxOutputTokens: maxTokens, temperature },
-        systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-    });
-    const result = await model.generateContent(fullPrompt);
-    const response = result.response;
-    const text = (_o = (_m = (_l = (_k = (_j = (_h = response.candidates) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.content) === null || _k === void 0 ? void 0 : _k.parts) === null || _l === void 0 ? void 0 : _l[0]) === null || _m === void 0 ? void 0 : _m.text) !== null && _o !== void 0 ? _o : "";
-    const inputTokens = (_q = (_p = response.usageMetadata) === null || _p === void 0 ? void 0 : _p.promptTokenCount) !== null && _q !== void 0 ? _q : 0;
-    const outputTokens = (_s = (_r = response.usageMetadata) === null || _r === void 0 ? void 0 : _r.candidatesTokenCount) !== null && _s !== void 0 ? _s : 0;
-    return { text, inputTokens, outputTokens };
+    try {
+        const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
+        const model = vertexAI.getGenerativeModel({
+            model: modelId,
+            generationConfig: { maxOutputTokens: maxTokens, temperature },
+            systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+        });
+        const result = await model.generateContent(fullPrompt);
+        const response = result.response;
+        const text = (_o = (_m = (_l = (_k = (_j = (_h = response.candidates) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.content) === null || _k === void 0 ? void 0 : _k.parts) === null || _l === void 0 ? void 0 : _l[0]) === null || _m === void 0 ? void 0 : _m.text) !== null && _o !== void 0 ? _o : "";
+        const inputTokens = (_q = (_p = response.usageMetadata) === null || _p === void 0 ? void 0 : _p.promptTokenCount) !== null && _q !== void 0 ? _q : 0;
+        const outputTokens = (_s = (_r = response.usageMetadata) === null || _r === void 0 ? void 0 : _r.candidatesTokenCount) !== null && _s !== void 0 ? _s : 0;
+        return { text, inputTokens, outputTokens };
+    }
+    catch (err) {
+        console.error("[AI] Vertex AI also failed:", (_t = err.message) !== null && _t !== void 0 ? _t : err);
+        throw err;
+    }
 }
 // Streaming version — for Care Companion bot real-time responses
 function streamCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature) {

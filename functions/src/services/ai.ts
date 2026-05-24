@@ -7,11 +7,11 @@ import * as admin from "firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { COLLECTIONS } from "../config/collections";
 
-// Gemini model IDs — gemini-2.0-flash with billing enabled
+// Gemini model IDs — gemini-1.5-flash is stable and available to all billing accounts
 const MODELS = {
-  companion: "gemini-2.0-flash",   // Care Companion bot
-  quality:   "gemini-2.0-flash",   // Documentation & quality checks
-  fast:      "gemini-2.0-flash",   // Form prefill, daily brief, scribe
+  companion: "gemini-1.5-flash",   // Care Companion bot
+  quality:   "gemini-1.5-flash",   // Documentation & quality checks
+  fast:      "gemini-1.5-flash",   // Form prefill, daily brief, scribe
 } as const;
 
 

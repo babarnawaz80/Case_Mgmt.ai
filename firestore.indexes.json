@@ -4,6 +4,14 @@
       "collectionGroup": "individuals",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "companion_token", "order": "ASCENDING" },
+        { "fieldPath": "companion_link_active", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "individuals",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "organizationId", "order": "ASCENDING" },
         { "fieldPath": "assigned_case_manager", "order": "ASCENDING" }
       ]

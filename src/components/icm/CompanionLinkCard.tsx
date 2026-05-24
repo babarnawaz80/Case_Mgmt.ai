@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,12 +18,15 @@ import {
 
 interface CompanionLinkCardProps {
   individual: Individual;
+  /** When provided, shows a "View Transcripts" link in the header */
+  individualId?: string;
 }
 
 const BASE_URL = "https://casemanagement-ai.web.app/care-assistant";
 
-export function CompanionLinkCard({ individual }: CompanionLinkCardProps) {
+export function CompanionLinkCard({ individual, individualId }: CompanionLinkCardProps) {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [generating, setGenerating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -100,18 +104,29 @@ export function CompanionLinkCard({ individual }: CompanionLinkCardProps) {
           </div>
         </div>
 
-        {/* Status pill */}
-        {isActive ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-icm-green animate-pulse" />
-            Active
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-geist font-semibold bg-icm-panel border border-icm-border text-icm-text-dim shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-icm-text-faint" />
-            Not configured
-          </span>
-        )}
+        {/* Status pill + transcripts link */}
+        <div className="flex items-center gap-2 shrink-0">
+          {individualId && (
+            <button
+              onClick={() => navigate(`/people/${individualId}/companion-transcripts`)}
+              className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-purple-500 hover:text-purple-600 hover:underline transition-colors"
+            >
+              View Transcripts
+              <span className="text-[10px]">→</span>
+            </button>
+          )}
+          {isActive ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-green animate-pulse" />
+              Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-geist font-semibold bg-icm-panel border border-icm-border text-icm-text-dim">
+              <span className="w-1.5 h-1.5 rounded-full bg-icm-text-faint" />
+              Not configured
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Body */}

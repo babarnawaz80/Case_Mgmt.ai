@@ -131,6 +131,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import PersonAuthorizations from "./pages/PersonAuthorizations";
 import PersonAuthorizationNew from "./pages/PersonAuthorizationNew";
 import AuthorizationTracker from "./pages/AuthorizationTracker";
+import CompanionTranscripts from "./pages/CompanionTranscripts";
 
 // Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
@@ -191,6 +192,7 @@ const App = () => (
             <Route path="/people/:id/profile" element={<ProtectedRoute><PersonProfile /></ProtectedRoute>} />
             <Route path="/people/:id/facesheet" element={<ProtectedRoute><PersonFaceSheet /></ProtectedRoute>} />
            <Route path="/people/:id/echart" element={<ProtectedRoute><EChart /></ProtectedRoute>} />
+            <Route path="/people/:id/companion-transcripts" element={<ProtectedRoute><CompanionTranscripts /></ProtectedRoute>} />
            <Route path="/people/:id/monitors-baselines" element={<ProtectedRoute><PersonMonitorsBaselines /></ProtectedRoute>} />
             <Route path="/people/:id/contact-note" element={<ProtectedRoute><ContactNote /></ProtectedRoute>} />
             <Route path="/people/:id/contact-note/:noteId" element={<ProtectedRoute><ContactNoteDetail /></ProtectedRoute>} />

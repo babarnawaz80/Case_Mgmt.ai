@@ -89,23 +89,6 @@ export async function companionGet(req: Request, res: Response): Promise<void> {
   <title>Care Companion — ${preferredName}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; height: 100dvh; display: flex; flex-direction: column; }
-    header { background: #fff; padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; }
-    .logo { font-weight: 700; font-size: 0.9rem; color: #6366f1; }
-    .user-name { font-size: 0.9rem; color: #64748b; font-weight: 500; }
-    .chat-area { flex: 1; overflow-y: auto; padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 1rem; }
-    .msg { display: flex; gap: 0.75rem; max-width: 85%; }
-    .msg.bot { align-self: flex-start; }
-    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
-    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e0e7ff; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
-    .bubble { padding: 0.75rem 1rem; border-radius: 1rem; font-size: 0.95rem; line-height: 1.5; }
-    .bot .bubble { background: #fff; color: #1e293b; border-radius: 0.25rem 1rem 1rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .user .bubble { background: #0d9488; color: #fff; border-radius: 1rem 0.25rem 1rem 1rem; }
-    .bubble.urgent { border: 2px solid #f59e0b; background: #fffbeb; }
-    .urgent-banner { background: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; color: #92400e; }
-    .ts { font-size: 0.7rem; color: #94a3b8; margin-top: 0.25rem; text-align: center; }
-    .input-bar { background: #fff; border-top: 1px solid #e2e8f0; padding: 1rem; display: flex; gap: 0.5rem; align-items: flex-end; }
-    .input-bar textarea { flex: 1; border: 1px solid #e2e8f0; border-radius: 1.5rem; padding: 0.75rem 1rem; font-size: 0.95rem; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.15s; }
     html, body {
       height: 100%; height: 100dvh;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;

@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
-import { CompanionLinkCard } from "@/components/icm/CompanionLinkCard";
+
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 import { useIndividual, updateIndividual, initials, riskAvatarClass, riskScoreClass, calcAge, type Individual } from "@/hooks/useIndividuals";
@@ -278,10 +278,7 @@ const PersonProfile = () => {
 
         {/* Tab content */}
         {tab === "basic" && (
-          <>
-            <CompanionLinkCard individual={person} />
             <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} />
-          </>
         )}
         {tab === "medical" && <MedicalInfoTab profile={profile} />}
         

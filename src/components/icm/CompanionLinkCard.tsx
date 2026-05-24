@@ -46,7 +46,7 @@ export function CompanionLinkCard({ individual }: CompanionLinkCardProps) {
         companion_generated_at: serverTimestamp(),
         companion_generated_by: currentUser.uid,
       });
-      toast.success("Care Companion link generated successfully.");
+      toast.success("Case Companion link generated successfully.");
     } catch (err) {
       console.error("Failed to generate companion link:", err);
       toast.error("Failed to generate link. Please try again.");
@@ -61,10 +61,10 @@ export function CompanionLinkCard({ individual }: CompanionLinkCardProps) {
       await updateDoc(doc(db, "individuals", individual.id), {
         companion_link_active: false,
       });
-      toast.success("Care Companion link deactivated.");
+      toast.success("Case Companion link deactivated.");
     } catch (err) {
       console.error("Failed to deactivate companion link:", err);
-      toast.error("Failed to deactivate link. Please try again.");
+      toast.error("Failed to deactivate Case Companion link. Please try again.");
     } finally {
       setDeactivating(false);
     }
@@ -92,7 +92,7 @@ export function CompanionLinkCard({ individual }: CompanionLinkCardProps) {
           </div>
           <div>
             <h2 className="font-manrope font-bold text-[13.5px] text-icm-text leading-tight">
-              AI Care Companion
+              AI Case Companion
             </h2>
             <p className="text-[11px] font-geist text-icm-text-dim leading-snug">
               Generate a secure link for daily check-in conversations

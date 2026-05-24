@@ -5,6 +5,7 @@ import { demoToast } from "@/lib/demoToast";
 import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { useRole } from "@/contexts/RoleContext";
 import { useIndividual, calcAge, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { useEChartCounts } from "@/hooks/useEChartCounts";
 import {
   CheckSquare,
@@ -213,9 +214,13 @@ const EChart = () => {
               {/* LEFT — avatar + identity */}
               <div className="flex items-start gap-3 sm:gap-4 shrink-0 w-full sm:w-[280px]">
                 <div className="flex flex-col items-center gap-2 shrink-0">
-                  <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center font-mono text-[20px] font-bold ${riskClass}`}>
-                    {personInitials}
-                  </div>
+                  <PersonAvatar
+                    person={individual}
+                    size={64}
+                    shape="circle"
+                    editable
+                    individualId={individual.id}
+                  />
                   <button
                     onClick={() => navigate(`/people/${individual.id}/profile`)}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-icm-border bg-icm-bg hover:bg-icm-panel hover:border-icm-accent/40 text-[10.5px] font-geist font-semibold text-icm-text transition-colors"

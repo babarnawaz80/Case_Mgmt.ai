@@ -50,10 +50,11 @@ app.post("/api/billing/webhook", stripeWebhook);
 app.post("/api/billing/simulate-webhook", simulateWebhookPayment);
 
 // ─── Care Companion Bot API ────────────────────────────────────────────────
-import { companionGet, companionMessage, companionEndSession } from "./api/companion";
+import { companionGet, companionMessage, companionEndSession, companionDeepgramToken } from "./api/companion";
 app.get("/care-assistant/:token", companionGet);
 app.post("/care-assistant/:token/message", companionMessage);
 app.post("/care-assistant/:token/end-session", companionEndSession);
+app.post("/care-assistant/:token/deepgram-token", companionDeepgramToken);
 
 // ─── Compliance Agents API ────────────────────────────────────────────────
 import { runPcpRenewalAgent } from "./api/agents";

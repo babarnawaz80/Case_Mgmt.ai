@@ -424,3 +424,29 @@ Do NOT include any personally identifying information beyond first name.`,
     res.json({ success: true }); // Never error on session end — it must always succeed
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /care-assistant/:token/deepgram-token
+// Public — authenticated by the companion_token (not Firebase auth).
+// Returns the Deepgram API key so the browser can open a WebSocket to
+// Deepgram STT and call the Deepgram TTS API directly.
+// The key is never bundled in the frontend — it is fetched fresh each session.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function companionDeepgramToken(req: Request, res: Response): Promise<void> {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  // Validate the companion token is real and active
+  const individual = await findIndividualByToken(token);
+  if (!individual) {
+    res.status(403).json({ error: "Invalid or inactive companion link." });
+    return;
+  }
+
+  const key = process.env.DEEPGRAM_API_KEY ?? "";
+  if (!key || key === "PASTE_YOUR_KEY_HERE") {
+    res.status(503).json({ error: "Deepgram API key not configured on server." });
+    return;
+  }
+
+  res.json({ key });
+}

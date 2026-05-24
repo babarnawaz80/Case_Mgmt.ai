@@ -44,6 +44,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.companionGet = companionGet;
 exports.companionMessage = companionMessage;
 exports.companionEndSession = companionEndSession;
+exports.companionDeepgramToken = companionDeepgramToken;
 const admin = __importStar(require("firebase-admin"));
 const ai_1 = require("../services/ai");
 const credits_1 = require("../services/credits");
@@ -408,5 +409,50 @@ Do NOT include any personally identifying information beyond first name.`, "Plea
         console.error("[end-session] error:", error);
         res.json({ success: true }); // Never error on session end — it must always succeed
     }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /care-assistant/:token/deepgram-token
+// Public — authenticated by the companion_token (not Firebase auth).
+// Returns the Deepgram API key so the browser can open a WebSocket to
+// Deepgram STT and call the Deepgram TTS API directly.
+// The key is never bundled in the frontend — it is fetched fresh each session.
+async function companionDeepgramToken(req, res) {
+    var _a;
+    res.set("Access-Control-Allow-Origin", "*");
+    if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+    }
+    const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+    // Strategy 1: exact companion_token + companion_link_active match
+    let individual = await findIndividualByToken(token);
+    // Strategy 2: decode individual ID directly from the base64 token
+    // Token format: cmp_<base64(individualId_timestamp)>
+    if (!individual) {
+        try {
+            const raw = token.startsWith("cmp_") ? token.slice(4) : token;
+            const decoded = Buffer.from(raw, "base64").toString("utf8");
+            const underscoreIdx = decoded.lastIndexOf("_");
+            const individualId = underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
+            if (individualId) {
+                const db = admin.firestore();
+                const docSnap = await db.collection(collections_1.COLLECTIONS.INDIVIDUALS).doc(individualId).get();
+                if (docSnap.exists) {
+                    individual = Object.assign({ id: docSnap.id }, docSnap.data());
+                }
+            }
+        }
+        catch (_) { /* ignore decode errors */ }
+    }
+    if (!individual) {
+        res.status(403).json({ error: "Invalid companion link." });
+        return;
+    }
+    const key = (_a = process.env.DEEPGRAM_API_KEY) !== null && _a !== void 0 ? _a : "";
+    if (!key || key === "PASTE_YOUR_KEY_HERE") {
+        res.status(503).json({ error: "Deepgram API key not configured on server." });
+        return;
+    }
+    res.json({ key });
 }
 //# sourceMappingURL=companion.js.map

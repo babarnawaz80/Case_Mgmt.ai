@@ -71,7 +71,9 @@ export default function CareAssistant() {
   const [sessionId, setSessionId] = useState<string>(`session_${Date.now()}`);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [started, setStarted] = useState(false);
+  const [awaitingStart, setAwaitingStart] = useState(true); // wait for first tap to unlock audio
   const [dgKey, setDgKey] = useState<string | null>(null);
+  const dgKeyRef = useRef<string | null>(null); // mutable ref so beginSession always has latest key
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,10 +94,12 @@ export default function CareAssistant() {
     fetch(`${API_BASE}/care-assistant/${linkToken}/deepgram-token`, { method: "POST" })
       .then((r) => r.json())
       .then((d) => {
-        if (d.key) setDgKey(d.key);
+        if (d.key) {
+          setDgKey(d.key);
+          dgKeyRef.current = d.key; // keep ref in sync
+        }
       })
       .catch(() => {
-        // Fall back to browser TTS if key fetch fails
         console.warn("[Companion] Could not fetch Deepgram key — falling back to browser TTS");
       });
   }, [linkToken]);
@@ -374,8 +378,12 @@ export default function CareAssistant() {
     sendToAPI(text);
   }, [input, voiceState, stopAll, sendToAPI]);
 
-  // ── Orb = pause / resume ──────────────────────────────────────────────────
+  // ── Orb tap: pause / resume / begin ──────────────────────────────────────
   const togglePause = useCallback(() => {
+    if (awaitingStart) {
+      beginSession();
+      return;
+    }
     if (voiceState === "paused") {
       pausedRef.current = false;
       listenAfterSpeak();
@@ -384,37 +392,39 @@ export default function CareAssistant() {
       stopAll();
       setVoiceState("paused");
     }
-  }, [voiceState, listenAfterSpeak, stopAll]);
+  }, [awaitingStart, beginSession, voiceState, listenAfterSpeak, stopAll]);
 
-  // ── Auto-start on page load ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!person || started || loading) return;
+  // ── Begin session (called on first orb tap — this IS the user gesture) ────
+  const beginSession = useCallback(async () => {
+    if (started || !person) return;
     setStarted(true);
+    setAwaitingStart(false);
     setVoiceState("greeting");
-    window.speechSynthesis?.getVoices(); // preload voices
+    window.speechSynthesis?.getVoices();
 
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/care-assistant/${linkToken}/message`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: "__OPEN__", session_id: sessionId }),
-        });
-        const data = await res.json();
-        const text = data.response ?? `Hey ${firstName}! I'm your Care Companion. How are you doing today?`;
-        if (data.sessionId) setSessionId(data.sessionId);
-        setMessages([{ id: `a-${Date.now()}`, role: "agent", text, ts: new Date() }]);
-        await aiSpeakAndListen(text);
-      } catch {
-        const fallback = `Hey ${firstName}! I'm your Care Companion. I'm here for you. How are you doing today?`;
-        setMessages([{ id: "welcome", role: "agent", text: fallback, ts: new Date() }]);
-        await aiSpeakAndListen(fallback);
-      }
-    }, 800);
+    // Use the ref so we always get the latest key even if state hasn't updated
+    const key = dgKeyRef.current;
 
-    return () => clearTimeout(timer);
+    try {
+      const res = await fetch(`${API_BASE}/care-assistant/${linkToken}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "__OPEN__", session_id: sessionId }),
+      });
+      const data = await res.json();
+      const text = data.response ?? `Hey ${firstName}! I'm your AI Case Companion. How are you doing today?`;
+      if (data.sessionId) setSessionId(data.sessionId);
+      setMessages([{ id: `a-${Date.now()}`, role: "agent", text, ts: new Date() }]);
+      // Temporarily patch dgKey from ref so dgSpeak uses it
+      if (key && !dgKey) setDgKey(key);
+      await aiSpeakAndListen(text);
+    } catch {
+      const fallback = `Hey ${firstName}! I'm your AI Case Companion. I'm here for you. How are you doing today?`;
+      setMessages([{ id: "welcome", role: "agent", text: fallback, ts: new Date() }]);
+      await aiSpeakAndListen(fallback);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [person, started, loading]);
+  }, [person, started, linkToken, sessionId, firstName, aiSpeakAndListen]);
 
   // Cleanup on unmount
   useEffect(() => () => { stopAll(); window.speechSynthesis?.cancel(); }, [stopAll]);
@@ -427,7 +437,8 @@ export default function CareAssistant() {
     : 20;
 
   const statusLabel =
-    voiceState === "greeting" || voiceState === "idle" ? "Connecting…"
+    awaitingStart ? "Tap to begin"
+    : voiceState === "greeting" || voiceState === "idle" ? "Connecting…"
     : voiceState === "speaking" ? "Speaking…"
     : voiceState === "listening" ? "Listening…"
     : voiceState === "thinking" ? "Thinking…"
@@ -440,6 +451,11 @@ export default function CareAssistant() {
     : "#34d399";
 
   const isPaused = voiceState === "paused";
+  const orbColors = awaitingStart
+    ? { c1: "oklch(72% 0.18 280)", c2: "oklch(68% 0.22 320)", c3: "oklch(65% 0.20 250)" }
+    : isPaused
+    ? { c1: "oklch(55% 0.06 220)", c2: "oklch(50% 0.05 260)", c3: "oklch(53% 0.07 200)" }
+    : { c1: "oklch(82% 0.18 195)", c2: "oklch(78% 0.22 330)", c3: "oklch(70% 0.18 280)" };
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -551,13 +567,22 @@ export default function CareAssistant() {
 
           <SiriOrb
             size="220px"
-            colors={{
-              c1: isPaused ? "oklch(55% 0.06 220)" : "oklch(82% 0.18 195)",
-              c2: isPaused ? "oklch(50% 0.05 260)" : "oklch(78% 0.22 330)",
-              c3: isPaused ? "oklch(53% 0.07 200)" : "oklch(70% 0.18 280)",
-            }}
-            animationDuration={orbAnimDuration}
+            colors={orbColors}
+            animationDuration={awaitingStart ? 8 : orbAnimDuration}
           />
+          {/* Tap to begin overlay on first load */}
+          {awaitingStart && (
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: "50%",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: "0.25rem",
+              background: "rgba(0,0,0,0.12)",
+              animation: "fadeInOrb 0.8s ease",
+            }}>
+              <Play style={{ width: 28, height: 28, color: "rgba(255,255,255,0.9)", marginBottom: 2 }} />
+              <span style={{ color: "rgba(255,255,255,0.85)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tap to begin</span>
+            </div>
+          )}
 
           {isPaused && (
             <div style={{

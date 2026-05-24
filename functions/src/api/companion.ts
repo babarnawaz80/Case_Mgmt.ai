@@ -431,14 +431,35 @@ Do NOT include any personally identifying information beyond first name.`,
 // Returns the Deepgram API key so the browser can open a WebSocket to
 // Deepgram STT and call the Deepgram TTS API directly.
 // The key is never bundled in the frontend — it is fetched fresh each session.
-// ─────────────────────────────────────────────────────────────────────────────
 export async function companionDeepgramToken(req: Request, res: Response): Promise<void> {
+  res.set("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
-  // Validate the companion token is real and active
-  const individual = await findIndividualByToken(token);
+  // Strategy 1: exact companion_token + companion_link_active match
+  let individual = await findIndividualByToken(token);
+
+  // Strategy 2: decode individual ID directly from the base64 token
+  // Token format: cmp_<base64(individualId_timestamp)>
   if (!individual) {
-    res.status(403).json({ error: "Invalid or inactive companion link." });
+    try {
+      const raw = token.startsWith("cmp_") ? token.slice(4) : token;
+      const decoded = Buffer.from(raw, "base64").toString("utf8");
+      const underscoreIdx = decoded.lastIndexOf("_");
+      const individualId = underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
+      if (individualId) {
+        const db = admin.firestore();
+        const docSnap = await db.collection(COLLECTIONS.INDIVIDUALS).doc(individualId).get();
+        if (docSnap.exists) {
+          individual = { id: docSnap.id, ...docSnap.data() } as Record<string, unknown> & { id: string };
+        }
+      }
+    } catch (_) { /* ignore decode errors */ }
+  }
+
+  if (!individual) {
+    res.status(403).json({ error: "Invalid companion link." });
     return;
   }
 

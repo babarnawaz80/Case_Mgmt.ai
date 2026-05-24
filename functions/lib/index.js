@@ -78,6 +78,7 @@ const companion_1 = require("./api/companion");
 app.get("/care-assistant/:token", companion_1.companionGet);
 app.post("/care-assistant/:token/message", companion_1.companionMessage);
 app.post("/care-assistant/:token/end-session", companion_1.companionEndSession);
+app.post("/care-assistant/:token/deepgram-token", companion_1.companionDeepgramToken);
 // ─── Compliance Agents API ────────────────────────────────────────────────
 const agents_1 = require("./api/agents");
 app.post("/api/agents/pcp-renewal/run", agents_1.runPcpRenewalAgent);

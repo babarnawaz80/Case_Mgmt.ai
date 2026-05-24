@@ -338,10 +338,14 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
       sessionId: sessionRef.id,
       urgent: isUrgent,
     });
-  } catch (error) {
-    console.error("[companion-message] error:", error);
-    res.status(500).json({
-      response: "I'm having a little trouble right now. Please try again in a moment.",
+  } catch (error: any) {
+    console.error("[companion-message] error:", error?.message ?? error);
+    // Give a warm, non-alarming message while AI service warms up
+    const isQuota = error?.message?.includes("quota") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.message?.includes("AI_UNAVAILABLE");
+    res.json({
+      response: isQuota
+        ? "I'm warming up — give me just a moment and try again! 😊"
+        : "I'm having a little trouble connecting right now. Please try again in a moment.",
       urgent: false,
     });
   }

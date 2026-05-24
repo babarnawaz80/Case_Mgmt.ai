@@ -2,9 +2,7 @@
 // AI Abstraction Layer — THE ONLY file that calls AI APIs (Gemini)
 // CaseManagement.AI — PRD v2.0
 // All features call generateCompletion() or streamCompletion() — NO EXCEPTIONS.
-// Supports:
-//   1. Gemini Developer API (via GEMINI_API_KEY env var) — preferred
-//   2. Vertex AI (via GCP service account) — fallback if no API key
+// Uses Gemini Developer API exclusively (via GEMINI_API_KEY env var).
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -62,24 +60,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCompletion = generateCompletion;
 exports.streamCompletion = streamCompletion;
 const admin = __importStar(require("firebase-admin"));
-const vertexai_1 = require("@google-cloud/vertexai");
 const genai_1 = require("@google/genai");
 const collections_1 = require("../config/collections");
-const PROJECT_ID = process.env.GCLOUD_PROJECT || "casemanagement-ai";
-const LOCATION = "us-central1";
-// Gemini model IDs
-// Gemini Developer API (via API key) uses the short name.
-// Vertex AI uses the versioned model name.
+// Gemini model IDs — gemini-2.0-flash with billing enabled
 const MODELS = {
     companion: "gemini-2.0-flash", // Care Companion bot
     quality: "gemini-2.0-flash", // Documentation & quality checks
     fast: "gemini-2.0-flash", // Form prefill, daily brief, scribe
-};
-// Vertex AI model names (versioned — required by Vertex AI SDK)
-const VERTEX_MODELS = {
-    companion: "gemini-2.0-flash-001",
-    quality: "gemini-2.0-flash-001",
-    fast: "gemini-2.0-flash-001",
 };
 // Check org is allowed to use AI before making any call
 async function checkOrgAIAccess(organizationId) {
@@ -124,7 +111,7 @@ async function checkOrgAIAccess(organizationId) {
 }
 // Main generation function — called by all feature functions
 async function generateCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature, options = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+    var _a, _b, _c, _d, _e, _f, _g;
     await checkOrgAIAccess(organizationId);
     const modelId = MODELS[tier];
     const maxTokens = (_a = options.maxTokens) !== null && _a !== void 0 ? _a : 4096;
@@ -153,32 +140,15 @@ async function generateCompletion(systemPrompt, userPrompt, context, tier, organ
             console.error("[AI] Gemini API error, trying Vertex AI:", err.message);
         }
     }
-    // Fall back to Vertex AI (uses Cloud Run service account — no API key needed)
-    try {
-        const vertexModelId = VERTEX_MODELS[tier];
-        const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
-        const model = vertexAI.getGenerativeModel({
-            model: vertexModelId,
-            generationConfig: { maxOutputTokens: maxTokens, temperature },
-            systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-        });
-        const result = await model.generateContent(fullPrompt);
-        const response = result.response;
-        const text = (_o = (_m = (_l = (_k = (_j = (_h = response.candidates) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.content) === null || _k === void 0 ? void 0 : _k.parts) === null || _l === void 0 ? void 0 : _l[0]) === null || _m === void 0 ? void 0 : _m.text) !== null && _o !== void 0 ? _o : "";
-        const inputTokens = (_q = (_p = response.usageMetadata) === null || _p === void 0 ? void 0 : _p.promptTokenCount) !== null && _q !== void 0 ? _q : 0;
-        const outputTokens = (_s = (_r = response.usageMetadata) === null || _r === void 0 ? void 0 : _r.candidatesTokenCount) !== null && _s !== void 0 ? _s : 0;
-        return { text, inputTokens, outputTokens };
-    }
-    catch (err) {
-        console.error("[AI] Vertex AI also failed:", (_t = err.message) !== null && _t !== void 0 ? _t : err);
-        throw err;
-    }
+    // Vertex AI fallback is not available on this project.
+    // If we reach here, Gemini API failed — rethrow so callers can handle gracefully.
+    throw new Error("AI_UNAVAILABLE");
 }
 // Streaming version — for Care Companion bot real-time responses
 function streamCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature) {
     return __asyncGenerator(this, arguments, function* streamCompletion_1() {
-        var _a, e_1, _b, _c, _d, e_2, _e, _f;
-        var _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
+        var _a, e_1, _b, _c;
+        var _d, _e, _f, _g, _h, _j;
         yield __await(checkOrgAIAccess(organizationId));
         const modelId = MODELS[tier];
         const fullPrompt = context ? `${context}\n\n${userPrompt}` : userPrompt;
@@ -197,11 +167,11 @@ function streamCompletion(systemPrompt, userPrompt, context, tier, organizationI
                     },
                 }));
                 try {
-                    for (var _v = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield __await(stream_1.next()), _a = stream_1_1.done, !_a; _v = true) {
+                    for (var _k = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield __await(stream_1.next()), _a = stream_1_1.done, !_a; _k = true) {
                         _c = stream_1_1.value;
-                        _v = false;
+                        _k = false;
                         const chunk = _c;
-                        const text = (_m = (_l = (_k = (_j = (_h = (_g = chunk.candidates) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.content) === null || _j === void 0 ? void 0 : _j.parts) === null || _k === void 0 ? void 0 : _k[0]) === null || _l === void 0 ? void 0 : _l.text) !== null && _m !== void 0 ? _m : "";
+                        const text = (_j = (_h = (_g = (_f = (_e = (_d = chunk.candidates) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.content) === null || _f === void 0 ? void 0 : _f.parts) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.text) !== null && _j !== void 0 ? _j : "";
                         if (text)
                             yield yield __await(text);
                     }
@@ -209,48 +179,18 @@ function streamCompletion(systemPrompt, userPrompt, context, tier, organizationI
                 catch (e_1_1) { e_1 = { error: e_1_1 }; }
                 finally {
                     try {
-                        if (!_v && !_a && (_b = stream_1.return)) yield __await(_b.call(stream_1));
+                        if (!_k && !_a && (_b = stream_1.return)) yield __await(_b.call(stream_1));
                     }
                     finally { if (e_1) throw e_1.error; }
                 }
                 return yield __await(void 0);
             }
             catch (err) {
-                console.error("[AI] Gemini stream error, trying Vertex AI:", err.message);
+                console.error("[AI] Gemini stream error:", err.message);
+                throw err;
             }
         }
-        // Fall back to Vertex AI streaming
-        try {
-            const vertexModelId = VERTEX_MODELS[tier];
-            const vertexAI = new vertexai_1.VertexAI({ project: PROJECT_ID, location: LOCATION });
-            const model = vertexAI.getGenerativeModel({
-                model: vertexModelId,
-                generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-                systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-            });
-            const stream = yield __await(model.generateContentStream(fullPrompt));
-            try {
-                for (var _w = true, _x = __asyncValues(stream.stream), _y; _y = yield __await(_x.next()), _d = _y.done, !_d; _w = true) {
-                    _f = _y.value;
-                    _w = false;
-                    const chunk = _f;
-                    const text = (_t = (_s = (_r = (_q = (_p = (_o = chunk.candidates) === null || _o === void 0 ? void 0 : _o[0]) === null || _p === void 0 ? void 0 : _p.content) === null || _q === void 0 ? void 0 : _q.parts) === null || _r === void 0 ? void 0 : _r[0]) === null || _s === void 0 ? void 0 : _s.text) !== null && _t !== void 0 ? _t : "";
-                    if (text)
-                        yield yield __await(text);
-                }
-            }
-            catch (e_2_1) { e_2 = { error: e_2_1 }; }
-            finally {
-                try {
-                    if (!_w && !_d && (_e = _x.return)) yield __await(_e.call(_x));
-                }
-                finally { if (e_2) throw e_2.error; }
-            }
-        }
-        catch (err) {
-            console.error("[AI] Vertex AI stream also failed:", (_u = err.message) !== null && _u !== void 0 ? _u : err);
-            throw err;
-        }
+        throw new Error("AI_UNAVAILABLE");
     });
 }
 //# sourceMappingURL=ai.js.map

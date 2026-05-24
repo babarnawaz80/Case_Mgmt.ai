@@ -1,32 +1,17 @@
 // AI Abstraction Layer — THE ONLY file that calls AI APIs (Gemini)
 // CaseManagement.AI — PRD v2.0
 // All features call generateCompletion() or streamCompletion() — NO EXCEPTIONS.
-// Supports:
-//   1. Gemini Developer API (via GEMINI_API_KEY env var) — preferred
-//   2. Vertex AI (via GCP service account) — fallback if no API key
+// Uses Gemini Developer API exclusively (via GEMINI_API_KEY env var).
 
 import * as admin from "firebase-admin";
-import { VertexAI, GenerativeModel } from "@google-cloud/vertexai";
 import { GoogleGenAI } from "@google/genai";
 import { COLLECTIONS } from "../config/collections";
 
-const PROJECT_ID = process.env.GCLOUD_PROJECT || "casemanagement-ai";
-const LOCATION = "us-central1";
-
-// Gemini model IDs
-// Gemini Developer API (via API key) uses the short name.
-// Vertex AI uses the versioned model name.
+// Gemini model IDs — gemini-2.0-flash with billing enabled
 const MODELS = {
   companion: "gemini-2.0-flash",   // Care Companion bot
   quality:   "gemini-2.0-flash",   // Documentation & quality checks
   fast:      "gemini-2.0-flash",   // Form prefill, daily brief, scribe
-} as const;
-
-// Vertex AI model names (versioned — required by Vertex AI SDK)
-const VERTEX_MODELS = {
-  companion: "gemini-2.0-flash-001",
-  quality:   "gemini-2.0-flash-001",
-  fast:      "gemini-2.0-flash-001",
 } as const;
 
 
@@ -128,26 +113,10 @@ export async function generateCompletion(
     }
   }
 
-  // Fall back to Vertex AI (uses Cloud Run service account — no API key needed)
-  try {
-    const vertexModelId = VERTEX_MODELS[tier];
-    const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
-    const model: GenerativeModel = vertexAI.getGenerativeModel({
-      model: vertexModelId,
-      generationConfig: { maxOutputTokens: maxTokens, temperature },
-      systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-    });
+  // Vertex AI fallback is not available on this project.
+  // If we reach here, Gemini API failed — rethrow so callers can handle gracefully.
+  throw new Error("AI_UNAVAILABLE");
 
-    const result = await model.generateContent(fullPrompt);
-    const response = result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const inputTokens = response.usageMetadata?.promptTokenCount ?? 0;
-    const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
-    return { text, inputTokens, outputTokens };
-  } catch (err: any) {
-    console.error("[AI] Vertex AI also failed:", err.message ?? err);
-    throw err;
-  }
 }
 
 // Streaming version — for Care Companion bot real-time responses
@@ -186,27 +155,11 @@ export async function* streamCompletion(
       }
       return;
     } catch (err: any) {
-      console.error("[AI] Gemini stream error, trying Vertex AI:", err.message);
+      console.error("[AI] Gemini stream error:", err.message);
+      throw err;
     }
   }
 
-  // Fall back to Vertex AI streaming
-  try {
-    const vertexModelId = VERTEX_MODELS[tier];
-    const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
-    const model = vertexAI.getGenerativeModel({
-      model: vertexModelId,
-      generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-      systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-    });
-
-    const stream = await model.generateContentStream(fullPrompt);
-    for await (const chunk of stream.stream) {
-      const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (text) yield text;
-    }
-  } catch (err: any) {
-    console.error("[AI] Vertex AI stream also failed:", err.message ?? err);
-    throw err;
-  }
+  throw new Error("AI_UNAVAILABLE");
 }
+

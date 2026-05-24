@@ -213,6 +213,7 @@ async function companionGet(req, res) {
 // regular user messages.
 // ─────────────────────────────────────────────────────────────────────────────
 async function companionMessage(req, res) {
+    var _a, _b, _c, _d;
     try {
         const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
         const individual = await findIndividualByToken(token);
@@ -330,9 +331,13 @@ async function companionMessage(req, res) {
         });
     }
     catch (error) {
-        console.error("[companion-message] error:", error);
-        res.status(500).json({
-            response: "I'm having a little trouble right now. Please try again in a moment.",
+        console.error("[companion-message] error:", (_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : error);
+        // Give a warm, non-alarming message while AI service warms up
+        const isQuota = ((_b = error === null || error === void 0 ? void 0 : error.message) === null || _b === void 0 ? void 0 : _b.includes("quota")) || ((_c = error === null || error === void 0 ? void 0 : error.message) === null || _c === void 0 ? void 0 : _c.includes("RESOURCE_EXHAUSTED")) || ((_d = error === null || error === void 0 ? void 0 : error.message) === null || _d === void 0 ? void 0 : _d.includes("AI_UNAVAILABLE"));
+        res.json({
+            response: isQuota
+                ? "I'm warming up — give me just a moment and try again! 😊"
+                : "I'm having a little trouble connecting right now. Please try again in a moment.",
             urgent: false,
         });
     }

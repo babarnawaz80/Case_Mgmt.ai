@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -11,6 +11,10 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { type CarePlan, type PlanGoal } from "@/data/carePlans";
 import { useCarePlans, updateCarePlan } from "@/hooks/useFirestore";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
 type SectionKey = "details" | "profile" | "nsr" | "goals" | "services" | "support" | "lifecourse" | "linkages" | "team" | "history";
 
@@ -23,12 +27,17 @@ const PersonCarePlanDetail = () => {
   const plan = allPlans.find((p: any) => p.id === planId);
   const loading = individualLoading || plansLoading;
 
+  const { userProfile } = useAuth();
+  const aiDraftCalledRef = useRef(false);
+
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     details: true, profile: false, nsr: true, goals: true, services: false,
     support: false, lifecourse: false, linkages: true, team: false, history: false,
   });
   const [aiBannerVisible, setAiBannerVisible] = useState(true);
   const [printOpen, setPrintOpen] = useState(false);
+  const [aiDraftingGoals, setAiDraftingGoals] = useState(false);
+
 
   if (loading) {
     return (
@@ -213,8 +222,70 @@ const PersonCarePlanDetail = () => {
               <button onClick={() => toast("Add goal", { description: "Opening goal builder…" })} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Add goal
               </button>
-              <button onClick={() => toast.success("AI drafting goals", { description: "Reviewing last 12 mo of notes & assessments…" })} className="h-9 px-3 rounded-xl border border-icm-accent/20 bg-icm-accent-soft text-[12px] font-medium text-icm-accent hover:bg-icm-accent-soft/70 inline-flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" /> AI: Add goals based on recent notes
+              <button
+                onClick={async () => {
+                  if (aiDraftCalledRef.current || aiDraftingGoals) return;
+                  aiDraftCalledRef.current = true;
+                  setAiDraftingGoals(true);
+                  try {
+                    const token = await auth.currentUser?.getIdToken();
+                    const res = await fetch(`${FUNCTIONS_BASE}/api/ai-forms/care-plan-draft`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
+                      body: JSON.stringify({
+                        individualId: id,
+                        organizationId: userProfile?.organizationId ?? "unknown",
+                        userId: auth.currentUser?.uid ?? "unknown",
+                        userName: userProfile?.displayName ?? "Case Manager",
+                        userRole: userProfile?.role ?? "case_manager",
+                      }),
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    if (!data.success || !data.draft?.goals?.length) {
+                      toast.error("AI could not generate goals — try again later.");
+                      return;
+                    }
+                    // Map AI goals to PlanGoal shape and append to plan via Firestore
+                    const aiGoals = data.draft.goals.map((g: any, i: number) => ({
+                      id: `ai-g${Date.now()}-${i}`,
+                      number: (plan?.goals?.length ?? 0) + i + 1,
+                      title: g.title,
+                      description: g.description,
+                      targetDate: g.target_date ?? "",
+                      responsibleParty: g.responsible_party ?? "Case Manager",
+                      progress: "In Progress" as const,
+                      aiSuggested: true,
+                      domain: g.domain ?? "",
+                      objectives: (g.objectives ?? []).map((o: any) => ({
+                        id: o.id ?? `o${i}`,
+                        description: o.text ?? "",
+                        status: "In Progress" as const,
+                        aiSuggested: true,
+                      })),
+                    }));
+                    await updateCarePlan(planId!, {
+                      goals: [...(plan?.goals ?? []), ...aiGoals],
+                      aiDrafted: true,
+                    });
+                    toast.success(`AI drafted ${aiGoals.length} new goals`, {
+                      description: `Based on ${data.draft.plan_year ?? "12 months"} of documentation. Review and edit before saving.`,
+                    });
+                  } catch (err) {
+                    console.error("[CarePlanDetail] AI draft failed:", err);
+                    toast.error("AI drafting failed — check console.");
+                  } finally {
+                    setAiDraftingGoals(false);
+                  }
+                }}
+                className="h-9 px-3 rounded-xl border border-icm-accent/20 bg-icm-accent-soft text-[12px] font-medium text-icm-accent hover:bg-icm-accent-soft/70 inline-flex items-center gap-1.5 disabled:opacity-50"
+                disabled={aiDraftingGoals}
+              >
+                {aiDraftingGoals ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {aiDraftingGoals ? "AI drafting goals…" : "AI: Add goals based on recent notes"}
               </button>
             </div>
           )}

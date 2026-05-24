@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react";
+import { ChevronLeft, Play, Square, Clock, FileText, Paperclip, PenLine, Send, Save, Smartphone, Wifi, WifiOff, Link2, X, Camera, CheckCircle2, AlertTriangle, ShieldAlert, Loader2, Sparkles } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { addVisitSummary } from "@/hooks/useFirestore";
+
+const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
 const SERVICE_CODES = [
   { code: "T1016", label: "Case management — per 15 min", unitMinutes: 15 },
@@ -70,7 +75,9 @@ const PersonVisitDocument = () => {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
+  const { userProfile } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
+  const prefillCalledRef = useRef(false);
 
   const [docId] = useState(() => `vd-${Date.now()}`);
   const [startedAt, setStartedAt] = useState<string>("");
@@ -87,6 +94,9 @@ const PersonVisitDocument = () => {
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [now, setNow] = useState(Date.now());
   const [errors, setErrors] = useState<ValidationError[]>([]);
+  const [aiPrefilling, setAiPrefilling] = useState(false);
+  const [aiPrefilled, setAiPrefilled] = useState(false);
+
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -96,6 +106,52 @@ const PersonVisitDocument = () => {
     window.addEventListener("offline", off);
     return () => { clearInterval(t); window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
+
+  // AI prefill narrative on mount (non-blocking)
+  useEffect(() => {
+    if (!id || !individual || prefillCalledRef.current) return;
+    prefillCalledRef.current = true;
+
+    const runPrefill = async () => {
+      setAiPrefilling(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`${FUNCTIONS_BASE}/api/ai-forms/visit-summary-prefill`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            individualId: id,
+            organizationId: userProfile?.organizationId ?? "unknown",
+            userId: auth.currentUser?.uid ?? "unknown",
+            userName: userProfile?.displayName ?? "Case Manager",
+            userRole: userProfile?.role ?? "case_manager",
+          }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success || !data.suggestions) return;
+        const s = data.suggestions;
+        if (s.purposeOfSupport && !narrative) {
+          setNarrative(`Purpose: ${s.purposeOfSupport}\n\nWhat is working: ${s.whatIsWorking}\n\nChallenges: ${s.whatIsNotWorking}\n\nNext steps: ${s.visitSummaryAndNextSteps}`);
+        }
+        if (s.serviceCode) {
+          const validCode = SERVICE_CODES.find(c => c.code === s.serviceCode);
+          if (validCode) setServiceCode(validCode.code);
+        }
+        setAiPrefilled(true);
+      } catch (err) {
+        console.warn("[PersonVisitDocument] AI prefill failed (non-fatal):", err);
+      } finally {
+        setAiPrefilling(false);
+      }
+    };
+
+    runPrefill();
+  }, [id, individual, userProfile]);
+
 
   const svc = SERVICE_CODES.find(s => s.code === serviceCode)!;
   const elapsedMin = useMemo(() => {
@@ -159,7 +215,7 @@ const PersonVisitDocument = () => {
     return errs;
   };
 
-  const submit = () => {
+  const submit = async () => {
     const errs = runValidation();
     setErrors(errs);
     const blocking = errs.filter(e => e.severity === "block");
@@ -179,9 +235,30 @@ const PersonVisitDocument = () => {
     const doc = buildDoc("Submitted for review");
     persistDoc(doc);
     writeAudit({ ts: doc.submittedAt!, action: "Visit note submitted for supervisor review", entity: doc.id, personId: id, by: doc.createdBy, detail: `${serviceCode} · ${doc.units} units` });
+
+    // Also persist to Firestore visit_summaries collection
+    try {
+      await addVisitSummary({
+        individual_id: id!,
+        individual_name: `${individual.last_name}, ${individual.first_name}`,
+        visit_date: startedAt ? new Date(startedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+        start_time: startedAt,
+        end_time: endedAt,
+        purpose_of_support: narrative.split("\n\n")[0]?.replace("Purpose: ", "") || narrative.slice(0, 200),
+        next_steps: narrative,
+        status: "submitted",
+        author_uid: auth.currentUser?.uid ?? "",
+        author_name: userProfile?.displayName ?? "Case Manager",
+      });
+    } catch (err) {
+      console.warn("[PersonVisitDocument] Firestore save failed (visit still saved locally):", err);
+    }
+
+
     toast.success("Submitted for supervisor review.");
     setTimeout(() => navigate(`/people/${individual.id}/visit-summary`), 700);
   };
+
 
   return (
     <ICMShell title="Document Visit (Mobile)" showAIPanel={false}>

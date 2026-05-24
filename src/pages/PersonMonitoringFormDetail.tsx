@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, X, Save, Printer, CheckCircle2, AlertTriangle,
@@ -10,6 +10,10 @@ import { useIndividual } from "@/hooks/useIndividuals";
 import { useMonitoringForms, addMonitoringForm, updateMonitoringForm } from "@/hooks/useFirestore";
 import { aiPrefilledDraft, type YesNoAnswer, type GoalProgress, type RecommendedAction } from "@/data/monitoringForms";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
 type SectionKey = "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "s8" | "s9" | "s10";
 
@@ -39,17 +43,99 @@ const PersonMonitoringFormDetail = () => {
     return allForms.find((f: any) => f.id === formId);
   }, [formId, id, isNew, allForms, individual]);
 
+  const { userProfile } = useAuth();
   const [form, setForm] = useState<any>(undefined);
   const [aiBanner, setAiBanner] = useState(true);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [aiPrefilling, setAiPrefilling] = useState(false);
+  const prefillCalledRef = useRef(false);
 
   useEffect(() => {
     if (initial && !form) {
       setForm(initial);
     }
   }, [initial, form]);
+
+  // AI prefill on new form load
+  useEffect(() => {
+    if (!isNew || !initial || !form || !id || prefillCalledRef.current) return;
+    prefillCalledRef.current = true;
+
+    const runPrefill = async () => {
+      setAiPrefilling(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`${FUNCTIONS_BASE}/api/ai-forms/monitoring-form-prefill`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            individualId: id,
+            organizationId: userProfile?.organizationId ?? "unknown",
+            userId: auth.currentUser?.uid ?? "unknown",
+            userName: userProfile?.displayName ?? "Case Manager",
+            userRole: userProfile?.role ?? "case_manager",
+          }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success || !data.suggestions) return;
+        const s = data.suggestions;
+
+        // Apply AI suggestions to form sections — preserve existing ids, just fill answer/explain
+        setForm((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            aiPreFilled: true,
+            s2_circumstances: prev.s2_circumstances.map((q: YesNoAnswer, i: number) => {
+              const aiQ = s.s2_circumstances?.[i];
+              if (!aiQ) return q;
+              return { ...q, answer: aiQ.answer, explain: aiQ.explain || "", aiSuggested: true, aiSource: "Recent contact notes & visits" };
+            }),
+            s3_satisfaction: prev.s3_satisfaction.map((q: YesNoAnswer, i: number) => {
+              const aiQ = s.s3_satisfaction?.[i];
+              if (!aiQ) return q;
+              return { ...q, answer: aiQ.answer, explain: aiQ.explain || "", aiSuggested: true, aiSource: "Recent documentation" };
+            }),
+            s5_choice: prev.s5_choice.map((q: YesNoAnswer, i: number) => {
+              const aiQ = s.s5_choice?.[i];
+              if (!aiQ) return q;
+              return { ...q, answer: aiQ.answer, explain: aiQ.explain || "", aiSuggested: true, aiSource: "Case history" };
+            }),
+            s6_health: prev.s6_health.map((q: YesNoAnswer) => q),
+            s6_riskScore: s.s6_risk_score ?? prev.s6_riskScore,
+            s7_backupSummary: s.s7_backup_summary
+              ? { value: s.s7_backup_summary, aiSuggested: true, aiSource: "Last monitoring form" }
+              : prev.s7_backupSummary,
+            s8_incidents: prev.s8_incidents.map((q: YesNoAnswer, i: number) => {
+              const aiQ = s.s8_incidents?.[i];
+              if (!aiQ) return q;
+              return { ...q, answer: aiQ.answer, explain: aiQ.explain || "", aiSuggested: true, aiSource: "Open incidents" };
+            }),
+            s9_recommendedActions: s.s9_recommended_actions?.length
+              ? s.s9_recommended_actions.map((text: string, i: number) => ({
+                  id: `ai-${i}`,
+                  text,
+                  createTask: false,
+                  aiSuggested: true,
+                }))
+              : prev.s9_recommendedActions,
+          };
+        });
+      } catch (err) {
+        console.warn("[MonitoringFormDetail] AI prefill failed (non-fatal):", err);
+      } finally {
+        setAiPrefilling(false);
+      }
+    };
+
+    runPrefill();
+  }, [isNew, initial, form, id, userProfile]);
 
   const loading = individualLoading || formsLoading;
 
@@ -202,15 +288,27 @@ const PersonMonitoringFormDetail = () => {
           </div>
         </div>
 
+        {/* AI prefilling loading state */}
+        {aiPrefilling && !readOnly && (
+          <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft px-4 py-3 flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center shrink-0">
+              <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+            </div>
+            <p className="text-[12.5px] font-geist text-icm-text leading-snug">
+              <span className="font-semibold">AI is analyzing</span> {individual.first_name}'s recent documentation to pre-fill this form…
+            </p>
+          </div>
+        )}
+
         {/* AI banner */}
-        {aiBanner && form.aiPreFilled && !readOnly && (
+        {aiBanner && form.aiPreFilled && !readOnly && !aiPrefilling && (
           <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft px-4 py-3 flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center shrink-0">
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
               <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                I pre-filled <span className="font-semibold">sections 1–4</span> based on {individual.first_name}'s recent contact notes, visit summaries, and risk flags. All AI content is labeled. Review and edit before submitting.
+                I pre-filled <span className="font-semibold">sections 2, 3, 5, 7, 8 & 9</span> based on {individual.first_name}'s recent contact notes, visit summaries, and risk flags. All AI content is labeled. Review and edit before submitting.
               </p>
             </div>
             <button onClick={() => setAiBanner(false)} className="text-icm-text-dim hover:text-icm-text shrink-0">
@@ -218,6 +316,7 @@ const PersonMonitoringFormDetail = () => {
             </button>
           </div>
         )}
+
 
         {readOnly && (
           <div className="rounded-xl border border-icm-border bg-icm-bg px-4 py-3 text-[12.5px] text-icm-text-dim">

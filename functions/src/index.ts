@@ -28,8 +28,11 @@ app.get("/health", (_req: express.Request, res: express.Response) => {
 });
 
 // ─── AI Forms API ─────────────────────────────────────────────────────────
-import { progressNotePrefill } from "./api/ai-forms";
+import { progressNotePrefill, monitoringFormPrefill, visitSummaryPrefill, carePlanDraft } from "./api/ai-forms";
 app.post("/api/ai-forms/progress-note-prefill", progressNotePrefill);
+app.post("/api/ai-forms/monitoring-form-prefill", monitoringFormPrefill);
+app.post("/api/ai-forms/visit-summary-prefill", visitSummaryPrefill);
+app.post("/api/ai-forms/care-plan-draft", carePlanDraft);
 
 // ─── AI Chat Panel API ────────────────────────────────────────────────────
 import { chatMessage } from "./api/chat";

@@ -59,6 +59,9 @@ app.get("/health", (_req, res) => {
 // ─── AI Forms API ─────────────────────────────────────────────────────────
 const ai_forms_1 = require("./api/ai-forms");
 app.post("/api/ai-forms/progress-note-prefill", ai_forms_1.progressNotePrefill);
+app.post("/api/ai-forms/monitoring-form-prefill", ai_forms_1.monitoringFormPrefill);
+app.post("/api/ai-forms/visit-summary-prefill", ai_forms_1.visitSummaryPrefill);
+app.post("/api/ai-forms/care-plan-draft", ai_forms_1.carePlanDraft);
 // ─── AI Chat Panel API ────────────────────────────────────────────────────
 const chat_1 = require("./api/chat");
 app.post("/api/chat", chat_1.chatMessage);

@@ -89,6 +89,9 @@ import SettingsSecurity from "./pages/settings/SettingsSecurity";
 import SettingsNotifications from "./pages/settings/SettingsNotifications";
 import SettingsBillingConfig from "./pages/settings/SettingsBillingConfig";
 import SettingsAIUsage from "./pages/settings/SettingsAIUsage";
+import SettingsRiskScore from "./pages/settings/SettingsRiskScore";
+import { RiskScoreProvider, useRiskScore } from "@/contexts/RiskScoreContext";
+import { RiskScoreDrawer } from "@/components/icm/RiskScoreDrawer";
 import BillingCheckoutSimulation from "./pages/settings/BillingCheckoutSimulation";
 import BillingPortalSimulation from "./pages/settings/BillingPortalSimulation";
 import SettingsImport from "./pages/settings/SettingsImport";
@@ -163,10 +166,17 @@ import PlatformLogin from "./pages/PlatformLogin";
 
 const queryClient = new QueryClient();
 
+// Global risk drawer — needs to be inside RiskScoreProvider and BrowserRouter
+function GlobalRiskDrawer() {
+  const { isOpen, personId, personName, closeDrawer } = useRiskScore();
+  return <RiskScoreDrawer isOpen={isOpen} personId={personId} personName={personName} onClose={closeDrawer} />;
+}
+
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <RoleProvider>
+      <RiskScoreProvider>
       <BillingProvider>
       <TooltipProvider>
         <Toaster />
@@ -174,6 +184,7 @@ const App = () => (
         <SmartNoteAttacher />
         <BrowserRouter>
           <CommandPalette />
+          <GlobalRiskDrawer />
           <Routes>
             {/* ── PUBLIC ROUTES — no auth required ─────────────────────── */}
             <Route path="/" element={<Login />} />
@@ -282,6 +293,7 @@ const App = () => (
             <Route path="/settings/organization" element={<ProtectedRoute requireRole="admin"><SettingsOrganization /></ProtectedRoute>} />
             <Route path="/settings/programs" element={<ProtectedRoute requireRole="admin"><SettingsPrograms /></ProtectedRoute>} />
             <Route path="/settings/ai" element={<ProtectedRoute requireRole="admin"><SettingsAI /></ProtectedRoute>} />
+            <Route path="/settings/risk-score" element={<ProtectedRoute requireRole="admin"><SettingsRiskScore /></ProtectedRoute>} />
             <Route path="/settings/integrations" element={<ProtectedRoute requireRole="admin"><SettingsIntegrations /></ProtectedRoute>} />
             <Route path="/settings/security" element={<ProtectedRoute requireRole="admin"><SettingsSecurity /></ProtectedRoute>} />
             <Route path="/settings/notifications" element={<ProtectedRoute requireRole="admin"><SettingsNotifications /></ProtectedRoute>} />
@@ -353,6 +365,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
       </BillingProvider>
+      </RiskScoreProvider>
     </RoleProvider>
   </QueryClientProvider>
   </ErrorBoundary>

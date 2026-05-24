@@ -11,6 +11,7 @@ import {
   Plug,
   LayoutTemplate,
   Shield,
+  ShieldAlert,
   CreditCard,
   Bell,
   Zap,
@@ -69,6 +70,13 @@ const Settings = () => {
         "Enable or disable AI features by program, state, and role. Configure ambient listening and AI behavior.",
       to: "/settings/ai",
       tone: "accent",
+    },
+    {
+      icon: ShieldAlert,
+      title: "Risk Score",
+      description: "Configure risk scoring factors, point values, and Low / Moderate / High thresholds.",
+      to: "/settings/risk-score",
+      tone: "red",
     },
     {
       icon: Plug,

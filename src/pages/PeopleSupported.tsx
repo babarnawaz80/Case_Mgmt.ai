@@ -27,6 +27,9 @@ import {
   calcAge,
   type Individual,
 } from "@/hooks/useIndividuals";
+import { useRiskScore } from "@/contexts/RiskScoreContext";
+import { calculateRiskScore, loadRiskSettings } from "@/lib/riskEngine";
+
 
 type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending";
 type RiskFilter = "All" | "High" | "Review" | "Standard";
@@ -34,11 +37,23 @@ type RiskFilter = "All" | "High" | "Review" | "Standard";
 const PeopleSupported = () => {
   const navigate = useNavigate();
   const { individuals, loading, error } = useIndividuals();
+  const { openDrawer } = useRiskScore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("All");
   const [risk, setRisk] = useState<RiskFilter>("All");
   const [county, setCounty] = useState("All");
   const [showImport, setShowImport] = useState(false);
+
+  // Compute scores once per render (uses localStorage settings)
+  const riskSettings = useMemo(() => loadRiskSettings(), []);
+  const computedScores = useMemo(() => {
+    const m: Record<string, number> = {};
+    individuals.forEach((p) => {
+      m[p.id] = calculateRiskScore(p.id, riskSettings).total;
+    });
+    return m;
+  }, [individuals, riskSettings]);
+
 
   const counties = useMemo(
     () => ["All", ...Array.from(new Set(individuals.map((p) => p.county ?? "").filter(Boolean)))],
@@ -58,17 +73,19 @@ const PeopleSupported = () => {
       const matchStatus =
         status === "All" || statusLabel(p.enrollment_status) === status;
       const matchCounty = county === "All" || p.county === county;
+      const score = computedScores[p.id] ?? p.risk_score ?? 0;
       const matchRisk =
         risk === "All" ||
-        (risk === "High" && riskTier(p.risk_score) === "high") ||
-        (risk === "Review" && riskTier(p.risk_score) === "review") ||
-        (risk === "Standard" && riskTier(p.risk_score) === "standard");
+        (risk === "High" && score >= 60) ||
+        (risk === "Review" && score >= 35 && score < 60) ||
+        (risk === "Standard" && score < 35);
       return matchQ && matchStatus && matchCounty && matchRisk;
     });
-  }, [query, status, risk, county, individuals]);
+  }, [query, status, risk, county, individuals, computedScores]);
 
-  const highRiskCount = individuals.filter(p => riskTier(p.risk_score) === "high").length;
+  const highRiskCount = individuals.filter(p => (computedScores[p.id] ?? p.risk_score ?? 0) >= 60).length;
   const alertCount = individuals.filter(p => (p.alerts?.length ?? 0) > 0 || (p.open_incidents ?? 0) > 0).length;
+
 
   return (
     <ICMShell title="People Supported" showAIPanel={false}>
@@ -183,9 +200,11 @@ const PeopleSupported = () => {
               <PersonRow
                 key={p.id}
                 person={p}
+                computedScore={computedScores[p.id]}
                 onOpen={() => navigate(`/people/${p.id}/echart`)}
                 onOpenFaceSheet={() => navigate(`/people/${p.id}/facesheet`)}
                 onOpenProfile={() => navigate(`/people/${p.id}/profile`)}
+                onOpenRisk={() => openDrawer(p.id, `${p.first_name} ${p.last_name}`)}
               />
             ))}
             {filtered.length === 0 && (
@@ -238,14 +257,18 @@ function FilterSelect({
   );
 }
 
-function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: {
+function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfile, onOpenRisk }: {
   person: Individual;
+  computedScore?: number;
   onOpen: () => void;
   onOpenFaceSheet: () => void;
   onOpenProfile: () => void;
+  onOpenRisk: () => void;
 }) {
   const age = calcAge(person.dob);
   const status = statusLabel(person.enrollment_status);
+  const displayScore = computedScore ?? person.risk_score;
+
 
   return (
     <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
@@ -294,14 +317,18 @@ function PersonRow({ person, onOpen, onOpenFaceSheet, onOpenProfile }: {
         <p className="text-[12px] text-icm-text font-geist mt-0.5 truncate">{person.program ?? "—"}</p>
       </div>
 
-      {/* Risk score */}
-      {person.risk_score !== undefined && (
-        <div className="hidden md:block text-right shrink-0">
+      {/* Risk score — clickable → opens breakdown drawer */}
+      {displayScore !== undefined && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenRisk(); }}
+          className="hidden md:block text-right shrink-0 group"
+          title="View risk score breakdown"
+        >
           <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">Risk</p>
-          <p className={`font-mono font-bold text-[16px] leading-tight ${riskScoreClass(person.risk_score)}`}>
-            {person.risk_score}
+          <p className={`font-mono font-bold text-[16px] leading-tight group-hover:underline ${riskScoreClass(displayScore)}`}>
+            {displayScore}
           </p>
-        </div>
+        </button>
       )}
 
       {/* Status */}

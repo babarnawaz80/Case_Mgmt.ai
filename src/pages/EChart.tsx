@@ -6,6 +6,8 @@ import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { useRole } from "@/contexts/RoleContext";
 import { useIndividual, calcAge, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
+import { useRiskScore } from "@/contexts/RiskScoreContext";
+import { calculateRiskScore, loadRiskSettings, riskColor } from "@/lib/riskEngine";
 import { useEChartCounts } from "@/hooks/useEChartCounts";
 import {
   CheckSquare,
@@ -193,6 +195,10 @@ const EChart = () => {
   const allergies = "Document in Face Sheet";
   const specialInstructions = individual.diagnosis ?? "See care plan for details";
 
+  const { openDrawer } = useRiskScore();
+  const computedRisk = calculateRiskScore(individual.id, loadRiskSettings());
+  const computedScore = computedRisk.total;
+  const computedLevel = computedRisk.level;
 
   return (
     <ICMShell title="eChart" showAIPanel={false}>
@@ -283,7 +289,18 @@ const EChart = () => {
 
             {/* Metric strip */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-5 pt-5 border-t border-icm-border">
-              <Metric label="RISK SCORE" value={individual.risk_score?.toString() ?? "—"} valueClass={individual.risk_score && individual.risk_score >= 60 ? "text-icm-red" : individual.risk_score && individual.risk_score >= 35 ? "text-icm-amber" : "text-icm-green"} foot={individual.level_of_care ?? "Standard"} />
+              <button
+                onClick={() => openDrawer(individual.id, `${individual.first_name} ${individual.last_name}`)}
+                className="text-left group"
+                title="View risk score breakdown"
+              >
+                <Metric
+                  label="RISK SCORE"
+                  value={computedScore.toString()}
+                  valueClass={`${riskColor(computedLevel)} group-hover:underline`}
+                  foot={computedLevel === "high" ? "HIGH RISK" : computedLevel === "moderate" ? "MODERATE" : "Low Risk"}
+                />
+              </button>
               <Metric label="LAST VISIT" value={individual.last_visit_date ?? "—"} valueClass="text-icm-text" foot="See visit summary" />
               <Metric label="NEXT VISIT" value={individual.next_visit_date ?? "—"} valueClass="text-icm-accent" foot="Scheduled" />
               <Metric label="OPEN TASKS" value={individual.open_tasks?.toString() ?? "0"} valueClass="text-purple-600" foot="See workflow" />

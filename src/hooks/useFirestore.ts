@@ -299,6 +299,7 @@ export interface IncidentReport {
   last_updated_at?: string;
   created_at?: unknown;
   updated_at?: unknown;
+  [key: string]: any;
 }
 
 export function useIncidentReports(individualId: string | undefined) {

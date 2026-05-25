@@ -41,6 +41,11 @@ export async function signIn(email: string, password: string): Promise<void> {
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (error) {
+    // Re-throw MFA challenge errors unwrapped — Login.tsx needs the original
+    // MultiFactorError (with its .code and resolver) to show the SMS modal.
+    if ((error as AuthError)?.code === 'auth/multi-factor-auth-required') {
+      throw error;
+    }
     const authError = error as AuthError;
     throw new Error(getFriendlyAuthError(authError.code));
   }

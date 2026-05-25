@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/casemanagement-logo.png";
 import heroImg from "@/assets/login-hero.jpg";
@@ -62,6 +62,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [mfaResolver, setMfaResolver] = useState<import("firebase/auth").MultiFactorResolver | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // If already authenticated, redirect to the correct area
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function Login() {
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     setLoading("email");
     try {
       await signIn(email, password);
@@ -82,6 +84,7 @@ export default function Login() {
         setMfaResolver(getMFAResolver(error as MultiFactorError));
         setLoading(null);
       } else {
+        setAuthError("Invalid email or password. Please try again.");
         toast.error((error as Error).message);
         setLoading(null);
       }
@@ -261,6 +264,17 @@ export default function Login() {
                 {resetSent ? "Email sent ✓" : "Reset password"}
               </button>
             </div>
+
+            {authError && (
+              <div
+                role="alert"
+                aria-live="polite"
+                className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-[13px]"
+              >
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
 
             <button
               type="submit"

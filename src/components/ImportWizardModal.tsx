@@ -713,7 +713,7 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <p className="text-[13px] text-icm-text font-medium">
                   <span className="text-icm-text-dim">File:</span> {parsed.fileName}
-                  <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">{parsed.rows.toLocaleString()} rows</span>
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">{parsed.rows.length.toLocaleString()} rows</span>
                 </p>
                 <div className="flex items-center gap-3 text-[12px]">
                   <span className="flex items-center gap-1 text-emerald-600 font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> {autoMapped} auto-matched</span>

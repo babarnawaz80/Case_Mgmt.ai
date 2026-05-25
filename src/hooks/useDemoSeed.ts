@@ -231,7 +231,7 @@ export async function seedDemoIfEmpty(
     ];
 
     // ── 5. Write individuals and collect their IDs ────────────────────────────
-    type IndRow = { indId: string; firstName: string; fullName: string };
+    type IndRow = { id?: string; indId: string; firstName: string; fullName: string };
     const seededInds: IndRow[] = [];
 
     for (const indData of individualsData) {

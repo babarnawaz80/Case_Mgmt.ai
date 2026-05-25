@@ -323,7 +323,7 @@ export async function seedDemoIfEmpty(
         {
           title: 'Progress Note Due — Williams, Marcus',
           description: 'Monthly progress note for Marcus Williams is overdue. Complete and sign.',
-          individualId: seededInds[0]?.id,
+          individualId: seededInds[0]?.indId,
           individualName: 'Marcus Williams',
           dueDate: yesterday,
           status: 'open',

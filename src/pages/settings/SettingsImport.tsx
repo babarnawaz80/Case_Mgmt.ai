@@ -341,7 +341,7 @@ export default function SettingsImport() {
       // Fetch all existing records in this organization to check against
       const q = query(collection(db, collectionName), where("organizationId", "==", orgId));
       const querySnapshot = await getDocs(q);
-      const existingDocs = querySnapshot.docs.map(docSnapshot => ({
+      const existingDocs: Record<string, any>[] = querySnapshot.docs.map(docSnapshot => ({
         id: docSnapshot.id,
         ...(docSnapshot.data() as Record<string, unknown>)
       }));

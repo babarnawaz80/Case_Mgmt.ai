@@ -126,7 +126,7 @@ const PersonReferralDetail = () => {
     );
   }
 
-  const tone = statusTone(referral.status);
+  const tone = statusTone(referral.status as ReferralStatus);
   const isPending = referral.status === "Pending Response" || referral.status === "Submitted" || referral.status === "pending";
 
   const markStatus = async (status: ReferralStatus, label: string) => {
@@ -459,12 +459,12 @@ const PersonReferralDetail = () => {
 
       {showUpdate && (
         <UpdateStatusModal
-          currentStatus={referral.status}
+          currentStatus={referral.status as ReferralStatus}
           onClose={() => setShowUpdate(false)}
           onSave={async (newStatus, event, extras) => {
             try {
               await updateReferral(referral.id, {
-                status: newStatus,
+                status: newStatus as any,
                 lastActivity: event.date.split(" ")[0],
                 timeline: [...referral.timeline, event] as any,
                 ...extras,

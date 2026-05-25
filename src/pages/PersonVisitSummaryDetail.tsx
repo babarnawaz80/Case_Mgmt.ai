@@ -10,6 +10,7 @@ import { useVisitSummaries } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { toast } from "sonner";
+import type { VisitStatus } from "@/data/visitSummaries";
 
 type ComplianceTone = "green" | "amber" | "red";
 
@@ -75,7 +76,7 @@ const PersonVisitSummaryDetail = () => {
     setForm((prev: any) => (prev ? { ...prev, [k]: v } : prev));
   const aiSourceFor = (k: string) => form.aiFields?.[k];
 
-  const complianceTone: ComplianceTone = "green";
+  let complianceTone: ComplianceTone = "green";
 
   const handleSave = async (status: string = "draft") => {
     if (!form || !person) return;

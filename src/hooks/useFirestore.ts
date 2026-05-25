@@ -216,12 +216,16 @@ export interface MonitoringFormRecord {
   status: "Draft" | "In Progress" | "Submitted";
   active: "Active" | "Inactive";
   due_date?: string;
+  dueDate?: string;
   submitted_date?: string;
   updated_by?: string;
+  updatedBy?: string;
+  author_name?: string;
   updated_on?: string;
+  updatedOn?: string;
   sections?: Record<string, unknown>;
   author_uid?: string;
-  created_at?: unknown;
+  created_at?: any;
   updated_at?: unknown;
 }
 
@@ -241,10 +245,12 @@ export interface VisitSummaryRecord {
   individual_id: string;
   individual_name?: string;
   visit_date: string;
+  visitDate?: string;
   start_time?: string;
   end_time?: string;
   location?: string;
   purpose_of_support?: string;
+  purposeOfSupport?: string;
   what_went_well?: string;
   what_is_not_working?: string;
   goals_addressed?: string[];
@@ -253,8 +259,10 @@ export interface VisitSummaryRecord {
   author_uid?: string;
   author_name?: string;
   updated_by?: string;
+  updatedBy?: string;
   updated_on?: string;
-  created_at?: unknown;
+  updatedOn?: string;
+  created_at?: any;
   updated_at?: unknown;
 }
 

@@ -148,8 +148,10 @@ export interface Referral {
   status: "pending" | "in_progress" | "completed" | "declined";
   notes?: string;
   outcome?: string;
+  conversation?: any[];
   created_at?: unknown;
   updated_at?: unknown;
+  [key: string]: any;
 }
 
 export function useReferrals(individualId: string | undefined) {

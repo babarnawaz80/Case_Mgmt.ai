@@ -11,6 +11,7 @@ import {
   AlertCircle,
   FileSignature,
   Lock,
+  X,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";

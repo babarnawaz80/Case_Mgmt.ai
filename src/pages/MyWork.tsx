@@ -28,6 +28,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 import {
   bucketForTask,
   parseMDY,
@@ -96,7 +97,7 @@ function mapTaskToMyWork(t: Task): MyWorkTask {
     individualCounty: "",
     individualInitials: initials(t.individualName),
     dueDate: dueMDY,
-    status: isOverdue && status !== "Completed" ? "Overdue" : status,
+    status: isOverdue ? "Overdue" : status,
     daysOverdue: isOverdue && diff !== null ? Math.abs(diff) : undefined,
     staffResponsible: "Me",
     priority: priorityMap[t.priority] ?? "Medium",

@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBillingClaims, useBillingSummary, updateClaimStatus } from "@/hooks/useBillingClaims";
-import type { BillingClaim } from "@/hooks/useBillingClaims";
+import type { AiStatus, BillingClaim, BillStatus } from "@/hooks/useBillingClaims";
 
 type TabKey = "all" | "pending" | "ready" | "attention" | "submitted" | "denied";
 

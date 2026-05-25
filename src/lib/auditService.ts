@@ -32,9 +32,15 @@ export type AuditAction =
   | 'visit_summary_created'
   | 'visit_summary_signed'
   | 'monitoring_form_submitted'
+  | 'monitoring_form_created'
+  | 'monitoring_form_saved'
   | 'incident_created'
+  | 'incident_reported'
   | 'incident_stage_updated'
   | 'referral_created'
+  | 'referral_submitted'
+  | 'plan_saved'
+  | 'plan_submitted'
   | 'workflow_task_updated'
   | 'eligibility_verified';
 

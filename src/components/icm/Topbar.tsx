@@ -159,7 +159,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
           {isAdmin && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/platform")} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate("/platform/agents")} className="cursor-pointer">
                 <Bot className="w-4 h-4 mr-2" />
                 AI Agent
               </DropdownMenuItem>

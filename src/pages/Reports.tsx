@@ -216,7 +216,7 @@ function ReportExportPanel() {
         }
         const snap = await getDocs(q);
         rows = snap.docs.map((d) => {
-          const data = d.data();
+          const data = d.data() as Record<string, any>;
           return {
             id: d.id,
             individualId: data.individualId ?? "",
@@ -254,7 +254,7 @@ function ReportExportPanel() {
         }
         const snap = await getDocs(q);
         rows = snap.docs.map((d) => {
-          const data = d.data();
+          const data = d.data() as Record<string, any>;
           return {
             id: d.id,
             individualId: data.individualId ?? "",
@@ -288,7 +288,7 @@ function ReportExportPanel() {
         }
         const snap = await getDocs(q);
         rows = snap.docs.map((d) => {
-          const data = d.data();
+          const data = d.data() as Record<string, any>;
           return {
             id: d.id,
             title: data.title ?? "",

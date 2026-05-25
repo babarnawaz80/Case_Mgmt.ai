@@ -19,11 +19,16 @@ export interface Individual {
   first_name: string;
   last_name: string;
   preferred_name?: string;
+  /** camelCase aliases (legacy components). Not persisted. */
+  firstName?: string;
+  lastName?: string;
+  nickname?: string;
   dob?: string;
   gender?: string;
   medicaid_id?: string;
   diagnosis?: string;
   risk_score?: number;
+  risk_level?: "low" | "medium" | "high" | string;
   county?: string;
   address?: string;
   phone?: string;

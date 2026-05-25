@@ -231,7 +231,7 @@ export async function seedDemoIfEmpty(
     ];
 
     // ── 5. Write individuals and collect their IDs ────────────────────────────
-    type IndRow = { indId: string; firstName: string; fullName: string };
+    type IndRow = { id?: string; indId: string; firstName: string; fullName: string };
     const seededInds: IndRow[] = [];
 
     for (const indData of individualsData) {
@@ -323,7 +323,7 @@ export async function seedDemoIfEmpty(
         {
           title: 'Progress Note Due — Williams, Marcus',
           description: 'Monthly progress note for Marcus Williams is overdue. Complete and sign.',
-          individualId: seededInds[0]?.id,
+          individualId: seededInds[0]?.indId,
           individualName: 'Marcus Williams',
           dueDate: yesterday,
           status: 'open',

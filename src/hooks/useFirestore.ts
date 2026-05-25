@@ -148,8 +148,10 @@ export interface Referral {
   status: "pending" | "in_progress" | "completed" | "declined";
   notes?: string;
   outcome?: string;
+  conversation?: any[];
   created_at?: unknown;
   updated_at?: unknown;
+  [key: string]: any;
 }
 
 export function useReferrals(individualId: string | undefined) {
@@ -180,7 +182,7 @@ export interface CarePlan {
   individual_id: string;
   title: string;
   plan_type?: string;
-  status: "draft" | "active" | "archived";
+  status: "draft" | "active" | "archived" | string;
   effective_date?: string;
   review_date?: string;
   goals?: CarePlanGoal[];
@@ -188,15 +190,17 @@ export interface CarePlan {
   author_name?: string;
   created_at?: unknown;
   updated_at?: unknown;
+  [key: string]: any;
 }
 
 export interface CarePlanGoal {
   id: string;
-  goal: string;
+  goal?: string;
   priority?: "high" | "medium" | "low";
   target_date?: string;
-  progress?: "not_started" | "in_progress" | "achieved" | "discontinued";
+  progress?: "not_started" | "in_progress" | "achieved" | "discontinued" | string;
   interventions?: string[];
+  [key: string]: any;
 }
 
 export function useCarePlans(individualId: string | undefined) {
@@ -295,6 +299,7 @@ export interface IncidentReport {
   last_updated_at?: string;
   created_at?: unknown;
   updated_at?: unknown;
+  [key: string]: any;
 }
 
 export function useIncidentReports(individualId: string | undefined) {

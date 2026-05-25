@@ -20,11 +20,19 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export type AiStatus = "passed" | "attention" | "pending";
 export type BillingStatus = "ready" | "hold" | "pending" | "submitted" | "denied" | "paid";
+/** Legacy alias used by some pages. */
+export type BillStatus = BillingStatus;
 
 export interface BillingClaim {
   id: string;
   individualId: string;
   individualName: string;
+  /** Legacy aliases (camelCase / short names) — not persisted. */
+  individual?: string;
+  code?: string;
+  auth?: string;
+  ai?: AiStatus;
+  billing?: BillingStatus;
   dos: string; // YYYY-MM-DD date of service
   serviceCode: string;
   units: number;

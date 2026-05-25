@@ -23,6 +23,15 @@ export interface Individual {
   firstName?: string;
   lastName?: string;
   nickname?: string;
+  age?: number | null;
+  admittedOn?: string;
+  status?: "Active" | "Pending" | "Discharged" | string;
+  updatedOn?: string;
+  allergies?: string;
+  specialInstructions?: string;
+  riskScore?: number;
+  email?: string;
+  isp_due_date?: string;
   dob?: string;
   gender?: string;
   medicaid_id?: string;
@@ -62,11 +71,22 @@ function toIndividual(id: string, data: DocumentData): Individual {
     first_name: data.first_name ?? "",
     last_name: data.last_name ?? "",
     preferred_name: data.preferred_name,
+    firstName: data.firstName ?? data.first_name ?? "",
+    lastName: data.lastName ?? data.last_name ?? "",
+    nickname: data.nickname ?? data.preferred_name,
     dob: data.dob,
+    age: data.age ?? calcAge(data.dob),
     gender: data.gender,
+    status: data.status ?? (data.enrollment_status === "discharged" ? "Discharged" : data.enrollment_status === "pending" ? "Pending" : "Active"),
+    admittedOn: data.admittedOn ?? data.admitted_on ?? data.created_at,
+    updatedOn: data.updatedOn ?? data.updated_on,
+    allergies: data.allergies,
+    specialInstructions: data.specialInstructions ?? data.special_instructions,
+    email: data.email,
     medicaid_id: data.medicaid_id,
     diagnosis: data.diagnosis,
     risk_score: data.risk_score,
+    riskScore: data.riskScore ?? data.risk_score,
     county: data.county,
     address: data.address,
     phone: data.phone,
@@ -81,6 +101,7 @@ function toIndividual(id: string, data: DocumentData): Individual {
     assigned_supervisor_uid: data.assigned_supervisor_uid ?? data.assigned_supervisor,
     assigned_supervisor_name: data.assigned_supervisor_name ?? data.assigned_supervisor_display_name,
     pcp_due_date: data.pcp_due_date,
+    isp_due_date: data.isp_due_date ?? data.pcp_due_date,
     last_visit_date: data.last_visit_date,
     next_visit_date: data.next_visit_date,
     monitoring_compliance_pct: data.monitoring_compliance_pct,

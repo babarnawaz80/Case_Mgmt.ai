@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Sparkles,
@@ -375,7 +375,9 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
   // Step 4 state — extractGroups is populated by AI response in processing step
   const [extractGroups, setExtractGroups] = useState<ExtractGroup[]>(EMPTY_EXTRACT_GROUPS);
   const [tab, setTab] = useState<"items" | "transcript">("items");
-  const [includedItems, setIncludedItems] = useState<Set<string>>(new Set());
+  const [includedItems, setIncludedItems] = useState<Set<string>>(
+    new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id)))
+  );
   const [confirmedRisk, setConfirmedRisk] = useState(false);
 
   // Inline field editing state
@@ -396,6 +398,10 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
 
   // Step 5 state
   const [undoSeconds, setUndoSeconds] = useState(60);
+  // Track written doc IDs so undo can delete them
+  const [savedDocIds, setSavedDocIds] = useState<{ collection: string; id: string }[]>([]);
+  // Dynamic success lines built from what was actually saved
+  const [savedSuccessLines, setSavedSuccessLines] = useState<{ icon: typeof FileText; text: string }[]>([]);
 
   // Recording timer
   useEffect(() => {
@@ -425,32 +431,46 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // 3. Determine best supported mimeType
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
+      // 3. Determine best supported mimeType (includes iOS Safari mp4 fallback)
+      const AMBIENT_MIME_CANDIDATES = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
+        "", // browser default
+      ];
+      const mimeType = typeof MediaRecorder !== "undefined"
+        ? (AMBIENT_MIME_CANDIDATES.find((m) => m === "" || MediaRecorder.isTypeSupported(m)) ?? "")
+        : "";
 
-      // 4. Open Deepgram WebSocket
+      // 4. Open Deepgram WebSocket using subprotocol auth (confirmed working in all browsers;
+      // access_token URL approach returns 401 for API keys)
       const ws = new WebSocket(
         `wss://api.deepgram.com/v1/listen?` +
-        `model=nova-2&diarize=true&diarize_version=latest&` +
-        `punctuate=true&language=en-US&` +
-        `encoding=webm-opus&sample_rate=48000&channels=1&interim_results=false`,
+        `model=nova-2&diarize=true&punctuate=true&language=en-US&interim_results=true`,
         ["token", key]
       );
       socketRef.current = ws;
 
       ws.onopen = () => {
         setDgConnecting(false);
-        // 5. Start sending audio chunks every 250 ms
-        const recorder = new MediaRecorder(stream, { mimeType });
-        mediaRecorderRef.current = recorder;
-        recorder.addEventListener("dataavailable", (e) => {
-          if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
-            ws.send(e.data);
-          }
-        });
-        recorder.start(250);
+        try {
+          // 5. Start sending audio chunks every 250 ms
+          const recorderOpts = mimeType ? { mimeType } : {};
+          const recorder = new MediaRecorder(stream, recorderOpts as MediaRecorderOptions);
+          mediaRecorderRef.current = recorder;
+          recorder.addEventListener("dataavailable", (e) => {
+            if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
+              ws.send(e.data);
+            }
+          });
+          recorder.start(250);
+        } catch (recErr: any) {
+          console.error("[Ambient] MediaRecorder init failed:", recErr);
+          setDeepgramError("Microphone recording failed on this device. Please try on a desktop browser.");
+          setDgConnecting(false);
+        }
       };
 
       ws.onmessage = (msg) => {
@@ -488,11 +508,15 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
         }
       };
 
-      ws.onerror = () => {
-        setDeepgramError("Deepgram connection error — check your network.");
+      ws.onerror = (e) => {
+        console.error("[Ambient] Deepgram WS error:", e);
+        setDeepgramError("Deepgram connection error — microphone or network issue. Please retry.");
         setDgConnecting(false);
       };
-      ws.onclose = () => setDgConnecting(false);
+      ws.onclose = (ev) => {
+        console.log("[Ambient] Deepgram WS closed:", ev.code, ev.reason);
+        setDgConnecting(false);
+      };
     } catch (err: any) {
       setDeepgramError(err?.message ?? "Could not start transcription.");
       setDgConnecting(false);
@@ -594,16 +618,23 @@ ${fullTranscript}`,
                   setIncludedItems(new Set(groups.flatMap((g) => g.items.map((i) => i.id))));
                 }
               } catch {
-                // JSON parse failed — keep EMPTY_EXTRACT_GROUPS
+                // JSON parse failed — keep EMPTY_EXTRACT_GROUPS, pre-check all items
+                setIncludedItems(new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id))));
               }
+            } else {
+              // AI returned no parseable JSON — keep EMPTY_EXTRACT_GROUPS pre-checked
+              setIncludedItems(new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id))));
             }
           }
         } else if (!fullTranscript.trim()) {
+          // No transcript captured — clear review
           setExtractGroups([]);
           setIncludedItems(new Set());
         }
       } catch (err) {
         console.warn("Extraction API call failed (non-blocking):", err);
+        // Keep EMPTY_EXTRACT_GROUPS pre-checked so user can still save
+        setIncludedItems(new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id))));
       }
 
       const finalTimer = setTimeout(() => setStep("review"), dynamicLines.length * 500 + 500);
@@ -667,16 +698,23 @@ ${fullTranscript}`,
   const handleSaveAndPush = async () => {
     if (!currentUser) return;
     setSaving(true);
+    const written: { collection: string; id: string }[] = [];
+    const successLines: { icon: typeof FileText; text: string }[] = [];
     try {
       const orgId = selectedPerson?.organizationId || userProfile?.organizationId || "";
       const uid = currentUser.uid;
-      const authorName = userProfile?.first_name
-        ? `${userProfile.first_name} ${userProfile.last_name}`
-        : "Case Manager";
+      const authorName = userProfile?.displayName ||
+        (userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name}` : "Case Manager");
       const indId = selectedPerson?.id || defaultIndividualId || "";
       const indName = selectedPerson
         ? `${selectedPerson.first_name || selectedPerson.firstName || ""} ${selectedPerson.last_name || selectedPerson.lastName || ""}`.trim()
         : defaultIndividualName || "Unknown";
+
+      if (!indId) {
+        toast({ title: "No individual selected", description: "Please select an individual before saving.", variant: "destructive" });
+        setSaving(false);
+        return;
+      }
 
       // Derive values from AI-extracted groups
       const contactNoteGroup = extractGroups.find((g) => g.id === "contact_note");
@@ -684,51 +722,64 @@ ${fullTranscript}`,
       const riskGroup        = extractGroups.find((g) => g.id === "risk");
       const ispGroup         = extractGroups.find((g) => g.id === "isp");
 
-      const contactNoteSummary = contactNoteGroup?.items.find((i) => i.id === "cn_details")?.value ?? "";
-      const contactNotePurpose = contactNoteGroup?.items.find((i) => i.id === "cn_purpose")?.value ?? "";
+      const contactNoteSummary   = contactNoteGroup?.items.find((i) => i.id === "cn_details")?.value ?? "";
+      const contactNotePurpose   = contactNoteGroup?.items.find((i) => i.id === "cn_purpose")?.value ?? "";
+      const contactNotePresent   = contactNoteGroup?.items.find((i) => i.id === "cn_present")?.value ?? "";
+      const contactNoteConcerns  = contactNoteGroup?.items.find((i) => i.id === "cn_concerns")?.value ?? "";
       const contactNoteNextSteps = contactNoteGroup?.items.find((i) => i.id === "cn_next")?.value ?? "";
       const includedTasks = taskGroup?.items.filter((i) => includedItems.has(i.id)) ?? [];
       const today = new Date().toISOString().split("T")[0];
       const contactType = sessionType.includes("Phone") ? "Phone" : sessionType.includes("Virtual") ? "Virtual" : "In-Person";
       const isBillable = !sessionType.includes("non-billable");
 
-      // ── 1. Contact Note (eChart Contact Note tile reads contact_notes collection) ──
+      // ── 1. Contact Note ────────────────────────────────────────────────────
       const noteIncluded = includedItems.has("cn_details") || includedItems.has("cn_purpose");
       if (noteIncluded && (contactNoteSummary || contactNotePurpose)) {
         const noteText = contactNoteSummary || contactNotePurpose;
 
-        // Write to contact_notes (what the eChart Contact Note tile reads)
-        await addDoc(collection(db, "contact_notes"), {
+        const cnRef = await addDoc(collection(db, "contact_notes"), {
+          // Fields used by ContactNote.tsx toNote() — must match exactly
           individualId:    indId,
           individualName:  indName,
           individual_id:   indId,
           individual_name: indName,
-          organizationId:   orgId,
-          author_id:   uid,
-          author_name: authorName,
-          type:        contactType,
-          activityType:    sessionType || "Phone Call",
-          activity_type:   sessionType || "Phone Call",
-          date:        today,
-          purpose:     contactNotePurpose || "Ambient session",
-          details:     noteText,
-          issues:      contactNoteGroup?.items.find((i) => i.id === "cn_concerns")?.value ?? "",
-          next_steps:  contactNoteNextSteps,
-          status:      "draft",
-          ai_drafted:  true,
-          createdAt:   serverTimestamp(),
-          updatedAt:   serverTimestamp(),
-          created_at:  serverTimestamp(),
-          updated_at:  serverTimestamp(),
+          person:          indName,
+          organizationId:  orgId,
+          author_id:       uid,
+          author_name:     authorName,
+          updatedBy:       authorName,
+          updatedOn:       today,
+          activityType:    sessionType || "Case Management",
+          activity_type:   sessionType || "Case Management",
+          contactType:     contactType,
+          type:            contactType,
+          date:            today,
+          billable:        isBillable,
+          purpose:         contactNotePurpose || "Ambient session",
+          background:      contactNotePresent,
+          present:         contactNotePresent,
+          details:         noteText,
+          issues:          contactNoteConcerns,
+          nextSteps:       contactNoteNextSteps,  // camelCase — read by toNote()
+          next_steps:      contactNoteNextSteps,  // snake_case — legacy
+          status:          "Draft",
+          ai_drafted:      true,
+          aiDrafted:       true,
+          createdAt:       serverTimestamp(),
+          updatedAt:       serverTimestamp(),
+          created_at:      serverTimestamp(),
+          updated_at:      serverTimestamp(),
         });
+        written.push({ collection: "contact_notes", id: cnRef.id });
+        successLines.push({ icon: FileText, text: "Contact Note created (Draft)" });
 
         // Also write to progress_notes (Progress Note module)
-        await saveProgressNote({
+        const pnId = await saveProgressNote({
           individualId:           indId,
           organizationId:         orgId,
           authorId:               uid,
           authorName,
-          activityType:           "Case Management",
+          activityType:           sessionType.includes("Meeting") ? "Team Meeting" : "Case Management",
           contactType,
           progressDate:           today,
           startTime:              "",
@@ -741,29 +792,41 @@ ${fullTranscript}`,
           status:                 "draft",
           aiDrafted:              true,
         });
+        written.push({ collection: "progress_notes", id: pnId });
+        successLines.push({ icon: FileText, text: "Progress Note created (Draft)" });
       }
 
-      // ── 2. Risk flags → incidents collection ────────────────────────────────
-      for (const riskItem of (riskGroup?.items ?? [])) {
-        if (!includedItems.has(riskItem.id)) continue;
-        await addDoc(collection(db, "incidents"), {
+      // ── 2. Risk flags → incidents ──────────────────────────────────────────
+      let riskCount = 0;
+      for (const item of (riskGroup?.items ?? [])) {
+        if (!includedItems.has(item.id)) continue;
+        const incRef = await addDoc(collection(db, "incidents"), {
           individual_id:    indId,
           individual_name:  indName,
+          individualId:     indId,
+          individualName:   indName,
           organizationId:   orgId,
           type:             "Behavioral Incident",
           severity:         "minor",
           status:           "open",
-          description:      riskItem.value,
+          description:      item.value,
           reported_at:      new Date().toISOString(),
           reported_by:      uid,
           reported_by_name: authorName,
           ai_flagged:       true,
           created_at:       serverTimestamp(),
           updated_at:       serverTimestamp(),
+          createdAt:        serverTimestamp(),
         });
+        written.push({ collection: "incidents", id: incRef.id });
+        riskCount++;
+      }
+      if (riskCount > 0) {
+        successLines.push({ icon: ShieldAlert, text: `${riskCount} risk/safety flag${riskCount > 1 ? "s" : ""} logged` });
       }
 
-      // ── 3. Tasks ────────────────────────────────────────────────────────────
+      // ── 3. Tasks ───────────────────────────────────────────────────────────
+      let taskCount = 0;
       for (const t of includedTasks) {
         await createTask({
           title:          t.value,
@@ -777,15 +840,45 @@ ${fullTranscript}`,
           assignedTo:     uid,
           organizationId: orgId,
         });
+        taskCount++;
+      }
+      if (taskCount > 0) {
+        successLines.push({ icon: ClipboardCheck, text: `${taskCount} task${taskCount > 1 ? "s" : ""} created` });
       }
 
-      // ── 4. Audit log ────────────────────────────────────────────────────────
+      // ── 4. ISP note — if included separately and no contact note written ───
+      if (!noteIncluded && ispGroup && includedItems.has("isp_goal") && ispGroup.items[0]?.value) {
+        const pnId = await saveProgressNote({
+          individualId:           indId,
+          organizationId:         orgId,
+          authorId:               uid,
+          authorName,
+          activityType:           "Case Management",
+          contactType,
+          progressDate:           today,
+          startTime:              "",
+          endTime:                "",
+          isBillable,
+          purposeOfActivity:      "",
+          goalsProgress:          [],
+          additionalObservations: ispGroup.items[0].value,
+          nextSteps:              "",
+          status:                 "draft",
+          aiDrafted:              true,
+        });
+        written.push({ collection: "progress_notes", id: pnId });
+        successLines.push({ icon: FileText, text: "ISP / goal note saved as Progress Note draft" });
+      }
+
+      // ── 5. Audit log ───────────────────────────────────────────────────────
       try {
         await audit.applyAmbient("amb-" + Date.now().toString().slice(-6), indId, [...includedItems].join(","));
       } catch {
         // audit failure is non-blocking
       }
 
+      setSavedDocIds(written);
+      setSavedSuccessLines(successLines);
       setStep("success");
     } catch (err: any) {
       console.error("Save & push failed:", err);
@@ -796,6 +889,21 @@ ${fullTranscript}`,
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (savedDocIds.length === 0) return;
+    try {
+      await Promise.all(
+        savedDocIds.map(({ collection: col, id }) => deleteDoc(doc(db, col, id)))
+      );
+      toast({ title: "Undone", description: "All ambient session records have been deleted." });
+      setSavedDocIds([]);
+      setUndoSeconds(0);
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Undo failed", description: err?.message ?? "Could not delete records.", variant: "destructive" });
     }
   };
 
@@ -1386,10 +1494,25 @@ ${fullTranscript}`,
               <p className="text-[11px] text-icm-text-faint text-center">
                 Writes to {moduleCount} modules simultaneously. Undoable for 60 seconds.
               </p>
-              <button className="w-full py-2 rounded-lg border border-icm-border text-[12.5px] text-icm-text hover:bg-icm-bg">
+              <button
+                onClick={() => {
+                  // Navigate to the individual's eChart to review notes manually
+                  if (selectedPerson?.id || defaultIndividualId) {
+                    onClose();
+                    navigate(`/people/${selectedPerson?.id || defaultIndividualId}/echart`);
+                  }
+                }}
+                className="w-full py-2 rounded-lg border border-icm-border text-[12.5px] text-icm-text hover:bg-icm-bg"
+              >
                 Review each module first
               </button>
-              <button onClick={onClose} className="w-full text-[11.5px] text-icm-text-dim hover:text-icm-text py-1">
+              <button
+                onClick={() => {
+                  toast({ title: "Draft saved", description: "Your ambient session notes are saved as drafts. Nothing has been pushed to modules yet." });
+                  onClose();
+                }}
+                className="w-full text-[11.5px] text-icm-text-dim hover:text-icm-text py-1"
+              >
                 Save as draft only (nothing pushed yet)
               </button>
             </div>
@@ -1410,23 +1533,23 @@ ${fullTranscript}`,
             <Check className="w-8 h-8 text-emerald-600" strokeWidth={3} />
           </div>
         </div>
-        <h2 className="text-center font-display font-bold text-[22px] text-icm-text mb-1">Done. {moduleCount} modules updated.</h2>
+        <h2 className="text-center font-display font-bold text-[22px] text-icm-text mb-1">
+          Done. {savedSuccessLines.length > 0 ? savedSuccessLines.length : moduleCount} item{savedSuccessLines.length !== 1 ? "s" : ""} saved.
+        </h2>
         <p className="text-center text-[13px] text-icm-text-dim mb-6">{personFirst}'s record is up to date.</p>
 
         <div className="rounded-xl border border-icm-border bg-white p-4 space-y-2 mb-5">
-          <SuccessLine icon={FileText} text="Contact Note created" />
-          <SuccessLine icon={ClipboardCheck} text="2 tasks marked complete, 1 new task created" />
-          <SuccessLine icon={FileText} text="ISP goal note saved for next review" />
-          <SuccessLine icon={ShieldAlert} text="Risk flag logged (Low-Medium)" />
-          <SuccessLine icon={ClipboardList} text="Monitoring form partially updated (4/8 fields)" />
-          <SuccessLine icon={Clock} text="Billable activity note created · 3 units" />
+          {savedSuccessLines.length > 0
+            ? savedSuccessLines.map((line, i) => <SuccessLine key={i} icon={line.icon} text={line.text} />)
+            : <p className="text-[13px] text-icm-text-dim italic">No items were saved.</p>
+          }
         </div>
 
-        {undoSeconds > 0 && (
+        {undoSeconds > 0 && savedDocIds.length > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[12.5px] text-amber-900">
-                Changed your mind? <button className="underline font-medium">Undo all changes</button>
+                Changed your mind? <button onClick={handleUndo} className="underline font-medium">Undo all changes</button>
               </span>
               <span className="text-[12px] font-mono text-amber-700">
                 0:{undoSeconds.toString().padStart(2, "0")} remaining

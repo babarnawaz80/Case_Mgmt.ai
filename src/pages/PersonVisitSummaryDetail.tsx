@@ -10,6 +10,7 @@ import { useVisitSummaries } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { toast } from "sonner";
+import type { VisitStatus } from "@/data/visitSummaries";
 
 type ComplianceTone = "green" | "amber" | "red";
 
@@ -75,7 +76,7 @@ const PersonVisitSummaryDetail = () => {
     setForm((prev: any) => (prev ? { ...prev, [k]: v } : prev));
   const aiSourceFor = (k: string) => form.aiFields?.[k];
 
-  const complianceTone: ComplianceTone = "green";
+  let complianceTone: ComplianceTone = "green";
 
   const handleSave = async (status: string = "draft") => {
     if (!form || !person) return;
@@ -338,7 +339,7 @@ const PersonVisitSummaryDetail = () => {
               <p><span className="font-semibold text-icm-text">Person:</span> {person.last_name}, {person.first_name}</p>
               <p><span className="font-semibold text-icm-text">Next visit:</span> {form.nextVisitDate}</p>
             </div>
-            {complianceTone === "red" && (
+            {(complianceTone as string) === "red" && (
               <div className="mt-3 rounded-xl border border-icm-red/20 bg-icm-red-soft px-3 py-2.5 text-[12px] text-icm-red flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>This date is after the required visit window. Submitting will flag {person.first_name} as Out of Compliance.</span>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -126,7 +126,7 @@ const PersonReferralDetail = () => {
     );
   }
 
-  const tone = statusTone(referral.status);
+  const tone = statusTone(referral.status as ReferralStatus);
   const isPending = referral.status === "Pending Response" || referral.status === "Submitted" || referral.status === "pending";
 
   const markStatus = async (status: ReferralStatus, label: string) => {
@@ -149,7 +149,7 @@ const PersonReferralDetail = () => {
     };
     try {
       await updateReferral(referral.id, {
-        status: status,
+        status: status as any,
         lastActivity: fmt,
         timeline: [...referral.timeline, newEvent] as any,
         conversation: [...referral.conversation, newConvo] as any,
@@ -459,12 +459,12 @@ const PersonReferralDetail = () => {
 
       {showUpdate && (
         <UpdateStatusModal
-          currentStatus={referral.status}
+          currentStatus={referral.status as ReferralStatus}
           onClose={() => setShowUpdate(false)}
           onSave={async (newStatus, event, extras) => {
             try {
               await updateReferral(referral.id, {
-                status: newStatus,
+                status: newStatus as any,
                 lastActivity: event.date.split(" ")[0],
                 timeline: [...referral.timeline, event] as any,
                 ...extras,

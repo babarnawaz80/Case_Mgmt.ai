@@ -716,7 +716,7 @@ function ProfileLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function GoalCard({ goal, readOnly }: { goal: PlanGoal; readOnly?: boolean }) {
+function GoalCard({ goal, readOnly }: { goal: any; readOnly?: boolean }) {
   const progressTone =
     goal.progress === "Achieved" ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
     : goal.progress === "In Progress" ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20"

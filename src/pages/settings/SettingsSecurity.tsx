@@ -370,7 +370,7 @@ const SettingsSecurity = () => {
             </thead>
             <tbody>
               {RETENTION_ROWS.map((r) => {
-                const saved = settings.retentionSettings[r.name] ?? {};
+                const saved: { period: string; action: string } = settings.retentionSettings[r.name] ?? { period: r.defaultPeriod, action: r.actions[0] };
                 return (
                   <tr key={r.name} className="border-t border-icm-border">
                     <td className="px-3 py-2 text-icm-text font-medium">{r.name}</td>

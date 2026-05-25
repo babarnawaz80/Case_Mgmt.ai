@@ -23,8 +23,7 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
-import { type CarePlan } from "@/data/carePlans";
-import { useCarePlans, addCarePlan } from "@/hooks/useFirestore";
+import { useCarePlans, addCarePlan, type CarePlan } from "@/hooks/useFirestore";
 
 
 const PersonCarePlan = () => {

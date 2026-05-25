@@ -84,10 +84,12 @@ interface AmbientFlowV2Props {
 
 type TranscriptLine = { speaker: string; text: string };
 
+// SpeechRecognition browser API typings (not in lib.dom)
+type SpeechRecognition = any;
 declare global {
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
   }
 }
 

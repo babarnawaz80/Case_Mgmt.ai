@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -149,7 +149,7 @@ const PersonReferralDetail = () => {
     };
     try {
       await updateReferral(referral.id, {
-        status: status,
+        status: status as any,
         lastActivity: fmt,
         timeline: [...referral.timeline, newEvent] as any,
         conversation: [...referral.conversation, newConvo] as any,

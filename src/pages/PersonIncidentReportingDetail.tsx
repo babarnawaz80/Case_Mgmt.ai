@@ -222,7 +222,7 @@ const PersonIncidentReportingDetail = () => {
     return <ICMShell title="Incident" showAIPanel={false}><p className="text-[13px] text-icm-text-dim font-geist">Incident not found.</p></ICMShell>;
   }
 
-  const allStagesComplete = ([1, 2, 3, 4] as IncidentStageId[]).every((s) => wf.stageStatuses[s] === "Complete") && !!wf.finalNarrative;
+  const allStagesComplete = ([1, 2, 3, 4] as IncidentStageId[]).every((s) => wf.stageStatuses[s] === "Complete") && !!(wf as any).finalNarrative;
 
   return (
     <ICMShell title="Incident" showAIPanel={false}>

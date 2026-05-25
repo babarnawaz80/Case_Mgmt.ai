@@ -574,7 +574,7 @@ const Index = () => {
                         {turn.text && (
                           <p className="text-sm text-foreground">{turn.text}</p>
                         )}
-                        <InlineIndividualSnapshot person={snapPerson} />
+                        <InlineIndividualSnapshot person={snapPerson as any} />
                       </div>
                     </div>
                   );

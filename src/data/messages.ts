@@ -53,6 +53,7 @@ export interface Conversation {
   lastWasYou: boolean;
   unread: number;
   muted?: boolean;
+  isFirestore?: boolean;
 }
 
 // ----- Staff directory -----------------------------------------------------

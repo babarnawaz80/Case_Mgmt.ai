@@ -21,6 +21,9 @@ export interface UserProfile {
   displayName: string;
   firstName: string;
   lastName: string;
+  /** snake_case aliases (legacy components). Not persisted. */
+  first_name?: string;
+  last_name?: string;
   role: AppRole;
   organizationId: string;
   caseload: string[];           // Array of individual IDs

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   collection, addDoc, onSnapshot, query, where,
-  serverTimestamp, orderBy, type DocumentData,
+  serverTimestamp, orderBy, limit, type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AuthorCell } from "@/components/icm/AuthorCell";
@@ -113,15 +113,26 @@ const ContactNote = () => {
     return String(ts);
   };
 
-  // Load notes from Firestore — scoped to this individual only
+  // Load notes from Firestore — scoped to individual when id is present, global otherwise
   useEffect(() => {
-    if (!userProfile?.organizationId || !id) return;
+    if (!userProfile) {
+      setNotesLoading(false);
+      return;
+    }
     setNotesLoading(true);
 
-    const q = query(
-      collection(db, "contact_notes"),
-      where("individualId", "==", id),
-    );
+    // Individual-scoped view: filter by individualId
+    // Global view (/modules/contact-note): load all recent notes
+    const q = id
+      ? query(
+          collection(db, "contact_notes"),
+          where("individualId", "==", id),
+        )
+      : query(
+          collection(db, "contact_notes"),
+          orderBy("createdAt", "desc"),
+          limit(200),
+        );
 
     const unsub = onSnapshot(
       q,
@@ -142,7 +153,7 @@ const ContactNote = () => {
       },
     );
     return unsub;
-  }, [userProfile?.organizationId]);
+  }, [id, userProfile?.uid]);
 
   const handleSave = async () => {
     if (!form.person || !form.activityType) {

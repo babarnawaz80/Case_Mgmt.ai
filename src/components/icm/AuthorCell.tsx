@@ -14,15 +14,20 @@ export function AuthorCell({ name = "System", className = "", size = "sm", showN
 
   const cleanName = name.trim();
   const lowerName = cleanName.toLowerCase();
-  
+
   const isKathy = lowerName.includes("kathy") || lowerName.includes("martinez") || lowerName.includes("adams");
   const isCurrentUser = userProfile?.displayName && lowerName.includes(userProfile.displayName.toLowerCase());
   const isBabar = lowerName.includes("babar") || lowerName.includes("nawaz");
-  
+
   let photoUrl = null;
   if (isKathy || isCurrentUser || isBabar) {
     photoUrl = userProfile?.photoURL || currentUser?.photoURL || employeePhoto;
   }
+
+  // Replace legacy "Kathy" placeholder names with the actual logged-in user's display name
+  const resolvedName = (isKathy && userProfile?.displayName)
+    ? userProfile.displayName
+    : cleanName;
 
   const sizeClasses = {
     sm: "w-5 h-5 text-[9px]",
@@ -43,8 +48,8 @@ export function AuthorCell({ name = "System", className = "", size = "sm", showN
     };
   };
 
-  const colors = getHashColor(cleanName);
-  const initials = cleanName
+  const colors = getHashColor(resolvedName);
+  const initials = resolvedName
     .split(" ")
     .filter(Boolean)
     .map(n => n[0])
@@ -54,23 +59,23 @@ export function AuthorCell({ name = "System", className = "", size = "sm", showN
 
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
-      <div 
+      <div
         className={`${sizeClasses[size]} rounded-full overflow-hidden shrink-0 flex items-center justify-center border font-geist font-bold transition-all`}
-        style={photoUrl ? { borderColor: "rgba(99, 102, 241, 0.15)" } : { 
-          backgroundColor: colors.bg, 
-          borderColor: colors.border, 
-          color: colors.text 
+        style={photoUrl ? { borderColor: "rgba(99, 102, 241, 0.15)" } : {
+          backgroundColor: colors.bg,
+          borderColor: colors.border,
+          color: colors.text
         }}
       >
         {photoUrl ? (
-          <img src={photoUrl} alt={cleanName} className="w-full h-full object-cover" />
+          <img src={photoUrl} alt={resolvedName} className="w-full h-full object-cover" />
         ) : (
           initials
         )}
       </div>
       {showName && (
-        <span className="font-medium text-icm-text truncate max-w-[150px]" title={cleanName}>
-          {cleanName}
+        <span className="font-medium text-icm-text truncate max-w-[150px]" title={resolvedName}>
+          {resolvedName}
         </span>
       )}
     </div>

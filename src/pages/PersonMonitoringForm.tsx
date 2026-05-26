@@ -182,7 +182,7 @@ const PersonMonitoringForm = () => {
                     <td className="px-4 py-3"><StatusPill status={f.status} /></td>
                     <td className="px-4 py-3 text-icm-text-dim">{f.active || "Active"}</td>
                     <td className="px-4 py-3 text-icm-text-dim">
-                      <AuthorCell name={f.updated_by || f.updatedBy || f.author_name || "Kathy Martinez"} />
+                      <AuthorCell name={f.updated_by || f.updatedBy || f.author_name || userProfile?.displayName || ""} />
                     </td>
                     <td className="px-4 py-3 font-mono text-icm-text-dim">{f.updated_on || f.updatedOn || new Date(f.created_at?.seconds * 1000 || Date.now()).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">

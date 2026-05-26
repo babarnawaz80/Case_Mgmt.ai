@@ -651,7 +651,12 @@ function IndividualPickerModal({
 ============================================================ */
 const Dashboard = () => {
   const { userProfile, currentUser } = useAuth();
-  const firstName = userProfile?.firstName || currentUser?.displayName?.split(" ")[0] || "Kathy";
+  const firstName =
+    userProfile?.firstName ||
+    userProfile?.displayName?.split(" ")[0] ||
+    currentUser?.displayName?.split(" ")[0] ||
+    currentUser?.email?.split("@")[0] ||
+    "there";
 
   return (
     <ICMShell title="iCM Dashboard">

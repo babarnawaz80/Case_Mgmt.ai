@@ -102,7 +102,7 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate(`/settings/users/${currentUser?.uid ?? ""}`)} className="gap-2 text-[12.5px]">
+        <DropdownMenuItem onClick={() => navigate("/my-profile")} className="gap-2 text-[12.5px]">
           <User className="w-4 h-4 text-muted-foreground" /> My profile
         </DropdownMenuItem>
         {isAdmin && (

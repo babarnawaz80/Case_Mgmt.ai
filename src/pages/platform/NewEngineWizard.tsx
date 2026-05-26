@@ -70,7 +70,7 @@ interface TemplateUpload {
   fileName?: string;
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 // ─── Universal Master Extraction Prompt ─────────────────────────────────────

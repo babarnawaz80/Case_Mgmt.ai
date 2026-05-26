@@ -52,21 +52,19 @@ const SettingsUserDetail = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      // Try the real Firebase UID first (for the currently logged-in user's own profile page)
-      const uidToTry = firebaseUser?.uid || userId;
-      if (!uidToTry) return;
+      if (!userId) return;
       try {
-        const docRef = doc(db, "users", uidToTry);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setFirestoreUser({ uid: uidToTry, ...docSnap.data() });
+        // Always fetch the TARGET user's document first (userId = their Firestore doc ID / Firebase Auth UID)
+        const targetSnap = await getDoc(doc(db, "users", userId));
+        if (targetSnap.exists()) {
+          setFirestoreUser({ uid: userId, ...targetSnap.data() });
           return;
         }
-        // Fall back: try the mock userId in case an admin is viewing another user
-        if (uidToTry !== userId && userId) {
-          const fallbackSnap = await getDoc(doc(db, "users", userId));
-          if (fallbackSnap.exists()) {
-            setFirestoreUser({ uid: userId, ...fallbackSnap.data() });
+        // Fallback: if target not found and we're on our own profile page, try logged-in UID
+        if (firebaseUser?.uid && firebaseUser.uid !== userId) {
+          const selfSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (selfSnap.exists()) {
+            setFirestoreUser({ uid: firebaseUser.uid, ...selfSnap.data() });
           }
         }
       } catch (err) {
@@ -269,7 +267,8 @@ const SettingsUserDetail = () => {
             <>
               <button
                 onClick={async () => {
-                  const realUid = firestoreUser?.uid || firestoreUser?.id || firebaseUser?.uid || userId;
+                  // userId is always the target user's Firestore doc ID (= their Firebase Auth UID)
+                  const realUid = userId || firestoreUser?.uid || firebaseUser?.uid;
                   try {
                     await updateDoc(doc(db, 'users', realUid), {
                       firstName: editFirst,
@@ -400,12 +399,17 @@ const SettingsUserDetail = () => {
               onClick={async () => {
                 try {
                   await updateDoc(doc(db, 'users', userId), {
-                    first_name: editFirst,
-                    last_name: editLast,
-                    display_name: `${editFirst} ${editLast}`,
+                    firstName: editFirst,
+                    lastName: editLast,
+                    displayName: `${editFirst} ${editLast}`,
                     email: editEmail,
-                    title: editTitle
+                    title: editTitle,
+                    updatedAt: new Date().toISOString(),
                   });
+                  // Refresh context if editing own profile
+                  if (refreshProfile && userId === currentUser?.uid) {
+                    await refreshProfile();
+                  }
                   toast.success("User profile saved successfully!");
                 } catch (err) {
                   console.error(err);

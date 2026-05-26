@@ -38,7 +38,7 @@ const REWRITE_ACTIONS: { id: string; label: string; description: string }[] = [
   { id: "grammar",      label: "Fix grammar & spelling", description: "Correct mechanics only" },
   { id: "soap",         label: "Convert to SOAP format", description: "Subjective / Objective / Assessment / Plan" },
 ];
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const REWRITE_PROMPTS: Record<string, string> = {
@@ -51,6 +51,9 @@ const REWRITE_PROMPTS: Record<string, string> = {
 };
 
 async function callGeminiRewrite(text: string, action: string): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    throw new Error("AI writing assistant is not configured. Please contact your administrator to set up the VITE_GEMINI_API_KEY.");
+  }
   const systemPrompt = REWRITE_PROMPTS[action] ?? REWRITE_PROMPTS.improve;
   const body = {
     contents: [

@@ -104,8 +104,12 @@ const ContactNote = () => {
 
   const formatDate = (ts: any) => {
     if (!ts) return "—";
-    if (ts?.toDate) return ts.toDate().toLocaleDateString("en-US");
-    if (ts instanceof Date) return ts.toLocaleDateString("en-US");
+    if (ts?.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (ts instanceof Date) return ts.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (typeof ts === "string") {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
     return String(ts);
   };
 

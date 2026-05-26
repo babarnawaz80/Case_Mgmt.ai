@@ -665,48 +665,10 @@ const Dashboard = () => {
         <HeroRow />
         <DonutRow />
         <QuickActions />
-        <AdminListDebug />
       </div>
     </ICMShell>
   );
 };
 
-function AdminListDebug() {
-  const { userProfile } = useAuth();
-  const [admins, setAdmins] = useState<any[]>([]);
-  
-  useEffect(() => {
-    if (!userProfile?.organizationId) return;
-    import("firebase/firestore").then(({ collection, query, where, getDocs }) => {
-      import("@/lib/firebase").then(({ db }) => {
-        const q = query(
-          collection(db, "users"),
-          where("organizationId", "==", userProfile.organizationId)
-        );
-        getDocs(q).then((snap) => {
-          const list = snap.docs.map(d => d.data());
-          setAdmins(list);
-          console.log("All users in org:", list);
-        }).catch(err => console.error("Admin fetch error", err));
-      });
-    });
-  }, [userProfile?.organizationId]);
-
-  if (admins.length === 0) return null;
-
-  return (
-    <div className="p-4 bg-icm-panel border border-icm-border rounded-xl mt-8">
-      <h3 className="text-[13px] font-bold mb-2">DEBUG: Users in Organization</h3>
-      <p className="text-[11px] mb-2 text-icm-text-dim">Your role: {userProfile?.role} | Org: {userProfile?.organizationId}</p>
-      <div className="space-y-1">
-        {admins.map(a => (
-          <div key={a.uid} className="text-[12px] font-mono">
-            - {a.displayName || a.email} ({a.email}): <strong className={a.role === 'admin' ? 'text-icm-green' : 'text-icm-amber'}>{a.role}</strong>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default Dashboard;

@@ -27,7 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle, Camera, Loader2 } from "lucide-react";
 import { db, storage } from "@/lib/firebase";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
 import { demoToast, demoSuccess } from "@/lib/demoToast";
@@ -54,14 +54,25 @@ const SettingsUserDetail = () => {
     const fetchUser = async () => {
       if (!userId) { setLoadingUser(false); return; }
       try {
-        // Always fetch the TARGET user's document first (userId = their Firestore doc ID / Firebase Auth UID)
+        // 1. Try direct lookup by userId (should be Firebase Auth UID for real users)
         const targetSnap = await getDoc(doc(db, "users", userId));
         if (targetSnap.exists()) {
           setFirestoreUser({ uid: userId, ...targetSnap.data() });
           setLoadingUser(false);
           return;
         }
-        // Fallback: if target not found and we're on our own profile page, try logged-in UID
+        // 2. userId may be a legacy mock ID (e.g. "u-002") — look up by the mock user's email
+        if (mockUser?.email) {
+          const q = query(collection(db, "users"), where("email", "==", mockUser.email));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const d = snap.docs[0];
+            setFirestoreUser({ uid: d.id, ...d.data() });
+            setLoadingUser(false);
+            return;
+          }
+        }
+        // 3. Last resort: if this appears to be the logged-in user's own profile, use their doc
         if (firebaseUser?.uid && firebaseUser.uid !== userId) {
           const selfSnap = await getDoc(doc(db, "users", firebaseUser.uid));
           if (selfSnap.exists()) {
@@ -75,7 +86,7 @@ const SettingsUserDetail = () => {
       }
     };
     fetchUser();
-  }, [userId, firebaseUser?.uid]);
+  }, [userId, firebaseUser?.uid, mockUser?.email]);
 
   const [loadingUser, setLoadingUser] = useState(true);
 
@@ -126,8 +137,8 @@ const SettingsUserDetail = () => {
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // Use real Firebase UID from Firestore doc, or fall back to current auth user
-    const realUid: string = firestoreUser?.uid || firestoreUser?.id || firebaseUser?.uid || userId;
+    // Prefer resolved Firestore UID (handles legacy mock IDs like "u-002"), fall back to auth UID
+    const realUid: string = firestoreUser?.uid || firebaseUser?.uid || userId;
     if (!file || !realUid) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file.");
@@ -305,26 +316,27 @@ const SettingsUserDetail = () => {
             <>
               <button
                 onClick={async () => {
-                  // userId is always the target user's Firestore doc ID (= their Firebase Auth UID)
-                  const realUid = userId || firestoreUser?.uid || firebaseUser?.uid;
+                  // Prefer the UID resolved from Firestore (handles legacy mock IDs like "u-002")
+                  const realUid = firestoreUser?.uid || userId || firebaseUser?.uid;
+                  if (!realUid) { toast.error("Cannot save: user ID not resolved"); return; }
                   try {
-                    await updateDoc(doc(db, 'users', realUid), {
+                    await setDoc(doc(db, 'users', realUid), {
                       firstName: editFirst,
                       lastName: editLast,
                       displayName: `${editFirst} ${editLast}`,
                       email: editEmail,
-                      title: editTitle
-                    });
-                    if (firestoreUser) {
-                      setFirestoreUser({
-                        ...firestoreUser,
-                        firstName: editFirst,
-                        lastName: editLast,
-                        displayName: `${editFirst} ${editLast}`,
-                        email: editEmail,
-                        title: editTitle
-                      });
-                    }
+                      title: editTitle,
+                      updatedAt: new Date().toISOString(),
+                    }, { merge: true });
+                    setFirestoreUser((prev: any) => ({
+                      ...prev,
+                      uid: realUid,
+                      firstName: editFirst,
+                      lastName: editLast,
+                      displayName: `${editFirst} ${editLast}`,
+                      email: editEmail,
+                      title: editTitle,
+                    }));
                     // If editing own profile, refresh context so greeting updates immediately
                     if (refreshProfile && (realUid === currentUser?.uid)) {
                       await refreshProfile();
@@ -435,23 +447,34 @@ const SettingsUserDetail = () => {
           <div className="flex justify-end pt-2">
             <button
               onClick={async () => {
+                const realUid = firestoreUser?.uid || userId || firebaseUser?.uid;
+                if (!realUid) { toast.error("Cannot save: user ID not resolved"); return; }
                 try {
-                  await updateDoc(doc(db, 'users', userId), {
+                  await setDoc(doc(db, 'users', realUid), {
                     firstName: editFirst,
                     lastName: editLast,
                     displayName: `${editFirst} ${editLast}`,
                     email: editEmail,
                     title: editTitle,
                     updatedAt: new Date().toISOString(),
-                  });
+                  }, { merge: true });
+                  setFirestoreUser((prev: any) => ({
+                    ...prev,
+                    uid: realUid,
+                    firstName: editFirst,
+                    lastName: editLast,
+                    displayName: `${editFirst} ${editLast}`,
+                    email: editEmail,
+                    title: editTitle,
+                  }));
                   // Refresh context if editing own profile
-                  if (refreshProfile && userId === currentUser?.uid) {
+                  if (refreshProfile && realUid === currentUser?.uid) {
                     await refreshProfile();
                   }
                   toast.success("User profile saved successfully!");
-                } catch (err) {
+                } catch (err: any) {
                   console.error(err);
-                  toast.error("Failed to save profile changes");
+                  toast.error("Failed to save profile changes", { description: err?.message });
                 }
               }}
               className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
@@ -829,15 +852,18 @@ const SettingsUserDetail = () => {
           <div className="flex justify-end pt-1">
             <button
               onClick={async () => {
+                const realUid = firestoreUser?.uid || userId || firebaseUser?.uid;
+                if (!realUid) { toast.error("Cannot save: user ID not resolved"); return; }
                 try {
-                  await updateDoc(doc(db, 'users', userId), {
+                  await setDoc(doc(db, 'users', realUid), {
                     providerInfo: provider,
-                    enrollments: enrollments
-                  });
+                    enrollments: enrollments,
+                    updatedAt: new Date().toISOString(),
+                  }, { merge: true });
                   toast.success("Provider & billing info saved successfully!");
-                } catch (err) {
+                } catch (err: any) {
                   console.error(err);
-                  toast.error("Failed to save provider info");
+                  toast.error("Failed to save provider info", { description: err?.message });
                 }
               }}
               className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"

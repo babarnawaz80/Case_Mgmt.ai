@@ -203,6 +203,16 @@ export default function CareAssistant() {
   const transcriptBufRef = useRef<string>("");
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dgKeyRef = useRef<string | null>(null);
+  // Ref-based session ID so stale closures (startListening/startBrowserListening)
+  // always send the current session to the backend, not the initial one.
+  const sessionIdRef = useRef<string>(`session_${Date.now()}`);
+  // Guard against duplicate sends when both UtteranceEnd and silence timer fire
+  const sendingRef = useRef(false);
+  // Ref to current messages so we can pass history even from stale closures
+  const messagesRef = useRef<Message[]>([]);
+
+  // Keep refs in sync with state so stale closures always see current values
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -307,6 +317,9 @@ export default function CareAssistant() {
     let recorder: MediaRecorder | null = null;
 
     const finish = (transcript: string) => {
+      // Cancel silence timer and clear buffer FIRST to prevent double-fire
+      if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+      transcriptBufRef.current = "";
       recorder?.stop();
       mediaStream?.getTracks().forEach((t) => t.stop());
       ws.close();
@@ -409,28 +422,43 @@ export default function CareAssistant() {
   const sendToAPI = useCallback(async (text: string) => {
     setVoiceState("thinking");
     setError(null);
+    // Build history from the ref so even stale closures pass full context
+    const history = messagesRef.current.map((m) => ({
+      role: m.role === "agent" ? "assistant" : "user",
+      text: m.text,
+    }));
     try {
       const res = await fetch(`${API_BASE}/care-assistant/${linkToken}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, session_id: sessionId }),
+        // Use ref (not state) — stable even in stale closures
+        body: JSON.stringify({ message: text, session_id: sessionIdRef.current, history }),
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = await res.json();
       let replyText: string = data.response ?? "I'm here for you. Can you tell me more?";
       const isUrgent = replyText.includes("[URGENT]");
       if (isUrgent) replyText = replyText.replace(/\[URGENT\]/g, "").trim();
-      if (data.sessionId) setSessionId(data.sessionId);
+      if (data.sessionId) {
+        sessionIdRef.current = data.sessionId;   // update ref immediately
+        setSessionId(data.sessionId);
+      }
       setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: "agent", text: replyText, urgent: isUrgent }]);
       await aiSpeakAndListen(replyText);
     } catch {
       setError("Couldn't reach your companion. Please check your connection.");
       setVoiceState("paused");
+    } finally {
+      sendingRef.current = false;
     }
-  }, [linkToken, sessionId, aiSpeakAndListen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkToken, aiSpeakAndListen]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleVoiceInput = useCallback((transcript: string) => {
+    // Guard: ignore if a send is already in flight (prevents UtteranceEnd + silence-timer double-fire)
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text: transcript }]);
     sendToAPI(transcript);
   }, [sendToAPI]);
@@ -449,7 +477,10 @@ export default function CareAssistant() {
       });
       const data = await res.json();
       const text = data.response ?? "Hey there! I'm your AI Care Companion. How are you doing today?";
-      if (data.sessionId) setSessionId(data.sessionId);
+      if (data.sessionId) {
+        sessionIdRef.current = data.sessionId;  // update ref immediately for stale closures
+        setSessionId(data.sessionId);
+      }
       if (data.firstName) setFirstName(data.firstName);
       setMessages([{ id: `a-${Date.now()}`, role: "agent", text }]);
       await aiSpeakAndListen(text);

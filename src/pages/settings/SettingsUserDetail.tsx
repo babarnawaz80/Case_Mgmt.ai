@@ -40,7 +40,7 @@ const SettingsUserDetail = () => {
     "profile"
   );
   const { isAdmin } = useRole();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, currentUser, refreshProfile } = useAuth();
   const initialProvider = useMemo(() => getStaffProvider(userId), [userId]);
   const [provider, setProvider] = useState(initialProvider);
   const [enrollments, setEnrollments] = useState<StaffStateEnrollment[]>(initialProvider.enrollments);
@@ -287,6 +287,10 @@ const SettingsUserDetail = () => {
                         email: editEmail,
                         title: editTitle
                       });
+                    }
+                    // If editing own profile, refresh context so greeting updates immediately
+                    if (refreshProfile && (realUid === currentUser?.uid)) {
+                      await refreshProfile();
                     }
                     toast.success("Profile saved successfully!");
                     setEditMode(false);

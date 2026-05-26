@@ -186,6 +186,10 @@ const MyProfile = () => {
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName });
       }
+      // Refresh Auth context so Dashboard greeting and nav update immediately
+      if (refreshProfile) {
+        await refreshProfile();
+      }
       toast.success("Profile saved");
     } catch (err: any) {
       console.error(err);

@@ -347,8 +347,19 @@ const EChart = () => {
               <span className="text-[11px] font-geist text-icm-text-faint">{tiles.length} modules</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {tiles.map((t) => (
-                t.slug === "authorizations" ? (
+              {tiles.map((t) => {
+                // Certain slugs navigate to the global list page instead of individual-scoped route
+                const globalRouteMap: Record<string, string> = {
+                  "monitoring-form": "/monitoring-form",
+                  "progress-note": "/progress-note",
+                  "visit-summary": "/visit-summary",
+                  "contact-note": "/modules/contact-note",
+                  "care-notes": "/modules/contact-note",
+                };
+                const destination = globalRouteMap[t.slug]
+                  ? globalRouteMap[t.slug]
+                  : `/people/${individual.id}/${t.route}`;
+                return t.slug === "authorizations" ? (
                   <AuthorizationTileCard
                     key={t.slug}
                     tile={t}
@@ -364,10 +375,10 @@ const EChart = () => {
                         ? liveCounts[t.slug]
                         : t.count,
                     }}
-                    onOpen={() => navigate(`/people/${individual.id}/${t.route}`)}
+                    onOpen={() => navigate(destination)}
                   />
-                )
-        ))}
+                );
+              })}
             </div>
           </section>
         ))}

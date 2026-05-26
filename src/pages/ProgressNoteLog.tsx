@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -11,6 +12,14 @@ const ProgressNoteLog = () => {
   const navigate = useNavigate();
   const { notes, loading } = useAllProgressNotes();
   const { individuals } = useIndividuals();
+
+  // Filter state
+  const [personFilter, setPersonFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [activityFilter, setActivityFilter] = useState("");
+  const [caseManagerFilter, setCaseManagerFilter] = useState("");
 
   const handleVoid = async (id: string) => {
     try {
@@ -26,6 +35,34 @@ const ProgressNoteLog = () => {
   const personName = (pid: string) => {
     const p = individuals.find((x) => x.id === pid);
     return p ? `${p.first_name} ${p.last_name}` : "—";
+  };
+
+  const anyFilterActive = !!(personFilter || dateFrom || dateTo || statusFilter || activityFilter || caseManagerFilter);
+
+  const uniqueActivityTypes = useMemo(
+    () => Array.from(new Set(notes.map((n) => n.activityType).filter(Boolean))).sort(),
+    [notes],
+  );
+
+  const filtered = useMemo(() => {
+    return notes.filter((n) => {
+      if (personFilter && !personName(n.individualId).toLowerCase().includes(personFilter.toLowerCase())) return false;
+      if (dateFrom && (n.progressDate || "") < dateFrom) return false;
+      if (dateTo && (n.progressDate || "") > dateTo) return false;
+      if (statusFilter && n.status !== statusFilter) return false;
+      if (activityFilter && n.activityType !== activityFilter) return false;
+      if (caseManagerFilter && !(n.authorName || "").toLowerCase().includes(caseManagerFilter.toLowerCase())) return false;
+      return true;
+    });
+  }, [notes, personFilter, dateFrom, dateTo, statusFilter, activityFilter, caseManagerFilter, individuals]);
+
+  const clearFilters = () => {
+    setPersonFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setStatusFilter("");
+    setActivityFilter("");
+    setCaseManagerFilter("");
   };
 
   const getStatusStyle = (status: string) => {
@@ -63,6 +100,92 @@ const ProgressNoteLog = () => {
           </button>
         </div>
 
+        {/* Summary chips */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "Total", value: notes.length, cls: "bg-icm-bg text-icm-text-dim ring-icm-border" },
+            { label: "Draft", value: notes.filter((n) => n.status === "draft").length, cls: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" },
+            { label: "Pending Signature", value: notes.filter((n) => n.status === "pending_signature").length, cls: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20" },
+            { label: "Signed", value: notes.filter((n) => n.status === "signed").length, cls: "bg-icm-green-soft text-icm-green ring-icm-green/20" },
+            { label: "Void", value: notes.filter((n) => n.status === "void").length, cls: "bg-icm-red-soft text-icm-red ring-icm-red/20" },
+          ].map((chip) => (
+            <div key={chip.label} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ring-1 ${chip.cls}`}>
+              <span className="text-[10px] uppercase tracking-wide font-geist font-semibold opacity-70">{chip.label}</span>
+              <span className="text-[12px] font-mono font-semibold">{chip.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-end gap-3 p-3 rounded-xl border border-icm-border bg-icm-panel/60">
+          <div>
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide mb-1">Person</p>
+            <input
+              value={personFilter}
+              onChange={(e) => setPersonFilter(e.target.value)}
+              placeholder="Filter by person…"
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:border-icm-accent focus:outline-none w-40"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide mb-1">Date From</p>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:border-icm-accent focus:outline-none"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide mb-1">Date To</p>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:border-icm-accent focus:outline-none"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide mb-1">Status</p>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:border-icm-accent focus:outline-none"
+            >
+              <option value="">All</option>
+              <option value="draft">Draft</option>
+              <option value="pending_signature">Pending Signature</option>
+              <option value="signed">Signed</option>
+              <option value="void">Void</option>
+            </select>
+          </div>
+          <div>
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide mb-1">Activity Type</p>
+            <select
+              value={activityFilter}
+              onChange={(e) => setActivityFilter(e.target.value)}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:border-icm-accent focus:outline-none"
+            >
+              <option value="">All</option>
+              {uniqueActivityTypes.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide mb-1">Case Manager</p>
+            <input
+              value={caseManagerFilter}
+              onChange={(e) => setCaseManagerFilter(e.target.value)}
+              placeholder="Filter by manager…"
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:border-icm-accent focus:outline-none w-40"
+            />
+          </div>
+          {anyFilterActive && (
+            <button onClick={clearFilters} className="text-[11px] text-icm-accent hover:underline self-end pb-1">
+              Clear filters
+            </button>
+          )}
+        </div>
+
         <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-[12px] font-geist">
@@ -87,14 +210,14 @@ const ProgressNoteLog = () => {
                       </div>
                     </td>
                   </tr>
-                ) : notes.length === 0 ? (
+                ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-icm-text-faint">
-                      No progress notes yet.
+                      {notes.length === 0 ? "No progress notes yet." : "No notes match the current filters."}
                     </td>
                   </tr>
                 ) : (
-                  notes.map((n) => (
+                  filtered.map((n) => (
                     <tr key={n.id} className="hover:bg-icm-bg/60">
                       <td className="px-4 py-3 font-mono text-icm-text">{n.progressDate}</td>
                       <td className="px-4 py-3 text-icm-text font-medium">{personName(n.individualId)}</td>
@@ -150,6 +273,12 @@ const ProgressNoteLog = () => {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="px-4 py-2 border-t border-icm-border bg-icm-bg/30 flex items-center justify-between">
+            <span className="text-[10.5px] font-geist text-icm-text-faint">
+              {filtered.length} note{filtered.length !== 1 ? "s" : ""}{anyFilterActive ? ` (filtered from ${notes.length})` : " total"}
+            </span>
+            <span className="text-[10px] font-mono text-icm-text-faint">Live Firestore</span>
           </div>
         </div>
       </div>

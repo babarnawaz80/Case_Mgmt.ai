@@ -61,6 +61,7 @@ const ProgressNoteNew = lazy(() => import("./pages/ProgressNoteNew"));
 const ProgressNoteLog = lazy(() => import("./pages/ProgressNoteLog"));
 const VisitSummaryNew = lazy(() => import("./pages/VisitSummaryNew"));
 const VisitSummaryLog = lazy(() => import("./pages/VisitSummaryLog"));
+const MonitoringFormLog = lazy(() => import("./pages/MonitoringFormLog"));
 const OnCallLog = lazy(() => import("./pages/OnCallLog"));
 const OnCallLogNew = lazy(() => import("./pages/OnCallLogNew"));
 const PersonWorkflowManager = lazy(() => import("./pages/PersonWorkflowManager"));
@@ -251,6 +252,7 @@ const App = () => (
             <Route path="/progress-note/new" element={<ProtectedRoute><ProgressNoteNew /></ProtectedRoute>} />
             <Route path="/visit-summary" element={<ProtectedRoute><VisitSummaryLog /></ProtectedRoute>} />
             <Route path="/visit-summary/new" element={<ProtectedRoute><VisitSummaryNew /></ProtectedRoute>} />
+            <Route path="/monitoring-form" element={<ProtectedRoute><MonitoringFormLog /></ProtectedRoute>} />
             <Route path="/oncall-log" element={<ProtectedRoute><OnCallLog /></ProtectedRoute>} />
             <Route path="/oncall-log/new" element={<ProtectedRoute><OnCallLogNew /></ProtectedRoute>} />
             <Route path="/oncall-log/:id" element={<ProtectedRoute><OnCallLog /></ProtectedRoute>} />

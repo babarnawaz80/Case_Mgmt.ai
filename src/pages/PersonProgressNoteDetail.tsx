@@ -11,13 +11,16 @@ import {
   buildAIPreFilledProgressNote, ACTIVITY_TYPES, NON_BILLABLE_REASONS,
   type ProgressNote, type ProgressStatus, type ContactType, type GoalProgressEntry, type GoalProgressStatus,
 } from "@/data/progressNotes";
-import { useProgressNote, updateProgressNote } from "@/hooks/useProgressNotes";
+import { useProgressNote, updateProgressNote, saveProgressNote } from "@/hooks/useProgressNotes";
 import { writeAudit } from "@/lib/auditService";
 import { AuthorCell } from "@/components/icm/AuthorCell";
+import { useAuth } from "@/contexts/AuthContext";
 
 const PersonProgressNoteDetail = () => {
   const { id, noteId } = useParams<{ id: string; noteId: string }>();
   const navigate = useNavigate();
+  const { userProfile, currentUser } = useAuth();
+  const authorName = userProfile?.displayName || currentUser?.displayName || userProfile?.email || "Unknown";
   const { individual, loading: indLoading } = useIndividual(id);
   const { data: dbRecord, loading: recordLoading } = useProgressNote(noteId);
 
@@ -154,9 +157,23 @@ const PersonProgressNoteDetail = () => {
         status: "draft" as const,
       };
 
-      await updateProgressNote(noteId, payload);
-      await writeAudit('edit_note', 'note', noteId, { status: 'draft' });
-      toast.success("Draft saved successfully");
+      if (isNew) {
+        // Create a new Firestore document
+        const newId = await saveProgressNote({
+          ...payload,
+          individualId: id ?? "",
+          organizationId: userProfile?.organizationId ?? "",
+          authorId: userProfile?.uid ?? currentUser?.uid ?? "",
+          authorName,
+        } as any);
+        await writeAudit('create_note', 'note', newId, { status: 'draft' });
+        toast.success("Draft saved successfully");
+        navigate(`/people/${id}/progress-note/${newId}`, { replace: true });
+      } else {
+        await updateProgressNote(noteId, payload);
+        await writeAudit('edit_note', 'note', noteId, { status: 'draft' });
+        toast.success("Draft saved successfully");
+      }
     } catch (err) {
       toast.error("Failed to save draft: " + (err as Error).message);
     } finally {
@@ -169,25 +186,53 @@ const PersonProgressNoteDetail = () => {
     setSaving(true);
     try {
       const today = new Date().toLocaleDateString("en-US");
-      const updatedFields = {
-        status: "signed" as const,
-        signedBy: "Kathy Adams, CM",
-        signedOn: today,
-        goalsProgress: form.goalProgress ? form.goalProgress.map(g => ({
-          goalId: g.goalId,
-          goalText: g.goalTitle,
-          narrative: g.progressNotes ?? "",
-          progressStatus: g.status === "Goal achieved" ? "met" as const :
-                          g.status === "Progressing" ? "progressing" as const :
-                          g.status === "No change" ? "no_change" as const : "no_change" as const,
-        })) : [],
-      };
-      
-      await updateProgressNote(noteId, updatedFields);
-      await writeAudit('edit_note', 'note', noteId, { status: 'signed' });
+      const credential = userProfile?.credential ? `, ${userProfile.credential}` : "";
+      const signedBy = `${authorName}${credential}`;
+      const goalsProgress = form.goalProgress ? form.goalProgress.map(g => ({
+        goalId: g.goalId,
+        goalText: g.goalTitle,
+        narrative: g.progressNotes ?? "",
+        progressStatus: g.status === "Goal achieved" ? "met" as const :
+                        g.status === "Progressing" ? "progressing" as const :
+                        g.status === "No change" ? "no_change" as const : "no_change" as const,
+      })) : [];
 
-      setForm({ ...form, status: "Signed", signedBy: "Kathy Adams, CM", signedOn: today });
+      let resolvedNoteId = noteId;
+
+      if (isNew) {
+        // Create the document first, then sign it
+        resolvedNoteId = await saveProgressNote({
+          activityType: form.activityType,
+          contactType: form.contactType ?? "In-Person",
+          progressDate: form.date,
+          startTime: form.startTime ?? "",
+          endTime: form.endTime ?? "",
+          isBillable: form.isBillable,
+          purposeOfActivity: form.purposeOfActivity ?? "",
+          goalsProgress,
+          additionalObservations: form.additionalObservations ?? "",
+          nextSteps: form.nextSteps ?? "",
+          status: "draft" as const,
+          individualId: id ?? "",
+          organizationId: userProfile?.organizationId ?? "",
+          authorId: userProfile?.uid ?? currentUser?.uid ?? "",
+          authorName,
+        } as any);
+      }
+
+      await updateProgressNote(resolvedNoteId, {
+        status: "signed" as const,
+        signedBy,
+        signedOn: today,
+        goalsProgress,
+      });
+      await writeAudit('edit_note', 'note', resolvedNoteId, { status: 'signed' });
+
+      setForm({ ...form, status: "Signed", signedBy, signedOn: today });
       toast.success("Progress note signed successfully");
+      if (isNew) {
+        navigate(`/people/${id}/progress-note/${resolvedNoteId}`, { replace: true });
+      }
     } catch (err) {
       toast.error("Failed to sign progress note: " + (err as Error).message);
     } finally {

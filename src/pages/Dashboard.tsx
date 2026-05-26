@@ -5,7 +5,7 @@
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Donut } from "@/components/icm/charts";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIndividuals, riskTier, riskAvatarClass, initials } from "@/hooks/useIndividuals";

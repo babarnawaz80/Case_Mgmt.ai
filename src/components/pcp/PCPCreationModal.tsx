@@ -7,7 +7,7 @@
  *   Step 4A – Navigate to full-page Section-by-Section builder
  *   Step 4B – Full-screen AI Draft overlay (handled by PCPOrbAnimation)
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   X, Upload, FileText, ChevronRight, CheckCircle2, Loader2,

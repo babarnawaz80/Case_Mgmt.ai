@@ -1,4 +1,4 @@
-// OrgSettingsContext — loads org logo + brand color from Firestore once,
+// OrgSettingsContext — loads org logo, brand color, and logo link URL from Firestore once,
 // exposes them globally, and applies the brand color as a CSS custom property.
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
@@ -8,12 +8,14 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface OrgSettings {
   logoUrl: string | null;
+  logoLinkUrl: string | null;   // optional click-through URL for the topbar logo
   brandColor: string;
   orgName: string;
 }
 
 const DEFAULT: OrgSettings = {
   logoUrl: null,
+  logoLinkUrl: null,
   brandColor: "#0d9488", // teal-600 matches existing theme
   orgName: "CaseManagement.ai",
 };
@@ -33,12 +35,16 @@ export function OrgSettingsProvider({ children }: { children: ReactNode }) {
       const d = snap.data();
       const color: string = d.brandColor ?? DEFAULT.brandColor;
       const logo: string | null = d.logoUrl ?? null;
+      const logoLink: string | null = d.logoLinkUrl ?? null;
       const name: string = d.name ?? DEFAULT.orgName;
 
-      setSettings({ logoUrl: logo, brandColor: color, orgName: name });
+      setSettings({ logoUrl: logo, logoLinkUrl: logoLink, brandColor: color, orgName: name });
 
-      // Apply brand color as CSS custom property so Tailwind `icm-accent` picks it up
-      document.documentElement.style.setProperty("--icm-accent", hexToHsl(color));
+      // Store the brand color in a dedicated CSS variable so it doesn't
+      // conflict with the dark/light mode --icm-accent values set by the
+      // stylesheet. Components can reference var(--icm-accent-brand) for
+      // org-specific accent colour when needed.
+      document.documentElement.style.setProperty("--icm-accent-brand", hexToHsl(color));
     });
 
     return unsub;

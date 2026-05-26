@@ -198,6 +198,17 @@ const PersonReferrals = () => {
           </div>
         )}
 
+        {/* Summary chips — always visible */}
+        <div className="flex flex-wrap gap-2">
+          <Chip label="Total" value={sum.total} tone="neutral" />
+          <Chip label="Pending" value={sum.pending} tone="amber" />
+          <Chip label="Connected" value={sum.connected} tone="green" />
+          <Chip label="Unsuccessful" value={sum.unsuccessful} tone="red" />
+          {sum.stalled > 0 && (
+            <Chip label="Stalled >14d" value={sum.stalled} tone="red" icon={AlertTriangle} />
+          )}
+        </div>
+
         {all.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
@@ -228,17 +239,6 @@ const PersonReferrals = () => {
           </div>
         ) : (
           <>
-            {/* Summary chips */}
-            <div className="flex flex-wrap gap-2">
-              <Chip label="Total" value={sum.total} tone="neutral" />
-              <Chip label="Pending" value={sum.pending} tone="amber" />
-              <Chip label="Connected" value={sum.connected} tone="green" />
-              <Chip label="Unsuccessful" value={sum.unsuccessful} tone="red" />
-              {sum.stalled > 0 && (
-                <Chip label="Stalled >14d" value={sum.stalled} tone="red" icon={AlertTriangle} />
-              )}
-            </div>
-
             {/* Filters */}
             <div className="flex items-center gap-2 flex-wrap">
               <select

@@ -18,6 +18,7 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useCareTracker, addCareTrackerEntry } from "@/hooks/useFirestore";
 import { toast } from "sonner";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 export default function PersonCareTracker() {
   const { id } = useParams<{ id: string }>();
@@ -181,7 +182,9 @@ export default function PersonCareTracker() {
                     <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${t.completed ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                       {t.time}
                     </span>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{t.provider}</p>
+                    <div className="mt-0.5">
+                      <AuthorCell name={t.provider} size="sm" showName={true} />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -268,7 +271,10 @@ export default function PersonCareTracker() {
                       </span>
                     </div>
                     <p className="mt-2 text-slate-700 leading-normal">{log.detail}</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Logged by: <span className="font-semibold text-slate-500">{log.provider}</span></p>
+                    <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                      <span>Logged by:</span>
+                      <AuthorCell name={log.provider} size="sm" showName={true} />
+                    </div>
                   </div>
                 ))
               )}

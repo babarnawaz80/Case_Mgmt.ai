@@ -83,27 +83,46 @@ export function QuickActions() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display font-semibold text-foreground text-sm uppercase tracking-wide">Quick Actions</h3>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {quickActions.map((action, i) => (
-            <motion.button
-              key={action.title}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + i * 0.04 }}
-              whileHover={{ y: -3, scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => handleQuickAction(action)}
-              className={cn(
-                "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm hover:shadow-lg transition-all duration-300",
-              )}
-              style={{ backgroundColor: categoryStyles[action.category].bg, color: categoryStyles[action.category].text }}
-            >
-              <div className="p-2.5 rounded-xl" style={{ backgroundColor: categoryStyles[action.category].iconBg }}>
-                <action.icon className="w-4 h-4" style={{ color: categoryStyles[action.category].text }} />
+        <div className="space-y-4">
+          {(
+            [
+              { key: "documentation", label: "Documentation" },
+              { key: "operations", label: "Operations" },
+              { key: "care", label: "Care" },
+            ] as { key: "documentation" | "operations" | "care"; label: string }[]
+          ).map(({ key, label }) => {
+            const tiles = quickActions.filter((a) => a.category === key);
+            if (tiles.length === 0) return null;
+            return (
+              <div key={key}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  {label}
+                </p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {tiles.map((action, i) => (
+                    <motion.button
+                      key={action.title}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 + i * 0.04 }}
+                      whileHover={{ y: -3, scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => handleQuickAction(action)}
+                      className={cn(
+                        "group relative overflow-hidden rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm hover:shadow-lg transition-all duration-300",
+                      )}
+                      style={{ backgroundColor: categoryStyles[action.category].bg, color: categoryStyles[action.category].text }}
+                    >
+                      <div className="p-2.5 rounded-xl" style={{ backgroundColor: categoryStyles[action.category].iconBg }}>
+                        <action.icon className="w-4 h-4" style={{ color: categoryStyles[action.category].text }} />
+                      </div>
+                      <span className="text-[11px] font-semibold text-center leading-tight">{action.title}</span>
+                    </motion.button>
+                  ))}
+                </div>
               </div>
-              <span className="text-[11px] font-semibold text-center leading-tight">{action.title}</span>
-            </motion.button>
-          ))}
+            );
+          })}
         </div>
       </div>
 

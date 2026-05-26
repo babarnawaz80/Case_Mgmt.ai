@@ -472,11 +472,39 @@ function generateProfile(p: Person): ProfileData {
   };
 }
 
+// ─── Living Situation overrides for the 7 primary individuals ────────────────
+// Deterministic values that match the spec. Applied after generation so the
+// profile singleton always reflects the correct starting value.
+export const LIVING_SITUATION_OPTIONS = [
+  "Own home",
+  "Family home",
+  "Group home",
+  "Assisted living",
+  "Supervised apartment",
+  "Homeless",
+  "Other",
+] as const;
+
+const LIVING_SITUATION_OVERRIDES: Record<string, string> = {
+  "1": "Family home",          // Joseph Brown
+  "2": "Group home",           // Travis Langston
+  "3": "Family home",          // Dwight Doe
+  "4": "Family home",          // Mohsin Raza
+  "5": "Family home",          // Muhammad Raaza
+  "6": "Supervised apartment", // Steve Smith
+  "7": "Own home",             // Ashley Walker
+};
+
 export function getProfile(id: string): ProfileData {
-  if (profiles[id]) return profiles[id];
-  const person = people.find((p) => p.id === id);
-  if (!person) return { ...empty, vitalBaselines: defaultBaselines() };
-  profiles[id] = generateProfile(person);
+  if (!profiles[id]) {
+    const person = people.find((p) => p.id === id);
+    if (!person) return { ...empty, vitalBaselines: defaultBaselines() };
+    profiles[id] = generateProfile(person);
+  }
+  // Apply specific living situation overrides for primary 7
+  if (LIVING_SITUATION_OVERRIDES[id] !== undefined) {
+    profiles[id].livingSituation = LIVING_SITUATION_OVERRIDES[id];
+  }
   return profiles[id];
 }
 
@@ -507,6 +535,7 @@ export function tabCompleteness(p: ProfileData, baseFirst: string, baseLast: str
     { label: "Primary Phone", ok: !!p.primaryPhone },
     { label: "County", ok: true },
     { label: "Date of Admission", ok: true },
+    { label: "Living Situation", ok: !!p.livingSituation },
   ];
   const medicalReq = [
     { label: "Primary Diagnosis", ok: p.diagnoses.some((d) => d.primary) },

@@ -9,6 +9,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ArrowLeft, Edit2, Check, Printer, Save, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 interface ContactNoteDoc {
   id: string;
@@ -379,9 +380,9 @@ const ContactNoteDetail = () => {
               <p className="text-[12px] font-mono text-icm-text-dim">
                 Created: {formatDate(note.createdAt)}
               </p>
-              <p className="text-[11.5px] text-icm-text-faint font-geist mt-0.5">
-                Last updated: {note.updatedOn} by {note.updatedBy || "System"}
-              </p>
+              <div className="text-[11.5px] text-icm-text-faint font-geist mt-0.5 flex items-center justify-end gap-1.5">
+                Last updated: {note.updatedOn} by <AuthorCell name={note.updatedBy || "System"} size="sm" showName={true} />
+              </div>
             </div>
           </div>
 
@@ -579,9 +580,9 @@ const ContactNoteDetail = () => {
                       <p className="text-[12.5px] font-semibold text-icm-text">
                         Electronically Signed
                       </p>
-                      <p className="text-[11.5px] text-icm-text-dim">
-                        Signed by {note.updatedBy} on {note.updatedOn}.
-                      </p>
+                      <div className="text-[11.5px] text-icm-text-dim flex items-center gap-1.5 mt-0.5">
+                        Signed by <AuthorCell name={note.updatedBy} size="sm" showName={true} /> on {note.updatedOn}.
+                      </div>
                     </div>
                   </div>
                 </div>

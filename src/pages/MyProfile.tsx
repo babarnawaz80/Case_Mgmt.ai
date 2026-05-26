@@ -13,12 +13,56 @@ import { cn } from "@/lib/utils";
 const MAX_SIZE_MB = 5;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
+const compressImageToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 256;
+        const MAX_HEIGHT = 256;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Could not get 2d context from canvas"));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+};
+
 function getInitials(first: string, last: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase();
 }
 
 const MyProfile = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [preview, setPreview] = useState<string | null>(null);
@@ -72,20 +116,28 @@ const MyProfile = () => {
     setUploading(true);
     setProgress(0);
     try {
-      const storageRef = ref(storage, `profile_photos/${userProfile.uid}/${Date.now()}_${file.name}`);
-      const task = uploadBytesResumable(storageRef, file, {
-        contentType: file.type,
-        customMetadata: { uploadedBy: userProfile.uid },
-      });
+      let downloadURL = "";
+      try {
+        // Try uploading to Firebase Storage
+        const storageRef = ref(storage, `profile_photos/${userProfile.uid}/${Date.now()}_${file.name}`);
+        const task = uploadBytesResumable(storageRef, file, {
+          contentType: file.type,
+          customMetadata: { uploadedBy: userProfile.uid },
+        });
 
-      const downloadURL = await new Promise<string>((resolve, reject) => {
-        task.on(
-          "state_changed",
-          (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-          reject,
-          async () => resolve(await getDownloadURL(task.snapshot.ref))
-        );
-      });
+        downloadURL = await new Promise<string>((resolve, reject) => {
+          task.on(
+            "state_changed",
+            (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            reject,
+            async () => resolve(await getDownloadURL(task.snapshot.ref))
+          );
+        });
+      } catch (storageErr) {
+        console.warn("Firebase Storage upload failed, using robust Base64 local storage fallback:", storageErr);
+        // Robust Base64 Local Database fallback
+        downloadURL = await compressImageToBase64(file);
+      }
 
       // Update Firestore user doc
       await updateDoc(doc(db, "users", userProfile.uid), {
@@ -98,12 +150,17 @@ const MyProfile = () => {
         await updateProfile(auth.currentUser, { photoURL: downloadURL });
       }
 
+      // Refresh Auth profile context to propagate changes instantly
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+
       setPreview(downloadURL);
       setFile(null);
-      toast.success("Profile photo updated!");
+      toast.success("Profile photo updated successfully!");
     } catch (err: any) {
       console.error(err);
-      toast.error("Upload failed", { description: err?.message });
+      toast.error("Upload failed", { description: err?.message || "An unknown error occurred during upload." });
     } finally {
       setUploading(false);
       setProgress(0);

@@ -1,0 +1,272 @@
+// Agents Service — Firestore Operations
+// CaseManagement.AI
+// Manages the 'agents' collection
+
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  orderBy,
+  addDoc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+  Timestamp,
+  writeBatch,
+  where,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type AgentType =
+  | 'pcp_generator'
+  | 'compliance_copilot'
+  | 'pcp_alignment'
+  | 'billing_documentation'
+  | 'monitoring_reauth'
+  | 'isp_generator';
+
+export type PushMode = 'manual' | 'auto_pass' | 'auto_always';
+
+export interface AgentDoc {
+  id: string;
+  name: string;
+  type: AgentType;
+  description: string;
+  status: 'active' | 'inactive' | 'draft';
+  guidelines_engine_id: string;
+  guidelines_engine_name: string;
+  guidelines_engine_version: string;
+  master_prompt: string;
+  master_prompt_updated_at: Timestamp | null;
+  master_prompt_updated_by: string;
+  auto_monitor: boolean;
+  push_mode: PushMode;
+  individuals_count: number;
+  avg_compliance: number;
+  active_runs: number;
+  drafts_pending: number;
+  created_by: string;
+  created_at: Timestamp | null;
+  last_run_at: Timestamp | null;
+  tone?: string; // for UI color
+  alert_count?: number;
+  version?: string;
+  schedule?: string;
+}
+
+// ─── Read Operations ──────────────────────────────────────────────────────────
+
+export async function getAgents(): Promise<AgentDoc[]> {
+  const snap = await getDocs(
+    query(collection(db, 'agents'), orderBy('created_at', 'desc'))
+  );
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentDoc));
+}
+
+export async function getAgentById(id: string): Promise<AgentDoc | null> {
+  const snap = await getDoc(doc(db, 'agents', id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as AgentDoc;
+}
+
+// ─── Write Operations ─────────────────────────────────────────────────────────
+
+export interface CreateAgentInput {
+  name: string;
+  type: AgentType;
+  description: string;
+  guidelines_engine_id: string;
+  guidelines_engine_name: string;
+  guidelines_engine_version: string;
+  master_prompt: string;
+  auto_monitor: boolean;
+  push_mode: PushMode;
+  created_by: string;
+}
+
+export async function createAgent(input: CreateAgentInput): Promise<string> {
+  const ref = doc(collection(db, 'agents'));
+  await setDoc(ref, {
+    ...input,
+    status: 'active',
+    individuals_count: 0,
+    avg_compliance: 0,
+    active_runs: 0,
+    drafts_pending: 0,
+    master_prompt_updated_at: serverTimestamp(),
+    master_prompt_updated_by: input.created_by,
+    created_at: serverTimestamp(),
+    last_run_at: null,
+    tone: 'accent',
+    alert_count: 0,
+    version: 'v1.0',
+    schedule: 'Manual only',
+  });
+  return ref.id;
+}
+
+export async function updateAgent(
+  id: string,
+  data: Partial<Omit<AgentDoc, 'id' | 'created_at'>>
+): Promise<void> {
+  await updateDoc(doc(db, 'agents', id), data as Record<string, unknown>);
+}
+
+export async function updateMasterPrompt(
+  id: string,
+  prompt: string,
+  updatedBy: string
+): Promise<void> {
+  await updateDoc(doc(db, 'agents', id), {
+    master_prompt: prompt,
+    master_prompt_updated_at: serverTimestamp(),
+    master_prompt_updated_by: updatedBy,
+  });
+}
+
+// ─── Seed Data ────────────────────────────────────────────────────────────────
+
+const SEED_AGENTS: Omit<AgentDoc, 'created_at' | 'last_run_at' | 'master_prompt_updated_at'>[] = [
+  {
+    id: 'agent-pcp-001',
+    name: 'PCP Generation Agent',
+    type: 'pcp_generator',
+    description: 'Generates complete Person-Centered Plans from the individual\'s chart and Maryland DDA state guidelines. Reviews all documentation and applies compliance rules automatically.',
+    status: 'active',
+    guidelines_engine_id: 'engine-maryland-dda-v2',
+    guidelines_engine_name: 'Maryland DDA',
+    guidelines_engine_version: 'v2.0',
+    master_prompt: 'Generate all PCP documentation using person-first, strengths-based language. Employment FAE must be completed annually. HRST must be reviewed within 90 days of APD. All risks identified in HRST must have documented mitigation strategies. Flag any individual with HRST score ≥ 3 for clinical review requirement. Do not make clinical recommendations — document what the individual and team have expressed.',
+    master_prompt_updated_by: 'Babar Nawaz',
+    auto_monitor: true,
+    push_mode: 'manual',
+    individuals_count: 24,
+    avg_compliance: 94,
+    active_runs: 0,
+    drafts_pending: 5,
+    created_by: 'system-seed',
+    tone: 'accent',
+    alert_count: 5,
+    version: 'v1.2',
+    schedule: 'Daily',
+  },
+  {
+    id: 'agent-alignment-001',
+    name: 'PCP Alignment Copilot',
+    type: 'pcp_alignment',
+    description: 'Scans PCP vs guideline pack requirements, identifies missing items, drafts addendum language.',
+    status: 'active',
+    guidelines_engine_id: 'engine-maryland-dda-v2',
+    guidelines_engine_name: 'Maryland DDA',
+    guidelines_engine_version: 'v2.0',
+    master_prompt: 'Scan existing PCPs against Maryland DDA v2.0 guidelines. Identify any missing required sections, unsigned goals, or outdated assessments. Draft addendum language in person-first style for any gaps found. Prioritize hard stops over warnings in your report.',
+    master_prompt_updated_by: 'Babar Nawaz',
+    auto_monitor: true,
+    push_mode: 'manual',
+    individuals_count: 18,
+    avg_compliance: 97,
+    active_runs: 0,
+    drafts_pending: 3,
+    created_by: 'system-seed',
+    tone: 'green',
+    alert_count: 3,
+    version: 'v1.0',
+    schedule: 'Daily',
+  },
+  {
+    id: 'agent-billing-001',
+    name: 'Billing Documentation Copilot',
+    type: 'billing_documentation',
+    description: 'Verifies billable requirements, generates compliant note templates, cross-checks conflicts and units.',
+    status: 'active',
+    guidelines_engine_id: 'engine-maryland-dda-v2',
+    guidelines_engine_name: 'Maryland DDA',
+    guidelines_engine_version: 'v2.0',
+    master_prompt: 'Verify all billing documentation meets Maryland DDA requirements. Check for conflicts between CCS and TCM billing. Validate authorization windows. Flag any units approaching monthly caps. Generate compliant contact note templates pre-filled with required fields.',
+    master_prompt_updated_by: 'Babar Nawaz',
+    auto_monitor: false,
+    push_mode: 'manual',
+    individuals_count: 30,
+    avg_compliance: 91,
+    active_runs: 0,
+    drafts_pending: 0,
+    created_by: 'system-seed',
+    tone: 'amber',
+    alert_count: 0,
+    version: 'v1.1',
+    schedule: 'Manual only',
+  },
+  {
+    id: 'agent-monitoring-001',
+    name: 'Monitoring & Reauth Copilot',
+    type: 'monitoring_reauth',
+    description: 'Tracks monitoring deadlines, reauthorization caps, creates monitoring forms and reauth drafts automatically.',
+    status: 'active',
+    guidelines_engine_id: 'engine-virginia-dbhds-v1',
+    guidelines_engine_name: 'Virginia DBHDS',
+    guidelines_engine_version: 'v1.0',
+    master_prompt: 'Monitor all Virginia DBHDS waiver individuals for reauthorization deadlines. Alert 45 days before auth expiration. Create pre-filled monitoring forms. Track quarterly visit requirements and flag any overdue visits. Prioritize individuals with ISP expiration within 60 days.',
+    master_prompt_updated_by: 'Babar Nawaz',
+    auto_monitor: true,
+    push_mode: 'manual',
+    individuals_count: 12,
+    avg_compliance: 96,
+    active_runs: 0,
+    drafts_pending: 2,
+    created_by: 'system-seed',
+    tone: 'purple',
+    alert_count: 4,
+    version: 'v1.0',
+    schedule: 'Every 6 hours',
+  },
+  {
+    id: 'agent-isp-001',
+    name: 'ISP Generator',
+    type: 'isp_generator',
+    description: 'Generates Individual Service Plans from assessments, monitoring data, and state guidelines. Drafts complete ISPs for case manager review.',
+    status: 'active',
+    guidelines_engine_id: 'engine-maryland-dda-v2',
+    guidelines_engine_name: 'Maryland DDA',
+    guidelines_engine_version: 'v2.0',
+    master_prompt: 'Generate complete ISPs using all available assessment data including HRST, SIS-A, and previous monitoring forms. Write goals in person-first language. Ensure all required sections are present. Flag any section where assessment data is missing or outdated. Do not generate employment goals without documented FAE.',
+    master_prompt_updated_by: 'Babar Nawaz',
+    auto_monitor: false,
+    push_mode: 'manual',
+    individuals_count: 15,
+    avg_compliance: 93,
+    active_runs: 0,
+    drafts_pending: 0,
+    created_by: 'system-seed',
+    tone: 'red',
+    alert_count: 0,
+    version: 'v1.0',
+    schedule: 'Manual only',
+  },
+];
+
+export async function seedAgents(): Promise<void> {
+  const existing = await getDocs(
+    query(collection(db, 'agents'), where('created_by', '==', 'system-seed'))
+  );
+  if (!existing.empty) return;
+
+  const batch = writeBatch(db);
+  const now = Timestamp.now();
+  const lastRunDate = Timestamp.fromDate(new Date('2026-02-22T09:30:00'));
+
+  for (const agent of SEED_AGENTS) {
+    const ref = doc(db, 'agents', agent.id);
+    batch.set(ref, {
+      ...agent,
+      created_at: now,
+      last_run_at: lastRunDate,
+      master_prompt_updated_at: now,
+    });
+  }
+
+  await batch.commit();
+}

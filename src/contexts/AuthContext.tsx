@@ -38,6 +38,7 @@ interface AuthContextValue {
   // Actions
   logout: () => Promise<void>;
   hasPermission: (requiredRole: AppRole) => boolean;
+  refreshProfile?: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -91,6 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const role = profile?.role ?? null;
 
+  const refreshProfile = async () => {
+    if (firebaseUser) {
+      try {
+        const result = await loadUserData(firebaseUser.uid);
+        setProfile(result.profile);
+      } catch (err) {
+        console.error('[AuthContext] Failed to refresh profile:', err);
+      }
+    }
+  };
+
   const logout = async () => {
     await logOut();
   };
@@ -116,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!firebaseUser,
     logout,
     hasPermission,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

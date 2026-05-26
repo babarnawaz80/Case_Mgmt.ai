@@ -42,6 +42,7 @@ export interface Individual {
   address?: string;
   phone?: string;
   enrollment_status: "active" | "transition" | "discharged" | "pending";
+  status?: string;
   program?: string;
   level_of_care?: string;
   organizationId: string;
@@ -60,7 +61,14 @@ export interface Individual {
   alerts?: string[];
   companion_link_active?: boolean;
   companion_token?: string | null;
+  companion_prompt?: {
+    content: string;
+    lastUpdatedBy: string;
+    lastUpdatedAt: unknown;
+    version: number;
+  } | null;
   employment?: any;
+  photo_url?: string | null;   // uploaded avatar image
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -91,6 +99,7 @@ function toIndividual(id: string, data: DocumentData): Individual {
     address: data.address,
     phone: data.phone,
     enrollment_status: data.enrollment_status ?? "active",
+    status: data.status ?? statusLabel(data.enrollment_status ?? "active"),
     program: data.program,
     level_of_care: data.level_of_care,
     organizationId: data.organizationId ?? "",
@@ -110,7 +119,9 @@ function toIndividual(id: string, data: DocumentData): Individual {
     alerts: data.alerts ?? [],
     companion_link_active: data.companion_link_active ?? false,
     companion_token: data.companion_token ?? null,
+    companion_prompt: data.companion_prompt ?? null,
     employment: data.employment ?? null,
+    photo_url: data.photo_url ?? null,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };

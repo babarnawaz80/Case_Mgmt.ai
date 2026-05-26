@@ -6,6 +6,7 @@ import {
   CheckCircle2, FileText, ShieldCheck, History, Plus, Trash2, Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import {
   buildAIPreFilledEligibility,
@@ -640,7 +641,9 @@ function Timeline({ personId }: { personId: string }) {
             <div className="text-[11.5px] font-geist text-icm-text-dim mt-1 flex items-center gap-2 flex-wrap">
               <span className="font-mono">MA #{r.maNumber}</span>
               <span>·</span>
-              <span>Verified by {r.updatedBy}</span>
+              <span className="inline-flex items-center gap-1">
+                Verified by <AuthorCell name={r.updatedBy} size="sm" showName={true} />
+              </span>
               {r.documentName && (
                 <>
                   <span>·</span>

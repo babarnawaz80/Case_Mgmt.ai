@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import {
@@ -18,12 +18,9 @@ import {
 } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { AdminOnly } from "@/components/platform/AdminOnly";
-import {
-  guidelinesEngines,
-  totalHardStops,
-  totalWarnings,
-} from "@/data/guidelinesEngines";
 import type { AgentType, PushMode } from "@/data/complianceAgents";
+import { getGuidelinesEngines, getPublishedEngines, type GuidelinesEngineDoc } from "@/services/guidelinesEngineService";
+import { createAgent } from "@/services/agentsService";
 
 const AGENT_TYPES: Array<{ type: AgentType; description: string }> = [
   {
@@ -111,6 +108,14 @@ const NewAgentWizard = () => {
   // Step 2
   const [engineId, setEngineId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qEngineId = params.get("engineId");
+    if (qEngineId) {
+      setEngineId(qEngineId);
+    }
+  }, []);
+
   // Step 3
   const [pushMode, setPushMode] = useState<PushMode>("Manual");
   const [cmOverride, setCmOverride] = useState(true);
@@ -136,16 +141,67 @@ const NewAgentWizard = () => {
   const [deployConfirm, setDeployConfirm] = useState(false);
   const [deployed, setDeployed] = useState(false);
 
-  if (!isAdmin) return <AdminOnly />;
+  const [publishedEngines, setPublishedEngines] = useState<GuidelinesEngineDoc[]>([]);
+  const [draftEngines, setDraftEngines] = useState<GuidelinesEngineDoc[]>([]);
+  const [newAgentId, setNewAgentId] = useState<string | null>(null);
 
-  const publishedEngines = guidelinesEngines.filter(
-    (e) => e.status === "Published",
-  );
+  useEffect(() => {
+    (async () => {
+      const docs = await getGuidelinesEngines();
+      setPublishedEngines(docs.filter((e) => e.status === "published"));
+      setDraftEngines(docs.filter((e) => e.status === "draft"));
+    })();
+  }, []);
+
+  function toServiceAgentType(t: AgentType): any {
+    const map: Record<AgentType, string> = {
+      "Guidelines Engine Agent": 'pcp_generator',
+      "PCP Alignment": 'pcp_alignment',
+      "Billing Documentation": 'billing_documentation',
+      "Monitoring / Reauthorization": 'monitoring_reauth',
+      "ISP Generator": 'isp_generator',
+      "Ambient Meeting Copilot": 'compliance_copilot',
+      "Custom": 'compliance_copilot',
+    };
+    return map[t] || 'pcp_generator';
+  }
+
+  function toServicePushMode(p: PushMode): any {
+    const map: Record<PushMode, string> = {
+      "Manual": 'manual',
+      "Auto-Pass": 'auto_pass',
+      "Auto-Always": 'auto_always',
+    };
+    return map[p] || 'manual';
+  }
 
   const selectedEngine = publishedEngines.find((e) => e.id === engineId);
 
   const canStep2 = !!engineId;
   const canDeploy = confirmed && !!engineId && name.trim().length > 0;
+
+  const handleDeployConfirm = async () => {
+    if (!engineId || !selectedEngine) return;
+    
+    const agentId = await createAgent({
+      name: name || "Untitled Agent",
+      type: toServiceAgentType(type),
+      description: description || "No description provided.",
+      guidelines_engine_id: engineId,
+      guidelines_engine_name: selectedEngine.name,
+      guidelines_engine_version: selectedEngine.version,
+      master_prompt: instructions || "Apply state guidelines engine.",
+      auto_monitor: autoMonitor,
+      push_mode: toServicePushMode(pushMode),
+      created_by: "Babar Nawaz",
+    });
+    
+    setNewAgentId(agentId);
+    setDeployConfirm(false);
+    setDeployed(true);
+  };
+
+  if (!isAdmin) return <AdminOnly />;
 
   if (deployed) {
     return (
@@ -174,7 +230,7 @@ const NewAgentWizard = () => {
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
             <button
-              onClick={() => navigate(`/platform/agents/agent-state-engine`)}
+              onClick={() => navigate(`/platform/agents/${newAgentId}`)}
               className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[12.5px] font-geist font-semibold hover:opacity-90"
             >
               View agent →
@@ -247,6 +303,7 @@ const NewAgentWizard = () => {
         {step === 2 && (
           <Step2
             publishedEngines={publishedEngines}
+            draftEngines={draftEngines}
             engineId={engineId}
             setEngineId={setEngineId}
             navigate={navigate}
@@ -355,10 +412,7 @@ const NewAgentWizard = () => {
               Cancel
             </button>
             <button
-              onClick={() => {
-                setDeployConfirm(false);
-                setDeployed(true);
-              }}
+              onClick={handleDeployConfirm}
               className="h-9 px-4 rounded-lg bg-icm-green text-white text-[12px] font-semibold hover:opacity-90"
             >
               Confirm & Deploy
@@ -532,18 +586,17 @@ function Step1(p: {
 
 function Step2({
   publishedEngines,
+  draftEngines,
   engineId,
   setEngineId,
   navigate,
 }: {
-  publishedEngines: typeof guidelinesEngines;
+  publishedEngines: GuidelinesEngineDoc[];
+  draftEngines: GuidelinesEngineDoc[];
   engineId: string | null;
   setEngineId: (id: string) => void;
   navigate: (p: string) => void;
 }) {
-  const draftEngines = guidelinesEngines.filter(
-    (e) => e.status === "Draft",
-  );
   return (
     <div className="space-y-5">
       <div>
@@ -572,8 +625,8 @@ function Step2({
       <div className="space-y-2.5">
         {publishedEngines.map((e) => {
           const selected = engineId === e.id;
-          const hs = totalHardStops(e);
-          const wn = totalWarnings(e);
+          const hs = e.hard_stop_count || 0;
+          const wn = e.warning_count || 0;
           return (
             <button
               key={e.id}
@@ -600,10 +653,10 @@ function Step2({
                   </span>
                 </div>
                 <p className="text-[11.5px] font-geist text-icm-text-dim mt-1 truncate">
-                  {e.state} · {e.program} · Effective {e.effectiveDate}
+                  {e.state} · {e.program} · Effective {e.effective_date}
                 </p>
                 <p className="text-[11px] font-mono text-icm-text-faint mt-0.5">
-                  {e.services.length} services · {hs} hard stops · {wn} warnings
+                  {e.extracted_rules?.required_sections?.length || 0} services · {hs} hard stops · {wn} warnings
                 </p>
               </div>
               {selected ? (
@@ -942,7 +995,7 @@ function Step4(p: {
 function Step5(p: {
   name: string;
   type: AgentType;
-  engine?: (typeof guidelinesEngines)[number];
+  engine?: GuidelinesEngineDoc;
   pushMode: PushMode;
   autoMonitor: boolean;
   schedule: string;

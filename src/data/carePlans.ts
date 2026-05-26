@@ -225,6 +225,130 @@ export const plans: CarePlan[] = [
       { date: "08/01/2024", user: "Babar Nawaz CM", action: "Plan effective" },
     ],
   },
+
+  // ─── Lisa Anderson — Current approved plan (Oct 2024–Sep 2025) ──
+  {
+    id: "la-2025",
+    personId: "46",
+    status: "Approved",
+    internalDueDate: "09/30/2025",
+    meetingDate: "10/14/2024",
+    approvalDate: "10/17/2024",
+    effectiveDate: "10/01/2024",
+    reviewDate: "09/30/2025",
+    updatedBy: "Kathy Martinez CM",
+    updatedOn: "04/15/2025",
+    aiDrafted: false,
+    goals: [
+      {
+        id: "la-g1",
+        number: 1,
+        title: "Independent Living Skills",
+        description:
+          "Lisa will develop and maintain independent living skills including meal preparation, personal budgeting, and household management with decreasing levels of support over the plan year.",
+        targetDate: "09/30/2025",
+        responsibleParty: "Kathy Martinez CM + Home Support Staff",
+        progress: "Achieved",
+        objectives: [
+          { id: "la-g1o1", description: "Independently prepare at least 3 meals per week without physical prompting", status: "Achieved" },
+          { id: "la-g1o2", description: "Manage weekly personal spending budget with a written checklist", status: "Achieved" },
+          { id: "la-g1o3", description: "Handle own laundry and household cleaning tasks on a set schedule", status: "Achieved" },
+        ],
+      },
+      {
+        id: "la-g2",
+        number: 2,
+        title: "Community Integration",
+        description:
+          "Lisa will participate in structured community activities including a day program and monthly social outings, building peer relationships and community presence.",
+        targetDate: "Ongoing",
+        responsibleParty: "Carroll Day Services + Kathy Martinez CM",
+        progress: "In Progress",
+        objectives: [
+          { id: "la-g2o1", description: "Enroll in day program by January 2025 and maintain 90%+ attendance", status: "In Progress" },
+          { id: "la-g2o2", description: "Participate in at least 1 community social outing per month by April 2025", status: "In Progress" },
+          { id: "la-g2o3", description: "Form at least 2 peer friendships through program activities", status: "Achieved" },
+        ],
+      },
+      {
+        id: "la-g3",
+        number: 3,
+        title: "Art & Creative Expression",
+        description:
+          "Lisa will pursue her interest in visual art by enrolling in a community art class, completing a full session, and expanding her creative practice as a source of personal fulfillment.",
+        targetDate: "06/30/2025",
+        responsibleParty: "Lisa Anderson (self-directed) + Kathy Martinez CM",
+        progress: "In Progress",
+        aiSuggested: false,
+        objectives: [
+          { id: "la-g3o1", description: "Research and enroll in a community art class by March 2025", status: "Achieved" },
+          { id: "la-g3o2", description: "Complete at least one 6-week art class session", status: "Achieved" },
+          { id: "la-g3o3", description: "Enroll in a second or intermediate class by June 2025", status: "In Progress" },
+        ],
+      },
+    ],
+    services: [
+      {
+        id: "la-s1",
+        name: "Case Management (T2022)",
+        provider: "Carroll County CM Services",
+        startDate: "10/01/2024",
+        endDate: "09/30/2025",
+        units: "8 hrs/mo",
+        status: "Active",
+      },
+      {
+        id: "la-s2",
+        name: "Day Habilitation (T2021)",
+        provider: "Carroll Day Services",
+        startDate: "01/06/2025",
+        endDate: "09/30/2025",
+        units: "5 days/week",
+        status: "Active",
+      },
+      {
+        id: "la-s3",
+        name: "Community Living Support (H2015)",
+        provider: "Carroll Home Care",
+        startDate: "04/15/2025",
+        endDate: "09/30/2025",
+        units: "10 hrs/week",
+        status: "Active",
+      },
+    ],
+    supportNeeds: {
+      workingWell: {
+        value:
+          "Lisa thrives with consistent routine and visual supports (written schedules, checklists). Relationship with her case manager is strong. Day program attendance has been excellent since January 2025. Art class has been a significant motivator.",
+      },
+      notWorking: {
+        value:
+          "Lisa experiences heightened anxiety in unstructured or unpredictable situations. Transportation to community activities has been inconsistent — need to coordinate consistent transportation support.",
+      },
+      preferences: {
+        value:
+          "Lisa prefers structured activities with clear expectations. She has expressed strong interest in art, music, and social outings with familiar peers. She wants to explore supported employment opportunities in the future.",
+      },
+      healthSafety: {
+        value:
+          "Anxiety Disorder managed with current medication — no recent episodes since February 2025. No safety incidents reported. PCP follow-up scheduled June 2025.",
+      },
+    },
+    team: [
+      { role: "Individual", name: "Lisa Anderson", status: "Signed", signedOn: "10/17/2024" },
+      { role: "Guardian / Representative", name: "Carol Anderson (mother)", status: "Signed", signedOn: "10/17/2024" },
+      { role: "Case Manager", name: "Kathy Martinez CM", status: "Signed", signedOn: "10/17/2024" },
+      { role: "Day Program Coordinator", name: "Carroll Day Services", status: "Signed", signedOn: "01/06/2025" },
+      { role: "Behavioral Support Specialist", name: "Dr. Susan Holt", status: "Not required" },
+    ],
+    history: [
+      { date: "04/15/2025", user: "Kathy Martinez CM", action: "Semi-annual review completed — 3 goals updated" },
+      { date: "01/16/2025", user: "Kathy Martinez CM", action: "Quarterly review — Art goal added, day program enrollment confirmed" },
+      { date: "10/17/2024", user: "Kathy Martinez CM", action: "Plan approved — all team signatures collected" },
+      { date: "10/14/2024", user: "Kathy Martinez CM", action: "Plan meeting completed with Lisa and Carol Anderson" },
+      { date: "10/01/2024", user: "Kathy Martinez CM", action: "Plan effective" },
+    ],
+  },
 ];
 
 export function getPlansForPerson(personId: string): CarePlan[] {

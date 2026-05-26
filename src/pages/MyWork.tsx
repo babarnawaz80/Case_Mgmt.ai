@@ -41,6 +41,7 @@ import { useTasks, completeTask as firestoreCompleteTask, addTaskComment, create
 import type { Task } from "@/hooks/useTasks";
 import { useIndividuals } from "@/hooks/useIndividuals";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 // ---------- Shape adapter: Firestore Task → MyWorkTask ----------
 function mapTaskToMyWork(t: Task): MyWorkTask {
@@ -538,47 +539,51 @@ const MyWork = () => {
 
         {/* Top-level segmented control: My Work / Alerts / Mentions / Completed */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="inline-flex items-center p-1.5 rounded-2xl bg-icm-bg/70 ring-1 ring-icm-border/60 shadow-inner">
-            {(() => {
-              const checkInsList = loadCheckIns();
-              const pendingAI = checkInsList.filter((c) => c.status === "Pending Review").length;
-              return [
-                { key: "my_work" as const, label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
-                { key: "alerts" as const, label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
-                { key: "mentions" as const, label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
-                { key: "ai_checkins" as const, label: "AI Check-Ins", count: pendingAI, alert: pendingAI > 0 },
-                { key: "completed" as const, label: "Completed", count: counts.completed, alert: false },
-              ];
-            })().map((t) => {
-              const active = view === t.key;
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setView(t.key)}
-                  className={cn(
-                    "h-9 px-4 rounded-xl text-[12.5px] font-geist flex items-center gap-1.5 transition-all",
-                    active
-                      ? "bg-icm-panel text-icm-text font-bold shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
-                      : "text-icm-text-dim hover:text-icm-text font-semibold"
-                  )}
-                >
-                  {t.label}
-                  {t.count > 0 && (
-                    <span
-                      className={cn(
-                        "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center",
-                        t.alert
-                          ? "bg-icm-red/10 text-icm-red"
-                          : "bg-icm-bg text-icm-text-faint",
-                        active && !t.alert && "bg-icm-bg"
-                      )}
-                    >
-                      {t.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="overflow-x-auto scrollbar-none -mx-1 sm:mx-0">
+            <div className="inline-flex items-center p-1.5 rounded-2xl bg-icm-bg/70 ring-1 ring-icm-border/60 shadow-inner min-w-max" role="tablist" aria-label="Work views">
+              {(() => {
+                const checkInsList = loadCheckIns();
+                const pendingAI = checkInsList.filter((c) => c.status === "Pending Review").length;
+                return [
+                  { key: "my_work" as const, label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
+                  { key: "alerts" as const, label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
+                  { key: "mentions" as const, label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
+                  { key: "ai_checkins" as const, label: "AI Check-Ins", count: pendingAI, alert: pendingAI > 0 },
+                  { key: "completed" as const, label: "Completed", count: counts.completed, alert: false },
+                ];
+              })().map((t) => {
+                const active = view === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setView(t.key)}
+                    className={cn(
+                      "h-9 px-4 rounded-xl text-[12.5px] font-geist flex items-center gap-1.5 transition-all whitespace-nowrap flex-shrink-0",
+                      active
+                        ? "bg-icm-panel text-icm-text font-bold shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
+                        : "text-icm-text-dim hover:text-icm-text font-semibold"
+                    )}
+                  >
+                    {t.label}
+                    {t.count > 0 && (
+                      <span
+                        className={cn(
+                          "px-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center",
+                          t.alert
+                            ? "bg-icm-red/10 text-icm-red"
+                            : "bg-icm-bg text-icm-text-faint",
+                          active && !t.alert && "bg-icm-bg"
+                        )}
+                      >
+                        {t.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {view === "my_work" && (
             <button
@@ -971,8 +976,8 @@ function TaskRow({
               {task.description}
             </p>
           )}
-          <div className="text-[10.5px] text-icm-text-dim font-geist">
-            Created by {task.createdBy} on {task.createdOn} · Source: {task.source}{task.sourceDetail ? ` · ${task.sourceDetail}` : ""}
+          <div className="text-[10.5px] text-icm-text-dim font-geist flex items-center gap-1.5 mt-0.5">
+            Created by <AuthorCell name={task.createdBy} size="sm" showName={true} /> on {task.createdOn} · Source: {task.source}{task.sourceDetail ? ` · ${task.sourceDetail}` : ""}
           </div>
           <div className="flex items-center gap-2">
             <input

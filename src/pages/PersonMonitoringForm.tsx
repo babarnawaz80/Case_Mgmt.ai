@@ -6,6 +6,8 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useMonitoringForms } from "@/hooks/useFirestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 import { type FormStatus, type ReviewType } from "@/data/monitoringForms";
 
 const PersonMonitoringForm = () => {
@@ -13,6 +15,9 @@ const PersonMonitoringForm = () => {
   const navigate = useNavigate();
   const { individual, loading: individualLoading } = useIndividual(id);
   const { data: allForms, loading: formsLoading } = useMonitoringForms(id);
+  const { userProfile } = useAuth();
+
+
 
   const [filterType, setFilterType] = useState<"All" | ReviewType>("All");
   const [filterStatus, setFilterStatus] = useState<"All" | FormStatus>("All");
@@ -148,11 +153,11 @@ const PersonMonitoringForm = () => {
           <FilterSelect label="Type" value={filterType} onChange={(v) => setFilterType(v as any)} options={["All", "Monthly", "Quarterly", "Annually"]} />
           <FilterSelect label="Status" value={filterStatus} onChange={(v) => setFilterStatus(v as any)} options={["All", "Draft", "In Progress", "Submitted"]} />
           <FilterSelect label="Active" value={filterActive} onChange={(v) => setFilterActive(v as any)} options={["All", "Active", "Inactive"]} />
-          <div className="flex items-center gap-1.5 ml-auto">
-            <span className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint">From</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text" />
-            <span className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint">To</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text" />
+          <div className="flex items-center gap-1.5 ml-auto max-w-full overflow-hidden">
+            <span className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint shrink-0">From</span>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text min-w-0 w-full max-w-[130px]" />
+            <span className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint shrink-0">To</span>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text min-w-0 w-full max-w-[130px]" />
           </div>
         </div>
 
@@ -176,7 +181,9 @@ const PersonMonitoringForm = () => {
                     <td className="px-4 py-3"><DateCell value={f.due_date || f.dueDate || f.submitted_date} /></td>
                     <td className="px-4 py-3"><StatusPill status={f.status} /></td>
                     <td className="px-4 py-3 text-icm-text-dim">{f.active || "Active"}</td>
-                    <td className="px-4 py-3 text-icm-text-dim">{f.updated_by || f.updatedBy || f.author_name || "Kathy Martinez"}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">
+                      <AuthorCell name={f.updated_by || f.updatedBy || f.author_name || "Kathy Martinez"} />
+                    </td>
                     <td className="px-4 py-3 font-mono text-icm-text-dim">{f.updated_on || f.updatedOn || new Date(f.created_at?.seconds * 1000 || Date.now()).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

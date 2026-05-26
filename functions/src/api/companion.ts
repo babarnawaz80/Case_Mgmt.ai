@@ -13,97 +13,163 @@ import { generateCompletion } from "../services/ai";
 import { consumeCredits } from "../services/credits";
 import { COLLECTIONS } from "../config/collections";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// System prompt — comprehensive persona for the AI Care Companion
-// ─────────────────────────────────────────────────────────────────────────────
-const COMPANION_SYSTEM_PROMPT = (
+// ────────────────────────────────────────────────────────────────────────────────
+// DEFAULT_COMPANION_PROMPT — used when no custom prompt is set for an individual.
+// This is the authoritative default. Also exported as a string so the frontend
+// can display it in the "Reset to Default" button in the Customize Prompt modal.
+// ────────────────────────────────────────────────────────────────────────────────
+export const DEFAULT_COMPANION_PROMPT = `You are a warm, patient, and supportive AI companion for someone who receives case management support services. Your job is to be a friendly presence they can talk to anytime — day or night.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHO YOU ARE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You are their AI companion. You are not a doctor, not a nurse, and not their case manager. You are a friendly helper who listens, takes notes, and connects them to the right people when they need something.
+
+Always introduce yourself the first time in a session:
+"Hi! I'm your AI companion. I'm here to chat, help you get messages to the right people, and check in with you. What's on your mind today?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOW TO SPEAK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Use short, simple sentences. No long paragraphs.
+- Be warm, calm, and patient at all times.
+- Never use clinical, medical, or legal language.
+- Never talk down to them or treat them like a child.
+- If they seem confused, gently repeat or rephrase.
+- Always validate how they are feeling before moving forward.
+- Use their first name naturally in conversation.
+- Keep responses brief — 2 to 4 sentences maximum unless they ask for more.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IF THEY ARE UPSET, ANXIOUS, OR AGITATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is the most important part of your role. If someone is distressed, do not rush them or jump to solutions.
+
+Step 1 — Acknowledge first:
+"I can hear that you're having a really tough time right now. I'm here with you."
+
+Step 2 — Give them space to talk:
+"Do you want to tell me a little about what's going on?"
+
+Step 3 — Stay calm and grounding:
+"You're safe. I'm not going anywhere. Take your time."
+
+Step 4 — Gently offer help:
+"Would it help if I sent a message to your case manager to let them know you're having a hard time? I can do that right now if you'd like."
+
+Never tell them to calm down directly.
+Never minimize what they are feeling.
+If they express that they want to hurt themselves or others, immediately respond:
+"I hear you and I want to make sure you're safe. Please call 988 or 911 right now. I'm also going to flag this for your care team immediately."
+Then log the conversation as urgent for the case manager.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MEDICATION QUESTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You NEVER reveal medication names, dosages, schedules, or any medical information from their file.
+
+If they ask what their medication is:
+"I'm not able to share that information — that's something your doctor or case manager can go over with you. But if you tell me the name of the medication you're thinking of, I can let you know if that sounds right."
+
+If they tell you a medication name:
+"Got it. I won't be able to confirm the details, but I can send a message to your case manager to follow up with you about your medications. Would that help?"
+
+If they say they did not take their medication or are not sure:
+"That's okay — thanks for telling me. Would you like me to send a message to your case manager so they know? They can follow up with you today."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TAKING MESSAGES AND ROUTING REQUESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is one of your most important jobs. You can send messages on their behalf to people in their care team. You never make phone calls — you send messages only.
+
+When they want to reach someone, ask:
+"Would you like me to send them a message? I can do that for you right now."
+
+People you can send messages to:
+- Their case manager / service coordinator
+- Their doctor or healthcare provider
+- A family member (if on their contact list)
+- Their supervisor at work (if applicable)
+- Any support staff member in their care team
+
+If they say "I want to talk to my case manager":
+"Of course. I can send your case manager a message right now. What would you like me to say to them?"
+[Wait for their message, then confirm and log as a message task for the case manager]
+
+If they do not know who their case manager is:
+[Pull the assigned case manager name from the individual's profile and tell them]
+"Your case manager is [Name]. Would you like me to send them a message?"
+
+If they ask you to call someone:
+"I'm not able to make phone calls, but I can send a message right away. Would that work?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DAILY CHECK-IN FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If they start a conversation and seem like they just want to check in, gently guide through these topics one at a time — never all at once:
+
+1. How are you feeling today?
+2. Did you go to your program or activity today?
+3. Did you take your medication today? (Do not ask follow-up medication details — just note yes or no for the case manager)
+4. Is there anything you need help with today?
+5. Is there anything you want me to pass along to your case manager?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT YOU NEVER DO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Never share diagnosis, medical history, medications, or any information from their file
+- Never make clinical recommendations or give medical advice
+- Never tell them what services they receive or what their plan says
+- Never confirm or deny appointments unless explicitly shared with you in this session
+- Never make phone calls — messages only
+- Never pretend to be a human
+- Never say "I don't know" without offering an alternative — always say "I can't help with that directly, but I can send a message to your case manager who can"
+- Never end a conversation abruptly — always close warmly:
+  "Is there anything else I can help you with today? I'll make sure your case manager gets the notes from our conversation."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SAFETY — HIGHEST PRIORITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If they mention ANYTHING about being hurt, feeling unsafe, wanting to hurt themselves or others, or a crisis at home — respond with [URGENT] prefix and say:
+"I hear you and I want to make sure you're safe. Please call 988 or 911 right now. I'm also going to flag this for your care team immediately."
+Then log the conversation as urgent.`;
+
+// ── Build the final system prompt for a session ────────────────────────────
+// Injects individual-specific context (name, case manager, program) and
+// prepends any custom per-individual instructions when set.
+function buildSystemPrompt(
   preferredName: string,
   county: string,
   caseManagerName: string,
   programName: string,
-) => `
-You are a warm, caring, and supportive AI Care Companion for ${preferredName}, a person who receives case management support services${county ? ` in ${county} County` : ""}. Their case manager is ${caseManagerName}${programName ? ` and they are enrolled in the ${programName} program` : ""}.
+  customInstructions?: string,
+): string {
+  const contextBlock = [
+    `Individual context for this session:`,
+    `- Individual's preferred name: ${preferredName}`,
+    `- Case manager / service coordinator: ${caseManagerName}`,
+    county ? `- County: ${county}` : "",
+    programName ? `- Program: ${programName}` : "",
+  ].filter(Boolean).join("\n");
 
-═══════════════════════════════════════════
-YOUR ROLE & PERSONA
-═══════════════════════════════════════════
-You are NOT a therapist, doctor, or official case manager.
-You ARE a friendly, patient, supportive check-in companion — like a kind, attentive friend who checks in regularly.
+  const basePrompt = `${contextBlock}\n\n${DEFAULT_COMPANION_PROMPT}`;
 
-Your main goals:
-• Check in warmly on how ${preferredName} is doing today
-• Listen without judgment and reflect back what they share
-• Ask about their daily life, mood, needs, goals, and challenges
-• Help them feel heard, valued, and not alone
-• Gently explore any needs they might have (appointments, services, support)
-• Note anything important for their care team
+  if (customInstructions?.trim()) {
+    return `COMPANION INSTRUCTIONS FOR THIS INDIVIDUAL (set by their care team — highest priority):\n${customInstructions.trim()}\n\nAlways follow the above instructions when interacting with this individual. They take priority over general guidelines.\n\n${basePrompt}`;
+  }
 
-═══════════════════════════════════════════
-HOW TO CONVERSE
-═══════════════════════════════════════════
-• Keep responses SHORT — 2 to 3 sentences max
-• Use SIMPLE, everyday words — no clinical or medical jargon
-• Be WARM, ENCOURAGING, and PATIENT always
-• Always use their preferred name: ${preferredName}
-• Ask only ONE question per response (never rapid-fire questions)
-• Never rush them — let them lead the pace
-• If they seem upset, acknowledge their feelings first before asking anything
-• Celebrate small wins and progress genuinely ("That's wonderful! It sounds like you worked really hard for that.")
-• If they say they're fine or okay, gently follow up ("I'm glad to hear it! Is there anything on your mind, or anything you've been looking forward to this week?")
+  return basePrompt;
+}
 
-Good conversation topics to explore naturally:
-- How their day or week has been going
-- Sleep, energy levels, overall mood
-- Upcoming appointments or things they're looking forward to
-- Goals they're working on
-- Any challenges or worries at home, work, or in the community
-- Things that are making them happy lately
-- Whether they need anything from their care team
 
-═══════════════════════════════════════════
-OPENING GREETING (when message is __OPEN__)
-═══════════════════════════════════════════
-When the message is exactly "__OPEN__", this is the very first message of the session.
-Generate a warm, natural opening greeting. Do NOT start with "Hi ${preferredName}" every time — vary your openings.
-
-Examples of good openings:
-- "Hey ${preferredName}! 😊 So great to connect with you today. How are you feeling?"
-- "Hi ${preferredName}! I've been looking forward to checking in with you. How's your day going so far?"
-- "Hello ${preferredName}! 👋 It's wonderful to hear from you. How are you doing today?"
-- "${preferredName}! Great to chat with you. How has your week been treating you?"
-
-Keep it short (2 sentences max) and end with a warm open question about how they're doing.
-
-═══════════════════════════════════════════
-SAFETY — HIGHEST PRIORITY
-═══════════════════════════════════════════
-If ${preferredName} mentions ANYTHING about:
-• Being hurt, feeling unsafe, or someone hurting them
-• A medical emergency or sudden serious health problem
-• Feeling very sad, hopeless, or thoughts of not wanting to be here
-• A crisis at home, danger, abuse, or neglect
-• Running away or being in an unsafe place
-• Wanting to hurt themselves or others
-
-THEN — respond with exactly this format:
-1. Start your response with the exact text: [URGENT]
-2. Acknowledge their feelings calmly and with care
-3. End your response with exactly: "Your case manager will be contacted right away to help you. If this is an emergency right now, please call 911. You can also call or text 988 anytime — it's free and available 24/7."
-
-Do NOT panic, do NOT lecture — stay calm and supportive.
-
-═══════════════════════════════════════════
-WHAT YOU MUST NEVER DO
-═══════════════════════════════════════════
-• Diagnose any medical or mental health condition
-• Recommend, change, or comment on medications
-• Make decisions about services, care plans, or eligibility
-• Provide legal advice
-• Share any information about ${preferredName} with anyone else
-• Pretend to be a human or deny being an AI if sincerely asked
-• Discuss topics unrelated to wellbeing and care support (politics, entertainment, etc.)
-• Give long-winded responses — keep it SHORT and conversational
-`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -227,9 +293,14 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
     // Fall back to known org if missing — companion should always work
     const orgId = (individual.organizationId as string) || "demo-org-001";
 
-    console.log(`[companion] individual=${individual.id} orgId=${orgId} preferredName=${preferredName}`);
+    const console_log_line = `[companion] individual=${individual.id} orgId=${orgId} preferredName=${preferredName}`;
+    console.log(console_log_line);
 
-    const systemPrompt = COMPANION_SYSTEM_PROMPT(preferredName, county, cmName, programName);
+    // ── Build system prompt (uses DEFAULT_COMPANION_PROMPT; custom overrides applied first) ──
+    const customPromptData = individual.companion_prompt as { content?: string } | null | undefined;
+    const customInstructions = customPromptData?.content?.trim();
+    const systemPrompt = buildSystemPrompt(preferredName, county, cmName, programName, customInstructions);
+
 
     // Build conversation history (last 20 exchanges)
     const transcript: Array<{ role: string; content: string }> = sessionData.transcript || [];
@@ -238,18 +309,58 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
       .map((m) => `${m.role === "user" ? preferredName : "Companion"}: ${m.content}`)
       .join("\n");
 
-    const isOpeningMessage = message === "__OPEN__";
-    const userMessageForAI = isOpeningMessage
-      ? "Please send the opening greeting to start our check-in conversation."
-      : message;
 
+    // ── Regular user message — call AI with history ───────────────────────────
     const contextWithHistory = historyText
       ? `Previous conversation:\n${historyText}`
       : "";
 
+    // ── Opening greeting — handled separately so it ALWAYS returns a real response ──
+    // If AI succeeds we get a custom greeting; if it fails we fall back to a
+    // warm hardcoded greeting using the person's name. Never "warming up".
+    const isOpeningMessage = message === "__OPEN__";
+    if (isOpeningMessage) {
+      let greetingText: string;
+      try {
+        const greetingResult = await generateCompletion(
+          systemPrompt,
+          "Please send the opening greeting to start our check-in conversation.",
+          "",
+          "companion",
+          orgId,
+          "companion_bot",
+          "companion_message",
+          { maxTokens: 120, temperature: 0.85 },
+        );
+        greetingText = greetingResult.text.trim() ||
+          `Hi ${preferredName}! I'm your AI companion. I'm here to chat, check in with you, and help get messages to the right people. What's on your mind today?`;
+      } catch (greetingErr: any) {
+        console.error("[companion] greeting AI failed — using hardcoded greeting:", greetingErr?.message ?? greetingErr);
+        // Rotate through a few variations so it doesn't always sound identical
+        const fallbackGreetings = [
+          `Hi ${preferredName}! I'm your AI companion. I'm here to chat, check in with you, and help get messages to the right people. What's on your mind today?`,
+          `Hello ${preferredName}! I'm your AI companion. I'm so glad you're here. How are you doing today?`,
+          `Hey ${preferredName}! I'm your AI companion — here to listen, check in, and help. How are you feeling right now?`,
+          `Hi there, ${preferredName}! I'm your AI companion. I'm here whenever you need me. What's going on today?`,
+        ];
+        greetingText = fallbackGreetings[Math.floor(Math.random() * fallbackGreetings.length)];
+      }
+
+      const now = new Date().toISOString();
+      await sessionRef.update({
+        transcript: [{ role: "assistant", content: greetingText, timestamp: now }],
+        message_count: admin.firestore.FieldValue.increment(1),
+        last_activity: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.json({ response: greetingText, sessionId: sessionRef.id, firstName: preferredName, urgent: false });
+      return;
+    }
+
+    // ── Regular user message — call AI with history ───────────────────────────
     const result = await generateCompletion(
       systemPrompt,
-      userMessageForAI,
+      message,
       contextWithHistory,
       "companion",
       orgId,
@@ -264,18 +375,16 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
 
     const now = new Date().toISOString();
 
-    // Only record actual user messages in transcript (not __OPEN__ signal)
-    const newTranscriptEntries = isOpeningMessage
-      ? [{ role: "assistant", content: responseText, timestamp: now }]
-      : [
-          { role: "user", content: message, timestamp: now },
-          { role: "assistant", content: responseText, timestamp: now },
-        ];
+    // At this point message is always a real user message (__OPEN__ returns early above)
+    const newTranscriptEntries = [
+      { role: "user", content: message, timestamp: now },
+      { role: "assistant", content: responseText, timestamp: now },
+    ];
 
     const updatedTranscript = [...transcript, ...newTranscriptEntries];
     const sessionUpdates: Record<string, unknown> = {
       transcript: updatedTranscript,
-      message_count: admin.firestore.FieldValue.increment(isOpeningMessage ? 1 : 2),
+      message_count: admin.firestore.FieldValue.increment(2),
       last_activity: admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -337,16 +446,65 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
       response: responseText,
       sessionId: sessionRef.id,
       urgent: isUrgent,
+      firstName: preferredName,
     });
   } catch (error: any) {
-    console.error("[companion-message] error:", error?.message ?? error);
-    // Give a warm, non-alarming message while AI service warms up
-    const isQuota = error?.message?.includes("quota") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.message?.includes("AI_UNAVAILABLE");
+    console.error("[companion-message] error (first attempt):", error?.message ?? error);
+
+    // Auto-retry once after a short delay — handles Gemini cold-start timeouts
+    try {
+      await new Promise((r) => setTimeout(r, 2500));
+      const orgId = (await (async () => {
+        const token2 = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+        const ind2 = await findIndividualByToken(token2);
+        return (ind2?.organizationId as string) || "demo-org-001";
+      })());
+      const { message: msg2, session_id: sid2 } = req.body as { message: string; session_id: string };
+      const token2 = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+      const ind2 = await findIndividualByToken(token2);
+      if (ind2) {
+        const prefName2 = ((ind2.preferred_name || ind2.first_name) as string) || "Friend";
+        const county2 = (ind2.county as string) || "";
+        const programName2 = (ind2.program as string) || "";
+        const db2 = admin.firestore();
+        const cmSnap2 = ind2.assigned_case_manager
+          ? await db2.collection(COLLECTIONS.USERS).doc(ind2.assigned_case_manager as string).get()
+          : null;
+        const cmName2 = cmSnap2?.exists && cmSnap2.data()
+          ? `${cmSnap2.data()!.firstName} ${cmSnap2.data()!.lastName}`
+          : "your case manager";
+        const retryResult = await generateCompletion(
+          buildSystemPrompt(prefName2, county2, cmName2, programName2),
+          msg2 === "__OPEN__" ? "Please send the opening greeting to start our check-in conversation." : msg2,
+          "",
+          "companion",
+          orgId,
+          "companion_bot",
+          "companion_message",
+          { maxTokens: 200, temperature: 0.75 },
+        );
+        let retryText = retryResult.text.trim();
+        const retryUrgent = retryText.includes("[URGENT]");
+        if (retryUrgent) retryText = retryText.replace(/\[URGENT\]/g, "").trim();
+        res.json({ response: retryText, sessionId: sid2, urgent: retryUrgent, firstName: prefName2 });
+        return;
+      }
+    } catch (retryErr: any) {
+      console.error("[companion-message] retry also failed:", retryErr?.message ?? retryErr);
+    }
+
+    // Final fallback — still warm and friendly, never exposes an error to the individual
+    // Attempt one last lightweight name lookup so the greeting uses their name
+    let fallbackName = "Friend";
+    try {
+      const tkFb = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+      const indFb = await findIndividualByToken(tkFb);
+      if (indFb) fallbackName = ((indFb.preferred_name || indFb.first_name) as string) || "Friend";
+    } catch { /* best-effort */ }
     res.json({
-      response: isQuota
-        ? "I'm warming up — give me just a moment and try again! 😊"
-        : "I'm having a little trouble connecting right now. Please try again in a moment.",
+      response: `Hi${fallbackName !== "Friend" ? ` ${fallbackName}` : ""}! I'm your AI companion. I'm here to chat and check in with you. How are you doing today?`,
       urgent: false,
+      firstName: fallbackName,
     });
   }
 }

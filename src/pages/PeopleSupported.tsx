@@ -20,15 +20,14 @@ import { ImportWizardModal } from "@/components/ImportWizardModal";
 import {
   useIndividuals,
   riskScoreClass,
-  riskAvatarClass,
   riskTier,
-  initials,
   statusLabel,
   calcAge,
   type Individual,
 } from "@/hooks/useIndividuals";
 import { useRiskScore } from "@/contexts/RiskScoreContext";
 import { calculateRiskScore, loadRiskSettings } from "@/lib/riskEngine";
+import { getRiskLabel } from "@/lib/formatDate";
 
 
 type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending";
@@ -49,7 +48,7 @@ const PeopleSupported = () => {
   const computedScores = useMemo(() => {
     const m: Record<string, number> = {};
     individuals.forEach((p) => {
-      m[p.id] = calculateRiskScore(p.id, riskSettings).total;
+      m[p.id] = calculateRiskScore(p.id, riskSettings, p.risk_score).total;
     });
     return m;
   }, [individuals, riskSettings]);
@@ -272,12 +271,13 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
 
   return (
     <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
-      {/* Avatar — initials + risk color */}
-      <div
-        className={`w-12 h-12 rounded-xl flex items-center justify-center text-[13px] font-bold shrink-0 ${riskAvatarClass(person.risk_score)}`}
-      >
-        {initials(person)}
-      </div>
+      {/* Avatar — shows photo if uploaded, falls back to risk-tinted initials */}
+      <PersonAvatar
+        person={person}
+        size={48}
+        shape="rounded"
+        className="shrink-0"
+      />
 
       {/* Identity */}
       <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">
@@ -323,10 +323,14 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
           onClick={(e) => { e.stopPropagation(); onOpenRisk(); }}
           className="hidden md:block text-right shrink-0 group"
           title="View risk score breakdown"
+          aria-label={`Risk score ${displayScore} — ${getRiskLabel(displayScore)}. Click to view breakdown.`}
         >
           <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">Risk</p>
           <p className={`font-mono font-bold text-[16px] leading-tight group-hover:underline ${riskScoreClass(displayScore)}`}>
             {displayScore}
+          </p>
+          <p className={`text-[9.5px] font-geist leading-tight ${riskScoreClass(displayScore)}`}>
+            {getRiskLabel(displayScore)}
           </p>
         </button>
       )}

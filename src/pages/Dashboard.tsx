@@ -12,6 +12,7 @@ import { useIndividuals, riskTier, riskAvatarClass, initials } from "@/hooks/use
 import { useAllProgressNotes } from "@/hooks/useProgressNotes";
 import { useIncidentSummary } from "@/hooks/useIncidents";
 import { useAllAuthorizations } from "@/hooks/useFirestore";
+import { donutColor } from "@/lib/formatDate";
 import {
   Sun,
   Users,
@@ -295,9 +296,14 @@ function DonutCard({ kpi }: { kpi: DonutKpi }) {
           </div>
         )}
         <div className="relative">
-          <Donut value={kpi.value} size={72} stroke={8} color={kpi.color} />
+          <Donut value={kpi.value} size={72} stroke={8} color={donutColor(kpi.value)} />
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-mono font-bold text-[12px] text-icm-text">{kpi.centerLabel}</span>
+            <span
+              className="font-mono font-bold text-[12px] text-icm-text"
+              aria-label={`${kpi.value} percent ${kpi.title}`}
+            >
+              {kpi.centerLabel}
+            </span>
           </div>
         </div>
       </div>
@@ -354,14 +360,14 @@ function DonutRow() {
 
   const items: DonutKpi[] = [
     {
-      title: "ISP On-Time",
-      subtitle: "Active care plans",
+      title: "PCP Compliance",
+      subtitle: "Person-Centered Plan status",
       value: loading || !metrics ? 0 : metrics.ispOnTime.pct,
       centerLabel: loading ? dash : !metrics ? "0%" : `${metrics.ispOnTime.pct}%`,
       color: "hsl(var(--icm-green))",
       to: "/documentation/care-plans",
       legend: loading || !metrics ? undefined : [
-        { label: "On-Time", value: metrics.ispOnTime.n, dot: "bg-icm-green" },
+        { label: "Current", value: metrics.ispOnTime.n, dot: "bg-icm-green" },
         { label: "Overdue/Missing", value: metrics.total - metrics.ispOnTime.n, dot: "bg-icm-red" },
       ],
     },
@@ -516,7 +522,7 @@ function QuickActions() {
         <h3 className="font-manrope font-bold text-[13px] text-icm-text uppercase tracking-wider">
           Quick Actions
         </h3>
-        <span className="text-[11px] text-icm-text-faint font-geist ml-auto">
+        <span className="text-[11px] text-icm-text-faint font-geist">
           {ACTIONS.length} modules
         </span>
       </div>
@@ -524,23 +530,18 @@ function QuickActions() {
         {categories.map((cat) => {
           const items = tiles.filter((a) => a.category === cat);
           return (
-            <div key={cat} className="space-y-2.5">
-              {items.map((a) => (
-                <ActionTileBtn key={a.label} tile={a} onClick={() => handleTileClick(a)} />
-              ))}
+            <div key={cat} className="space-y-2">
+              <div className="space-y-2">
+                {items.map((a) => (
+                  <ActionTileBtn key={a.label} tile={a} onClick={() => handleTileClick(a)} />
+                ))}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-icm-border">
-        {(["Documentation", "Operations", "Care"] as ActionCategory[]).map((cat) => (
-          <div key={cat} className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-sm ${ACTION_TONES[cat].bg}`} />
-            <span className="text-[11px] font-geist text-icm-text-dim">{cat}</span>
-          </div>
-        ))}
-      </div>
+
 
       {picker && (
         <IndividualPickerModal
@@ -659,9 +660,48 @@ const Dashboard = () => {
         <HeroRow />
         <DonutRow />
         <QuickActions />
+        <AdminListDebug />
       </div>
     </ICMShell>
   );
 };
+
+function AdminListDebug() {
+  const { userProfile } = useAuth();
+  const [admins, setAdmins] = useState<any[]>([]);
+  
+  useEffect(() => {
+    if (!userProfile?.organizationId) return;
+    import("firebase/firestore").then(({ collection, query, where, getDocs }) => {
+      import("@/lib/firebase").then(({ db }) => {
+        const q = query(
+          collection(db, "users"),
+          where("organizationId", "==", userProfile.organizationId)
+        );
+        getDocs(q).then((snap) => {
+          const list = snap.docs.map(d => d.data());
+          setAdmins(list);
+          console.log("All users in org:", list);
+        }).catch(err => console.error("Admin fetch error", err));
+      });
+    });
+  }, [userProfile?.organizationId]);
+
+  if (admins.length === 0) return null;
+
+  return (
+    <div className="p-4 bg-icm-panel border border-icm-border rounded-xl mt-8">
+      <h3 className="text-[13px] font-bold mb-2">DEBUG: Users in Organization</h3>
+      <p className="text-[11px] mb-2 text-icm-text-dim">Your role: {userProfile?.role} | Org: {userProfile?.organizationId}</p>
+      <div className="space-y-1">
+        {admins.map(a => (
+          <div key={a.uid} className="text-[12px] font-mono">
+            - {a.displayName || a.email} ({a.email}): <strong className={a.role === 'admin' ? 'text-icm-green' : 'text-icm-amber'}>{a.role}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default Dashboard;

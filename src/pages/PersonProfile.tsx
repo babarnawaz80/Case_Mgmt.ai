@@ -39,18 +39,15 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
-import {
-  getProfile,
-  tabCompleteness,
-  overallCompleteness,
-  type TabKey,
-  type ProfileData,
-} from "@/data/profiles";
+import { getProfile, tabCompleteness, overallCompleteness, type TabKey, type ProfileData, LIVING_SITUATION_OPTIONS } from "@/data/profiles";
 import { useServiceAuthorizations } from "@/hooks/useFirestore";
+import { calculateRiskScore } from "@/lib/riskEngine";
+import { getRiskLabel } from "@/lib/formatDate";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "Basic Info" },
   { key: "medical", label: "Medical Info" },
+  { key: "monitors", label: "Monitors & Baselines" },
   { key: "court", label: "Court Involvement" },
   { key: "program", label: "Program" },
   { key: "contacts", label: "Contacts" },
@@ -70,6 +67,55 @@ const PersonProfile = () => {
   const [showSsn, setShowSsn] = useState(false);
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [echartOpen, setEchartOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  const getStatusStyles = (status?: string) => {
+    const s = (status ?? "active").toLowerCase();
+    if (s === "active") {
+      return {
+        dot: "bg-icm-green",
+        badge: "bg-icm-green-soft text-icm-green ring-icm-green/20",
+      };
+    }
+    if (s === "transition") {
+      return {
+        dot: "bg-icm-amber",
+        badge: "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
+      };
+    }
+    if (s === "discharged") {
+      return {
+        dot: "bg-icm-red",
+        badge: "bg-icm-red-soft text-icm-red ring-icm-red/20",
+      };
+    }
+    return {
+      dot: "bg-icm-accent",
+      badge: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
+    };
+  };
+
+  const handleStatusChange = async (newStatus: "active" | "transition" | "discharged" | "pending") => {
+    if (!person) return;
+    try {
+      const friendlyStatus =
+        newStatus === "active"
+          ? "Active"
+          : newStatus === "transition"
+          ? "Transition"
+          : newStatus === "discharged"
+          ? "Discharged"
+          : "Pending";
+      await updateIndividual(person.id, {
+        enrollment_status: newStatus,
+        status: friendlyStatus,
+      });
+      toast.success(`Status updated to ${friendlyStatus}`);
+      setStatusOpen(false);
+    } catch (err: any) {
+      toast.error(`Failed to update status: ${err.message}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -129,7 +175,7 @@ const PersonProfile = () => {
         <div className="sticky top-0 z-20 -mx-6 px-6 pt-1 pb-3 bg-icm-bg/95 backdrop-blur-sm">
           <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
             <div className="flex items-start gap-4 flex-wrap">
-              <PersonAvatar person={person as any} size={64} shape="square" className="text-[18px]" />
+              <PersonAvatar person={person as any} size={64} shape="square" className="text-[18px]" editable individualId={person.id} />
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -142,13 +188,14 @@ const PersonProfile = () => {
                   {person.risk_score !== undefined && (
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ring-1 ring-current/20 ${riskScoreClass(person.risk_score)}`}
+                      aria-label={`Risk score ${person.risk_score} — ${getRiskLabel(person.risk_score)}`}
                     >
-                      RISK {person.risk_score}
+                      RISK {person.risk_score} · {getRiskLabel(person.risk_score)}
                     </span>
                   )}
                 </div>
                 <p className="text-[12px] font-mono text-icm-text-dim mt-1">
-                  {person.gender} · {person.age}y · {person.dob} · {person.county} · ID #{person.id}
+                  {person.gender} · {calcAge(person.dob) != null ? `${calcAge(person.dob)}y` : "Age unknown"} · {person.dob} · {person.county} · ID #{person.id}
                 </p>
                 {/* Authorization compliance summary — one minimal line */}
                 <AuthComplianceLine individualId={person.id} />
@@ -162,11 +209,36 @@ const PersonProfile = () => {
               </div>
 
               <div className="flex items-center gap-2 flex-wrap relative">
-                <button className="h-9 px-3 rounded-xl text-[12px] font-geist font-medium flex items-center gap-1.5 bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 hover:brightness-95">
-                  <span className="w-1.5 h-1.5 rounded-full bg-icm-green" />
-                  {person.status}
-                  <ChevronDown className="w-3 h-3 opacity-70" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setStatusOpen((s) => !s)}
+                    className={`h-9 px-3 rounded-xl text-[12px] font-geist font-medium flex items-center gap-1.5 ring-1 ${getStatusStyles(person.status).badge} hover:brightness-95`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${getStatusStyles(person.status).dot}`} />
+                    {person.status ?? "Active"}
+                    <ChevronDown className="w-3 h-3 opacity-70" />
+                  </button>
+                  {statusOpen && (
+                    <div className="absolute left-0 top-10 z-30 w-[150px] rounded-xl border border-icm-border bg-icm-panel shadow-elevated overflow-hidden">
+                      <DropdownItem
+                        label="Active"
+                        onClick={() => handleStatusChange("active")}
+                      />
+                      <DropdownItem
+                        label="Pending"
+                        onClick={() => handleStatusChange("pending")}
+                      />
+                      <DropdownItem
+                        label="Transition"
+                        onClick={() => handleStatusChange("transition")}
+                      />
+                      <DropdownItem
+                        label="Discharged"
+                        onClick={() => handleStatusChange("discharged")}
+                      />
+                    </div>
+                  )}
+                </div>
                 <div className="relative">
                   <button
                     onClick={() => setEchartOpen((s) => !s)}
@@ -251,7 +323,7 @@ const PersonProfile = () => {
             )}
 
             {/* Tabs */}
-            <div className="mt-4 flex items-center gap-0.5 border-b border-icm-border overflow-x-auto -mb-3 -mx-1 px-1">
+            <div className="mt-4 flex items-center gap-0.5 border-b border-icm-border overflow-x-auto -mb-3 -mx-1 px-1" role="tablist" aria-label="Profile sections">
               {TABS.map((t) => {
                 const tc = tabMap[t.key];
                 const incomplete = tc && tc.missing.length > 0;
@@ -259,6 +331,11 @@ const PersonProfile = () => {
                 return (
                   <button
                     key={t.key}
+                    role="tab"
+                    aria-selected={active}
+                    tabIndex={active ? 0 : -1}
+                    aria-controls={`profile-tabpanel-${t.key}`}
+                    id={`profile-tab-${t.key}`}
                     onClick={() => setTabAndUrl(t.key)}
                     className={cn(
                       "px-3 py-2 text-[12.5px] font-geist border-b-2 -mb-px flex items-center gap-1.5 whitespace-nowrap",
@@ -268,7 +345,13 @@ const PersonProfile = () => {
                     )}
                   >
                     {t.label}
-                    {incomplete && <span className="w-1.5 h-1.5 rounded-full bg-icm-amber" />}
+                    {incomplete && (
+                      <span
+                        title="This section has missing required information"
+                        aria-label="(has missing information)"
+                        className="w-1.5 h-1.5 rounded-full bg-icm-amber"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -278,15 +361,15 @@ const PersonProfile = () => {
 
         {/* Tab content */}
         {tab === "basic" && (
-            <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} />
+            <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} personId={person.id} />
         )}
         {tab === "medical" && <MedicalInfoTab profile={profile} />}
-        
+        {tab === "monitors" && <MonitorsTab profile={profile} />}
         {tab === "court" && <CourtTab profile={profile} />}
         {tab === "program" && <ProgramTab profile={profile} />}
         {tab === "contacts" && <ContactsTab profile={profile} />}
         {tab === "documents" && <DocumentsTab profile={profile} />}
-        {tab === "administrative" && <AdminTab profile={profile} />}
+        {tab === "administrative" && <AdminTab profile={profile} person={person} />}
 
         {/* Per-tab completeness footer */}
         {tabMap[tab] && (
@@ -346,85 +429,208 @@ function AuthComplianceLine({ individualId }: { individualId: string }) {
 // =============================================================
 // TAB 1 — Basic Info
 // =============================================================
+const GENDER_OPTIONS = ["Male", "Female", "Non-binary", "Transgender", "Prefer not to say", "Other"];
+const RACE_OPTIONS = [
+  "American Indian or Alaska Native", "Asian", "Black or African American",
+  "Hispanic or Latino", "Native Hawaiian or Other Pacific Islander",
+  "White", "Two or more races", "Prefer not to say",
+];
+const LANGUAGE_OPTIONS = ["English", "Spanish", "French", "Mandarin", "Arabic", "ASL", "Other"];
+const REFERRAL_OPTIONS = ["Self-referral", "Family", "Hospital", "Court", "School", "State agency", "Other"];
+const CONTACT_PREF_OPTIONS = ["Phone", "Email", "Text", "Mail"];
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA",
+  "ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK",
+  "OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY",
+];
+
 function BasicInfoTab({
   person,
   profile,
   showSsn,
   setShowSsn,
+  personId,
 }: {
   person: Individual;
   profile: ProfileData;
   showSsn: boolean;
   setShowSsn: (v: boolean) => void;
+  personId: string;
 }) {
+  const [localLS, setLocalLS] = useState(profile.livingSituation ?? "");
+  const unstable = localLS === "Homeless" || localLS === "Other";
+
+  const handleLivingSituationChange = (newVal: string) => {
+    const oldLS = profile.livingSituation ?? "";
+    setLocalLS(newVal);
+    // Mutate the singleton so risk engine picks it up immediately
+    profile.livingSituation = newVal;
+
+    // Recalculate risk and show toast if level changed
+    try {
+      const before = calculateRiskScore(personId);
+      profile.livingSituation = newVal;
+      const after = calculateRiskScore(personId);
+      if (before.level !== after.level || before.total !== after.total) {
+        toast.success(
+          `Risk score updated to ${after.total} (${after.level}) based on living situation change.`,
+          { duration: 4500 }
+        );
+      }
+    } catch {
+      // silent — risk engine is non-blocking
+    }
+    if (oldLS !== newVal) {
+      // Log to profile change history
+      const today = new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+      profile.changeHistory = [
+        { date: today, user: "Case Manager", field: "Living Situation", oldValue: oldLS || "—", newValue: newVal },
+        ...profile.changeHistory,
+      ];
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Section title="Personal Information">
-        <KvGrid
-          rows={[
-            ["First Name", person!.first_name, true],
-            ["Middle Name", profile.middleName ?? "—"],
-            ["Last Name", person!.last_name, true],
-            ["Preferred Name", profile.preferredName ?? "—"],
-            ["Date of Birth", `${person!.dob}  ·  ${calcAge(person!.dob)}y`, true],
-            ["Gender", person!.gender === "M" ? "Male" : "Female"],
-            ["Pronouns", profile.pronouns ?? "—"],
-            ["Race / Ethnicity", profile.raceEthnicity?.join(", ") ?? "—"],
-            ["Primary Language", profile.primaryLanguage],
-            ["Secondary Language", profile.secondaryLanguage ?? "—"],
-            ["Communication Needs", profile.communicationNeeds ?? "—"],
-          ]}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="First Name" defaultValue={person.first_name} required />
+          <EditableField label="Middle Name" defaultValue={profile.middleName ?? ""} />
+          <EditableField label="Last Name" defaultValue={person.last_name} required />
+          <EditableField label="Preferred Name / Also Known As" defaultValue={profile.preferredName ?? ""} />
+          <EditableField label="Date of Birth" defaultValue={person.dob} required hint={`Age: ${calcAge(person.dob)}y`} />
+          <EditableSelect label="Gender" defaultValue={person.gender === "M" ? "Male" : "Female"} options={GENDER_OPTIONS} />
+          <EditableField label="Pronouns" defaultValue={profile.pronouns ?? ""} />
+          <EditableSelect label="Primary Language" defaultValue={profile.primaryLanguage} options={LANGUAGE_OPTIONS} required />
+          <EditableSelect label="Secondary Language" defaultValue={profile.secondaryLanguage ?? ""} options={["—", ...LANGUAGE_OPTIONS]} />
+          <div className="md:col-span-2">
+            <EditableField label="Communication Needs" defaultValue={profile.communicationNeeds ?? ""} multiline />
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">Race / Ethnicity</label>
+            <div className="flex flex-wrap gap-1.5">
+              {RACE_OPTIONS.map((opt) => {
+                const selected = (profile.raceEthnicity ?? []).includes(opt);
+                return (
+                  <span key={opt} className={cn(
+                    "px-2 py-0.5 rounded-full text-[11px] font-geist border cursor-default",
+                    selected ? "bg-icm-accent-soft text-icm-accent border-icm-accent/30" : "border-icm-border text-icm-text-dim"
+                  )}>{opt}</span>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </Section>
 
       <Section title="Address & Location">
-        <KvGrid
-          rows={[
-            ["Street", profile.street ?? "—"],
-            ["City", profile.city ?? "—"],
-            ["State", profile.state ?? "—"],
-            ["ZIP", profile.zip ?? "—"],
-            ["County", person!.county, true],
-            ["Living Situation", profile.livingSituation ?? "—"],
-          ]}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <div className="md:col-span-2">
+            <EditableField label="Street Address" defaultValue={profile.street ?? ""} />
+          </div>
+          <EditableField label="City" defaultValue={profile.city ?? ""} />
+          <EditableSelect label="State" defaultValue={profile.state ?? ""} options={US_STATES} />
+          <EditableField label="ZIP Code" defaultValue={profile.zip ?? ""} />
+          <EditableField label="County" defaultValue={person.county} required hint="Drives program assignment" />
+          {/* Living Situation — connected field */}
+          <div className="md:col-span-2">
+            <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">
+              Living Situation <span className="text-icm-red">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <select
+                className="modal-input max-w-xs"
+                value={localLS}
+                onChange={(e) => handleLivingSituationChange(e.target.value)}
+              >
+                <option value="">— Select —</option>
+                {LIVING_SITUATION_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {unstable && (
+                <span
+                  title="This living situation may affect the individual's risk score"
+                  className="flex items-center gap-1 text-[11px] font-geist text-icm-amber"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  May affect risk score
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </Section>
 
       <Section title="Identification">
-        <KvGrid
-          rows={[
-            [
-              "SSN",
-              <span className="flex items-center gap-2" key="ssn">
-                <span className="font-mono">{showSsn ? "123-45-6789" : profile.ssn ?? "XXX-XX-XXXX"}</span>
-                <button
-                  onClick={() => setShowSsn(!showSsn)}
-                  className="text-icm-text-faint hover:text-icm-text"
-                >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">SSN</label>
+              <div className="flex items-center gap-2">
+                <input
+                  className="modal-input w-40 font-mono"
+                  type={showSsn ? "text" : "password"}
+                  defaultValue={profile.ssn ?? "XXX-XX-XXXX"}
+                  readOnly
+                />
+                <button onClick={() => setShowSsn(!showSsn)} className="text-icm-text-faint hover:text-icm-text">
                   {showSsn ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
-              </span>,
-            ],
-            ["Medicaid ID", profile.medicaidId ?? "—"],
-            ["Medicare ID", profile.medicareId ?? "—"],
-            ["State ID", profile.stateId ?? "—"],
-            ["LTSS ID", profile.ltssId ?? "—"],
-            ["Date of Admission", person!.admittedOn, true],
-            ["Referral Source", profile.referralSource ?? "—"],
-          ]}
-        />
+              </div>
+            </div>
+          </div>
+          <EditableField label="Medicaid ID / MA Number" defaultValue={profile.medicaidId ?? ""} required />
+          <EditableField label="Medicare ID" defaultValue={profile.medicareId ?? ""} />
+          <EditableField label="State ID / Client ID" defaultValue={profile.stateId ?? ""} />
+          <EditableField label="LTSS ID" defaultValue={profile.ltssId ?? ""} />
+          <EditableField label="Date of Admission" defaultValue={person.admittedOn} required />
+          <EditableSelect label="Referral Source" defaultValue={profile.referralSource ?? ""} options={["", ...REFERRAL_OPTIONS]} />
+        </div>
       </Section>
 
       <Section title="Contact">
-        <KvGrid
-          rows={[
-            ["Primary Phone", profile.primaryPhone ?? "—", true],
-            ["Secondary Phone", profile.secondaryPhone ?? "—"],
-            ["Email", profile.email ?? "—"],
-            ["Preferred Contact", profile.preferredContact ?? "—"],
-          ]}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Primary Phone" defaultValue={profile.primaryPhone ?? ""} required />
+          <EditableField label="Secondary Phone" defaultValue={profile.secondaryPhone ?? ""} />
+          <EditableField label="Email Address" defaultValue={profile.email ?? ""} />
+          <EditableSelect label="Preferred Contact Method" defaultValue={profile.preferredContact ?? ""} options={["", ...CONTACT_PREF_OPTIONS]} />
+        </div>
       </Section>
+    </div>
+  );
+}
+
+// Small reusable editable field (reads disabled state from parent fieldset)
+function EditableField({
+  label, defaultValue, required, hint, multiline,
+}: { label: string; defaultValue: string; required?: boolean; hint?: string; multiline?: boolean }) {
+  return (
+    <div>
+      <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">
+        {label}{required && <span className="text-icm-red ml-0.5">*</span>}
+        {hint && <span className="ml-1.5 normal-case text-[10px] text-icm-text-faint">({hint})</span>}
+      </label>
+      {multiline ? (
+        <textarea className="modal-input min-h-[60px] py-1.5 px-2" defaultValue={defaultValue} />
+      ) : (
+        <input className="modal-input" defaultValue={defaultValue} />
+      )}
+    </div>
+  );
+}
+
+function EditableSelect({
+  label, defaultValue, options, required,
+}: { label: string; defaultValue: string; options: string[]; required?: boolean }) {
+  return (
+    <div>
+      <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">
+        {label}{required && <span className="text-icm-red ml-0.5">*</span>}
+      </label>
+      <select className="modal-input" defaultValue={defaultValue}>
+        {options.map((opt) => <option key={opt} value={opt}>{opt || "— Select —"}</option>)}
+      </select>
     </div>
   );
 }
@@ -565,72 +771,256 @@ function MedicalInfoTab({ profile }: { profile: ProfileData }) {
 
 
 // =============================================================
-// TAB 4 — Court Involvement
+// TAB 3 — Monitors & Baselines (NEW)
 // =============================================================
-function CourtTab({ profile }: { profile: ProfileData }) {
-  const isGuardianship =
-    profile.legalStatus === "Guardianship" || profile.legalStatus === "Power of Attorney";
+const OTHER_INSTRUMENT_INIT = { name: "", score: "", date: "", nextDue: "" };
+
+function MonitorsTab({ profile }: { profile: ProfileData }) {
+  const [instruments, setInstruments] = useState([OTHER_INSTRUMENT_INIT]);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="lg:col-span-2 space-y-4">
-        <Section title="Court Details">
-          <KvGrid
-            rows={[
-              ["Court", profile.court ?? "—"],
-              ["Attorney", profile.attorney ?? "—"],
-              ["Last Court Date", profile.lastCourtDate ?? "—"],
-              ["Next Court Date", profile.nextCourtDate ?? "—"],
-              ["Next Report Date", profile.nextReportDate ?? "—"],
-              ["Forensic Involvement", profile.forensicInvolvement ? "Yes" : "No"],
-              ["Legal Status", profile.legalStatus ?? "None"],
-            ]}
-          />
-          {isGuardianship && (
-            <div className="mt-4 pt-4 border-t border-icm-border">
-              <KvGrid
-                rows={[
-                  ["Guardian / POA Name", profile.guardianName ?? "—"],
-                  ["Relationship", profile.guardianRelationship ?? "—"],
-                  ["Phone", profile.guardianPhone ?? "—"],
-                  ["Address", profile.guardianAddress ?? "—"],
-                  ["Guardianship Type", profile.guardianshipType ?? "—"],
-                ]}
+    <div className="space-y-4">
+      <Section title="Standardized Scores">
+        <div className="space-y-4">
+          {/* HRST */}
+          <div>
+            <p className="text-[11px] font-mono uppercase tracking-wider text-icm-text-faint mb-2">HRST Score</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <EditableField label="Score (1–6)" defaultValue={profile.hrstScore?.toString() ?? ""} />
+              <EditableField label="Date of Last Assessment" defaultValue={profile.hrstScoredOn ?? ""} />
+              <EditableField label="Next Due Date" defaultValue="" />
+              <EditableField label="Assessed By" defaultValue="" />
+              <EditableSelect
+                label="Source"
+                defaultValue={profile.hrstSource ?? "Manual entry"}
+                options={["Intellectability", "Manual entry", "Uploaded"]}
               />
             </div>
-          )}
-        </Section>
-      </div>
-      <div className="space-y-4">
-        <Section title="Providers">
-          {profile.providers.length === 0 ? (
-            <Empty text="Manage in Medical tab." />
-          ) : (
-            <ul className="space-y-1.5 text-[12px] font-geist">
-              {profile.providers.map((p) => (
-                <li key={p.name} className="flex items-center justify-between">
-                  <span className="text-icm-text">{p.name}</span>
-                  <span className="text-icm-text-dim text-[11px]">{p.specialty}</span>
-                </li>
+            {(profile.hrstScore ?? 0) >= 3 && (
+              <div className="mt-2 rounded-lg border border-icm-amber/30 bg-icm-amber-soft p-2.5 text-[11.5px] font-geist text-icm-text flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-icm-amber" />
+                Score of {profile.hrstScore} requires nursing review per state guidelines.
+              </div>
+            )}
+          </div>
+
+          {/* Level of Care */}
+          <div className="pt-3 border-t border-icm-border">
+            <p className="text-[11px] font-mono uppercase tracking-wider text-icm-text-faint mb-2">Level of Care (LOC)</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <EditableField label="Current LOC" defaultValue="" />
+              <EditableField label="Effective Date" defaultValue="" />
+              <EditableField label="Expiration / Renewal Date" defaultValue="" />
+              <EditableField label="Issued By" defaultValue="" />
+            </div>
+          </div>
+
+          {/* Other instruments */}
+          <div className="pt-3 border-t border-icm-border">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-icm-text-faint">Other Standardized Instruments</p>
+              <button
+                type="button"
+                onClick={() => setInstruments((prev) => [...prev, { ...OTHER_INSTRUMENT_INIT }])}
+                className="h-7 px-2.5 rounded-lg border border-dashed border-icm-border text-[11px] font-geist text-icm-text-dim hover:text-icm-text flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+            </div>
+            <div className="space-y-2">
+              {instruments.map((inst, i) => (
+                <div key={i} className="grid grid-cols-2 md:grid-cols-4 gap-2 rounded-lg border border-icm-border p-2">
+                  <EditableField label="Instrument Name" defaultValue={inst.name} />
+                  <EditableField label="Score" defaultValue={inst.score} />
+                  <EditableField label="Date" defaultValue={inst.date} />
+                  <EditableField label="Next Due" defaultValue={inst.nextDue} />
+                </div>
               ))}
-            </ul>
-          )}
-        </Section>
-        <Section title="Pharmacies">
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Behavioral Baselines">
+        <EditableField
+          label="Behavioral baselines, triggers, de-escalation strategies, and support protocols"
+          defaultValue={profile.behavioralMonitoringNotes ?? ""}
+          multiline
+        />
+      </Section>
+
+      <Section title="Health Baselines">
+        <div className="mb-3">
           <DataTable
-            compact
-            columns={["Pharmacy", "Phone"]}
-            rows={profile.pharmacies.map((ph) => [
-              <span key="n" className="flex items-center gap-1.5">
-                {ph.primary && <Star className="w-3 h-3 text-icm-amber fill-icm-amber" />}
-                {ph.name}
-              </span>,
-              <span key="p" className="font-mono text-[11px]">{ph.phone}</span>,
+            columns={["Measurement", "Baseline", "Normal Range", "Last Measured", "Measured By"]}
+            rows={profile.vitalBaselines.map((v) => [
+              <span key="m" className="font-semibold">{v.measurement}</span>,
+              v.baseline,
+              v.normalRange,
+              v.lastMeasured ?? "—",
+              v.measuredBy ?? "—",
             ])}
-            emptyText="No pharmacies."
-            addLabel="Add pharmacy"
+            emptyText="No baselines recorded."
           />
-        </Section>
+        </div>
+        <EditableField
+          label="Additional health baseline notes"
+          defaultValue={profile.healthMonitoringNotes ?? ""}
+          multiline
+        />
+      </Section>
+    </div>
+  );
+}
+
+// =============================================================
+// TAB 4 — Court Involvement
+// =============================================================
+const LEGAL_STATUS_OPTIONS = [
+  "Competent adult — self-directing",
+  "Guardianship — full",
+  "Guardianship — limited",
+  "Power of Attorney",
+  "Representative payee",
+  "Conservatorship",
+  "Other",
+];
+const GUARDIAN_REL_OPTIONS = ["Parent", "Sibling", "Spouse", "Other family", "Professional guardian", "Agency", "Other"];
+const CASE_TYPE_OPTIONS = ["Criminal", "Civil", "Family", "Probate", "Other"];
+const CASE_STATUS_OPTIONS = ["Active", "Closed", "Pending"];
+
+function CourtTab({ profile }: { profile: ProfileData }) {
+  const [hasCourtInvolvement, setHasCourtInvolvement] = useState(
+    !!(profile.court || profile.legalStatus || profile.forensicInvolvement)
+  );
+  const [hasProbation, setHasProbation] = useState(false);
+  const [legalStatus, setLegalStatus] = useState(profile.legalStatus ?? "");
+  const isGuardianship = legalStatus.includes("Guardianship") || legalStatus === "Power of Attorney";
+
+  return (
+    <div className="space-y-4">
+      {/* Toggle */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center justify-between">
+        <div>
+          <p className="text-[13.5px] font-manrope font-bold text-icm-text">Court Involvement</p>
+          <p className="text-[11.5px] text-icm-text-dim mt-0.5">Toggle on if individual has active court cases, guardianship, or legal supervision.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setHasCourtInvolvement((p) => !p)}
+          className={cn(
+            "w-11 h-6 rounded-full transition-colors relative shrink-0",
+            hasCourtInvolvement ? "bg-icm-accent" : "bg-icm-border"
+          )}
+        >
+          <span className={cn(
+            "absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform",
+            hasCourtInvolvement ? "translate-x-6" : "translate-x-1"
+          )} />
+        </button>
       </div>
+
+      {!hasCourtInvolvement ? (
+        <div className="rounded-xl border border-icm-border bg-icm-panel p-6 text-center">
+          <p className="text-[13px] text-icm-text-dim font-geist">No active court involvement documented.</p>
+        </div>
+      ) : (
+        <>
+          <Section title="Legal Status">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="md:col-span-2">
+                <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">Legal Status</label>
+                <select
+                  className="modal-input max-w-xs"
+                  value={legalStatus}
+                  onChange={(e) => setLegalStatus(e.target.value)}
+                >
+                  <option value="">— Select —</option>
+                  {LEGAL_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              {isGuardianship && (
+                <>
+                  <EditableField label="Guardian / POA Name" defaultValue={profile.guardianName ?? ""} required />
+                  <EditableSelect label="Guardian / POA Relationship" defaultValue={profile.guardianRelationship ?? ""} options={GUARDIAN_REL_OPTIONS} />
+                  <EditableField label="Guardian / POA Phone" defaultValue={profile.guardianPhone ?? ""} required />
+                  <EditableField label="Guardian / POA Email" defaultValue="" />
+                  <div className="md:col-span-2">
+                    <EditableField label="Guardian / POA Address" defaultValue={profile.guardianAddress ?? ""} />
+                  </div>
+                  <EditableField label="Effective Date of Guardianship / POA" defaultValue="" />
+                </>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Active Court Cases">
+            <DataTable
+              columns={["Case Type", "Case #", "Court", "Status", "Next Date", "Attorney"]}
+              rows={profile.court ? [[
+                <span key="t" className="font-semibold">Court Case</span>,
+                "—",
+                profile.court,
+                <span key="s" className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-icm-green-soft text-icm-green">Active</span>,
+                profile.nextCourtDate ?? "—",
+                profile.attorney ?? "—",
+              ]] : []}
+              emptyText="No active court cases recorded."
+              addLabel="Add case"
+            />
+          </Section>
+
+          <Section title="Probation / Parole">
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                type="button"
+                onClick={() => setHasProbation((p) => !p)}
+                className={cn(
+                  "w-9 h-5 rounded-full transition-colors relative shrink-0",
+                  hasProbation ? "bg-icm-accent" : "bg-icm-border"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
+                  hasProbation ? "translate-x-4" : "translate-x-0.5"
+                )} />
+              </button>
+              <span className="text-[12.5px] font-geist text-icm-text">Under probation or parole supervision</span>
+            </div>
+            {hasProbation && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <EditableField label="Officer Name" defaultValue="" />
+                <EditableField label="Officer Phone" defaultValue="" />
+                <EditableField label="Supervision End Date" defaultValue="" />
+                <div className="md:col-span-2">
+                  <EditableField label="Conditions" defaultValue="" multiline />
+                </div>
+              </div>
+            )}
+          </Section>
+
+          {/* Sidebar: providers and pharmacies */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2" />
+            <div className="space-y-4">
+              <Section title="Providers">
+                {profile.providers.length === 0 ? (
+                  <Empty text="Manage in Medical tab." />
+                ) : (
+                  <ul className="space-y-1.5 text-[12px] font-geist">
+                    {profile.providers.map((p) => (
+                      <li key={p.name} className="flex items-center justify-between">
+                        <span className="text-icm-text">{p.name}</span>
+                        <span className="text-icm-text-dim text-[11px]">{p.specialty}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -992,7 +1382,12 @@ function ContactsTab({ profile }: { profile: ProfileData }) {
               key={c.name}
               className="rounded-lg border border-icm-border bg-icm-bg p-3 flex items-center gap-3"
             >
-              {c.priority === 1 && <Star className="w-4 h-4 text-icm-amber fill-icm-amber shrink-0" />}
+              {c.priority === 1 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <Star className="w-4 h-4 text-icm-amber fill-icm-amber" />
+                  <span className="text-[9px] font-mono font-bold text-icm-amber uppercase tracking-wide">Primary</span>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-icm-text">{c.name}</p>
                 <p className="text-[11.5px] text-icm-text-dim">
@@ -1006,10 +1401,30 @@ function ContactsTab({ profile }: { profile: ProfileData }) {
             </div>
           ))}
           {profile.emergencyContacts.length === 0 && <Empty text="No emergency contacts." />}
-          <button className="mt-1 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1">
+          <button className="mt-1 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1" id="add-emergency-contact">
             <Plus className="w-3.5 h-3.5" /> Add contact
           </button>
         </div>
+      </Section>
+
+      <Section title="Care Team">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between py-1.5 border-b border-icm-border/40">
+            <span className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">Case Manager</span>
+            <span className="text-[12.5px] text-icm-text font-geist">{profile.caseManager}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-icm-border/40">
+            <span className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">Supervisor</span>
+            <span className="text-[12.5px] text-icm-text font-geist">{profile.supervisor ?? "—"}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">Program Coordinator</span>
+            <span className="text-[12.5px] text-icm-text font-geist">{profile.programCoordinator ?? "—"}</span>
+          </div>
+        </div>
+        <p className="text-[11px] text-icm-text-faint mt-2 font-geist italic">
+          Manage team assignments in Admin Settings.
+        </p>
       </Section>
 
       <Section title="Support Circle">
@@ -1038,9 +1453,9 @@ function ContactsTab({ profile }: { profile: ProfileData }) {
         />
       </Section>
 
-      <Section title="Professional Contacts">
+      <Section title="External Providers">
         <DataTable
-          columns={["Contact", "Organization", "Role", "Phone", "Last Contacted"]}
+          columns={["Provider", "Organization", "Role", "Phone", "Last Contact"]}
           rows={profile.professionalContacts.map((p) => [
             <span key="n" className="font-semibold">{p.name}</span>,
             p.organization,
@@ -1058,14 +1473,14 @@ function ContactsTab({ profile }: { profile: ProfileData }) {
               {p.lastContacted ?? "—"}
             </span>,
           ])}
-          emptyText="No professional contacts yet."
-          addLabel="Add contact"
+          emptyText="No external providers yet."
+          addLabel="Add provider"
         />
         {stale.length > 0 && (
           <div className="mt-3 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 text-[11.5px] font-geist text-icm-text flex items-start gap-2">
             <Sparkle className="w-3.5 h-3.5 text-icm-accent mt-0.5" />
             <span>
-              {stale.length} professional contact{stale.length === 1 ? "" : "s"} with no recorded
+              {stale.length} provider{stale.length === 1 ? "" : "s"} with no recorded
               contact in 90+ days. Consider reaching out to stay updated on service delivery.
             </span>
           </div>
@@ -1074,6 +1489,7 @@ function ContactsTab({ profile }: { profile: ProfileData }) {
     </div>
   );
 }
+
 
 // =============================================================
 // TAB 7 — Documents
@@ -1141,9 +1557,40 @@ function DocumentsTab({ profile }: { profile: ProfileData }) {
 }
 
 // =============================================================
+// =============================================================
 // TAB 8 — Administrative
 // =============================================================
-function AdminTab({ profile }: { profile: ProfileData }) {
+const DISCHARGE_REASONS = [
+  "Completed services", "Individual request", "Non-compliance",
+  "Moved out of area", "Deceased", "Other",
+];
+
+function AdminTab({ profile, person }: { profile: ProfileData; person: Individual }) {
+  const [showDischargeModal, setShowDischargeModal] = useState(false);
+  const [dischargeDate, setDischargeDate] = useState("");
+  const [dischargeReason, setDischargeReason] = useState("");
+  const [dischargeNotes, setDischargeNotes] = useState("");
+  const [dischargeDone, setDischargeDone] = useState(false);
+
+  const handleDischarge = () => {
+    if (!dischargeDate || !dischargeReason) {
+      toast.error("Discharge date and reason are required.");
+      return;
+    }
+    profile.dischargeDate = dischargeDate;
+    profile.dischargeType = "Voluntary";
+    profile.dischargeReason = dischargeReason;
+    profile.dischargeSummary = dischargeNotes;
+    const today = new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+    profile.changeHistory = [
+      { date: today, user: "Case Manager", field: "Enrollment Status", oldValue: person.status, newValue: "Discharged" },
+      ...profile.changeHistory,
+    ];
+    setDischargeDone(true);
+    setShowDischargeModal(false);
+    toast.success(`${person.first_name} ${person.last_name} has been discharged.`, { duration: 5000 });
+  };
+
   return (
     <div className="space-y-4">
       <Section title="Case Assignment">
@@ -1155,6 +1602,9 @@ function AdminTab({ profile }: { profile: ProfileData }) {
             ["Program Coordinator", profile.programCoordinator ?? "—"],
           ]}
         />
+        <p className="text-[11px] text-icm-text-faint mt-2 font-geist">
+          Assignment changes are managed in Admin Settings.
+        </p>
       </Section>
 
       <Section title="Caseload Weighting">
@@ -1172,9 +1622,8 @@ function AdminTab({ profile }: { profile: ProfileData }) {
             ["Referral date", profile.referralDate ?? "—"],
             ["Admission type", profile.admissionType ?? "—"],
             ["Previous agency", profile.previousAgency ?? "—"],
-            ["Discharge date", profile.dischargeDate ?? "—"],
-            ["Discharge type", profile.dischargeType ?? "—"],
-            ["Discharge reason", profile.dischargeReason ?? "—"],
+            ["Discharge date", profile.dischargeDate ?? (dischargeDone ? dischargeDate : "—")],
+            ["Discharge reason", profile.dischargeReason ?? (dischargeDone ? dischargeReason : "—")],
           ]}
         />
       </Section>
@@ -1192,22 +1641,6 @@ function AdminTab({ profile }: { profile: ProfileData }) {
           <ComplianceChip label="MA" status="Active" tone="green" />
           <ComplianceChip label="Visits" status="Overdue" tone="red" />
         </div>
-      </Section>
-
-      <Section title="Notes & Special Instructions">
-        <Field label="Special instructions">
-          <textarea
-            defaultValue=""
-            placeholder="Visible across modules and in the sticky header."
-            className="modal-input min-h-[60px]"
-          />
-        </Field>
-        <Field label="Internal notes (not visible to individual or family)">
-          <textarea
-            defaultValue={profile.internalNotes ?? ""}
-            className="modal-input min-h-[80px]"
-          />
-        </Field>
       </Section>
 
       <Section title="Profile Change History">
@@ -1230,6 +1663,91 @@ function AdminTab({ profile }: { profile: ProfileData }) {
           </ul>
         )}
       </Section>
+
+      <Section title="System Information">
+        <KvGrid
+          rows={[
+            ["Individual ID", <span key="id" className="font-mono text-[11px]">{person.id}</span>],
+            ["Created Date", person.admittedOn],
+            ["Last Modified", person.updatedOn ?? "—"],
+            ["Companion Token", <span key="ct" className="font-mono text-[11px] blur-sm select-none">••••••••••••</span>],
+          ]}
+        />
+      </Section>
+
+      {/* Discharge Management — only visible if not already discharged */}
+      {person.status !== "Discharged" && !dischargeDone && (
+        <div className="rounded-xl border border-icm-red/30 bg-icm-red-soft p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-semibold text-icm-red font-manrope">Discharge Management</p>
+              <p className="text-[11.5px] text-icm-text-dim mt-0.5">
+                Initiating discharge will close all active tasks, terminate active workflows, and flag this record as inactive.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDischargeModal(true)}
+              className="h-9 px-3 rounded-xl border border-icm-red text-[12px] font-semibold text-icm-red hover:bg-icm-red/10 flex items-center gap-1.5"
+            >
+              Initiate Discharge
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Discharge confirmation modal */}
+      {showDischargeModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowDischargeModal(false)}>
+          <div className="bg-icm-panel rounded-xl border border-icm-border w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-manrope font-bold text-[15px] text-icm-text">Initiate Discharge</h3>
+              <button onClick={() => setShowDischargeModal(false)} className="text-icm-text-dim hover:text-icm-text">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[12.5px] text-icm-text-dim mb-4 font-geist">
+              You are initiating discharge for <span className="font-semibold text-icm-text">{person.first_name} {person.last_name}</span>.
+              This action will close all active tasks and terminate active workflows.
+            </p>
+            <div className="space-y-3">
+              <ModalField label="Discharge Date (required)">
+                <input type="date" className="modal-input" value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
+              </ModalField>
+              <ModalField label="Reason for Discharge (required)">
+                <select className="modal-input" value={dischargeReason} onChange={(e) => setDischargeReason(e.target.value)}>
+                  <option value="">— Select —</option>
+                  {DISCHARGE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </ModalField>
+              <ModalField label="Notes (optional)">
+                <textarea
+                  className="modal-input min-h-[60px]"
+                  value={dischargeNotes}
+                  onChange={(e) => setDischargeNotes(e.target.value)}
+                  placeholder="Any additional context..."
+                />
+              </ModalField>
+            </div>
+            <div className="flex items-center gap-2 mt-5 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDischargeModal(false)}
+                className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-semibold text-icm-text-dim hover:text-icm-text"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDischarge}
+                className="h-9 px-4 rounded-xl bg-icm-red text-white text-[12px] font-semibold hover:opacity-90"
+              >
+                Initiate Discharge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals
 import { useProgressNotes, updateProgressNote } from "@/hooks/useProgressNotes";
 import { writeAudit } from "@/lib/auditService";
 import { toast } from "sonner";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 export default function PersonESignature() {
   const { id } = useParams<{ id: string }>();
@@ -172,6 +173,10 @@ export default function PersonESignature() {
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
                           {n.startTime} – {n.endTime}
                         </span>
+                      </p>
+                      <p className="flex items-center gap-1.5 mt-1">
+                        <span className="font-semibold text-slate-400 w-16">Author:</span>
+                        <AuthorCell name={n.authorName || "System"} size="sm" showName={true} />
                       </p>
                       {n.purposeOfActivity && (
                         <p className="text-[11.5px] text-slate-500 leading-normal line-clamp-2 mt-2 bg-slate-50 p-2 rounded-lg italic">

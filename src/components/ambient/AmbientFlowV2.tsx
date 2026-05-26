@@ -190,120 +190,121 @@ function buildExtractGroups(ai: {
   return groups;
 }
 
-const EMPTY_EXTRACT_GROUPS: ExtractGroup[] = [
-  {
-    id: "contact_note",
-    title: "Contact Note",
-    icon: FileText,
-    borderClass: "border-l-blue-500",
-    bgClass: "bg-blue-50",
-    destinationModule: "Contact Note",
-    items: [
-      { id: "cn_type", label: "Contact type", value: "In-person visit" },
-      { id: "cn_purpose", label: "Purpose", value: "Quarterly check-in, service review" },
-      { id: "cn_present", label: "Who was present", value: "Kathy Adams (CM), Joseph Brown, Joseph's mother Linda" },
-      {
-        id: "cn_details",
-        label: "Details",
-        value:
-          "Discussed Joseph's satisfaction with current day program. He mentioned wanting to explore part-time employment. Mother expressed concern about recent behavioral changes at home.",
-      },
-      {
-        id: "cn_concerns",
-        label: "Issues / concerns",
-        value: "Behavioral changes at home reported by mother.",
-        confidence: 94,
-      },
-      {
-        id: "cn_next",
-        label: "Next steps",
-        value: "Follow up with behavioral support team. Schedule employment exploration meeting.",
-      },
-    ],
-  },
-  {
-    id: "tasks",
-    title: "Tasks",
-    icon: ClipboardCheck,
-    borderClass: "border-l-emerald-500",
-    bgClass: "bg-emerald-50",
-    destinationModule: "Case Management",
-    items: [
-      { id: "tk_1", label: "Mark complete", value: "Schedule quarterly visit (was 76 days overdue)" },
-      { id: "tk_2", label: "Mark complete", value: "Quarterly visit — in-person confirmed today" },
-      { id: "tk_3", label: "Create new task", value: "Contact behavioral support team · Due: 2 weeks" },
-    ],
-  },
-  {
-    id: "isp",
-    title: "ISP / Care Plan",
-    icon: FileText,
-    borderClass: "border-l-purple-500",
-    bgClass: "bg-purple-50",
-    destinationModule: "Care Plan / ISP",
-    items: [
-      {
-        id: "isp_goal",
-        label: "Goal note",
-        value:
-          "Joseph expressed interest in part-time employment. Recommend adding employment goal to next ISP review. [AI suggested — review before saving]",
-      },
-    ],
-  },
-  {
-    id: "risk",
-    title: "Risk & Safety",
-    icon: ShieldAlert,
-    borderClass: "border-l-rose-500",
-    bgClass: "bg-rose-50",
-    destinationModule: "Risk & Safety",
-    items: [
-      {
-        id: "risk_1",
-        label: "Flag",
-        value:
-          "Behavioral changes reported at home by primary caregiver. Severity: Low-Medium. Recommend monitoring.",
-        confidence: 78,
-        requiresConfirm: true,
-      },
-    ],
-  },
-  {
-    id: "monitoring",
-    title: "Monitoring Form",
-    icon: ClipboardList,
-    borderClass: "border-l-amber-500",
-    bgClass: "bg-amber-50",
-    destinationModule: "Monitoring Form",
-    items: [
-      {
-        id: "mon_1",
-        label: "Current circumstances update",
-        value:
-          "No demographic changes reported. Primary caregiver (mother Linda) — no changes. Individual satisfaction with services: Positive.",
-      },
-      { id: "mon_2", label: "Type of review", value: "Quarterly" },
-      {
-        id: "mon_3",
-        label: "Pre-fills",
-        value: "4 of 8 required fields completed by AI.",
-      },
-    ],
-  },
-  {
-    id: "billable",
-    title: "Billable Activity",
-    icon: Clock,
-    borderClass: "border-l-slate-400",
-    bgClass: "bg-slate-50",
-    destinationModule: "Billable Activity",
-    items: [
-      { id: "bl_1", label: "Activity type", value: "Face-to-face visit" },
-      { id: "bl_2", label: "Date", value: new Date().toLocaleDateString() },
-      { id: "bl_3", label: "Duration", value: "47 minutes · Calculated units: 3 (15-min increments)" },
-    ],
-  },
-];
+/** Returns the placeholder extract groups used when no real transcript was captured.
+ * Uses the selected individual's first name so AI-demo content is personalized. */
+function getEmptyExtractGroups(firstName: string): ExtractGroup[] {
+  const name = firstName || "the individual";
+  return [
+    {
+      id: "contact_note",
+      title: "Contact Note",
+      icon: FileText,
+      borderClass: "border-l-blue-500",
+      bgClass: "bg-blue-50",
+      destinationModule: "Contact Note",
+      items: [
+        { id: "cn_type", label: "Contact type", value: "In-person visit" },
+        { id: "cn_purpose", label: "Purpose", value: "Quarterly check-in, service review" },
+        { id: "cn_present", label: "Who was present", value: `Kathy Adams (CM), ${name}` },
+        {
+          id: "cn_details",
+          label: "Details",
+          value: `Discussed ${name}'s satisfaction with current day program and upcoming service review. Topics included employment exploration and support goals.`,
+        },
+        {
+          id: "cn_concerns",
+          label: "Issues / concerns",
+          value: "No immediate concerns identified. Behavioral support plan reviewed and is current.",
+          confidence: 94,
+        },
+        {
+          id: "cn_next",
+          label: "Next steps",
+          value: "Follow up with support team. Schedule next quarterly visit.",
+        },
+      ],
+    },
+    {
+      id: "tasks",
+      title: "Tasks",
+      icon: ClipboardCheck,
+      borderClass: "border-l-emerald-500",
+      bgClass: "bg-emerald-50",
+      destinationModule: "Case Management",
+      items: [
+        { id: "tk_1", label: "Mark complete", value: "Schedule quarterly visit" },
+        { id: "tk_2", label: "Mark complete", value: "Quarterly visit — in-person confirmed today" },
+        { id: "tk_3", label: "Create new task", value: "Follow up with support team · Due: 2 weeks" },
+      ],
+    },
+    {
+      id: "isp",
+      title: "ISP / Care Plan",
+      icon: FileText,
+      borderClass: "border-l-purple-500",
+      bgClass: "bg-purple-50",
+      destinationModule: "Care Plan / ISP",
+      items: [
+        {
+          id: "isp_goal",
+          label: "Goal note",
+          value: `${name} expressed interest in expanding community participation. Recommend reviewing employment and social goals at next ISP. [AI suggested — review before saving]`,
+        },
+      ],
+    },
+    {
+      id: "risk",
+      title: "Risk & Safety",
+      icon: ShieldAlert,
+      borderClass: "border-l-rose-500",
+      bgClass: "bg-rose-50",
+      destinationModule: "Risk & Safety",
+      items: [
+        {
+          id: "risk_1",
+          label: "Flag",
+          value: "No new risk flags identified during this session. Ongoing monitoring recommended.",
+          confidence: 78,
+          requiresConfirm: true,
+        },
+      ],
+    },
+    {
+      id: "monitoring",
+      title: "Monitoring Form",
+      icon: ClipboardList,
+      borderClass: "border-l-amber-500",
+      bgClass: "bg-amber-50",
+      destinationModule: "Monitoring Form",
+      items: [
+        {
+          id: "mon_1",
+          label: "Current circumstances update",
+          value: `No demographic changes reported. ${name}'s satisfaction with services: Positive.`,
+        },
+        { id: "mon_2", label: "Type of review", value: "Quarterly" },
+        {
+          id: "mon_3",
+          label: "Pre-fills",
+          value: "4 of 8 required fields completed by AI.",
+        },
+      ],
+    },
+    {
+      id: "billable",
+      title: "Billable Activity",
+      icon: Clock,
+      borderClass: "border-l-slate-400",
+      bgClass: "bg-slate-50",
+      destinationModule: "Billable Activity",
+      items: [
+        { id: "bl_1", label: "Activity type", value: "Face-to-face visit" },
+        { id: "bl_2", label: "Date", value: new Date().toLocaleDateString() },
+        { id: "bl_3", label: "Duration", value: "47 minutes · Calculated units: 3 (15-min increments)" },
+      ],
+    },
+  ];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tone tag rendering
@@ -373,11 +374,12 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
   ];
 
   // Step 4 state — extractGroups is populated by AI response in processing step
-  const [extractGroups, setExtractGroups] = useState<ExtractGroup[]>(EMPTY_EXTRACT_GROUPS);
+  const [extractGroups, setExtractGroups] = useState<ExtractGroup[]>(() => getEmptyExtractGroups(personFirst));
   const [tab, setTab] = useState<"items" | "transcript">("items");
-  const [includedItems, setIncludedItems] = useState<Set<string>>(
-    new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id)))
-  );
+  const [includedItems, setIncludedItems] = useState<Set<string>>(() => {
+    const eg = getEmptyExtractGroups(personFirst);
+    return new Set(eg.flatMap(g => g.items.map(i => i.id)));
+  });
   const [confirmedRisk, setConfirmedRisk] = useState(false);
 
   // Inline field editing state
@@ -619,11 +621,11 @@ ${fullTranscript}`,
                 }
               } catch {
                 // JSON parse failed — keep EMPTY_EXTRACT_GROUPS, pre-check all items
-                setIncludedItems(new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id))));
+                setIncludedItems(new Set(getEmptyExtractGroups(personFirst).flatMap(g => g.items.map(i => i.id))));
               }
             } else {
               // AI returned no parseable JSON — keep EMPTY_EXTRACT_GROUPS pre-checked
-              setIncludedItems(new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id))));
+              setIncludedItems(new Set(getEmptyExtractGroups(personFirst).flatMap(g => g.items.map(i => i.id))));
             }
           }
         } else if (!fullTranscript.trim()) {
@@ -634,7 +636,7 @@ ${fullTranscript}`,
       } catch (err) {
         console.warn("Extraction API call failed (non-blocking):", err);
         // Keep EMPTY_EXTRACT_GROUPS pre-checked so user can still save
-        setIncludedItems(new Set(EMPTY_EXTRACT_GROUPS.flatMap(g => g.items.map(i => i.id))));
+        setIncludedItems(new Set(getEmptyExtractGroups(personFirst).flatMap(g => g.items.map(i => i.id))));
       }
 
       const finalTimer = setTimeout(() => setStep("review"), dynamicLines.length * 500 + 500);

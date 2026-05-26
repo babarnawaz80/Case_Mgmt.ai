@@ -1,54 +1,207 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
-  Sparkles,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Send,
-  X,
-  ArrowRight,
-  Loader2,
+  Sparkles, Clock, CheckCircle2, AlertTriangle, Send,
+  X, ArrowRight, Loader2, Download, RefreshCw, Filter,
+  ChevronRight, ExternalLink, DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useBillingClaims, useBillingSummary, updateClaimStatus } from "@/hooks/useBillingClaims";
-import type { AiStatus, BillingClaim, BillStatus } from "@/hooks/useBillingClaims";
+import { useBillingRecords, updateBillingRecord, markRecordsSubmitted, type BillingRecord, type BillingStatus } from "@/hooks/useBillingRecords";
+import { useBillingRecordsSummary } from "@/hooks/useBillingRecords";
+import { submitToIddBilling, generate837P, createBillingBatch, type OrgBillingInfo } from "@/services/iddBillingService";
+import { useAuth } from "@/contexts/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-type TabKey = "all" | "pending" | "ready" | "attention" | "submitted" | "denied";
-
+type TabKey = "all" | "pending_scrub" | "scrub_passed" | "needs_attention" | "submitted" | "denied";
 
 const BillingHub = () => {
   const [tab, setTab] = useState<TabKey>("all");
-  const [autoScrub, setAutoScrub] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [drawerRecord, setDrawerRecord] = useState<BillingRecord | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [drawerClaim, setDrawerClaim] = useState<BillingClaim | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
 
-  const { claims, loading } = useBillingClaims();
-  const { ready: readyCount, attention: attentionCount, submitted: submittedCount, pending: pendingCount, denied: deniedCount } = useBillingSummary();
+  // Filters
+  const [filterIndividual, setFilterIndividual] = useState("");
+  const [filterCode, setFilterCode] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
+  const { records, loading } = useBillingRecords();
+  const { pending_scrub, scrub_passed, needs_attention, submitted_this_month, total_ready_amount } = useBillingRecordsSummary();
+  const { userProfile } = useAuth();
+
+  // Filtered records for current tab
   const filtered = useMemo(() => {
-    switch (tab) {
-      case "pending": return claims.filter((c) => c.aiStatus === "pending");
-      case "ready": return claims.filter((c) => c.billingStatus === "ready");
-      case "attention": return claims.filter((c) => c.aiStatus === "attention");
-      case "submitted": return claims.filter((c) => c.billingStatus === "submitted");
-      case "denied": return claims.filter((c) => c.billingStatus === "denied");
-      default: return claims;
-    }
-  }, [tab, claims]);
+    let base = records;
 
-  const hasReady = filtered.some((c) => c.billingStatus === "ready");
+    // Tab filter
+    switch (tab) {
+      case "pending_scrub": base = base.filter(r => r.billing_status === "pending_scrub"); break;
+      case "scrub_passed": base = base.filter(r => r.billing_status === "scrub_passed" && !r.submitted_to_iddbilling); break;
+      case "needs_attention": base = base.filter(r => r.billing_status === "needs_attention"); break;
+      case "submitted": base = base.filter(r => r.submitted_to_iddbilling); break;
+      case "denied": base = base.filter(r => r.billing_status === "denied"); break;
+    }
+
+    // Text filters
+    if (filterIndividual) {
+      base = base.filter(r => r.individual_name?.toLowerCase().includes(filterIndividual.toLowerCase()));
+    }
+    if (filterCode) {
+      base = base.filter(r => r.service_code?.toLowerCase().includes(filterCode.toLowerCase()));
+    }
+    if (filterDateFrom) base = base.filter(r => r.date_of_service >= filterDateFrom);
+    if (filterDateTo) base = base.filter(r => r.date_of_service <= filterDateTo);
+
+    return base;
+  }, [records, tab, filterIndividual, filterCode, filterDateFrom, filterDateTo]);
+
+  const selectedRecords = useMemo(() =>
+    filtered.filter(r => selectedIds.has(r.id)),
+    [filtered, selectedIds]
+  );
+
+  const readyToSubmit = selectedRecords.filter(r => r.billing_status === "scrub_passed");
+  const totalReadyAmount = readyToSubmit.reduce((s, r) => s + (r.total_amount || 0), 0);
 
   const tabs: { key: TabKey; label: string; count?: number }[] = [
-    { key: "all", label: "All Claims", count: claims.length },
-    { key: "pending", label: "Pending Scrub", count: pendingCount },
-    { key: "ready", label: "Ready to Submit", count: readyCount },
-    { key: "attention", label: "Needs Attention", count: attentionCount },
-    { key: "submitted", label: "Submitted", count: submittedCount },
-    { key: "denied", label: "Denied", count: deniedCount },
+    { key: "all", label: "All Claims", count: records.length },
+    { key: "pending_scrub", label: "Pending Scrub", count: pending_scrub },
+    { key: "scrub_passed", label: "Ready to Submit", count: scrub_passed },
+    { key: "needs_attention", label: "Needs Attention", count: needs_attention },
+    { key: "submitted", label: "Submitted", count: submitted_this_month },
+    { key: "denied", label: "Denied", count: records.filter(r => r.billing_status === "denied").length },
   ];
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllReady = () => {
+    const readyIds = filtered.filter(r => r.billing_status === "scrub_passed").map(r => r.id);
+    setSelectedIds(new Set(readyIds));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const runScrub = async () => {
+    setScrubbing(true);
+    // Simulate AI scrub — marks pending_scrub records as scrub_passed or needs_attention
+    try {
+      const pending = records.filter(r => r.billing_status === "pending_scrub");
+      for (const r of pending) {
+        const hasAuth = !!r.authorization_number;
+        const hasUnits = r.units > 0;
+        const newStatus: BillingStatus = (hasAuth && hasUnits) ? "scrub_passed" : "needs_attention";
+        await updateBillingRecord(r.id, { billing_status: newStatus });
+      }
+      toast.success(`Scrub complete — ${pending.length} claims reviewed`);
+    } catch (err) {
+      toast.error("Scrub error: " + (err as Error).message);
+    } finally {
+      setScrubbing(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!userProfile?.organizationId) return;
+    setSubmitting(true);
+
+    try {
+      // Fetch org billing info
+      const orgSnap = await getDoc(doc(db, "organizations", userProfile.organizationId));
+      const orgData = orgSnap.data() || {};
+      const billing = orgData.billing || {};
+
+      const orgInfo: OrgBillingInfo = {
+        npi: billing.npi || "",
+        taxId: billing.taxId || "",
+        name: orgData.name || "Organization",
+        submitterId: billing.submitterId || "",
+        isaSenderId: billing.isaSenderId || "",
+        street: orgData.address?.street,
+        city: orgData.address?.city,
+        state: orgData.address?.state,
+        zip: orgData.address?.zip,
+      };
+
+      const claimPayloads = readyToSubmit.map(r => ({
+        claim_id: r.id,
+        individual_id: r.individual_id,
+        individual_name: r.individual_name,
+        date_of_service: r.date_of_service,
+        service_code: r.service_code,
+        service_description: r.service_description || "",
+        billing_unit_type: r.billing_unit_type,
+        units: r.units,
+        rate_per_unit: r.rate_per_unit,
+        total_amount: r.total_amount,
+        authorization_number: r.authorization_number,
+        payer_id: r.payer_id || "",
+        payer_name: r.payer_name || "",
+        rendering_provider_npi: orgInfo.npi,
+        billing_provider_npi: orgInfo.npi,
+        place_of_service: "11",
+        diagnosis_codes: [],
+        case_manager_name: r.case_manager_name,
+        note_type: r.source_note_type,
+        source_note_id: r.source_note_id,
+        validation_status: r.validation_status,
+      }));
+
+      // Try IDD Billing.AI submission
+      const result = await submitToIddBilling(
+        {
+          batch_id: `BATCH-${Date.now()}`,
+          submitted_by: userProfile.uid || "",
+          submitted_at: new Date().toISOString(),
+          org_id: userProfile.organizationId,
+          org_name: orgInfo.name,
+          claims: claimPayloads,
+        },
+        userProfile.organizationId,
+      );
+
+      if (result.success) {
+        // Mark all records as submitted
+        const claimMap: Record<string, { id: string; status: string }> = {};
+        (result.claims || []).forEach(c => { claimMap[c.claim_id] = { id: c.id, status: c.status }; });
+        await markRecordsSubmitted(readyToSubmit.map(r => r.id), result.batch_id || "", claimMap);
+        toast.success(`${readyToSubmit.length} claims submitted to IDD Billing.AI`);
+      } else {
+        // API not configured or error — export 837P file as fallback
+        const ediContent = generate837P(claimPayloads, orgInfo, `BATCH-${Date.now()}`);
+        const blob = new Blob([ediContent], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `837P_${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`837P file exported — ${readyToSubmit.length} claims`);
+
+        // Still mark as submitted locally
+        await markRecordsSubmitted(readyToSubmit.map(r => r.id), "", {});
+      }
+
+      clearSelection();
+      setConfirmOpen(false);
+    } catch (err) {
+      toast.error("Submission error: " + (err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <ICMShell title="Billing" showAIPanel={false}>
@@ -69,11 +222,11 @@ const BillingHub = () => {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Clock} tone="gray" value={String(pendingCount)} label="Pending Scrub" sub="Awaiting AI review" />
-          <StatCard icon={CheckCircle2} tone="green" value={String(readyCount)} label="Scrub Passed" sub="Ready to submit" />
-          <StatCard icon={AlertTriangle} tone="amber" value={String(attentionCount)} label="Needs Attention" sub="Action required" />
-          <StatCard icon={Send} tone="blue" value={String(submittedCount)} label="Submitted" sub="This session" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard icon={Clock} tone="gray" value={String(pending_scrub)} label="Pending Scrub" sub="Awaiting AI review" />
+          <StatCard icon={CheckCircle2} tone="green" value={String(scrub_passed)} label="Scrub Passed" sub={`$${total_ready_amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ready`} />
+          <StatCard icon={AlertTriangle} tone="amber" value={String(needs_attention)} label="Needs Attention" sub="Action required" />
+          <StatCard icon={Send} tone="blue" value={String(submitted_this_month)} label="Submitted" sub="This month" />
         </div>
 
         {/* AI Scrub Agent banner */}
@@ -85,35 +238,17 @@ const BillingHub = () => {
             <div className="flex-1 min-w-[240px]">
               <p className="font-manrope font-bold text-[13.5px] text-icm-text">AI Billing Agent — Active</p>
               <p className="text-[11.5px] font-geist text-icm-text-dim mt-1">
-                Continuously reviewing completed notes. Last scrub run: Today at 9:14 PM · 18 claims reviewed · 2 flagged for attention.
+                Reviewing completed notes. {pending_scrub > 0 ? `${pending_scrub} claims awaiting scrub.` : "All claims reviewed."} Click to run full scrub now.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-[11.5px] font-geist text-icm-text cursor-pointer">
-                <span>Auto-scrub on note completion</span>
-                <button
-                  type="button"
-                  onClick={() => setAutoScrub((v) => !v)}
-                  className={cn(
-                    "relative inline-block w-9 h-5 rounded-full transition-colors",
-                    autoScrub ? "bg-teal-500" : "bg-icm-border"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform",
-                      autoScrub && "translate-x-4"
-                    )}
-                  />
-                </button>
-              </label>
-              <button
-                onClick={() => toast.success("Full scrub started · 18 claims in queue")}
-                className="h-8 px-3 rounded-lg border border-teal-600 bg-white text-[11.5px] font-geist font-semibold text-teal-600 inline-flex items-center gap-1.5 hover:bg-teal-50"
-              >
-                Run full scrub now
-              </button>
-            </div>
+            <button
+              onClick={runScrub}
+              disabled={scrubbing}
+              className="h-8 px-3 rounded-lg border border-teal-600 bg-white text-[11.5px] font-geist font-semibold text-teal-600 inline-flex items-center gap-1.5 hover:bg-teal-50 disabled:opacity-60"
+            >
+              {scrubbing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Run full scrub
+            </button>
           </div>
         </div>
 
@@ -138,24 +273,76 @@ const BillingHub = () => {
           ))}
         </div>
 
+        {/* Filter bar */}
+        <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex flex-wrap items-center gap-2">
+          <Filter className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
+          <input
+            value={filterIndividual}
+            onChange={e => setFilterIndividual(e.target.value)}
+            placeholder="Individual name…"
+            className="h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[11.5px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none w-[160px]"
+          />
+          <input
+            value={filterCode}
+            onChange={e => setFilterCode(e.target.value)}
+            placeholder="Service code…"
+            className="h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[11.5px] font-mono text-icm-text placeholder:text-icm-text-faint focus:outline-none w-[120px]"
+          />
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={e => setFilterDateFrom(e.target.value)}
+            className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] font-geist text-icm-text focus:outline-none"
+          />
+          <span className="text-[11px] text-icm-text-faint">to</span>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={e => setFilterDateTo(e.target.value)}
+            className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] font-geist text-icm-text focus:outline-none"
+          />
+          {(filterIndividual || filterCode || filterDateFrom || filterDateTo) && (
+            <button
+              onClick={() => { setFilterIndividual(""); setFilterCode(""); setFilterDateFrom(""); setFilterDateTo(""); }}
+              className="h-8 px-2.5 rounded-lg border border-icm-border text-[11.5px] font-geist text-icm-text-dim hover:bg-icm-bg"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
         {/* Batch submit bar */}
-        {hasReady && (
+        {selectedIds.size > 0 && (
           <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-3 flex items-center justify-between flex-wrap gap-2">
-            <p className="text-[12px] font-geist text-icm-text">
-              <span className="font-semibold">12 claims</span> ready to submit to IDD Billing.AI
-            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-geist text-icm-text">
+                <span className="font-semibold">{selectedIds.size} claims selected</span>
+                {readyToSubmit.length > 0 && (
+                  <span className="text-icm-text-dim ml-1">
+                    ({readyToSubmit.length} ready · ${totalReadyAmount.toFixed(2)})
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={clearSelection}
+                className="text-[11px] font-geist text-icm-text-dim hover:text-icm-text"
+              >
+                <X className="w-3.5 h-3.5 inline" /> Clear
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => toast("All ready claims selected")}
+                onClick={selectAllReady}
                 className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-semibold text-icm-text"
               >
                 Select All Ready
               </button>
               <button
                 onClick={() => setConfirmOpen(true)}
-                className="h-8 px-3 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
+                disabled={readyToSubmit.length === 0}
+                className="h-8 px-3 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700 disabled:opacity-40"
               >
-                Submit Selected to IDD Billing.AI <ArrowRight className="w-3.5 h-3.5" />
+                Submit to IDD Billing.AI <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -163,81 +350,111 @@ const BillingHub = () => {
 
         {/* Claims table */}
         <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
-          <table className="w-full text-[12px] font-geist">
-            <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
-              <tr>
-                <Th>Individual</Th>
-                <Th>Date of Service</Th>
-                <Th>Service Code</Th>
-                <Th>Units</Th>
-                <Th>Payer</Th>
-                <Th>Authorization</Th>
-                <Th>AI Status</Th>
-                <Th>Billing Status</Th>
-                <Th>Actions</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="border-t border-icm-border">
-                  <td className="px-3 py-2 text-icm-text font-semibold">{c.individual}</td>
-                  <td className="px-3 py-2 text-icm-text-dim">{c.dos}</td>
-                  <td className="px-3 py-2 text-icm-text font-mono font-semibold">{c.code}</td>
-                  <td className="px-3 py-2 text-icm-text-dim">{c.units} units</td>
-                  <td className="px-3 py-2 text-icm-text-dim">{c.payer}</td>
-                  <td className="px-3 py-2 text-icm-text-dim font-mono">{c.auth}</td>
-                  <td className="px-3 py-2"><AiBadge status={c.ai} /></td>
-                  <td className="px-3 py-2"><BillingBadge status={c.billing} /></td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      {c.billing === "ready" && (
-                        <button
-                          onClick={() => toast.success(`Claim ${c.id.toUpperCase()} submitted`)}
-                          className="text-[11.5px] font-geist font-semibold text-teal-600 hover:underline"
-                        >
-                          Submit
-                        </button>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 gap-2 text-icm-text-dim">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-[12px] font-geist">Loading claims…</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[12px] font-geist min-w-[900px]">
+                <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+                  <tr>
+                    <th className="px-3 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.size === filtered.length && filtered.length > 0}
+                        onChange={e => e.target.checked ? setSelectedIds(new Set(filtered.map(r => r.id))) : clearSelection()}
+                        className="accent-teal-600"
+                      />
+                    </th>
+                    <Th>Individual</Th>
+                    <Th>Date of Service</Th>
+                    <Th>Service Code</Th>
+                    <Th>Units</Th>
+                    <Th>Amount</Th>
+                    <Th>Authorization</Th>
+                    <Th>Billing Status</Th>
+                    <Th>Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        "border-t border-icm-border hover:bg-icm-bg/40 cursor-pointer transition-colors",
+                        selectedIds.has(r.id) && "bg-teal-50/30"
                       )}
-                      {c.ai === "attention" && (
-                        <button
-                          onClick={() => setDrawerClaim(c)}
-                          className="text-[11.5px] font-geist font-semibold text-amber-600 hover:underline"
-                        >
-                          Fix
-                        </button>
-                      )}
-                      <button
-                        onClick={() => toast(`Viewing claim ${c.id.toUpperCase()}`)}
-                        className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={9} className="px-3 py-8 text-center text-icm-text-dim text-[12px]">No claims in this view.</td></tr>
-              )}
-            </tbody>
-          </table>
+                      onClick={() => setDrawerRecord(r)}
+                    >
+                      <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(r.id)}
+                          onChange={() => toggleSelect(r.id)}
+                          className="accent-teal-600"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-icm-text font-semibold">{r.individual_name}</td>
+                      <td className="px-3 py-2 text-icm-text-dim font-mono">{r.date_of_service || "—"}</td>
+                      <td className="px-3 py-2 text-icm-text font-mono font-semibold">{r.service_code}</td>
+                      <td className="px-3 py-2 text-icm-text-dim">{r.units} units</td>
+                      <td className="px-3 py-2 text-icm-text font-mono font-semibold">
+                        ${(r.total_amount || 0).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-icm-text-dim font-mono text-[11px]">
+                        {r.authorization_number || "—"}
+                      </td>
+                      <td className="px-3 py-2"><BillingStatusBadge status={r.billing_status} /></td>
+                      <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          {r.billing_status === "scrub_passed" && !r.submitted_to_iddbilling && (
+                            <button
+                              onClick={() => { setSelectedIds(new Set([r.id])); setConfirmOpen(true); }}
+                              className="text-[11.5px] font-geist font-semibold text-teal-600 hover:underline"
+                            >
+                              Submit
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setDrawerRecord(r)}
+                            className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline"
+                          >
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="px-3 py-12 text-center text-icm-text-dim text-[12px]">
+                        {loading ? "Loading…" : "No claims in this view."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Integration footer */}
         <div className="rounded-xl border border-icm-border bg-icm-bg/40 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
           <p className="text-[11px] font-geist text-icm-text-dim">
-            Connected to IDD Billing.AI · Last submission: 04/26/2026 · 28 claims submitted this month · Next scheduled submission: Daily at 11:00 PM
+            Connected to IDD Billing.AI · {records.filter(r => r.submitted_to_iddbilling).length} claims submitted · Live Firestore
           </p>
           <button
-            onClick={() => toast("Opening IDD Billing.AI")}
-            className="text-[11px] font-geist text-icm-accent hover:underline"
+            onClick={() => toast("Opening IDD Billing.AI dashboard")}
+            className="text-[11px] font-geist text-icm-accent hover:underline inline-flex items-center gap-1"
           >
-            Open IDD Billing.AI →
+            Open IDD Billing.AI <ExternalLink className="w-3 h-3" />
           </button>
         </div>
       </div>
 
-      {/* Confirm modal */}
+      {/* Confirm submit modal */}
       {confirmOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
@@ -245,96 +462,144 @@ const BillingHub = () => {
         >
           <div
             className="bg-icm-panel rounded-xl border border-icm-border w-full max-w-md p-5"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
-            <h3 className="font-manrope font-bold text-[15px] text-icm-text">Submit 12 claims to IDD Billing.AI?</h3>
-            <p className="text-[12px] font-geist text-icm-text-dim mt-2 leading-relaxed">
-              These claims have passed AI scrubbing and supervisor approval. They will be transmitted as an 837P file via IDD Billing.AI.
+            <h3 className="font-manrope font-bold text-[15px] text-icm-text">
+              Submit {readyToSubmit.length} claim{readyToSubmit.length !== 1 ? "s" : ""} to IDD Billing.AI?
+            </h3>
+            <div className="mt-3 rounded-xl border border-icm-border bg-icm-bg/40 p-3 space-y-1">
+              <div className="flex items-center justify-between text-[12px] font-geist">
+                <span className="text-icm-text-dim">Claims ready</span>
+                <span className="font-semibold text-icm-text">{readyToSubmit.length}</span>
+              </div>
+              <div className="flex items-center justify-between text-[12px] font-geist">
+                <span className="text-icm-text-dim">Total amount</span>
+                <span className="font-mono font-semibold text-teal-700">${totalReadyAmount.toFixed(2)}</span>
+              </div>
+            </div>
+            <p className="text-[11.5px] font-geist text-icm-text-dim mt-3 leading-relaxed">
+              Claims will be transmitted as an 837P file via IDD Billing.AI. If the API key is not configured, an 837P file will be exported for manual upload.
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => setConfirmOpen(false)}
                 className="h-9 px-3 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text"
+                disabled={submitting}
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  setConfirmOpen(false);
-                  toast.success("12 claims submitted to IDD Billing.AI · 837P file generated");
-                }}
-                className="h-9 px-3 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold"
+                onClick={handleSubmit}
+                disabled={submitting || readyToSubmit.length === 0}
+                className="h-9 px-3 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
               >
-                Confirm & Submit
+                {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                {submitting ? "Submitting…" : "Confirm & Submit"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Needs attention drawer */}
-      {drawerClaim && (
-        <div className="fixed inset-0 z-50 bg-black/30" onClick={() => setDrawerClaim(null)}>
+      {/* Claim detail drawer */}
+      {drawerRecord && (
+        <div className="fixed inset-0 z-50 bg-black/30" onClick={() => setDrawerRecord(null)}>
           <div
-            className="absolute top-0 right-0 h-full w-full max-w-md bg-icm-panel border-l border-icm-border shadow-xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+            className="absolute top-0 right-0 h-full w-full max-w-[420px] bg-icm-panel border-l border-icm-border shadow-xl flex flex-col"
+            onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-icm-border">
               <div>
-                <p className="text-[10.5px] font-geist uppercase tracking-wider text-icm-text-dim">Claim Issue</p>
+                <p className="text-[10.5px] font-geist uppercase tracking-wider text-icm-text-dim">Claim Detail</p>
                 <p className="font-manrope font-bold text-[14px] text-icm-text">
-                  {drawerClaim.individual.split(",").reverse().join(" ").trim()} · {drawerClaim.dos}
+                  {drawerRecord.individual_name} · {drawerRecord.date_of_service}
                 </p>
               </div>
-              <button onClick={() => setDrawerClaim(null)} className="text-icm-text-dim hover:text-icm-text">
+              <button onClick={() => setDrawerRecord(null)} className="text-icm-text-dim hover:text-icm-text">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div>
-                <p className="text-[11px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">AI Finding</p>
-
-                <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 mb-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-[12px] font-geist font-semibold text-icm-text">Issue 1</p>
-                      <p className="text-[11.5px] font-geist text-icm-text-dim mt-1 leading-relaxed">
-                        Narrative does not meet minimum documentation requirements for T2022 under Anthem Indiana. Required: description of coordination activity and individual response. Current narrative is 12 words — minimum is 25 words.
-                      </p>
-                      <button
-                        onClick={() => toast("Opening note")}
-                        className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent hover:underline inline-flex items-center gap-1"
-                      >
-                        Open note to fix <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-[12px] font-geist font-semibold text-icm-text">Issue 2</p>
-                      <p className="text-[11.5px] font-geist text-icm-text-dim mt-1 leading-relaxed">
-                        Authorization SA-2026-002 has 4 units remaining. This claim is for 3 units — within limit but within 85% warning threshold.
-                      </p>
-                      <button
-                        onClick={() => toast("Opening authorization")}
-                        className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent hover:underline inline-flex items-center gap-1"
-                      >
-                        View authorization <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              {/* Status */}
+              <div className="flex items-center gap-2">
+                <BillingStatusBadge status={drawerRecord.billing_status} />
+                {drawerRecord.submitted_to_iddbilling && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200">
+                    IDD Billing.AI submitted
+                  </span>
+                )}
               </div>
 
-              <p className="text-[11.5px] font-geist text-icm-text-dim italic">
-                Once issues are resolved, AI will automatically re-scrub this claim.
-              </p>
+              {/* Service info */}
+              <ClaimSection title="Service Details">
+                <KV label="Service Code" value={drawerRecord.service_code} mono />
+                <KV label="Description" value={drawerRecord.service_description || "—"} />
+                <KV label="Units" value={`${drawerRecord.units} units`} />
+                <KV label="Rate" value={`$${(drawerRecord.rate_per_unit || 0).toFixed(2)}/unit`} mono />
+                <KV label="Total Amount" value={`$${(drawerRecord.total_amount || 0).toFixed(2)}`} mono />
+                <KV label="Date of Service" value={drawerRecord.date_of_service} mono />
+                <KV label="Time" value={drawerRecord.start_time && drawerRecord.end_time ? `${drawerRecord.start_time} – ${drawerRecord.end_time}` : "—"} />
+              </ClaimSection>
+
+              {/* Authorization */}
+              <ClaimSection title="Authorization">
+                <KV label="Auth Number" value={drawerRecord.authorization_number || "—"} mono />
+                <KV label="Payer" value={drawerRecord.payer_name || "—"} />
+              </ClaimSection>
+
+              {/* Validation */}
+              {drawerRecord.validation_checks && (
+                <ClaimSection title="Validation Results">
+                  {Object.entries(drawerRecord.validation_checks).map(([key, check]: [string, any]) => (
+                    <div key={key} className="flex items-start gap-2">
+                      {check?.passed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-icm-green shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="text-[11.5px] font-geist font-medium text-icm-text capitalize">
+                          {key.replace(/_/g, " ")}
+                        </p>
+                        <p className="text-[11px] font-geist text-icm-text-dim">{check?.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </ClaimSection>
+              )}
+
+              {/* Denial reason */}
+              {drawerRecord.denial_reason && (
+                <div className="rounded-lg border border-red-200 bg-red-50/60 p-3">
+                  <p className="text-[11.5px] font-geist font-semibold text-red-700 mb-1">Denial Reason</p>
+                  <p className="text-[11.5px] font-geist text-red-700">{drawerRecord.denial_reason}</p>
+                </div>
+              )}
+
+              {/* Source note link */}
+              {drawerRecord.source_note_url && (
+                <a
+                  href={drawerRecord.source_note_url}
+                  className="flex items-center gap-1.5 text-[11.5px] font-geist font-semibold text-icm-accent hover:underline"
+                >
+                  View source note <ChevronRight className="w-3.5 h-3.5" />
+                </a>
+              )}
+
+              {/* Actions */}
+              {drawerRecord.billing_status === "scrub_passed" && !drawerRecord.submitted_to_iddbilling && (
+                <button
+                  onClick={() => {
+                    setSelectedIds(new Set([drawerRecord.id]));
+                    setDrawerRecord(null);
+                    setConfirmOpen(true);
+                  }}
+                  className="w-full h-9 rounded-xl bg-teal-600 text-white text-[12.5px] font-geist font-semibold hover:bg-teal-700 flex items-center justify-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" /> Submit to IDD Billing.AI
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -343,13 +608,13 @@ const BillingHub = () => {
   );
 };
 
+// ── Sub-components ───────────────────────────────────────────────────────────
+
 function Th({ children }: { children: React.ReactNode }) {
   return <th className="text-left px-3 py-2 font-semibold">{children}</th>;
 }
 
-function StatCard({
-  icon: Icon, tone, value, label, sub,
-}: {
+function StatCard({ icon: Icon, tone, value, label, sub }: {
   icon: typeof Clock; tone: "gray" | "green" | "amber" | "blue"; value: string; label: string; sub: string;
 }) {
   const toneMap = {
@@ -372,30 +637,49 @@ function StatCard({
   );
 }
 
-function AiBadge({ status }: { status: AiStatus }) {
-  if (status === "passed") return <Pill tone="green">✅ Scrub passed</Pill>;
-  if (status === "attention") return <Pill tone="amber">⚠️ Needs attention</Pill>;
-  return <Pill tone="gray">🔄 Pending scrub</Pill>;
-}
-
-function BillingBadge({ status }: { status: BillStatus }) {
-  if (status === "ready") return <Pill tone="green">Ready</Pill>;
-  if (status === "hold") return <Pill tone="amber">On hold</Pill>;
-  if (status === "submitted") return <Pill tone="blue">Submitted</Pill>;
-  return <Pill tone="gray">Pending</Pill>;
-}
-
-function Pill({ tone, children }: { tone: "green" | "amber" | "gray" | "blue"; children: React.ReactNode }) {
-  const map = {
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    amber: "bg-amber-50 text-amber-700 ring-amber-200",
-    gray: "bg-slate-100 text-slate-700 ring-slate-200",
-    blue: "bg-blue-50 text-blue-700 ring-blue-200",
-  } as const;
+function BillingStatusBadge({ status }: { status: BillingStatus }) {
+  const map: Record<BillingStatus, string> = {
+    pending_scrub: "bg-slate-100 text-slate-700 ring-slate-200",
+    scrub_passed: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    needs_attention: "bg-amber-50 text-amber-700 ring-amber-200",
+    submitted: "bg-blue-50 text-blue-700 ring-blue-200",
+    accepted: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    denied: "bg-red-50 text-red-700 ring-red-200",
+    adjusted: "bg-purple-50 text-purple-700 ring-purple-200",
+    void: "bg-slate-100 text-slate-500 ring-slate-200",
+  };
+  const labels: Record<BillingStatus, string> = {
+    pending_scrub: "Pending Scrub",
+    scrub_passed: "Ready",
+    needs_attention: "Needs Attention",
+    submitted: "Submitted",
+    accepted: "Accepted",
+    denied: "Denied",
+    adjusted: "Adjusted",
+    void: "Void",
+  };
   return (
-    <span className={cn("px-1.5 py-0.5 rounded-full text-[10.5px] font-geist font-semibold ring-1 inline-flex items-center gap-1", map[tone])}>
-      {children}
+    <span className={cn("px-1.5 py-0.5 rounded-full text-[10.5px] font-geist font-semibold ring-1 inline-flex items-center", map[status] || "bg-slate-100 text-slate-700")}>
+      {labels[status] || status}
     </span>
+  );
+}
+
+function ClaimSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10.5px] font-geist font-bold uppercase tracking-[0.1em] text-icm-text-dim mb-2">{title}</p>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function KV({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11.5px] font-geist text-icm-text-dim">{label}</span>
+      <span className={cn("text-[11.5px] font-geist text-icm-text", mono && "font-mono font-semibold")}>{value}</span>
+    </div>
   );
 }
 

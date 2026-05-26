@@ -19,6 +19,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 import { writeAudit } from "@/lib/auditService";
 import { useAssignedStaff, addAssignedStaff, updateAssignedStaff } from "@/hooks/useFirestore";
 import { doc, deleteDoc } from "firebase/firestore";
@@ -428,9 +429,7 @@ const PersonCareTeam = () => {
               className="rounded-xl border border-icm-border bg-icm-panel p-4 hover:border-icm-border-strong transition-colors"
             >
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-icm-bg ring-1 ring-icm-border flex items-center justify-center text-[11.5px] font-medium text-icm-text-dim shrink-0">
-                  {nameInitials(m.name)}
-                </div>
+                <AuthorCell name={m.name} size="lg" showName={false} className="shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[13.5px] font-medium text-icm-text">{m.name}</span>

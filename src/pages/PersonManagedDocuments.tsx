@@ -12,6 +12,7 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, 
 import { db } from "@/lib/firebase";
 import { writeAudit } from "@/lib/auditService";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Node = {
@@ -609,10 +610,7 @@ export default function PersonManagedDocuments() {
                         </div>
                       </td>
                       <td className="px-3 py-2.5 hidden md:table-cell">
-                        <div className="flex items-center gap-1.5 text-[12px] text-slate-600">
-                          <User className="w-3 h-3 text-slate-400" />
-                          {n.createdBy}
-                        </div>
+                        <AuthorCell name={n.createdBy} size="sm" showName={true} />
                       </td>
                       <td className="px-3 py-2.5 hidden md:table-cell">
                         <div className="flex items-center gap-1.5 text-[12px] text-slate-600">

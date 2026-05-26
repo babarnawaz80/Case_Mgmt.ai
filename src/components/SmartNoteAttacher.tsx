@@ -37,51 +37,48 @@ const REWRITE_ACTIONS = [
   { id: "soap",         label: "Convert to SOAP format", description: "Subjective / Objective / Assessment / Plan" },
 ];
 
-function rewrite(text: string, action: string): string {
-  const t = text.trim();
-  if (!t) return t;
-  switch (action) {
-    case "improve":
-      return t
-        .replace(/\bvery\s+/gi, "")
-        .replace(/\ba lot of\b/gi, "numerous")
-        .replace(/\bgot\b/gi, "received")
-        .replace(/\s+/g, " ")
-        .replace(/\bi\b/g, "I")
-        .replace(/(^|\.\s+)([a-z])/g, (_, p, c) => p + c.toUpperCase());
-    case "professional":
-      return `Per documented observation: ${t
-        .replace(/\bi\b/gi, "this writer")
-        .replace(/\bthe client\b/gi, "the individual")
-        .replace(/\bhe said\b|\bshe said\b/gi, "the individual reported")
-        .replace(/\s+/g, " ")
-        .trim()}. All findings reviewed against current state guidelines.`;
-    case "concise": {
-      const sentences = t.split(/(?<=[.!?])\s+/);
-      return sentences
-        .map((s) => s
-          .replace(/\b(in order to|so as to)\b/gi, "to")
-          .replace(/\b(at this point in time|at the present time)\b/gi, "now")
-          .replace(/\b(due to the fact that|owing to the fact that)\b/gi, "because")
-          .replace(/\b(a large number of)\b/gi, "many")
-          .replace(/\s+/g, " ")
-          .trim()
-        ).filter(Boolean).join(" ");
-    }
-    case "expand":
-      return `${t}\n\nAdditional context: This entry reflects observations made during today's interaction. Relevant supports, prompts, and the individual's response are noted above. Follow-up will be documented in the next contact note, and any related guidelines or thresholds have been considered.`;
-    case "grammar":
-      return t
-        .replace(/\s+([,.;:!?])/g, "$1")
-        .replace(/\bi\b/g, "I")
-        .replace(/\s+/g, " ")
-        .replace(/(^|\.\s+|\?\s+|!\s+)([a-z])/g, (_, p, c) => p + c.toUpperCase())
-        .replace(/([a-zA-Z0-9])$/, "$1.");
-    case "soap":
-      return `S (Subjective): ${t}\nO (Objective): Observed during today's visit; no acute concerns noted.\nA (Assessment): Progress consistent with current Person-Centered Plan goals.\nP (Plan): Continue current supports; revisit at next scheduled contact.`;
-    default:
-      return t;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+const REWRITE_PROMPTS: Record<string, string> = {
+  improve:      "Improve the clarity and readability of the following clinical case management note. Fix awkward phrasing, tighten sentences, and ensure professional language. Return ONLY the rewritten text, no explanations.",
+  professional: "Rewrite the following text in a professional, clinical case management tone suitable for an official health record. Use third-person where appropriate (e.g. 'the individual' instead of 'he/she'), avoid informal language, and ensure it is audit-ready. Return ONLY the rewritten text, no explanations.",
+  concise:      "Make the following clinical note more concise. Remove filler words, redundant phrases, and unnecessary detail while preserving all critical clinical information. Return ONLY the rewritten text, no explanations.",
+  expand:       "Expand the following brief clinical note with appropriate clinical detail. Add structured context, document observations more thoroughly, and ensure it meets documentation standards for case management records. Return ONLY the expanded text, no explanations.",
+  grammar:      "Fix only the grammar, spelling, and punctuation in the following text. Do NOT change the meaning, tone, or content. Return ONLY the corrected text, no explanations.",
+  soap:         "Convert the following clinical note into SOAP format (Subjective, Objective, Assessment, Plan). Label each section clearly. Return ONLY the SOAP-formatted note, no explanations.",
+};
+
+async function callGeminiRewrite(text: string, action: string): Promise<string> {
+  const systemPrompt = REWRITE_PROMPTS[action] ?? REWRITE_PROMPTS.improve;
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: `${systemPrompt}\n\n---\n\n${text}` }],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 2048,
+    },
+  };
+
+  const res = await fetch(GEMINI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errText}`);
   }
+
+  const data = await res.json();
+  const output = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!output) throw new Error("Empty response from Gemini");
+  return output.trim();
 }
 
 // Set a controlled <textarea> value in a way React notices.
@@ -231,7 +228,7 @@ export default function SmartNoteAttacher() {
     }
   }, [lang, target]);
 
-  const doRewrite = (actionId: string) => {
+  const doRewrite = async (actionId: string) => {
     if (!target) return;
     const current = target.value;
     if (!current.trim()) {
@@ -242,14 +239,20 @@ export default function SmartNoteAttacher() {
     setShowRewrite(false);
     setIsRewriting(true);
     const el = target;
-    setTimeout(() => {
-      const out = rewrite(current, actionId);
+    try {
+      const out = await callGeminiRewrite(current, actionId);
       setNativeValue(el, out);
-      setIsRewriting(false);
       toast.success("Help Me Write applied", {
         description: REWRITE_ACTIONS.find((a) => a.id === actionId)?.label,
       });
-    }, 650);
+    } catch (err: any) {
+      console.error("AI rewrite failed:", err);
+      toast.error("AI rewrite failed", {
+        description: err.message || "Please check your connection and try again.",
+      });
+    } finally {
+      setIsRewriting(false);
+    }
   };
 
   if (!target || !pos) return null;

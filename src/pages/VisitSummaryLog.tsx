@@ -6,11 +6,16 @@ import { Plus, Eye, Printer, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCollection } from "@/hooks/useFirestore";
 import { useIndividuals } from "@/hooks/useIndividuals";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const VisitSummaryLog = () => {
   const navigate = useNavigate();
   const { data: notes, loading: visitsLoading } = useCollection<any>("visit_summaries", "visit_date", "desc");
   const { individuals, loading: individualsLoading } = useIndividuals();
+  const { userProfile } = useAuth();
+
+
 
   const loading = visitsLoading || individualsLoading;
 
@@ -72,7 +77,9 @@ const VisitSummaryLog = () => {
                 <tr key={n.id} className="hover:bg-icm-bg/60">
                   <td className="px-4 py-3 font-mono text-icm-text">{n.visit_date || n.visitDate}</td>
                   <td className="px-4 py-3 text-icm-text font-medium">{personName(n.individual_id || n.personId)}</td>
-                  <td className="px-4 py-3 text-icm-text-dim">{n.updated_by || n.updatedBy || n.author_name || n.caseManager || "Kathy Martinez"}</td>
+                  <td className="px-4 py-3 text-icm-text-dim">
+                    <AuthorCell name={n.updated_by || n.updatedBy || n.author_name || n.caseManager || "Kathy Martinez"} />
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${

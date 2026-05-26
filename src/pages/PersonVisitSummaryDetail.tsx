@@ -10,7 +10,11 @@ import { useVisitSummaries } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { toast } from "sonner";
-import type { VisitStatus } from "@/data/visitSummaries";
+import BillingSectionFields from "@/components/billing/BillingSectionFields";
+import { createBillingRecord, updateAuthorizationUnits } from "@/hooks/useBillingRecords";
+import { getRateForCode } from "@/hooks/useAuthorizations";
+import { calculateBillingUnits } from "@/services/billingValidation";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ComplianceTone = "green" | "amber" | "red";
 
@@ -42,6 +46,15 @@ const PersonVisitSummaryDetail = () => {
   const [showSubmit, setShowSubmit] = useState(false);
   const [reviewedAI, setReviewedAI] = useState(false);
   const [showAIBanner, setShowAIBanner] = useState(true);
+
+  // ── Billing state ─────────────────────────────────────────────────
+  const [isBillable, setIsBillable] = useState(true);
+  const [vsServiceCode, setVsServiceCode] = useState("");
+  const [vsUnits, setVsUnits] = useState(0);
+  const [vsAuthId, setVsAuthId] = useState("");
+  const [vsAuthNumber, setVsAuthNumber] = useState("");
+
+  const { userProfile } = useAuth();
 
   useEffect(() => {
     if (initial && !form) {
@@ -116,6 +129,53 @@ const PersonVisitSummaryDetail = () => {
     if (!form || !person) return;
     try {
       await handleSave("submitted");
+
+      // Auto-create billing record if billable
+      if (isBillable && vsServiceCode && userProfile?.organizationId) {
+        const { rate, unitType } = getRateForCode(vsServiceCode);
+        const startTime = form.startTime || form.start_time || "";
+        const endTime = form.endTime || form.end_time || "";
+        const unitCalc = calculateBillingUnits(startTime, endTime, unitType as any, rate);
+        const finalUnits = vsUnits > 0 ? vsUnits : unitCalc.units;
+        if (finalUnits > 0) {
+          try {
+            await createBillingRecord({
+              org_id: userProfile.organizationId,
+              individual_id: person.id,
+              individual_name: `${person.first_name} ${person.last_name}`,
+              case_manager_id: userProfile.uid ?? "",
+              case_manager_name: userProfile.displayName ?? "",
+              source_note_id: id || "",
+              source_note_type: "visit_summary",
+              source_note_url: `/people/${person.id}/visit-summary/${visitId}`,
+              service_code: vsServiceCode,
+              service_description: "",
+              billing_unit_type: unitType as any,
+              units: finalUnits,
+              rate_per_unit: rate,
+              total_amount: finalUnits * rate,
+              date_of_service: form.visitDate || form.visit_date || "",
+              start_time: startTime,
+              end_time: endTime,
+              duration_minutes: unitCalc.durationMinutes,
+              authorization_id: vsAuthId,
+              authorization_number: vsAuthNumber,
+              funding_stream_id: "",
+              payer_name: "",
+              payer_id: "",
+              validation_status: "passed",
+              billing_status: "scrub_passed",
+              submitted_to_iddbilling: false,
+              remittance_received: false,
+              signed_by: userProfile.uid ?? "",
+            });
+            if (vsAuthId) await updateAuthorizationUnits(vsAuthId, finalUnits, "add");
+          } catch (billingErr) {
+            console.error("[billing] visit summary billing record error:", billingErr);
+          }
+        }
+      }
+
       setShowSubmit(false);
     } catch (err) {
       console.error(err);
@@ -224,6 +284,40 @@ const PersonVisitSummaryDetail = () => {
             <textarea disabled={isReadOnly} maxLength={8000} value={form.othersPresent ?? ""} onChange={(e) => update("othersPresent", e.target.value)} className={textareaCls} rows={2} placeholder="List all individuals present during the visit" />
           </Field>
         </Section>
+
+        {/* Billing Section */}
+        <section className="rounded-xl border border-icm-border bg-icm-panel p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-manrope font-bold text-[15px] text-icm-text tracking-tight">Billing</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-[11.5px] font-geist text-icm-text-dim">Billable?</span>
+              <button
+                onClick={() => setIsBillable(true)}
+                disabled={isReadOnly}
+                className={`px-3 h-7 rounded-lg text-[11.5px] font-medium border transition-colors ${isBillable ? "bg-icm-green-soft border-icm-green text-icm-green" : "border-icm-border text-icm-text-dim"}`}
+              >Yes</button>
+              <button
+                onClick={() => setIsBillable(false)}
+                disabled={isReadOnly}
+                className={`px-3 h-7 rounded-lg text-[11.5px] font-medium border transition-colors ${!isBillable ? "bg-icm-bg border-icm-border-strong text-icm-text" : "border-icm-border text-icm-text-dim"}`}
+              >No</button>
+            </div>
+          </div>
+          {isBillable && (
+            <BillingSectionFields
+              individualId={id || ""}
+              serviceCode={vsServiceCode}
+              onServiceCodeChange={setVsServiceCode}
+              units={vsUnits}
+              onUnitsChange={setVsUnits}
+              authorizationId={vsAuthId}
+              authorizationNumber={vsAuthNumber}
+              onAuthorizationChange={(aid, anum) => { setVsAuthId(aid); setVsAuthNumber(anum); }}
+              startTime={form.startTime || form.start_time || ""}
+              endTime={form.endTime || form.end_time || ""}
+            />
+          )}
+        </section>
 
         {/* VISIT CONTENT */}
         <Section title="Visit Content">

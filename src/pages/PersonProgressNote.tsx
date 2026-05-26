@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, Pencil,
-  AlertTriangle, BarChart3, ListIcon, Loader2,
+  AlertTriangle, BarChart3, ListIcon, Loader2, Mic,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials, calcAge } from "@/hooks/useIndividuals";
 import { useProgressNotes, statusLabel, type NoteStatus } from "@/hooks/useProgressNotes";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 type Tab = "list" | "trends";
 
@@ -79,6 +80,12 @@ const PersonProgressNote = () => {
               <button onClick={newNote} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
                 + Start blank note
               </button>
+              <button
+                onClick={() => navigate(`/people/${id}/progress-note/new?from=ambient`)}
+                className="h-10 px-4 rounded-xl border border-icm-border bg-icm-panel text-[13px] font-medium text-icm-text-dim hover:bg-icm-bg inline-flex items-center gap-1.5"
+              >
+                <Mic className="w-3.5 h-3.5" /> Draft from ambient session
+              </button>
               <button onClick={newNote} className="h-10 px-4 rounded-xl bg-teal-600 text-white text-[13px] font-medium hover:bg-teal-700 inline-flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" /> AI-prefill from profile
               </button>
@@ -108,9 +115,17 @@ const PersonProgressNote = () => {
               {notes.length} note{notes.length !== 1 ? "s" : ""} · {unsigned.length} unsigned
             </p>
           </div>
-          <button onClick={newNote} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> Add Note
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={newNote} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" /> Add Note
+            </button>
+            <button
+              onClick={() => navigate(`/people/${id}/progress-note/new?from=ambient`)}
+              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:bg-icm-bg inline-flex items-center gap-1.5"
+            >
+              <Mic className="w-3.5 h-3.5" /> Draft from ambient session
+            </button>
+          </div>
         </div>
 
         {/* Unsigned alert */}
@@ -119,7 +134,7 @@ const PersonProgressNote = () => {
             <div className="flex items-center gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0" />
               <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                <span className="font-semibold">{unsigned.length} notes are pending your signature.</span>{" "}
+                <span className="font-semibold">{unsigned.length} {unsigned.length === 1 ? "note is" : "notes are"} pending your signature.</span>{" "}
                 <span className="text-icm-text-dim">Unsigned notes cannot be submitted for billing.</span>
               </p>
             </div>
@@ -150,7 +165,9 @@ const PersonProgressNote = () => {
                 <span className="text-[12px] font-geist">Loading notes…</span>
               </div>
             ) : (
-              <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+              <>
+              {/* Table — desktop only (sm and above) */}
+              <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden hidden sm:block">
                 <div className="overflow-x-auto">
                   <table className="w-full text-[12px] font-geist">
                     <thead className="bg-icm-bg/60">
@@ -172,7 +189,9 @@ const PersonProgressNote = () => {
                             </span>
                           </td>
                           <td className="px-4 py-3"><StatusPill status={n.status} /></td>
-                          <td className="px-4 py-3 text-icm-text-dim">{n.authorName || "—"}</td>
+                          <td className="px-4 py-3 text-icm-text-dim">
+                            <AuthorCell name={n.authorName || "—"} size="sm" showName={true} />
+                          </td>
                           <td className="px-4 py-3 text-right">
                             <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => openNote(n.id)} className="p-1.5 rounded hover:bg-icm-bg text-icm-accent" title="View"><Eye className="w-3.5 h-3.5" /></button>
@@ -189,6 +208,42 @@ const PersonProgressNote = () => {
                   </table>
                 </div>
               </div>
+
+              {/* Cards — mobile only (below sm) */}
+              <div className="sm:hidden space-y-3">
+                {filtered.length === 0 && (
+                  <p className="text-center text-[12px] text-icm-text-faint py-8">No notes match these filters.</p>
+                )}
+                {filtered.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => openNote(n.id)}
+                    className={`w-full text-left rounded-xl border border-icm-border bg-icm-panel p-4 space-y-2 hover:border-icm-border-strong transition-colors ${n.status === "void" ? "opacity-60" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={`font-mono text-[12px] ${n.status === "void" ? "line-through text-icm-text-dim" : "text-icm-text font-semibold"}`}>{n.progressDate}</p>
+                        <p className="text-[11px] text-icm-text-dim mt-0.5">{n.activityType || "—"} · {n.contactType || "—"}</p>
+                        <div className="mt-1">
+                          <AuthorCell name={n.authorName || "—"} size="sm" showName={true} />
+                        </div>
+                      </div>
+                      <StatusPill status={n.status} />
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-icm-border/60">
+                      <span className={`text-[11px] font-geist ${n.isBillable ? "text-icm-green" : "text-icm-text-dim"}`}>
+                        {n.isBillable ? "● Billable" : "○ Non-Billable"}
+                      </span>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => openNote(n.id)} className="p-1.5 rounded hover:bg-icm-bg text-icm-accent" title="View" aria-label="View note"><Eye className="w-4 h-4" /></button>
+                        <button className="p-1.5 rounded hover:bg-icm-bg text-icm-text-dim" title="Print" aria-label="Print note"><Printer className="w-4 h-4" /></button>
+                        <button className="p-1.5 rounded hover:bg-icm-bg text-icm-text-faint hover:text-icm-red" title="Delete" aria-label="Delete note"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              </>
             )}
           </>
         ) : (

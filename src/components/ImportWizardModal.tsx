@@ -417,6 +417,7 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fields = type === "individuals" ? INDIVIDUAL_FIELDS : STAFF_FIELDS;
@@ -500,11 +501,41 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
     reader.readAsArrayBuffer(file);
   }, [fields, type]);
 
+  // File type validation
+  const VALID_EXTENSIONS = [".xlsx", ".xls", ".csv"];
+  const VALID_TYPES = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "text/csv",
+    "application/csv",
+  ];
+
+  function validateFile(file: File): string | null {
+    const ext = "." + (file.name.split(".").pop()?.toLowerCase() ?? "");
+    if (!VALID_EXTENSIONS.includes(ext) && !VALID_TYPES.includes(file.type)) {
+      return `Invalid file type: "${file.name}". Please upload an .xlsx, .xls, or .csv file.`;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      return `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 50 MB.`;
+    }
+    return null;
+  }
+
+  const handleFileSelect = useCallback((file: File) => {
+    const error = validateFile(file);
+    if (error) {
+      setUploadError(error);
+      return;
+    }
+    setUploadError(null);
+    processFile(file);
+  }, [processFile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  }, [processFile]);
+    if (file) handleFileSelect(file);
+  }, [handleFileSelect]);
 
   // ── Duplicate Check ─────────────────────────────────────────────────────────
 
@@ -684,7 +715,7 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
                 onClick={() => fileRef.current?.click()}
                 className={cn(
                   "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all",
-                  dragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-border hover:border-primary/50 hover:bg-muted/30"
+                  uploadError ? "border-red-400 bg-red-50" : dragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-border hover:border-primary/50 hover:bg-muted/30"
                 )}
               >
                 <div className={cn("mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors", dragOver ? "bg-primary/10" : "bg-muted")}>
@@ -693,8 +724,14 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
                 <p className="font-semibold text-icm-text text-[15px]">{dragOver ? "Drop to upload" : "Drag & drop your spreadsheet here"}</p>
                 <p className="text-[13px] text-icm-text-dim mt-1">or click to browse</p>
                 <p className="text-[11.5px] text-icm-text-dim/70 mt-3">Supports .xlsx · .xls · .csv · Handles 40,000+ rows</p>
-                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }} />
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
               </div>
+              {uploadError && (
+                <div role="alert" className="flex items-start gap-2 text-red-600 text-[12.5px] font-geist bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
               <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
                 <p className="text-[12px] font-semibold text-icm-text flex items-center gap-1.5"><Info className="w-3.5 h-3.5 text-primary" /> Tips</p>
                 <ul className="text-[12px] text-icm-text-dim space-y-1 ml-5 list-disc">
@@ -704,6 +741,36 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
                   <li>{type === "individuals" ? 'Use "active", "pending", "transition" for status' : 'Use "admin", "supervisor", "case_manager" for role'}</li>
                 </ul>
               </div>
+            </div>
+          )}
+
+          {/* ── IMPORT COMPLETE ───────────────────────────────────────────── */}
+          {result && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-5">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div className="text-center space-y-1">
+                <h3 className="text-[18px] font-manrope font-bold text-icm-text">Import Complete!</h3>
+                <p className="text-[13px] text-icm-text-dim">
+                  {result.success} {typeLabel.toLowerCase()} successfully added.
+                </p>
+                {result.merged > 0 && (
+                  <p className="text-[12px] text-blue-600">{result.merged} existing records merged.</p>
+                )}
+                {result.skipped > 0 && (
+                  <p className="text-[12px] text-amber-600">{result.skipped} rows skipped (duplicates).</p>
+                )}
+                {result.errors > 0 && (
+                  <p className="text-[12px] text-red-600">{result.errors} rows failed to write.</p>
+                )}
+              </div>
+              <button
+                onClick={onClose}
+                className="h-9 px-5 rounded-lg bg-icm-accent text-white text-[13px] font-geist font-semibold hover:opacity-90 transition-opacity"
+              >
+                Done
+              </button>
             </div>
           )}
 

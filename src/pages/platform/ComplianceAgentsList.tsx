@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import {
@@ -14,31 +14,74 @@ import {
   Layers,
   Circle,
 } from "lucide-react";
-import {
-  complianceAgents,
-  agentsSummary,
-  TONE_CLASSES,
-  type ComplianceAgent,
-} from "@/data/complianceAgents";
+import { TONE_CLASSES, type ColorTone } from "@/data/complianceAgents";
+import { getAgents, type AgentDoc } from "@/services/agentsService";
+import { seedPlatformData } from "@/lib/seedPlatformData";
 import { useRole } from "@/contexts/RoleContext";
 import { AdminOnly } from "@/components/platform/AdminOnly";
+
+// Adapter: map AgentDoc → display-compatible shape
+function toDisplayAgent(a: AgentDoc) {
+  const lastRun = a.last_run_at?.toDate().toLocaleString() ?? "—";
+  return {
+    id: a.id,
+    name: a.name,
+    type: a.type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
+    version: a.version ?? "v1.0",
+    status: a.status === "active" ? "Active" : "Inactive",
+    autoMonitor: a.auto_monitor,
+    schedule: a.schedule ?? "Manual only",
+    pushMode: a.push_mode,
+    tone: (a.tone ?? "accent") as ColorTone,
+    description: a.description,
+    engineId: a.guidelines_engine_id,
+    engineName: a.guidelines_engine_name,
+    engineVersion: a.guidelines_engine_version,
+    compliancePct: a.avg_compliance,
+    individuals: a.individuals_count,
+    draftsPending: a.drafts_pending,
+    alertCount: a.alert_count ?? 0,
+    lastEvaluated: lastRun,
+  };
+}
 
 const ComplianceAgentsList = () => {
   const navigate = useNavigate();
   const { isAdmin } = useRole();
   const [query, setQuery] = useState("");
-  const sum = agentsSummary();
+  const [agents, setAgents] = useState<ReturnType<typeof toDisplayAgent>[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      await seedPlatformData();
+      const docs = await getAgents();
+      setAgents(docs.map(toDisplayAgent));
+      setLoading(false);
+    })();
+  }, []);
+
+  const sum = useMemo(() => {
+    const activeAgents = agents.filter(a => a.status === "Active").length;
+    const totalIndividuals = agents.reduce((s, a) => s + a.individuals, 0);
+    const avgCompliance = agents.length
+      ? Math.round(agents.reduce((s, a) => s + a.compliancePct, 0) / agents.length)
+      : 0;
+    const totalDrafts = agents.reduce((s, a) => s + a.draftsPending, 0);
+    const totalAlerts = agents.reduce((s, a) => s + a.alertCount, 0);
+    return { activeAgents, totalIndividuals, avgCompliance, totalDrafts, totalAlerts };
+  }, [agents]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return complianceAgents;
-    return complianceAgents.filter(
+    if (!q) return agents;
+    return agents.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
         a.type.toLowerCase().includes(q) ||
         a.engineName.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, agents]);
 
   if (!isAdmin) return <AdminOnly />;
 
@@ -91,20 +134,20 @@ const ComplianceAgentsList = () => {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2 justify-between">
             <div className="flex items-center gap-2 flex-wrap">
-              <Chip label="Active Agents" value={sum.activeAgents} tone="green" />
+              <Chip label="Active Agents" value={loading ? "—" : sum.activeAgents} tone="green" />
               <Chip
                 label="Individuals Served"
-                value={sum.totalIndividuals}
+                value={loading ? "—" : sum.totalIndividuals}
                 tone="accent"
               />
               <Chip
                 label="Avg Compliance"
-                value={`${sum.avgCompliance}%`}
+                value={loading ? "—" : `${sum.avgCompliance}%`}
                 tone="green"
               />
               <Chip
                 label="Drafts Pending"
-                value={sum.totalDrafts}
+                value={loading ? "—" : sum.totalDrafts}
                 tone="amber"
               />
             </div>
@@ -124,21 +167,45 @@ const ComplianceAgentsList = () => {
           </p>
         </div>
 
-        {/* Agent grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((a) => (
-            <AgentCard
-              key={a.id}
-              agent={a}
-              onOpen={() => navigate(`/platform/agents/${a.id}`)}
-            />
-          ))}
-        </div>
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="rounded-xl border border-icm-border bg-icm-panel p-4 animate-pulse">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-icm-bg" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-icm-bg rounded w-3/4" />
+                    <div className="h-3 bg-icm-bg rounded w-1/2" />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="h-3 bg-icm-bg rounded" />
+                  <div className="h-3 bg-icm-bg rounded w-4/5" />
+                </div>
+                <div className="mt-4 h-9 bg-icm-bg rounded-xl" />
+              </div>
+            ))}
+          </div>
+        )}
 
-        {filtered.length === 0 && (
+        {/* Agent grid */}
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map((a) => (
+              <AgentCard
+                key={a.id}
+                agent={a}
+                onOpen={() => navigate(`/platform/agents/${a.id}`)}
+              />
+            ))}
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <div className="rounded-xl border border-dashed border-icm-border bg-icm-panel py-12 text-center">
             <p className="text-[13px] text-icm-text-dim font-geist">
-              No agents match your search.
+              {agents.length === 0 ? "No agents found. Create your first agent to get started." : "No agents match your search."}
             </p>
           </div>
         )}
@@ -147,11 +214,14 @@ const ComplianceAgentsList = () => {
   );
 };
 
+
+type DisplayAgent = ReturnType<typeof toDisplayAgent>;
+
 function AgentCard({
   agent,
   onOpen,
 }: {
-  agent: ComplianceAgent;
+  agent: DisplayAgent;
   onOpen: () => void;
 }) {
   const navigate = useNavigate();

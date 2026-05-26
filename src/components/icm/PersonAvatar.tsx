@@ -3,6 +3,7 @@ import { Camera, Loader2 } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { updateIndividual } from "@/hooks/useIndividuals";
+import { toast } from "sonner";
 
 interface PersonAvatarProps {
   person: any; // Support both Person (static) and Individual (Firestore)
@@ -63,15 +64,18 @@ export function PersonAvatar({
     if (!file || !individualId) return;
 
     // Validate type + size (max 5 MB)
-    if (!file.type.startsWith("image/")) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be under 5 MB.");
+      toast.error("Image must be under 5 MB.");
       return;
     }
 
     setUploading(true);
 
-    // Show instant preview
+    // Show instant preview via blob URL
     const preview = URL.createObjectURL(file);
     setLocalUrl(preview);
     setErrored(false);
@@ -87,21 +91,23 @@ export function PersonAvatar({
 
       const downloadUrl = await getDownloadURL(storageRef);
 
-      // Save to Firestore
+      // Persist URL to Firestore — the onSnapshot listener in useIndividual
+      // will pick this up and update person.photo_url automatically
       await updateIndividual(individualId, { photo_url: downloadUrl } as any);
 
-      // Replace local blob URL with the real one
+      // Swap blob preview for the permanent CDN URL
       URL.revokeObjectURL(preview);
       setLocalUrl(downloadUrl);
       onPhotoUpdated?.(downloadUrl);
+      toast.success("Photo updated", { description: "The profile photo has been saved." });
     } catch (err) {
       console.error("[PersonAvatar] Upload failed:", err);
       URL.revokeObjectURL(preview);
       setLocalUrl(null);
-      alert("Photo upload failed. Please try again.");
+      toast.error("Photo upload failed. Please try again.");
     } finally {
       setUploading(false);
-      // Reset input so same file can be re-selected
+      // Reset input so the same file can be re-selected if needed
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };

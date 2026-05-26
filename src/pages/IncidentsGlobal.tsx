@@ -9,6 +9,7 @@ import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { useAllIncidents, useIncidentSummary, type Incident } from "@/hooks/useIncidents";
 import { useIndividuals, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/formatDate";
 
 const STATUS_OPTIONS = ["All", "open", "in_review", "closed", "void"] as const;
 type StatusFilter = typeof STATUS_OPTIONS[number];
@@ -29,7 +30,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = {
   open: "Open",
-  in_review: "In Review",
+  in_review: "Step 1 Pending",
   closed: "Closed",
   void: "Void",
 };
@@ -155,7 +156,7 @@ const IncidentsGlobal = () => {
                   placeholder="Select individual to report incident for…"
                   className="flex-1 bg-transparent text-[13px] font-geist text-icm-text focus:outline-none placeholder:text-icm-text-faint"
                 />
-                <button onClick={() => setShowPersonPicker(false)}>
+                <button onClick={() => setShowPersonPicker(false)} aria-label="Close person picker">
                   <X className="w-4 h-4 text-icm-text-faint hover:text-icm-text" />
                 </button>
               </div>
@@ -200,7 +201,7 @@ const IncidentsGlobal = () => {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryChip label="Total open" value={totalOpen} tone="red" />
-            <SummaryChip label="In review" value={inReview} tone="amber" />
+            <SummaryChip label="Step 1 Pending" value={inReview} tone="amber" />
             <SummaryChip label="Overdue (7d+)" value={overdue} tone="red" />
             <SummaryChip label="Closed" value={closedTotal} tone="green" />
           </div>
@@ -268,12 +269,19 @@ const IncidentsGlobal = () => {
               <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
                 <div className="divide-y divide-icm-border/50">
                   {filtered.map((incident) => {
-                    const personName = personMap.get(incident.individualId) ?? "Unknown Individual";
-                    const person = individuals.find((p) => p.id === incident.individualId);
+                    const hasIndividual = !!incident.individualId;
+                    const personName = hasIndividual
+                      ? (personMap.get(incident.individualId) ?? "Individual not found")
+                      : null;
+                    const person = hasIndividual ? individuals.find((p) => p.id === incident.individualId) : null;
                     return (
                       <button
                         key={incident.id}
-                        onClick={() => navigate(`/people/${incident.individualId}/incident-reporting/${incident.id}`)}
+                        onClick={() =>
+                          hasIndividual
+                            ? navigate(`/people/${incident.individualId}/incident-reporting/${incident.id}`)
+                            : navigate(`/incidents/${incident.id}/edit`)
+                        }
                         className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-icm-bg transition-colors group"
                       >
                         {person ? (
@@ -281,13 +289,20 @@ const IncidentsGlobal = () => {
                             {initials(person)}
                           </div>
                         ) : (
-                          <div className="w-8 h-8 rounded-lg bg-icm-bg border border-icm-border flex items-center justify-center shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-lg bg-icm-red-soft border border-icm-red/20 flex items-center justify-center shrink-0 mt-0.5">
                             <AlertTriangle className="w-3.5 h-3.5 text-icm-red" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[12.5px] font-semibold text-icm-text">{personName}</span>
+                            {personName ? (
+                              <span className="text-[12.5px] font-semibold text-icm-text">{personName}</span>
+                            ) : (
+                              <>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-icm-red-soft text-icm-red">Individual not assigned</span>
+                                <span className="text-[11px] font-geist text-icm-accent hover:underline">Link Individual →</span>
+                              </>
+                            )}
                             <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase", SEVERITY_COLOR[incident.severity] ?? "bg-icm-bg text-icm-text-dim")}>
                               {incident.severity}
                             </span>
@@ -295,7 +310,7 @@ const IncidentsGlobal = () => {
                               {STATUS_LABEL[incident.status] ?? incident.status}
                             </span>
                           </div>
-                          <p className="text-[11.5px] text-icm-text-dim mt-0.5">{incident.type} · {incident.reportedAt}</p>
+                          <p className="text-[11.5px] text-icm-text-dim mt-0.5">{incident.type} · {formatDate(incident.reportedAt)}</p>
                           {incident.description && (
                             <p className="text-[11px] text-icm-text-faint mt-0.5 line-clamp-1">{incident.description}</p>
                           )}

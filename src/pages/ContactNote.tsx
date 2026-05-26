@@ -11,6 +11,11 @@ import {
   serverTimestamp, orderBy, type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { AuthorCell } from "@/components/icm/AuthorCell";
+import BillingSectionFields from "@/components/billing/BillingSectionFields";
+import { createBillingRecord, updateAuthorizationUnits } from "@/hooks/useBillingRecords";
+import { getRateForCode } from "@/hooks/useAuthorizations";
+import { calculateBillingUnits } from "@/services/billingValidation";
 
 interface ContactNoteDoc {
   id: string;
@@ -91,6 +96,12 @@ const ContactNote = () => {
     date: new Date().toISOString().slice(0, 10),
   });
 
+  // Billing state for the modal
+  const [billingServiceCode, setBillingServiceCode] = useState("");
+  const [billingUnits, setBillingUnits] = useState(0);
+  const [billingAuthId, setBillingAuthId] = useState("");
+  const [billingAuthNumber, setBillingAuthNumber] = useState("");
+
   const formatDate = (ts: any) => {
     if (!ts) return "—";
     if (ts?.toDate) return ts.toDate().toLocaleDateString("en-US");
@@ -142,7 +153,7 @@ const ContactNote = () => {
     const now = new Date();
     const updatedOn = now.toISOString().slice(0, 16).replace("T", " ");
     try {
-      await addDoc(collection(db, "contact_notes"), {
+      const noteRef = await addDoc(collection(db, "contact_notes"), {
         individualId: form.individualId ?? id ?? null,
         individualName: form.person,
         individual_id: form.individualId ?? id ?? null,
@@ -169,9 +180,58 @@ const ContactNote = () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      // Create billing record if billable and signed
+      if (form.billable && form.status === "Signed" && billingServiceCode) {
+        const { rate, unitType } = getRateForCode(billingServiceCode);
+        const unitCalc = calculateBillingUnits(form.start || "", form.end || "", unitType as any, rate);
+        const finalUnits = billingUnits > 0 ? billingUnits : unitCalc.units;
+        if (finalUnits > 0) {
+          try {
+            await createBillingRecord({
+              org_id: userProfile.organizationId,
+              individual_id: form.individualId ?? id ?? "",
+              individual_name: form.person ?? "",
+              case_manager_id: userProfile.uid ?? "",
+              case_manager_name: userProfile.displayName ?? "",
+              source_note_id: noteRef.id,
+              source_note_type: "contact_note",
+              source_note_url: `/people/${id}/contact-note/${noteRef.id}`,
+              service_code: billingServiceCode,
+              service_description: "",
+              billing_unit_type: unitType as any,
+              units: finalUnits,
+              rate_per_unit: rate,
+              total_amount: finalUnits * rate,
+              date_of_service: form.date || now.toISOString().slice(0, 10),
+              start_time: form.start || "",
+              end_time: form.end || "",
+              duration_minutes: unitCalc.durationMinutes,
+              authorization_id: billingAuthId,
+              authorization_number: billingAuthNumber,
+              funding_stream_id: "",
+              payer_name: "",
+              payer_id: "",
+              validation_status: "passed",
+              billing_status: "scrub_passed",
+              submitted_to_iddbilling: false,
+              remittance_received: false,
+              signed_by: userProfile.uid ?? "",
+            });
+            if (billingAuthId) await updateAuthorizationUnits(billingAuthId, finalUnits, "add");
+          } catch (billingErr) {
+            console.error("[billing] contact note billing record error:", billingErr);
+          }
+        }
+      }
+
       toast.success(`Contact note saved — ${form.person} · ${form.activityType}`);
       setOpen(false);
       setForm({ billable: true, status: "Draft", date: new Date().toISOString().slice(0, 10) });
+      setBillingServiceCode("");
+      setBillingUnits(0);
+      setBillingAuthId("");
+      setBillingAuthNumber("");
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to save contact note. Please try again.");
@@ -226,7 +286,9 @@ const ContactNote = () => {
             <span className="text-[12px] font-geist">Loading contact notes…</span>
           </div>
         ) : (
-          <div className="rounded-[12px] border border-icm-border bg-icm-panel overflow-x-auto">
+          <>
+          {/* Table — desktop only (sm and above) */}
+          <div className="hidden sm:block rounded-[12px] border border-icm-border bg-icm-panel overflow-x-auto">
             <table className="w-full min-w-[720px] text-[12px] font-geist">
               <thead className="bg-icm-bg text-icm-text-dim uppercase tracking-wide text-[10px]">
                 <tr>
@@ -258,7 +320,10 @@ const ContactNote = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-[11px] text-icm-text-faint">
-                      {formatDate(n.updatedAt || n.createdAt)} · {n.updatedBy || "System"}
+                      <div className="flex items-center gap-1.5">
+                        <AuthorCell name={n.updatedBy || "System"} size="sm" showName={true} />
+                        <span>· {formatDate(n.updatedAt || n.createdAt)}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
@@ -296,6 +361,51 @@ const ContactNote = () => {
               </div>
             )}
           </div>
+
+          {/* Cards — mobile only (below sm) */}
+          <div className="sm:hidden space-y-3">
+            {notes.length === 0 && (
+              <p className="text-center text-[12px] text-icm-text-faint py-8">
+                No contact notes yet. Click "New Contact Note" to add the first one.
+              </p>
+            )}
+            {notes.map((n) => (
+              <div key={n.id} className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[13px] text-icm-text truncate">{n.individualName || "Unknown"}</p>
+                    <p className="text-[11px] text-icm-text-dim mt-0.5">{n.activityType} · {n.date}</p>
+                    <p className="text-[11px] text-icm-text-faint">{n.contactType}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${n.status?.toLowerCase() === "signed" ? "bg-icm-green-soft text-icm-green" : n.status?.toLowerCase() === "submitted" ? "bg-icm-accent-soft text-icm-accent" : "bg-icm-amber-soft text-icm-amber"}`}>
+                    {n.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-icm-border/60">
+                  <span className={`text-[11px] font-geist ${n.billable ? "text-icm-green" : "text-icm-text-dim"}`}>
+                    {n.billable ? "● Billable" : "○ Non-billable"}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      aria-label="View note"
+                      onClick={() => navigate(`/people/${id || n.individualId || "ind-001"}/contact-note/${n.id}`)}
+                      className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim hover:text-icm-text flex items-center justify-center"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      aria-label="Print note"
+                      onClick={() => navigate(`/people/${id || n.individualId || "ind-001"}/contact-note/${n.id}`)}
+                      className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim hover:text-icm-text flex items-center justify-center"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </div>
 
@@ -313,6 +423,10 @@ const ContactNote = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Required field legend */}
+              <p className="text-[11.5px] text-icm-text-dim">
+                Fields marked <span className="text-icm-red font-semibold">*</span> are required.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Person Supported" required>
                   <PersonSearchSelect
@@ -376,23 +490,56 @@ const ContactNote = () => {
                 </Field>
               </div>
 
+              {/* Billing section — only when billable */}
+              {form.billable && (
+                <div className="col-span-2">
+                  <BillingSectionFields
+                    individualId={form.individualId ?? id ?? ""}
+                    serviceCode={billingServiceCode}
+                    onServiceCodeChange={setBillingServiceCode}
+                    units={billingUnits}
+                    onUnitsChange={setBillingUnits}
+                    authorizationId={billingAuthId}
+                    authorizationNumber={billingAuthNumber}
+                    onAuthorizationChange={(aid, anum) => { setBillingAuthId(aid); setBillingAuthNumber(anum); }}
+                    startTime={form.start || ""}
+                    endTime={form.end || ""}
+                  />
+                </div>
+              )}
+
               <Field label="Purpose of Activity">
-                <textarea value={form.purpose || ""} onChange={(e) => set("purpose", e.target.value)} className={textareaCls} rows={2} />
+                <div className="relative">
+                  <textarea value={form.purpose || ""} onChange={(e) => set("purpose", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.purpose || "").length} / 4000</span>
+                </div>
               </Field>
               <Field label="Relevant Background / Circumstances">
-                <textarea value={form.background || ""} onChange={(e) => set("background", e.target.value)} className={textareaCls} rows={2} />
+                <div className="relative">
+                  <textarea value={form.background || ""} onChange={(e) => set("background", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.background || "").length} / 4000</span>
+                </div>
               </Field>
               <Field label="Who Was Present">
                 <input value={form.present || ""} onChange={(e) => set("present", e.target.value)} className={inputCls} />
               </Field>
               <Field label="Details of Activity">
-                <textarea value={form.details || ""} onChange={(e) => set("details", e.target.value)} className={textareaCls} rows={3} />
+                <div className="relative">
+                  <textarea value={form.details || ""} onChange={(e) => set("details", e.target.value)} className={textareaCls} rows={3} maxLength={4000} />
+                  <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.details || "").length} / 4000</span>
+                </div>
               </Field>
               <Field label="Issues / Concerns / Challenges">
-                <textarea value={form.issues || ""} onChange={(e) => set("issues", e.target.value)} className={textareaCls} rows={2} />
+                <div className="relative">
+                  <textarea value={form.issues || ""} onChange={(e) => set("issues", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.issues || "").length} / 4000</span>
+                </div>
               </Field>
               <Field label="Next Steps and Follow Up Plans">
-                <textarea value={form.nextSteps || ""} onChange={(e) => set("nextSteps", e.target.value)} className={textareaCls} rows={2} />
+                <div className="relative">
+                  <textarea value={form.nextSteps || ""} onChange={(e) => set("nextSteps", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.nextSteps || "").length} / 4000</span>
+                </div>
               </Field>
               <Field label="Status">
                 <select value={form.status || "Draft"} onChange={(e) => set("status", e.target.value as ContactNoteDoc["status"])} className={inputCls}>

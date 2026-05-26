@@ -11,6 +11,7 @@ import { getFormsForPerson } from "@/data/monitoringForms";
 import { getVisitSummariesForPerson } from "@/data/visitSummaries";
 import { getCurrentEligibility } from "@/data/eligibility";
 import { getPlansForPerson } from "@/data/carePlans";
+import { getProfile } from "@/data/profiles";
 
 // ─── ID normalisation ────────────────────────────────────────────────────────
 // Some mock modules key on "joseph-brown", some on "1".
@@ -151,6 +152,13 @@ export const DEFAULT_FACTORS: Omit<FactorConfig, "points" | "enabled">[] = [
     source: "Assessments",
     sourcePath: "/people/:id/assessments",
   },
+  {
+    factorId: "housing_instability",
+    label: "Unstable or unknown housing situation",
+    defaultPoints: 10,
+    source: "Individual Profile — Basic Info",
+    sourcePath: "/people/:id/profile",
+  },
 ];
 
 export const DEFAULT_THRESHOLDS: RiskThresholds = { lowMax: 34, moderateMax: 59 };
@@ -246,7 +254,8 @@ function daysUntil(d: Date | null): number | null {
 
 export function calculateRiskScore(
   personId: string, // numeric string "1"–"7" or slugs used in mock data
-  settings: RiskSettings
+  settings: RiskSettings,
+  baseRiskScore?: number
 ): RiskScoreResult {
   const slug = resolvePersonId(personId);
   // Try both the slug and the numeric id for mock data lookups
@@ -261,6 +270,10 @@ export function calculateRiskScore(
     const result = evaluateFactor(cfg, personId, tryIds, now);
     factors.push({ ...result, points: cfg.points });
     if (result.triggered) total += cfg.points;
+  }
+
+  if (baseRiskScore !== undefined) {
+    total = Math.max(total, baseRiskScore);
   }
 
   total = Math.min(100, total);
@@ -553,6 +566,21 @@ function evaluateFactor(
   if (cfg.factorId === "assessment_overdue") {
     // Mock: no overdue assessments for primary 7
     return { ...base, triggered: false, detail: "No overdue assessments" };
+  }
+
+  // ── housing_instability ─────────────────────────────────────────────────
+  if (cfg.factorId === "housing_instability") {
+    // Read living situation from profile singleton (mutable, always reflects edits)
+    const profile = getProfile(personId);
+    const ls = profile.livingSituation ?? "";
+    const unstable = ls === "Homeless" || ls === "Other";
+    return {
+      ...base,
+      triggered: unstable,
+      detail: unstable
+        ? `Living situation recorded as: ${ls}`
+        : `Living situation: ${ls || "Not recorded"} (stable — not a risk factor)`,
+    };
   }
 
   return { ...base, triggered: false, detail: "Factor not evaluated" };

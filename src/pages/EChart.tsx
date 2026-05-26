@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { demoToast } from "@/lib/demoToast";
 import { PreVisitModal } from "@/components/visit/PreVisitModal";
@@ -9,6 +10,7 @@ import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { useRiskScore } from "@/contexts/RiskScoreContext";
 import { calculateRiskScore, loadRiskSettings, riskColor } from "@/lib/riskEngine";
 import { useEChartCounts } from "@/hooks/useEChartCounts";
+import { useEChartStats, fmtVisitDate } from "@/hooks/useEChartStats";
 import {
   CheckSquare,
   FileHeart,
@@ -148,6 +150,7 @@ const EChart = () => {
   const [showPreVisit, setShowPreVisit] = useState(false);
   const [filter, setFilter] = useState<"All" | Category>("All");
   const liveCounts = useEChartCounts(id);
+  const liveStats = useEChartStats(id);
 
   // ALL hooks must be called before any early returns (Rules of Hooks)
   const visibleTiles = ALL_TILES.filter(
@@ -196,7 +199,7 @@ const EChart = () => {
   const specialInstructions = individual.diagnosis ?? "See care plan for details";
 
   const { openDrawer } = useRiskScore();
-  const computedRisk = calculateRiskScore(individual.id, loadRiskSettings());
+  const computedRisk = calculateRiskScore(individual.id, loadRiskSettings(), individual.risk_score);
   const computedScore = computedRisk.total;
   const computedLevel = computedRisk.level;
 
@@ -301,11 +304,11 @@ const EChart = () => {
                   foot={computedLevel === "high" ? "HIGH RISK" : computedLevel === "moderate" ? "MODERATE" : "Low Risk"}
                 />
               </button>
-              <Metric label="LAST VISIT" value={individual.last_visit_date ?? "—"} valueClass="text-icm-text" foot="See visit summary" />
-              <Metric label="NEXT VISIT" value={individual.next_visit_date ?? "—"} valueClass="text-icm-accent" foot="Scheduled" />
-              <Metric label="OPEN TASKS" value={individual.open_tasks?.toString() ?? "0"} valueClass="text-purple-600" foot="See workflow" />
-              <Metric label="INCIDENTS" value={individual.open_incidents?.toString() ?? "0"} valueClass={individual.open_incidents ? "text-icm-red" : "text-icm-text"} foot="Open" />
-              <Metric label="COMPLIANCE" value={individual.monitoring_compliance_pct ? `${individual.monitoring_compliance_pct}%` : "—"} valueClass="text-icm-green" foot="Monitoring" />
+              <Metric label="LAST VISIT" value={liveStats.loading ? "…" : fmtVisitDate(liveStats.lastVisitDate)} valueClass="text-icm-text" foot="See visit summary" />
+              <Metric label="NEXT VISIT" value={liveStats.loading ? "…" : fmtVisitDate(liveStats.nextVisitDate)} valueClass="text-icm-accent" foot="Scheduled" />
+              <Metric label="OPEN TASKS" value={liveStats.loading ? "…" : liveStats.openTasks.toString()} valueClass="text-purple-600" foot="See workflow" />
+              <Metric label="INCIDENTS" value={liveStats.loading ? "…" : liveStats.openIncidents.toString()} valueClass={liveStats.openIncidents > 0 ? "text-icm-red" : "text-icm-text"} foot="Open" />
+              <Metric label="COMPLIANCE" value={liveStats.loading ? "…" : liveStats.compliancePct != null ? `${liveStats.compliancePct}%` : "—"} valueClass="text-icm-green" foot="Monitoring" />
             </div>
           </div>
         </div>
@@ -509,28 +512,42 @@ function FilterPill({
 function ModuleTileCard({ tile, onOpen }: { tile: ModuleTile; onOpen: () => void }) {
   const Icon = tile.icon;
   const meta = CATEGORY_META[tile.category];
+
+  const hoverStyles = {
+    Documentation: "hover:border-icm-accent/40 hover:shadow-[0_8px_30px_rgb(59,130,246,0.06)] focus-visible:ring-icm-accent",
+    Care: "hover:border-icm-green/40 hover:shadow-[0_8px_30px_rgb(16,185,129,0.06)] focus-visible:ring-icm-green",
+    Operations: "hover:border-icm-amber/40 hover:shadow-[0_8px_30px_rgb(245,158,11,0.06)] focus-visible:ring-icm-amber"
+  }[tile.category];
+
   return (
     <button
       onClick={onOpen}
-      className="group relative text-left rounded-xl border border-icm-border bg-icm-panel pl-4 pr-3.5 py-3 min-h-[96px] hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col justify-between overflow-hidden"
+      className={cn(
+        "group relative text-left rounded-2xl border border-icm-border bg-icm-panel pl-4 pr-3.5 pt-4 pb-3.5 min-h-[104px] transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between overflow-hidden outline-none",
+        hoverStyles
+      )}
     >
-      {/* Left accent bar */}
-      <span className={`absolute left-0 top-0 bottom-0 w-1 ${meta.accentBar}`} />
+      {/* Rounded Left accent bar that expands smoothly on hover */}
+      <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-all duration-300 group-hover:top-1.5 group-hover:bottom-1.5 ${meta.accentBar}`} />
 
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between w-full">
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.iconBg} ${meta.iconColor}`}
+          className={cn(
+            "w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-all duration-300 transform group-hover:scale-105",
+            meta.iconBg,
+            meta.iconColor
+          )}
         >
           <Icon className="w-4 h-4" />
         </div>
         {tile.count !== undefined && (
-          <span className="font-mono font-bold text-[15px] text-icm-text leading-none">
+          <span className="font-mono font-extrabold text-[16px] text-icm-text mt-0.5">
             {tile.count}
           </span>
         )}
       </div>
 
-      <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight mt-2">
+      <p className="font-manrope font-bold text-[13px] text-icm-text-dim group-hover:text-icm-text leading-tight mt-3 transition-colors duration-200">
         {tile.label}
       </p>
     </button>
@@ -563,42 +580,46 @@ function AuthorizationTileCard({
   const expiringSoon = active.filter((a) => { const d = daysLeft(a.end_date); return d > 7 && d <= 30; });
   const overUnits = active.filter((a) => a.units_authorized > 0 && (a.units_used / a.units_authorized) >= 0.85);
 
-  // Top 3 by urgency: sort by days_left ascending then units pct descending
   const sorted = [...active].sort((a, b) => daysLeft(a.end_date) - daysLeft(b.end_date));
   const top3 = sorted.slice(0, 3);
 
   const hasRed = critical.length > 0 || overUnits.length > 0;
   const hasOrange = !hasRed && expiringSoon.length > 0;
 
+  const hoverStyles = "hover:border-icm-amber/40 hover:shadow-[0_8px_30px_rgb(245,158,11,0.06)] focus-visible:ring-icm-amber";
+
   return (
     <button
       onClick={onOpen}
-      className="group relative text-left rounded-xl border border-icm-border bg-icm-panel pl-4 pr-3.5 py-3 min-h-[96px] hover:border-icm-border-strong hover:shadow-elevated transition-all flex flex-col justify-between overflow-hidden"
+      className={cn(
+        "group relative text-left rounded-2xl border border-icm-border bg-icm-panel pl-4 pr-3.5 pt-4 pb-3.5 min-h-[104px] transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between overflow-hidden outline-none",
+        hoverStyles
+      )}
     >
-      <span className={`absolute left-0 top-0 bottom-0 w-1 ${meta.accentBar}`} />
+      <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-all duration-300 group-hover:top-1.5 group-hover:bottom-1.5 ${meta.accentBar}`} />
 
-      <div className="flex items-start justify-between">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.iconBg} ${meta.iconColor}`}>
+      <div className="flex items-start justify-between w-full">
+        <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-all duration-300 transform group-hover:scale-105 ${meta.iconBg} ${meta.iconColor}`}>
           <FileCheck className="w-4 h-4" />
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className="font-mono font-bold text-[15px] text-icm-text leading-none">{active.length}</span>
+          <span className="font-mono font-extrabold text-[16px] text-icm-text mt-0.5">{active.length}</span>
           {hasRed && (
-            <span className="inline-block w-2 h-2 rounded-full bg-icm-red" title="Critical authorization" />
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-icm-red animate-pulse" title="Critical authorization" />
           )}
           {hasOrange && !hasRed && (
-            <span className="inline-block w-2 h-2 rounded-full bg-icm-amber" title="Expiring soon" />
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-icm-amber animate-pulse" title="Expiring soon" />
           )}
         </div>
       </div>
 
-      <p className="font-tight font-semibold text-[12.5px] text-icm-text leading-tight mt-1.5 mb-1">
+      <p className="font-manrope font-bold text-[13px] text-icm-text-dim group-hover:text-icm-text leading-tight mt-3 transition-colors duration-200">
         {tile.label}
       </p>
 
       {/* Mini progress bars for top 3 auths */}
       {top3.length > 0 && (
-        <div className="space-y-0.5 mt-1">
+        <div className="space-y-1 mt-2 w-full">
           {top3.map((auth) => {
             const pct = auth.units_authorized > 0
               ? Math.min(100, (auth.units_used / auth.units_authorized) * 100)
@@ -606,11 +627,11 @@ function AuthorizationTileCard({
             const barColor = pct >= 85 ? "bg-icm-red" : pct >= 70 ? "bg-icm-amber" : "bg-icm-green";
             const dl = daysLeft(auth.end_date);
             return (
-              <div key={auth.id} className="flex items-center gap-1.5">
-                <div className="flex-1 h-1 rounded-full bg-icm-border overflow-hidden">
+              <div key={auth.id} className="flex items-center gap-1.5 w-full">
+                <div className="flex-1 h-1 rounded-full bg-icm-border/60 overflow-hidden">
                   <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                 </div>
-                <span className={`text-[9px] font-mono shrink-0 ${dl <= 7 ? "text-icm-red" : dl <= 30 ? "text-icm-amber" : "text-icm-text-faint"}`}>
+                <span className={`text-[9px] font-mono font-bold shrink-0 ${dl <= 7 ? "text-icm-red" : dl <= 30 ? "text-icm-amber" : "text-icm-text-faint"}`}>
                   {dl}d
                 </span>
               </div>

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
@@ -10,10 +10,12 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { type CarePlan, type PlanGoal } from "@/data/carePlans";
-import { useCarePlans, updateCarePlan } from "@/hooks/useFirestore";
+import { useCarePlans, updateCarePlan, usePCP } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { PCPDocumentViewer } from "@/components/pcp/PCPDocumentViewer";
+import { MOCK_PCP_BROWN_2026 } from "@/data/pcpMockData";
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
@@ -21,12 +23,35 @@ type SectionKey = "details" | "profile" | "nsr" | "goals" | "services" | "suppor
 
 const PersonCarePlanDetail = () => {
   const { id, planId } = useParams<{ id: string; planId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { individual, loading: individualLoading } = useIndividual(id);
   const { data: allPlans, loading: plansLoading } = useCarePlans(id);
 
+  // ── PCP v2 detection ──────────────────────────────────────────────────────
+  // A plan is a new PCP v2 if:
+  //   1. planId starts with "pcp-" (seeded mock records)
+  //   2. planId is a Firestore ID for a record in the `pcps` collection
+  //      (detected via usePCP hook below)
+  //   3. URL has ?ai=true (freshly generated from PCPOrbAnimation)
+  const isPcpV2Candidate =
+    planId?.startsWith("pcp-") ||
+    searchParams.get("ai") === "true" ||
+    false;
+
+  const { data: pcpRecord, loading: pcpLoading } = usePCP(
+    isPcpV2Candidate ? planId : undefined
+  );
+
+  // Use mock for the seeded Joseph Brown record when Firestore has no data
+  const resolvedPcp =
+    pcpRecord ??
+    (planId === MOCK_PCP_BROWN_2026.id || isPcpV2Candidate ? MOCK_PCP_BROWN_2026 : null);
+
+  const isAiParam = searchParams.get("ai") === "true";
+  // ─────────────────────────────────────────────────────────────────────────
+
   const plan = allPlans.find((p: any) => p.id === planId);
-  const loading = individualLoading || plansLoading;
 
   const { userProfile } = useAuth();
   const aiDraftCalledRef = useRef(false);
@@ -39,6 +64,8 @@ const PersonCarePlanDetail = () => {
   const [printOpen, setPrintOpen] = useState(false);
   const [aiDraftingGoals, setAiDraftingGoals] = useState(false);
 
+  // ── Loading state (includes PCP v2 loading) ───────────────────────────────────────────
+  const loading = individualLoading || plansLoading || (isPcpV2Candidate && pcpLoading);
 
   if (loading) {
     return (
@@ -50,6 +77,25 @@ const PersonCarePlanDetail = () => {
       </ICMShell>
     );
   }
+
+  // ── PCP v2 render path ────────────────────────────────────────────────────
+  if (resolvedPcp && individual) {
+    return (
+      <ICMShell title="Person-Centered Plan" showAIPanel={false}>
+        {/* Use negative margins to break out of ICMShell's p-6 padding */}
+        <div className="-mx-6 -mt-6 flex h-[calc(100vh-64px)] overflow-hidden">
+          <PCPDocumentViewer
+            pcp={resolvedPcp as any}
+            individualId={id ?? ""}
+            individualName={`${individual.first_name} ${individual.last_name}`}
+            isAiGenerated={isAiParam || resolvedPcp.ai_generated}
+          />
+        </div>
+      </ICMShell>
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   if (!individual || !plan) {
     return (
       <ICMShell title="Care Plan" showAIPanel={false}>

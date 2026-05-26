@@ -12,6 +12,7 @@ import {
   type IncidentRecord, type IncidentStageId, type NotificationRow, type ActionItem,
 } from "@/data/incidents";
 import { toast } from "sonner";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const PersonIncidentReportingDetail = () => {
   const { id, incidentId } = useParams<{ id: string; incidentId: string }>();
@@ -250,8 +251,8 @@ const PersonIncidentReportingDetail = () => {
                 <ClassificationPill c={wf.classification} />
                 <StatusPill s={wf.status} />
               </div>
-              <p className="text-[11.5px] font-mono text-icm-text-dim mt-1.5">
-                Occurred {wf.incidentDate} {wf.incidentTime} · {wf.programSite} · Reported by {wf.lastUpdatedBy}
+              <p className="text-[11.5px] font-mono text-icm-text-dim mt-1.5 flex items-center gap-1.5">
+                Occurred {wf.incidentDate} {wf.incidentTime} · {wf.programSite} · Reported by <AuthorCell name={wf.lastUpdatedBy} size="sm" showName={true} />
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -641,8 +642,8 @@ function Stage5View({ wf, onClose, onUpdate, onChange, canClose }: { wf: Inciden
         <textarea value={lessons} onChange={(e) => setLessons(e.target.value)} onBlur={persist} rows={3} maxLength={4000} className="w-full px-2 py-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text" />
       </Field>
 
-      <div className="rounded-lg border border-icm-border bg-icm-bg p-3 mb-3">
-        <p className="text-[11.5px] font-geist text-icm-text-dim">Supervisor approval: {wf.supervisorApprovedBy ? <span className="text-icm-green">Approved by {wf.supervisorApprovedBy} on {wf.supervisorApprovalDate}</span> : <span className="text-icm-amber">Pending supervisor review</span>}</p>
+      <div className="rounded-lg border border-icm-border bg-icm-bg p-3 mb-3 flex items-center">
+        <div className="text-[11.5px] font-geist text-icm-text-dim flex items-center gap-1.5">Supervisor approval: {wf.supervisorApprovedBy ? <span className="text-icm-green flex items-center gap-1.5">Approved by <AuthorCell name={wf.supervisorApprovedBy} size="sm" showName={true} /> on {wf.supervisorApprovalDate}</span> : <span className="text-icm-amber">Pending supervisor review</span>}</div>
       </div>
 
       <div className="flex justify-end">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { updateCarePlan } from "@/hooks/useFirestore";
 import {
   ChevronLeft,
   ChevronDown,
@@ -22,8 +23,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
-import { useCarePlans, addCarePlan, type CarePlan } from "@/hooks/useFirestore";
+import { type CarePlan } from "@/data/carePlans";
+import { useCarePlans, addCarePlan } from "@/hooks/useFirestore";
+import { PCPCreationModal, type PCPMode } from "@/components/pcp/PCPCreationModal";
 
 
 const PersonCarePlan = () => {
@@ -34,14 +38,41 @@ const PersonCarePlan = () => {
   const [completedOpen, setCompletedOpen] = useState(false);
   const [newPlanOpen, setNewPlanOpen] = useState(false);
   const [draftingAI, setDraftingAI] = useState(false);
+  // PCP Creation Modal state
+  const [pcpModalOpen, setPcpModalOpen] = useState(false);
+  const [pcpMode, setPcpMode] = useState<PCPMode>("blank");
   const [sharePlan, setSharePlan] = useState<CarePlan | null>(null);
 
   const [planType, setPlanType] = useState("Person-Centered Plan (PCP)");
   const [internalDueDate, setInternalDueDate] = useState("2026-08-01");
   const [notes, setNotes] = useState("");
+  // Renewal date modify state
+  const [showModifyRenewal, setShowModifyRenewal] = useState(false);
+  const [renewalDateEdit, setRenewalDateEdit] = useState("2026-08-31");
 
-  const inProgress = useMemo(() => allPlans.filter((p: any) => !p.isCompleted), [allPlans]);
-  const completed = useMemo(() => allPlans.filter((p: any) => p.isCompleted), [allPlans]);
+  const inProgress = useMemo(() => allPlans.filter((p: any) => {
+    if (p.isCompleted === true) return false;
+    const s = (p.status || '').toLowerCase();
+    return s !== 'archived' && s !== 'completed';
+  }), [allPlans]);
+  const completed = useMemo(() => allPlans.filter((p: any) => {
+    if (p.isCompleted === true) return true;
+    const s = (p.status || '').toLowerCase();
+    return s === 'archived' || s === 'completed';
+  }), [allPlans]);
+
+  // Compute renewal days — must be above all early returns (Rules of Hooks)
+  const activePlan = inProgress[0];
+  const renewalTarget = (activePlan as any)?.reviewDate || (activePlan as any)?.internalDueDate || null;
+  const renewalDaysNum = useMemo(() => {
+    if (!renewalTarget) return null;
+    const d = new Date(renewalTarget);
+    if (isNaN(d.getTime())) return null;
+    return Math.ceil((d.getTime() - Date.now()) / 86400000);
+  }, [renewalTarget]);
+  const isOverdue = renewalDaysNum !== null && renewalDaysNum < 0;
+  const renewalDays = renewalDaysNum !== null ? Math.abs(renewalDaysNum) : 127;
+  const lastApproved = (completed[0] as any)?.approvalDate ?? "—";
 
   const loading = individualLoading || plansLoading;
 
@@ -63,10 +94,28 @@ const PersonCarePlan = () => {
     );
   }
 
-  const activePlan = inProgress[0];
-  const renewalDays = 127;
-  const isOverdue = false;
-  const lastApproved = completed[0]?.approvalDate ?? "—";
+  // Handler to save a date field on a plan
+  const handleSetDate = async (planId: string, field: string, value: string) => {
+    try {
+      await updateCarePlan(planId, { [field]: value });
+      toast.success("Date saved");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save date");
+    }
+  };
+
+  // Handler to save annual renewal date
+  const handleSaveRenewal = async () => {
+    if (!activePlan) { setShowModifyRenewal(false); return; }
+    try {
+      await updateCarePlan(activePlan.id, { reviewDate: renewalDateEdit, internalDueDate: renewalDateEdit });
+      toast.success("Renewal date updated");
+    } catch (err) {
+      toast.error("Failed to update renewal date");
+    }
+    setShowModifyRenewal(false);
+  };
 
   const openPlan = (planId: string) => navigate(`/people/${id}/care-plan/${planId}`);
 
@@ -151,10 +200,18 @@ const PersonCarePlan = () => {
             Start {individual.first_name}'s first plan or let AI draft one based on existing records.
           </p>
           <div className="flex gap-2">
-            <button onClick={() => setNewPlanOpen(true)} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
+            <button
+              id="btn-start-blank-plan"
+              onClick={() => { setPcpMode("blank"); setPcpModalOpen(true); }}
+              className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg"
+            >
               + Start blank plan
             </button>
-            <button onClick={() => { setNewPlanOpen(true); setDraftingAI(true); }} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+            <button
+              id="btn-draft-with-ai"
+              onClick={() => { setPcpMode("ai"); setPcpModalOpen(true); }}
+              className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5"
+            >
               <Sparkles className="w-3.5 h-3.5" /> Draft with AI
             </button>
           </div>
@@ -204,15 +261,49 @@ const PersonCarePlan = () => {
             <h1 className="font-manrope text-[26px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
               PCP
             </h1>
-            <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
+            <p className="text-[13px] text-icm-text-dim mt-1 font-geist relative">
               <span className="font-semibold text-icm-text">Person-Centered Plan (PCP)</span>
               <span className="text-icm-text-faint"> · </span>
-              Annual renewal: <span className="font-mono text-icm-text">August 31</span>
-              <button onClick={() => toast("Modify renewal date", { description: "Opening renewal scheduler…" })} className="ml-1.5 text-icm-accent hover:underline text-[12px]">Modify</button>
+              Annual renewal:{" "}
+              <span className="font-mono text-icm-text">
+                {renewalTarget
+                  ? new Date(renewalTarget).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                  : "August 31"}
+              </span>
+              <button
+                onClick={() => { setRenewalDateEdit(renewalTarget || "2026-08-31"); setShowModifyRenewal(true); }}
+                className="ml-1.5 text-icm-accent hover:underline text-[12px]"
+              >
+                Modify
+              </button>
+              {/* Inline renewal date editor */}
+              {showModifyRenewal && (
+                <span className="absolute left-0 top-7 z-30 bg-white border border-icm-border rounded-xl shadow-lg p-3 flex items-center gap-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <input
+                    type="date"
+                    value={renewalDateEdit}
+                    onChange={e => setRenewalDateEdit(e.target.value)}
+                    className="h-8 px-2 rounded-lg border border-icm-border text-[12.5px] font-mono text-icm-text bg-white focus:outline-none focus:border-icm-accent"
+                  />
+                  <button
+                    onClick={handleSaveRenewal}
+                    className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setShowModifyRenewal(false)}
+                    className="h-8 px-3 rounded-lg border border-icm-border text-[12px] text-icm-text-dim hover:bg-icm-bg"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              )}
             </p>
           </div>
           <button
-            onClick={() => setNewPlanOpen(true)}
+            id="btn-new-pcp-plan"
+            onClick={() => { setPcpMode("blank"); setPcpModalOpen(true); }}
             className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-medium hover:bg-teal-700 inline-flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> New Plan
@@ -259,12 +350,12 @@ const PersonCarePlan = () => {
 
         {/* In Progress */}
         <Section title="In Progress" count={inProgress.length}>
-          <PlanTable plans={inProgress} onOpen={openPlan} variant="inProgress" />
+          <PlanTable plans={inProgress} onOpen={openPlan} variant="inProgress" onSetDate={handleSetDate} />
         </Section>
 
         {/* Completed */}
         <Section title="Completed" count={completed.length} collapsible collapsed={!completedOpen} onToggle={() => setCompletedOpen((o) => !o)}>
-          <PlanTable plans={completed} onOpen={openPlan} variant="completed" onShare={(p) => setSharePlan(p)} />
+          <PlanTable plans={completed} onOpen={openPlan} variant="completed" onShare={(p) => setSharePlan(p)} onSetDate={handleSetDate} />
         </Section>
       </div>
 
@@ -276,82 +367,15 @@ const PersonCarePlan = () => {
         />
       )}
 
-      {/* New Plan Modal */}
-      {newPlanOpen && (
-        <Modal title="Start New Plan" onClose={() => { setNewPlanOpen(false); setDraftingAI(false); }}>
-          {!draftingAI ? (
-            <>
-              <div className="space-y-3">
-                <Field label="Plan type">
-                  <select 
-                    value={planType}
-                    onChange={(e) => setPlanType(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text"
-                  >
-                    <option>Person-Centered Plan (PCP)</option>
-                    <option>Care Plan</option>
-                    <option>Service Plan</option>
-                  </select>
-                </Field>
-                <Field label="Internal due date">
-                  <input 
-                    type="date" 
-                    value={internalDueDate}
-                    onChange={(e) => setInternalDueDate(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text" 
-                  />
-                </Field>
-                <Field label="Notes">
-                  <textarea 
-                    rows={2} 
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text" 
-                  />
-                </Field>
-              </div>
-              <div className="mt-4 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3">
-                <div className="flex items-start gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-icm-accent mt-0.5 shrink-0" />
-                  <p className="text-[12px] text-icm-text leading-relaxed">
-                    Based on {individual.first_name}'s last plan and current monitoring notes, I can pre-populate goals, services, and outcomes. Want me to draft this plan?
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-end gap-2 mt-5">
-                <button 
-                  onClick={() => handleCreatePlan(false)} 
-                  className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg"
-                >
-                  Start blank
-                </button>
-                <button
-                  onClick={() => {
-                    setDraftingAI(true);
-                    setTimeout(() => {
-                      handleCreatePlan(true);
-                    }, 1200);
-                  }}
-                  className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Start with AI draft
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="py-6 text-center">
-              <div className="w-12 h-12 rounded-xl ai-gradient flex items-center justify-center mx-auto mb-3 animate-pulse">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <p className="text-[13px] text-icm-text font-medium">AI is reviewing {individual.first_name}'s records...</p>
-              <p className="text-[12px] text-icm-text-dim mt-1">6 monitoring forms · 3 visit summaries · 2 contact notes</p>
-              <div className="flex items-center justify-center gap-2 mt-5">
-                <Loader2 className="w-4 h-4 animate-spin text-icm-accent" />
-                <span className="text-[12px] font-geist text-icm-text-dim">Generating AI draft…</span>
-              </div>
-            </div>
-          )}
-        </Modal>
+      {/* PCP Creation Modal — replaces the old broken modal */}
+      {pcpModalOpen && (
+        <PCPCreationModal
+          mode={pcpMode}
+          individualId={id ?? ""}
+          individualName={`${individual.first_name} ${individual.last_name}`}
+          annualPlanDate="08/31/2026"
+          onClose={() => setPcpModalOpen(false)}
+        />
       )}
     </ICMShell>
   );
@@ -399,7 +423,15 @@ function Section({
   );
 }
 
-function PlanTable({ plans, onOpen, variant, onShare }: { plans: CarePlan[]; onOpen: (id: string) => void; variant: "inProgress" | "completed"; onShare?: (p: CarePlan) => void }) {
+function PlanTable({
+  plans, onOpen, variant, onShare, onSetDate,
+}: {
+  plans: CarePlan[];
+  onOpen: (id: string) => void;
+  variant: "inProgress" | "completed";
+  onShare?: (p: CarePlan) => void;
+  onSetDate?: (planId: string, field: string, value: string) => void;
+}) {
   if (plans.length === 0) {
     return (
       <div className="px-4 py-6 text-[12px] text-icm-text-faint font-geist">
@@ -424,76 +456,170 @@ function PlanTable({ plans, onOpen, variant, onShare }: { plans: CarePlan[]; onO
           </tr>
         </thead>
         <tbody className="divide-y divide-icm-border">
-          {plans.map((p) => (
-            <tr key={p.id} className="hover:bg-icm-bg/40 transition-colors">
-              <td className="px-4 py-3">
-                <button onClick={() => onOpen(p.id)} className="font-mono font-semibold text-icm-accent hover:underline">
-                  {p.id}
-                </button>
-                {p.goals && p.goals.length > 0 && (
-                  <div className="text-[11px] text-icm-text-dim mt-1 space-y-0.5 max-w-[220px]">
-                    {p.goals.map((g: any, idx: number) => (
-                      <div key={idx} className="truncate">
-                        • {g.title || g.goal || "Goal"}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </td>
-              <td className="px-4 py-3"><DateCell value={p.internalDueDate} /></td>
-              <td className="px-4 py-3"><DateCell value={p.meetingDate} /></td>
-              <td className="px-4 py-3"><DateCell value={p.crReceivedDate} /></td>
-              <td className="px-4 py-3"><DateCell value={p.approvalDate} /></td>
-              {variant === "completed" && <td className="px-4 py-3"><DateCell value={p.completedDate} /></td>}
-              <td className="px-4 py-3 text-icm-text-dim">
-                <div className="text-[11.5px]">{p.updatedBy}</div>
-                <div className="font-mono text-[11px] text-icm-text-faint">{p.updatedOn}</div>
-              </td>
-              <td className="px-4 py-3 text-right">
-                <div className="inline-flex items-center gap-1">
-                  {variant === "completed" && (
-                    <>
-                      <button
-                        onClick={() => onShare?.(p)}
-                        title="Send secure link to provider"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] font-geist font-medium text-icm-accent hover:bg-icm-accent-soft"
-                      >
-                        <Send className="w-3.5 h-3.5" /> Send
-                      </button>
-                      <button
-                        onClick={() => toast.success(`Downloading PCP ${p.id}.pdf`)}
-                        title="Download PDF"
-                        className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => { toast("Opening print dialog…"); setTimeout(() => window.print(), 200); }}
-                        title="Print"
-                        className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                  <button onClick={() => toast(`Delete plan ${p.id}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${p.id} deleted`) } })} className="text-icm-text-faint hover:text-icm-red p-1.5 rounded-md">
-                    <Trash2 className="w-3.5 h-3.5" />
+          {plans.map((p) => {
+            // Show a short human-readable ID: plan_id_display (e.g. "6080") or first 8 chars
+            const displayId = (p as any).plan_id_display || p.id.slice(0, 8);
+            return (
+              <tr key={p.id} className="hover:bg-icm-bg/40 transition-colors">
+                <td className="px-4 py-3">
+                  <button onClick={() => onOpen(p.id)} className="font-mono font-semibold text-icm-accent hover:underline">
+                    {displayId}
                   </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+                  {p.goals && p.goals.length > 0 && (
+                    <div className="text-[11px] text-icm-text-dim mt-1 space-y-0.5 max-w-[220px]">
+                      {p.goals.map((g: any, idx: number) => (
+                        <div key={idx} className="truncate">
+                          • {g.title || g.goal || "Goal"}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <DateCell value={(p as any).internalDueDate || (p as any).internal_due_date} planId={p.id} field="internalDueDate" onSave={onSetDate} />
+                </td>
+                <td className="px-4 py-3">
+                  <DateCell value={(p as any).meetingDate || (p as any).meeting_date} planId={p.id} field="meetingDate" onSave={onSetDate} />
+                </td>
+                <td className="px-4 py-3">
+                  <DateCell value={(p as any).crReceivedDate || (p as any).cr_received_date} planId={p.id} field="crReceivedDate" onSave={onSetDate} />
+                </td>
+                <td className="px-4 py-3">
+                  <DateCell value={(p as any).approvalDate || (p as any).approval_date} planId={p.id} field="approvalDate" onSave={onSetDate} />
+                </td>
+                {variant === "completed" && (
+                  <td className="px-4 py-3">
+                    <DateCell value={(p as any).completedDate || (p as any).completed_date} planId={p.id} field="completedDate" onSave={onSetDate} />
+                  </td>
+                )}
+                <td className="px-4 py-3 text-icm-text-dim">
+                  <AuthorCell name={p.updatedBy} size="sm" showName={true} />
+                  <div className="font-mono text-[11px] text-icm-text-faint mt-0.5">{p.updatedOn}</div>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="inline-flex items-center gap-1">
+                    {variant === "completed" && (
+                      <>
+                        <button
+                          onClick={() => onShare?.(p)}
+                          title="Send secure link to provider"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] font-geist font-medium text-icm-accent hover:bg-icm-accent-soft"
+                        >
+                          <Send className="w-3.5 h-3.5" /> Send
+                        </button>
+                        <button
+                          onClick={() => toast.success(`Downloading PCP ${displayId}.pdf`)}
+                          title="Download PDF"
+                          className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { toast("Opening print dialog…"); setTimeout(() => window.print(), 200); }}
+                          title="Print"
+                          className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => toast(`Delete plan ${displayId}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${displayId} deleted`) } })}
+                      className="text-icm-text-faint hover:text-icm-red p-1.5 rounded-md"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function DateCell({ value }: { value?: string }) {
-  if (!value || value === "—") {
-    return <button onClick={() => toast("Set date", { description: "Opening date picker…" })} className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Set date</button>;
+function DateCell({
+  value, planId, field, onSave,
+}: {
+  value?: string;
+  planId?: string;
+  field?: string;
+  onSave?: (planId: string, field: string, value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+
+  // If no planId / onSave (legacy usage), fall back to old toast behaviour
+  if (!planId || !onSave) {
+    if (!value || value === "—") {
+      return (
+        <button
+          onClick={() => toast("Set date", { description: "Date picker coming soon." })}
+          className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"
+        >
+          <CalendarDays className="w-3 h-3" /> Set date
+        </button>
+      );
+    }
+    return <span className="font-mono text-icm-text">{value}</span>;
   }
-  return <span className="font-mono text-icm-text">{value}</span>;
+
+  if (!value || value === "—") {
+    // Show "Set date" — clicking shows an inline date input
+    if (!editing) {
+      return (
+        <button
+          onClick={() => { setDraft(""); setEditing(true); }}
+          className="text-icm-accent hover:underline text-[12px] inline-flex items-center gap-1"
+        >
+          <CalendarDays className="w-3 h-3" /> Set date
+        </button>
+      );
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <input
+          type="date"
+          autoFocus
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          className="h-7 px-2 rounded-md border border-icm-accent text-[12px] font-mono text-icm-text bg-white focus:outline-none"
+        />
+        <button
+          onClick={() => {
+            if (!draft) { setEditing(false); return; }
+            onSave(planId, field!, draft);
+            setEditing(false);
+          }}
+          className="h-7 px-2 rounded-md bg-icm-text text-icm-panel text-[11px] font-medium hover:opacity-90"
+        >
+          Save
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          className="h-7 px-2 rounded-md border border-icm-border text-[11px] text-icm-text-dim hover:bg-icm-bg"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  // Has a value — show it, click to edit
+  return (
+    <button
+      onClick={() => { setDraft(value || ""); setEditing(true); }}
+      className="font-mono text-icm-text hover:text-icm-accent hover:underline text-[12px]"
+      title="Click to edit date"
+    >
+      {value}
+    </button>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

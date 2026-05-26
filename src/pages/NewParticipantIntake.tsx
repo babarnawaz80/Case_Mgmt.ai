@@ -448,8 +448,8 @@ export default function NewParticipantIntake() {
 
       // Build the individual document
       const individualDoc = {
-        first_name: data.firstName,
-        last_name: data.lastName,
+        first_name: data.firstName.trim(),
+        last_name: data.lastName.trim(),
         middle_name: data.middleName,
         preferred_name: data.preferredName,
         dob: data.dob,

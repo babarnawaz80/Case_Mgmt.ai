@@ -4,6 +4,7 @@ import { ICMShell } from "@/components/icm/ICMShell";
 import { ChevronLeft, CheckCircle2, XCircle, RotateCcw, ShieldAlert, Lock, Paperclip, Link2, Clock, User2, FileText, History, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { loadSubmittedNotes, saveSubmittedNotes, writeAudit, type SubmittedNote } from "@/data/supervisor";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 type Action = "approve" | "reject" | "return" | "override";
 
@@ -74,7 +75,7 @@ const SupervisorReviewNote = () => {
           <div>
             <div className="flex items-center gap-2 text-[11.5px] text-icm-text-dim font-mono"><User2 className="w-3.5 h-3.5" /> {note.personName} · ID #{note.personId} · note {note.id}</div>
             <h1 className="font-manrope text-[22px] font-extrabold text-icm-text mt-0.5">{note.serviceCode} — {note.units} billable units</h1>
-            <p className="text-[12px] text-icm-text-dim">Submitted by {note.coordinator} · {new Date(note.submittedAt).toLocaleString()} <span className={`ml-2 px-1.5 h-5 inline-flex items-center rounded text-[10.5px] ${note.agingHours>=48 ? "bg-rose-100 text-rose-700" : note.agingHours>=24 ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{note.agingHours}h pending</span></p>
+            <div className="text-[12px] text-icm-text-dim flex items-center gap-1.5 mt-0.5">Submitted by <AuthorCell name={note.coordinator} size="sm" showName={true} /> · {new Date(note.submittedAt).toLocaleString()} <span className={`ml-2 px-1.5 h-5 inline-flex items-center rounded text-[10.5px] ${note.agingHours>=48 ? "bg-rose-100 text-rose-700" : note.agingHours>=24 ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{note.agingHours}h pending</span></div>
           </div>
           <span className={`px-2 h-7 inline-flex items-center rounded-md text-[12px] font-medium ${locked?"bg-emerald-100 text-emerald-800":note.status==="Rejected"?"bg-rose-100 text-rose-700":note.status==="Returned"?"bg-amber-100 text-amber-800":"bg-blue-100 text-blue-700"}`}>
             {locked && <Lock className="w-3.5 h-3.5 mr-1" />}{note.status}

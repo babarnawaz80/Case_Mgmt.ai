@@ -26,6 +26,7 @@ import { useMessages } from "@/hooks/useMessages";
 import { useFirestoreConversations } from "@/hooks/useFirestoreMessages";
 import { cn } from "@/lib/utils";
 import { openCommandPalette } from "@/components/CommandPalette";
+import { useOrgSettings } from "@/contexts/OrgSettingsContext";
 
 interface TopbarProps {
   title?: string;
@@ -62,10 +63,21 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const { unreadCount: fsUnread } = useFirestoreNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
   const { totalUnread: fsMessagesUnread } = useFirestoreConversations();
+  const { logoUrl, logoLinkUrl, orgName } = useOrgSettings();
+  const [logoError, setLogoError] = useState(false);
 
   // Use Firestore unread count if > 0, otherwise fall back to mock counts
   const totalUnread = fsUnread > 0 ? fsUnread : (unreadAlerts + unreadMentions);
   const totalMessagesUnread = unreadMessages + fsMessagesUnread;
+
+  // Org initials fallback (e.g. "iCareManager Demo" → "iD")
+  const orgInitials = orgName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 
   function badgeFor(item: TopNavItem): { count: number; tone: "red" | "amber" | "accent" } | null {
     if (item.url === "/my-work") {
@@ -78,15 +90,53 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
   return (
     <header className="h-14 border-b border-icm-border bg-icm-panel flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2">
-      {/* Left: brand */}
+      {/* Left: CaseManagement.ai brand + org logo side-by-side */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-        <NavLink to="/" className="flex items-center gap-2 shrink-0" title="AI Companion">
+        <NavLink to="/home" className="flex items-center gap-2 shrink-0" title="Home">
           <img
             src={brandLogo}
             alt="CaseManagement AI"
             className="h-6 w-auto object-contain shrink-0"
           />
         </NavLink>
+
+        {/* Org logo — clickable if a link URL is configured in Settings */}
+        {logoUrl && !logoError && (() => {
+          const isExternal = logoLinkUrl && (logoLinkUrl.startsWith("http://") || logoLinkUrl.startsWith("https://"));
+          const isInternal = logoLinkUrl && logoLinkUrl.startsWith("/");
+          const logoImg = (
+            <img
+              src={logoUrl}
+              alt={orgName}
+              title={logoLinkUrl ? `${orgName} — click to open link` : orgName}
+              className={`h-6 w-auto max-w-[96px] object-contain shrink-0 ${logoLinkUrl ? "cursor-pointer opacity-90 hover:opacity-100 transition-opacity" : ""}`}
+              onError={() => setLogoError(true)}
+            />
+          );
+          return (
+            <>
+              <span className="w-px h-5 bg-icm-border shrink-0" />
+              {isExternal ? (
+                <a href={logoLinkUrl!} target="_blank" rel="noopener noreferrer">{logoImg}</a>
+              ) : isInternal ? (
+                <NavLink to={logoLinkUrl!}>{logoImg}</NavLink>
+              ) : (
+                logoImg
+              )}
+            </>
+          );
+        })()}
+
+        {/* Fallback: org name text when no logo is set */}
+        {(!logoUrl || logoError) && orgName !== "CaseManagement.ai" && (
+          <>
+            <span className="w-px h-5 bg-icm-border shrink-0" />
+            <span className="text-[11px] font-geist font-semibold text-icm-text-dim max-w-[130px] truncate shrink-0">
+              {orgName}
+            </span>
+          </>
+        )}
+
         <span className="hidden lg:block w-px h-5 bg-icm-border" />
       </div>
 
@@ -198,19 +248,23 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
           <Search className="w-[18px] h-[18px]" />
         </button>
 
-        {/* Gradient AI button (icon only) */}
+        {/* AI Chat Sidebar Toggle Button */}
         <button
           onClick={toggleAI}
-          aria-pressed={aiOpen}
-          title="Ask AI"
-          className="h-9 w-9 flex items-center justify-center rounded-xl text-white ai-gradient shadow-elevated hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
+          title={aiOpen ? "Close AI Assistant" : "Open AI Assistant"}
+          className={cn(
+            "h-9 w-9 rounded-xl flex items-center justify-center text-white transition-all shadow-[0_4px_12px_-4px_rgba(168,85,247,0.4)] hover:opacity-95 hover:scale-[1.03] active:scale-95 shrink-0",
+            aiOpen 
+              ? "bg-gradient-to-br from-fuchsia-600 via-purple-600 to-indigo-600 ring-2 ring-purple-400"
+              : "bg-gradient-to-r from-purple-600 via-pink-500 to-rose-500"
+          )}
         >
-          <Sparkles className="w-[18px] h-[18px]" />
+          <Sparkles className="w-[18px] h-[18px] text-white" />
         </button>
 
         {isAdmin && (
           <button
-            onClick={() => navigate("/platform")}
+            onClick={() => navigate("/platform/agents")}
             title="AI Agent"
             className="hidden md:flex h-9 px-3.5 rounded-xl text-white text-[12px] font-manrope font-bold items-center gap-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-sky-500 shadow-[0_8px_20px_-8px_rgba(99,102,241,0.55)] hover:opacity-95 hover:-translate-y-px active:translate-y-0 transition-all"
           >
@@ -223,6 +277,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
         {/* Notifications dropdown (alerts + mentions) */}
         <NotificationsBell />
+
         <button
           onClick={() => demoToast("Help & documentation")}
           className="hidden sm:flex h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg items-center justify-center transition-colors"

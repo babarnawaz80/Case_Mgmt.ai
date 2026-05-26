@@ -12,8 +12,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   collection, query, where, orderBy, onSnapshot, type DocumentData,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 // ──── Pending progress note type ────────────────────────────────────────────
 interface PendingNote {
@@ -188,8 +188,10 @@ const SupervisorDashboard = () => {
                         <div className="text-[13px] font-semibold text-icm-text truncate">
                           {n.individualName || "Individual"}
                         </div>
-                        <div className="text-[11.5px] text-icm-text-dim font-mono">
-                          {n.serviceCode && `${n.serviceCode} · `}{n.units != null && `${n.units}u · `}{n.authorName}{n.progressDate && ` · ${n.progressDate}`}
+                        <div className="text-[11.5px] text-icm-text-dim font-mono flex items-center gap-1 mt-0.5">
+                          {n.serviceCode && `${n.serviceCode} · `}{n.units != null && `${n.units}u · `}
+                          <AuthorCell name={n.authorName} size="sm" showName={true} />
+                          {n.progressDate && ` · ${n.progressDate}`}
                         </div>
                       </div>
                       <span className="px-1.5 h-5 inline-flex items-center rounded text-[10.5px] bg-amber-100 text-amber-700">

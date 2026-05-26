@@ -5,6 +5,7 @@ import { Plus, Eye, Printer, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useIndividuals } from "@/hooks/useIndividuals";
 import { useAllProgressNotes, updateProgressNote } from "@/hooks/useProgressNotes";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const ProgressNoteLog = () => {
   const navigate = useNavigate();
@@ -114,8 +115,8 @@ const ProgressNoteLog = () => {
                           {getStatusLabel(n.status)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-icm-text-faint">
-                        {n.authorName}
+                      <td className="px-4 py-3">
+                        <AuthorCell name={n.authorName} size="sm" showName={true} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">

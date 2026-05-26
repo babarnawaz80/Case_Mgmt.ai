@@ -36,7 +36,7 @@ const AgentCard = ({ agent }: AgentCardProps) => {
       <div className={`h-1 -mx-5 mb-2 bg-gradient-to-r ${CARD_COLORS[colorIndex]}`} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-semibold text-foreground truncate">{agent.name}</h3>
+          <h3 className="font-semibold text-foreground truncate" title={agent.name}>{agent.name}</h3>
           <p className="text-xs text-muted-foreground">{AGENT_TYPE_LABELS[agent.agentType]}</p>
         </div>
         <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
@@ -44,8 +44,14 @@ const AgentCard = ({ agent }: AgentCardProps) => {
           <Badge variant={agent.status === 'active' ? 'default' : 'secondary'} className="text-[10px]">
             {agent.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
           </Badge>
-          {agent.autoMonitor && (
-            <Badge variant="outline" className="text-[10px] text-accent border-accent">AUTO-MONITOR</Badge>
+          {agent.autoMonitor ? (
+            <Badge variant="outline" className="text-[10px] text-accent border-accent" title="Automated monitoring is enabled — this agent generates draft compliance runs in the background.">
+              AUTO-MONITOR
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] text-muted-foreground" title="Automated monitoring is disabled. This agent must be triggered manually.">
+              MONITOR OFF
+            </Badge>
           )}
         </div>
       </div>

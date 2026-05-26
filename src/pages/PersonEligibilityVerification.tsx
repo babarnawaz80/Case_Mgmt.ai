@@ -6,11 +6,14 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   daysUntil, complianceToneFor,
   type MAStatus, type MAType, type RecordStatus,
 } from "@/data/eligibility";
 import { useEligibilityVerifications, type EligibilityVerification } from "@/hooks/useFirestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 
 const PersonEligibilityVerification = () => {
@@ -18,6 +21,9 @@ const PersonEligibilityVerification = () => {
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
   const { data: eligibilityRecords, loading: eligibilityLoading } = useEligibilityVerifications(id);
+  const { userProfile } = useAuth();
+
+
 
   const records = useMemo(() => eligibilityRecords || [], [eligibilityRecords]);
   const current = useMemo(() => records[0], [records]);
@@ -60,26 +66,36 @@ const PersonEligibilityVerification = () => {
   if (records.length === 0) {
     return (
       <ICMShell title="Eligibility Verification" showAIPanel={false}>
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
-            <ShieldCheck className="w-7 h-7 text-icm-text-faint" />
-          </div>
-          <h2 className="font-manrope font-extrabold text-[20px] text-icm-text mb-1">No eligibility records yet</h2>
-          <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
-            Track {individual.first_name}'s Medicaid status to get compliance alerts and renewal reminders.
-          </p>
-          <div className="flex gap-2">
-            <button onClick={newRecord} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
-              + Add verification
-            </button>
-            <button onClick={newRecord} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> Import from profile
-            </button>
+        <div className="space-y-5">
+          <Breadcrumbs
+            items={[
+              { label: "People Supported", to: "/people" },
+              { label: `${individual.last_name}, ${individual.first_name}`, to: `/people/${id}/echart` },
+              { label: "Eligibility & Benefits" },
+            ]}
+          />
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-icm-bg border border-icm-border flex items-center justify-center mb-4">
+              <ShieldCheck className="w-7 h-7 text-icm-text-faint" />
+            </div>
+            <h2 className="font-manrope font-extrabold text-[20px] text-icm-text mb-1">No eligibility records yet</h2>
+            <p className="text-[13px] text-icm-text-dim max-w-md mb-6">
+              Track {individual.first_name}'s Medicaid status to get compliance alerts and renewal reminders.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={newRecord} className="h-10 px-4 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text hover:bg-icm-bg">
+                + Add verification
+              </button>
+              <button onClick={newRecord} className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center">
+                Import from profile
+              </button>
+            </div>
           </div>
         </div>
       </ICMShell>
     );
   }
+
 
   const days = daysUntil(current?.redeterminationDate);
   const tone = complianceToneFor(days);
@@ -92,6 +108,13 @@ const PersonEligibilityVerification = () => {
           <ChevronLeft className="w-3.5 h-3.5" />
           People · {individual.last_name}, {individual.first_name} · Eligibility Verification
         </button>
+        <Breadcrumbs
+          items={[
+            { label: "People Supported", to: "/people" },
+            { label: `${individual.last_name}, ${individual.first_name}`, to: `/people/${id}/echart` },
+            { label: "Eligibility & Benefits" },
+          ]}
+        />
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
@@ -190,7 +213,9 @@ const PersonEligibilityVerification = () => {
                     <td className="px-4 py-3 font-mono text-icm-text-dim">{r.maNumber ?? "—"}</td>
                     <td className="px-4 py-3 text-icm-text-dim">{r.maType ?? "—"}</td>
                     <td className="px-4 py-3"><StatusPill status={r.maStatus} /></td>
-                    <td className="px-4 py-3 text-icm-text-dim">{r.updatedBy}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">
+                      <AuthorCell name={r.updatedBy || "Kathy Martinez"} />
+                    </td>
                     <td className="px-4 py-3 font-mono text-icm-text-dim">{r.updatedOn}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

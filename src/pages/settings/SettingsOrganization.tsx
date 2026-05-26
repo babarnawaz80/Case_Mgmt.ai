@@ -6,7 +6,7 @@ import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { writeAudit } from "@/lib/auditService";
-import { Save, Loader2, Upload, X, ImagePlus } from "lucide-react";
+import { Save, Loader2, Upload, X, ImagePlus, Link as LinkIcon } from "lucide-react";
 
 interface OrgData {
   name: string;
@@ -60,6 +60,7 @@ const SettingsOrganization = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoLinkUrl, setLogoLinkUrl] = useState("");
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,6 +90,7 @@ const SettingsOrganization = () => {
             states: d.states ?? [],
           });
           setLogoUrl(d.logoUrl ?? null);
+          setLogoLinkUrl(d.logoLinkUrl ?? "");
           // Apply saved brand color immediately
           if (d.brandColor) applyColorVar(d.brandColor);
         }
@@ -166,7 +168,10 @@ const SettingsOrganization = () => {
         states_of_operation: form.states,
         updatedAt: serverTimestamp(),
       };
-      await updateDoc(doc(db, "organizations", orgId), payload);
+      await updateDoc(doc(db, "organizations", orgId), {
+        ...payload,
+        logoLinkUrl: logoLinkUrl.trim() || null,
+      });
       await writeAudit("update_organization", "organization", orgId, { name: form.name });
       toast.success("Organization profile saved", { description: "Changes propagated to all users." });
     } catch (err) {
@@ -359,6 +364,28 @@ const SettingsOrganization = () => {
                     <X className="w-3 h-3" /> Remove logo
                   </button>
                 )}
+
+                {/* Logo link URL — makes the topbar logo clickable */}
+                <div className="mt-3 space-y-1">
+                  <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide">
+                    Logo link URL
+                  </label>
+                  <div className="relative">
+                    <LinkIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint pointer-events-none" />
+                    <input
+                      type="url"
+                      value={logoLinkUrl}
+                      onChange={(e) => setLogoLinkUrl(e.target.value)}
+                      placeholder="https://yourcompany.com or /dashboard"
+                      className="w-full h-9 pl-8 pr-3 rounded-xl bg-icm-bg border border-icm-border text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/50 transition-colors"
+                    />
+                  </div>
+                  <p className="text-[10.5px] text-icm-text-faint font-geist">
+                    Optional. When set, clicking the logo in the topbar opens this URL.
+                    Use a full URL (https://…) for external sites or a path (/dashboard) for internal pages.
+                  </p>
+                </div>
+
                 <p className="text-[10.5px] text-icm-text-dim font-geist mt-2">
                   Used in the sidebar, reports, and email notifications. PNG or SVG recommended.
                 </p>
@@ -532,7 +559,9 @@ function applyColorVar(hex: string) {
     }
   }
   const hsl = `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-  document.documentElement.style.setProperty("--icm-accent", hsl);
+  // Use --icm-accent-brand so we don't stomp on the dark/light mode --icm-accent token
+  document.documentElement.style.setProperty("--icm-accent-brand", hsl);
 }
+
 
 export default SettingsOrganization;

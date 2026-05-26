@@ -1,170 +1,177 @@
+import React, { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { RoleProvider } from "@/contexts/RoleContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import SignDocument from "./pages/SignDocument";
-import CareAssistant from "./pages/CareAssistant";
-import PersonCommunicationsLog from "./pages/PersonCommunicationsLog";
-import SmartNoteAttacher from "./components/SmartNoteAttacher";
+import SmartNoteAttacher from "@/components/SmartNoteAttacher";
 import { CommandPalette } from "@/components/CommandPalette";
-import Dashboard from "./pages/Dashboard";
-import PeopleSupported from "./pages/PeopleSupported";
-import NewParticipantIntake from "./pages/NewParticipantIntake";
-import LifePlanBoard from "./pages/LifePlanBoard";
-import LifePlanAgentDetail from "./pages/LifePlanAgentDetail";
-import RuleLibraryBuilder from "./pages/RuleLibraryBuilder";
-import ComplianceEngineDashboard from "./pages/ComplianceEngineDashboard";
-import RuntimeAgentBuilder from "./pages/RuntimeAgentBuilder";
-import Layer2AgentBuilder from "./pages/Layer2AgentBuilder";
-import EngineHistory from "./pages/EngineHistory";
-import AgentDraftRuns from "./pages/AgentDraftRuns";
-import AgentMonitoringSettings from "./pages/AgentMonitoringSettings";
-import EChart from "./pages/EChart";
-import PersonMonitorsBaselines from "./pages/PersonMonitorsBaselines";
-import ContactNote from "./pages/ContactNote";
-import ContactNoteDetail from "./pages/ContactNoteDetail";
-
-import PersonModule from "./pages/PersonModule";
-import PersonCaseManagement from "./pages/PersonCaseManagement";
-import PersonCarePlan from "./pages/PersonCarePlan";
-import PersonCarePlanDetail from "./pages/PersonCarePlanDetail";
-import PersonMonitoringForm from "./pages/PersonMonitoringForm";
-import PersonMonitoringFormDetail from "./pages/PersonMonitoringFormDetail";
-import PersonVisitSummary from "./pages/PersonVisitSummary";
-import PersonVisitSummaryDetail from "./pages/PersonVisitSummaryDetail";
-import PersonVisitScheduler from "./pages/PersonVisitScheduler";
-import PersonVisitDocument from "./pages/PersonVisitDocument";
-import ExceptionsQueue from "./pages/ExceptionsQueue";
-import SupervisorDashboard from "./pages/SupervisorDashboard";
-import SupervisorReviewNote from "./pages/SupervisorReviewNote";
-import SupervisorCompliance from "./pages/SupervisorCompliance";
-import PersonEligibilityVerification from "./pages/PersonEligibilityVerification";
-import PersonEligibilityVerificationDetail from "./pages/PersonEligibilityVerificationDetail";
-import PersonProgressNote from "./pages/PersonProgressNote";
-import PersonProgressNoteDetail from "./pages/PersonProgressNoteDetail";
-import ProgressNoteNew from "./pages/ProgressNoteNew";
-import ProgressNoteLog from "./pages/ProgressNoteLog";
-import VisitSummaryNew from "./pages/VisitSummaryNew";
-import VisitSummaryLog from "./pages/VisitSummaryLog";
-import OnCallLog from "./pages/OnCallLog";
-import OnCallLogNew from "./pages/OnCallLogNew";
-import PersonWorkflowManager from "./pages/PersonWorkflowManager";
-import PersonWorkflowDetail from "./pages/PersonWorkflowDetail";
-import WorkflowsGlobal from "./pages/WorkflowsGlobal";
-import WorkflowTemplatesAdmin from "./pages/WorkflowTemplatesAdmin";
-import PersonIncidentReporting from "./pages/PersonIncidentReporting";
-import PersonIncidentReportingDetail from "./pages/PersonIncidentReportingDetail";
-import PersonIncidentReportNew from "./pages/PersonIncidentReportNew";
-import IncidentsGlobal from "./pages/IncidentsGlobal";
-import MyWork from "./pages/MyWork";
-import PersonProfile from "./pages/PersonProfile";
-import PersonFaceSheet from "./pages/PersonFaceSheet";
-import PlatformHub from "./pages/platform/PlatformHub";
-import GuidelinesEnginesList from "./pages/platform/GuidelinesEnginesList";
-import NewEngineWizard from "./pages/platform/NewEngineWizard";
-import EngineDetail from "./pages/platform/EngineDetail";
-import RuleLibrary from "./pages/platform/RuleLibrary";
-import AssessmentBuilderList from "./pages/admin/AssessmentBuilderList";
-import AssessmentBuilderEdit from "./pages/admin/AssessmentBuilderEdit";
-import PersonAssessments from "./pages/PersonAssessments";
-import PersonAssessmentForm from "./pages/PersonAssessmentForm";
-import PersonReferrals from "./pages/PersonReferrals";
-import AllReferrals from "./pages/AllReferrals";
-import PersonReferralForm from "./pages/PersonReferralForm";
-import PersonReferralDetail from "./pages/PersonReferralDetail";
-import Documentation from "./pages/Documentation";
-import Settings from "./pages/Settings";
-import SettingsUsers from "./pages/settings/SettingsUsers";
-import SettingsUserDetail from "./pages/settings/SettingsUserDetail";
-import SettingsOrganization from "./pages/settings/SettingsOrganization";
-import SettingsPrograms from "./pages/settings/SettingsPrograms";
-import SettingsAI from "./pages/settings/SettingsAI";
-import SettingsIntegrations from "./pages/settings/SettingsIntegrations";
-import SettingsSecurity from "./pages/settings/SettingsSecurity";
-import SettingsNotifications from "./pages/settings/SettingsNotifications";
-import SettingsBillingConfig from "./pages/settings/SettingsBillingConfig";
-import SettingsAIUsage from "./pages/settings/SettingsAIUsage";
-import SettingsRiskScore from "./pages/settings/SettingsRiskScore";
 import { RiskScoreProvider, useRiskScore } from "@/contexts/RiskScoreContext";
 import { RiskScoreDrawer } from "@/components/icm/RiskScoreDrawer";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { OrgSettingsProvider } from "@/contexts/OrgSettingsContext";
-import BillingCheckoutSimulation from "./pages/settings/BillingCheckoutSimulation";
-import BillingPortalSimulation from "./pages/settings/BillingPortalSimulation";
-import SettingsImport from "./pages/settings/SettingsImport";
-import MyProfile from "./pages/MyProfile";
-import AIRoadmap from "./pages/AIRoadmap";
-import ProviderDirectory from "./pages/admin/ProviderDirectory";
-import AuditLogPage from "./pages/AuditLogPage";
-import Reports from "./pages/Reports";
-import ReportRunner from "./pages/ReportRunner";
-import ReportBuilder from "./pages/ReportBuilder";
-import AuditEvidence from "./pages/AuditEvidence";
-import PersonDocuments from "./pages/PersonDocuments";
-import Documents from "./pages/Documents";
-import Leads from "./pages/Leads";
-import LeadForm from "./pages/LeadForm";
-import LeadDetail from "./pages/LeadDetail";
-import Messages from "./pages/Messages";
-import VirtualVisit from "./pages/VirtualVisit";
-import BillingHub from "./pages/BillingHub";
-import {
-  PersonCareTracker,
-  PersonCommunications,
-  PersonServices,
-  PersonEmployment,
-  PersonManagedDocuments,
-  PersonOnCall,
-  PersonTrainings,
-  PersonServicePlan,
-  PersonBillingSummary,
-  PersonESignature,
-} from "./pages/PersonPlaceholders";
-import PersonCareTeam from "./pages/PersonCareTeam";
-import PersonMeetingNotesPage from "./pages/PersonMeetingNotesPage";
-import NotFound from "./pages/NotFound";
-import Companion from "./pages/Companion";
-import MultiStateConfig from "./pages/MultiStateConfig";
-import CommunicationsHub from "./pages/CommunicationsHub";
-import AIGovernance from "./pages/AIGovernance";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import PersonAuthorizations from "./pages/PersonAuthorizations";
-import PersonAuthorizationNew from "./pages/PersonAuthorizationNew";
-import AuthorizationTracker from "./pages/AuthorizationTracker";
-import CompanionTranscripts from "./pages/CompanionTranscripts";
-
-// Billing module (copied verbatim from IDDBilling.ai)
 import { BillingProvider } from "@/contexts/BillingContext";
-import BillingLayout from "@/components/billing/BillingLayout";
-import BAgentsDashboard from "@/pages/billing/AgentsDashboard";
-import BEngines from "@/pages/billing/Engines";
-import BEngineBuilder from "@/pages/billing/EngineBuilder";
-import BEngineDetail from "@/pages/billing/EngineDetail";
-import BAgentCreate from "@/pages/billing/AgentCreate";
-import BAgentDetail from "@/pages/billing/AgentDetail";
-import BAgentRun from "@/pages/billing/AgentRun";
-import BAgentEdit from "@/pages/billing/AgentEdit";
-import BAgentSettings from "@/pages/billing/AgentSettings";
-import BIndividualsBillingHealth from "@/pages/billing/IndividualsBillingHealth";
-import BIndividualDetail from "@/pages/billing/IndividualDetail";
-import BRunsHistory from "@/pages/billing/RunsHistory";
-import BClaimsManagement from "@/pages/billing/ClaimsManagement";
-import BAuditLog from "@/pages/billing/AuditLog";
-import BRevenueCycle from "@/pages/billing/RevenueCycle";
-import { Navigate } from "react-router-dom";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PlatformAdminGuard } from "@/components/superadmin/PlatformAdminGuard";
-import SuperAdminOrganizations from "./pages/superadmin/SuperAdminOrganizations";
-import SuperAdminUsers from "./pages/superadmin/SuperAdminUsers";
-import SuperAdminBilling from "./pages/superadmin/SuperAdminBilling";
-import SuperAdminAIUsage from "./pages/superadmin/SuperAdminAIUsage";
-import SuperAdminSupport from "./pages/superadmin/SuperAdminSupport";
-import SuperAdminHealth from "./pages/superadmin/SuperAdminHealth";
-import PlatformLogin from "./pages/PlatformLogin";
+
+// ── Lazy page imports (each becomes its own chunk) ──────────────────────────
+const Index = lazy(() => import("./pages/Index"));
+const Login = lazy(() => import("./pages/Login"));
+const SignDocument = lazy(() => import("./pages/SignDocument"));
+const CareAssistant = lazy(() => import("./pages/CareAssistant"));
+const PersonCommunicationsLog = lazy(() => import("./pages/PersonCommunicationsLog"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const PeopleSupported = lazy(() => import("./pages/PeopleSupported"));
+const NewParticipantIntake = lazy(() => import("./pages/NewParticipantIntake"));
+const LifePlanBoard = lazy(() => import("./pages/LifePlanBoard"));
+const LifePlanAgentDetail = lazy(() => import("./pages/LifePlanAgentDetail"));
+const RuleLibraryBuilder = lazy(() => import("./pages/RuleLibraryBuilder"));
+const ComplianceEngineDashboard = lazy(() => import("./pages/ComplianceEngineDashboard"));
+const RuntimeAgentBuilder = lazy(() => import("./pages/RuntimeAgentBuilder"));
+const Layer2AgentBuilder = lazy(() => import("./pages/Layer2AgentBuilder"));
+const EngineHistory = lazy(() => import("./pages/EngineHistory"));
+const AgentDraftRuns = lazy(() => import("./pages/AgentDraftRuns"));
+const AgentMonitoringSettings = lazy(() => import("./pages/AgentMonitoringSettings"));
+const EChart = lazy(() => import("./pages/EChart"));
+const PersonMonitorsBaselines = lazy(() => import("./pages/PersonMonitorsBaselines"));
+const ContactNote = lazy(() => import("./pages/ContactNote"));
+const ContactNoteDetail = lazy(() => import("./pages/ContactNoteDetail"));
+const PersonModule = lazy(() => import("./pages/PersonModule"));
+const PersonCaseManagement = lazy(() => import("./pages/PersonCaseManagement"));
+const PersonCarePlan = lazy(() => import("./pages/PersonCarePlan"));
+const PersonCarePlanDetail = lazy(() => import("./pages/PersonCarePlanDetail"));
+const PersonCarePlanBuilder = lazy(() => import("./pages/PersonCarePlanBuilder"));
+const PersonMonitoringForm = lazy(() => import("./pages/PersonMonitoringForm"));
+const PersonMonitoringFormDetail = lazy(() => import("./pages/PersonMonitoringFormDetail"));
+const PersonVisitSummary = lazy(() => import("./pages/PersonVisitSummary"));
+const PersonVisitSummaryDetail = lazy(() => import("./pages/PersonVisitSummaryDetail"));
+const PersonVisitScheduler = lazy(() => import("./pages/PersonVisitScheduler"));
+const PersonVisitDocument = lazy(() => import("./pages/PersonVisitDocument"));
+const ExceptionsQueue = lazy(() => import("./pages/ExceptionsQueue"));
+const SupervisorDashboard = lazy(() => import("./pages/SupervisorDashboard"));
+const SupervisorReviewNote = lazy(() => import("./pages/SupervisorReviewNote"));
+const SupervisorCompliance = lazy(() => import("./pages/SupervisorCompliance"));
+const PersonEligibilityVerification = lazy(() => import("./pages/PersonEligibilityVerification"));
+const PersonEligibilityVerificationDetail = lazy(() => import("./pages/PersonEligibilityVerificationDetail"));
+const PersonProgressNote = lazy(() => import("./pages/PersonProgressNote"));
+const PersonProgressNoteDetail = lazy(() => import("./pages/PersonProgressNoteDetail"));
+const ProgressNoteNew = lazy(() => import("./pages/ProgressNoteNew"));
+const ProgressNoteLog = lazy(() => import("./pages/ProgressNoteLog"));
+const VisitSummaryNew = lazy(() => import("./pages/VisitSummaryNew"));
+const VisitSummaryLog = lazy(() => import("./pages/VisitSummaryLog"));
+const OnCallLog = lazy(() => import("./pages/OnCallLog"));
+const OnCallLogNew = lazy(() => import("./pages/OnCallLogNew"));
+const PersonWorkflowManager = lazy(() => import("./pages/PersonWorkflowManager"));
+const PersonWorkflowDetail = lazy(() => import("./pages/PersonWorkflowDetail"));
+const WorkflowsGlobal = lazy(() => import("./pages/WorkflowsGlobal"));
+const WorkflowTemplatesAdmin = lazy(() => import("./pages/WorkflowTemplatesAdmin"));
+const PersonIncidentReporting = lazy(() => import("./pages/PersonIncidentReporting"));
+const PersonIncidentReportingDetail = lazy(() => import("./pages/PersonIncidentReportingDetail"));
+const PersonIncidentReportNew = lazy(() => import("./pages/PersonIncidentReportNew"));
+const IncidentsGlobal = lazy(() => import("./pages/IncidentsGlobal"));
+const MyWork = lazy(() => import("./pages/MyWork"));
+const PersonProfile = lazy(() => import("./pages/PersonProfile"));
+const PersonFaceSheet = lazy(() => import("./pages/PersonFaceSheet"));
+const PlatformHub = lazy(() => import("./pages/platform/PlatformHub"));
+const GuidelinesEnginesList = lazy(() => import("./pages/platform/GuidelinesEnginesList"));
+const NewEngineWizard = lazy(() => import("./pages/platform/NewEngineWizard"));
+const EngineDetail = lazy(() => import("./pages/platform/EngineDetail"));
+const RuleLibrary = lazy(() => import("./pages/platform/RuleLibrary"));
+const ComplianceAgentsList = lazy(() => import("./pages/platform/ComplianceAgentsList"));
+const NewAgentWizard = lazy(() => import("./pages/platform/NewAgentWizard"));
+const AgentDetail = lazy(() => import("./pages/platform/AgentDetail"));
+const AssessmentBuilderList = lazy(() => import("./pages/admin/AssessmentBuilderList"));
+const AssessmentBuilderEdit = lazy(() => import("./pages/admin/AssessmentBuilderEdit"));
+const PersonAssessments = lazy(() => import("./pages/PersonAssessments"));
+const PersonAssessmentForm = lazy(() => import("./pages/PersonAssessmentForm"));
+const PersonReferrals = lazy(() => import("./pages/PersonReferrals"));
+const AllReferrals = lazy(() => import("./pages/AllReferrals"));
+const PersonReferralForm = lazy(() => import("./pages/PersonReferralForm"));
+const PersonReferralDetail = lazy(() => import("./pages/PersonReferralDetail"));
+const Documentation = lazy(() => import("./pages/Documentation"));
+const Settings = lazy(() => import("./pages/Settings"));
+const SettingsUsers = lazy(() => import("./pages/settings/SettingsUsers"));
+const SettingsUserDetail = lazy(() => import("./pages/settings/SettingsUserDetail"));
+const SettingsOrganization = lazy(() => import("./pages/settings/SettingsOrganization"));
+const SettingsPrograms = lazy(() => import("./pages/settings/SettingsPrograms"));
+const SettingsAI = lazy(() => import("./pages/settings/SettingsAI"));
+const SettingsIntegrations = lazy(() => import("./pages/settings/SettingsIntegrations"));
+const SettingsSecurity = lazy(() => import("./pages/settings/SettingsSecurity"));
+const SettingsNotifications = lazy(() => import("./pages/settings/SettingsNotifications"));
+const SettingsBillingConfig = lazy(() => import("./pages/settings/SettingsBillingConfig"));
+const SettingsAIUsage = lazy(() => import("./pages/settings/SettingsAIUsage"));
+const SettingsRiskScore = lazy(() => import("./pages/settings/SettingsRiskScore"));
+const BillingCheckoutSimulation = lazy(() => import("./pages/settings/BillingCheckoutSimulation"));
+const BillingPortalSimulation = lazy(() => import("./pages/settings/BillingPortalSimulation"));
+const SettingsImport = lazy(() => import("./pages/settings/SettingsImport"));
+const SettingsTemplates = lazy(() => import("./pages/settings/SettingsTemplates"));
+const SettingsBilling = lazy(() => import("./pages/settings/SettingsBilling"));
+const MyProfile = lazy(() => import("./pages/MyProfile"));
+const AIRoadmap = lazy(() => import("./pages/AIRoadmap"));
+const ProviderDirectory = lazy(() => import("./pages/admin/ProviderDirectory"));
+const AuditLogPage = lazy(() => import("./pages/AuditLogPage"));
+const Reports = lazy(() => import("./pages/Reports"));
+const ReportRunner = lazy(() => import("./pages/ReportRunner"));
+const ReportBuilder = lazy(() => import("./pages/ReportBuilder"));
+const AuditEvidence = lazy(() => import("./pages/AuditEvidence"));
+const PersonDocuments = lazy(() => import("./pages/PersonDocuments"));
+const Documents = lazy(() => import("./pages/Documents"));
+const Leads = lazy(() => import("./pages/Leads"));
+const LeadForm = lazy(() => import("./pages/LeadForm"));
+const LeadDetail = lazy(() => import("./pages/LeadDetail"));
+const Messages = lazy(() => import("./pages/Messages"));
+const VirtualVisit = lazy(() => import("./pages/VirtualVisit"));
+const BillingHub = lazy(() => import("./pages/BillingHub"));
+const PersonCareTeam = lazy(() => import("./pages/PersonCareTeam"));
+const PersonMeetingNotesPage = lazy(() => import("./pages/PersonMeetingNotesPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Companion = lazy(() => import("./pages/Companion"));
+const MultiStateConfig = lazy(() => import("./pages/MultiStateConfig"));
+const CommunicationsHub = lazy(() => import("./pages/CommunicationsHub"));
+const AIGovernance = lazy(() => import("./pages/AIGovernance"));
+const PersonAuthorizations = lazy(() => import("./pages/PersonAuthorizations"));
+const PersonAuthorizationNew = lazy(() => import("./pages/PersonAuthorizationNew"));
+const AuthorizationTracker = lazy(() => import("./pages/AuthorizationTracker"));
+const CompanionTranscripts = lazy(() => import("./pages/CompanionTranscripts"));
+const PersonCareTracker = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("care-tracker") })));
+const PersonCommunications = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("communications") })));
+const PersonServices = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("services") })));
+const PersonEmployment = lazy(() => import("./pages/PersonEmployment"));
+const PersonManagedDocuments = lazy(() => import("./pages/PersonManagedDocuments"));
+const PersonOnCall = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("oncall") })));
+const PersonTrainings = lazy(() => import("./pages/PersonTrainings"));
+const PersonServicePlan = lazy(() => import("./pages/PersonServicePlan"));
+const PersonBillingSummary = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("billing") })));
+const PersonESignature = lazy(() => import("./pages/PersonESignature"));
+
+// Billing module pages
+const BillingLayout = lazy(() => import("@/components/billing/BillingLayout")) as any;
+const BAgentsDashboard = lazy(() => import("@/pages/billing/AgentsDashboard"));
+const BEngines = lazy(() => import("@/pages/billing/Engines"));
+const BEngineBuilder = lazy(() => import("@/pages/billing/EngineBuilder"));
+const BEngineDetail = lazy(() => import("@/pages/billing/EngineDetail"));
+const BAgentCreate = lazy(() => import("@/pages/billing/AgentCreate"));
+const BAgentDetail = lazy(() => import("@/pages/billing/AgentDetail"));
+const BAgentRun = lazy(() => import("@/pages/billing/AgentRun"));
+const BAgentEdit = lazy(() => import("@/pages/billing/AgentEdit"));
+const BAgentSettings = lazy(() => import("@/pages/billing/AgentSettings"));
+const BIndividualsBillingHealth = lazy(() => import("@/pages/billing/IndividualsBillingHealth"));
+const BIndividualDetail = lazy(() => import("@/pages/billing/IndividualDetail"));
+const BRunsHistory = lazy(() => import("@/pages/billing/RunsHistory"));
+const BClaimsManagement = lazy(() => import("@/pages/billing/ClaimsManagement"));
+const BAuditLog = lazy(() => import("@/pages/billing/AuditLog"));
+const BRevenueCycle = lazy(() => import("@/pages/billing/RevenueCycle"));
+const SuperAdminOrganizations = lazy(() => import("./pages/superadmin/SuperAdminOrganizations"));
+const SuperAdminUsers = lazy(() => import("./pages/superadmin/SuperAdminUsers"));
+const SuperAdminBilling = lazy(() => import("./pages/superadmin/SuperAdminBilling"));
+const SuperAdminAIUsage = lazy(() => import("./pages/superadmin/SuperAdminAIUsage"));
+const SuperAdminSupport = lazy(() => import("./pages/superadmin/SuperAdminSupport"));
+const SuperAdminHealth = lazy(() => import("./pages/superadmin/SuperAdminHealth"));
+const PlatformLogin = lazy(() => import("./pages/PlatformLogin"));
+
+// Static non-page imports (must not be lazy-loaded)
 
 const queryClient = new QueryClient();
 
@@ -172,6 +179,15 @@ const queryClient = new QueryClient();
 function GlobalRiskDrawer() {
   const { isOpen, personId, personName, closeDrawer } = useRiskScore();
   return <RiskScoreDrawer isOpen={isOpen} personId={personId} personName={personName} onClose={closeDrawer} />;
+}
+
+// Page-level loading skeleton for Suspense fallback
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-64" aria-label="Loading page">
+      <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 }
 
 const App = () => (
@@ -189,6 +205,7 @@ const App = () => (
         <BrowserRouter>
           <CommandPalette />
           <GlobalRiskDrawer />
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* ── PUBLIC ROUTES — no auth required ─────────────────────── */}
             <Route path="/" element={<Login />} />
@@ -207,12 +224,14 @@ const App = () => (
             <Route path="/people/:id/profile" element={<ProtectedRoute><PersonProfile /></ProtectedRoute>} />
             <Route path="/people/:id/facesheet" element={<ProtectedRoute><PersonFaceSheet /></ProtectedRoute>} />
            <Route path="/people/:id/echart" element={<ProtectedRoute><EChart /></ProtectedRoute>} />
+           <Route path="/people/:id/face-sheet" element={<ProtectedRoute><PersonFaceSheet /></ProtectedRoute>} />
             <Route path="/people/:id/companion-transcripts" element={<ProtectedRoute><CompanionTranscripts /></ProtectedRoute>} />
            <Route path="/people/:id/monitors-baselines" element={<ProtectedRoute><PersonMonitorsBaselines /></ProtectedRoute>} />
             <Route path="/people/:id/contact-note" element={<ProtectedRoute><ContactNote /></ProtectedRoute>} />
             <Route path="/people/:id/contact-note/:noteId" element={<ProtectedRoute><ContactNoteDetail /></ProtectedRoute>} />
             <Route path="/people/:id/case-management" element={<ProtectedRoute><PersonCaseManagement /></ProtectedRoute>} />
             <Route path="/people/:id/care-plan" element={<ProtectedRoute><PersonCarePlan /></ProtectedRoute>} />
+            <Route path="/people/:id/care-plan/new" element={<ProtectedRoute><PersonCarePlanBuilder /></ProtectedRoute>} />
             <Route path="/people/:id/care-plan/:planId" element={<ProtectedRoute><PersonCarePlanDetail /></ProtectedRoute>} />
             <Route path="/people/:id/monitoring-form" element={<ProtectedRoute><PersonMonitoringForm /></ProtectedRoute>} />
             <Route path="/people/:id/monitoring-form/:formId" element={<ProtectedRoute><PersonMonitoringFormDetail /></ProtectedRoute>} />
@@ -306,6 +325,8 @@ const App = () => (
             <Route path="/settings/billing/checkout-simulation" element={<ProtectedRoute requireRole="admin"><BillingCheckoutSimulation /></ProtectedRoute>} />
             <Route path="/settings/billing/portal-simulation" element={<ProtectedRoute requireRole="admin"><BillingPortalSimulation /></ProtectedRoute>} />
             <Route path="/settings/import" element={<ProtectedRoute requireRole="admin"><SettingsImport /></ProtectedRoute>} />
+            <Route path="/settings/templates" element={<ProtectedRoute requireRole="admin"><SettingsTemplates /></ProtectedRoute>} />
+            <Route path="/settings/billing" element={<ProtectedRoute requireRole="admin"><SettingsBilling /></ProtectedRoute>} />
             <Route path="/ai-roadmap" element={<ProtectedRoute><AIRoadmap /></ProtectedRoute>} />
             <Route path="/admin/provider-directory" element={<ProtectedRoute requireRole="admin"><ProviderDirectory /></ProtectedRoute>} />
             <Route path="/admin/audit-log" element={<ProtectedRoute requireRole="admin"><AuditLogPage /></ProtectedRoute>} />
@@ -318,8 +339,9 @@ const App = () => (
             <Route path="/platform/guidelines-engines/new" element={<ProtectedRoute requireRole="admin"><NewEngineWizard /></ProtectedRoute>} />
             <Route path="/platform/guidelines-engines/:engineId" element={<ProtectedRoute><EngineDetail /></ProtectedRoute>} />
             <Route path="/platform/rule-library" element={<ProtectedRoute><RuleLibrary /></ProtectedRoute>} />
-            <Route path="/platform/agents" element={<ProtectedRoute><LifePlanBoard /></ProtectedRoute>} />
-            <Route path="/platform/agents/new" element={<ProtectedRoute requireRole="admin"><RuntimeAgentBuilder /></ProtectedRoute>} />
+            <Route path="/platform/agents" element={<ProtectedRoute><ComplianceAgentsList /></ProtectedRoute>} />
+            <Route path="/platform/agents/new" element={<ProtectedRoute requireRole="admin"><NewAgentWizard /></ProtectedRoute>} />
+            <Route path="/platform/agents/:agentId" element={<ProtectedRoute><AgentDetail /></ProtectedRoute>} />
             <Route path="/platform/agents/:agentId/runs" element={<ProtectedRoute><Layer2AgentBuilder /></ProtectedRoute>} />
             <Route path="/platform/agents/:agentId/drafts" element={<ProtectedRoute><AgentDraftRuns /></ProtectedRoute>} />
             <Route path="/platform/agents/:agentId/monitoring" element={<ProtectedRoute requireRole="admin"><AgentMonitoringSettings /></ProtectedRoute>} />
@@ -366,6 +388,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
       </BillingProvider>

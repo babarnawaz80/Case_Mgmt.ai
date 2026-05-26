@@ -6,6 +6,7 @@ import { Plus, Eye, Printer, Trash2, PhoneCall, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useIndividuals } from "@/hooks/useIndividuals";
 import { useAllOnCallLogs } from "@/hooks/useFirestore";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const urgencyClass: Record<string, string> = {
   Routine: "bg-icm-bg text-icm-text-dim",
@@ -139,7 +140,9 @@ const OnCallLog = () => {
                       {n.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-icm-text-dim">{n.receivedBy}</td>
+                  <td className="px-4 py-3 text-icm-text-dim">
+                    <AuthorCell name={n.receivedBy} size="sm" showName={true} />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       <button

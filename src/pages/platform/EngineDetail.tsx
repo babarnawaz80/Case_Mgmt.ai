@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import {
@@ -11,11 +11,9 @@ import {
   History,
   Layers,
   Lock,
+  Loader2,
 } from "lucide-react";
 import {
-  getEngine,
-  totalHardStops,
-  totalWarnings,
   RULE_TYPE_TONE,
   type GuidelinesEngine,
   type ServiceDefinition,
@@ -23,6 +21,7 @@ import {
 } from "@/data/guidelinesEngines";
 import { useRole } from "@/contexts/RoleContext";
 import { AdminOnly } from "@/components/platform/AdminOnly";
+import { getEngineById, type GuidelinesEngineDoc } from "@/services/guidelinesEngineService";
 
 type Tab = "overview" | "services" | "agents" | "versions" | "audit";
 
@@ -32,9 +31,100 @@ const EngineDetail = () => {
   const { isAdmin } = useRole();
   const [tab, setTab] = useState<Tab>("overview");
 
+  const [engine, setEngine] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  function toDisplayEngineDetail(e: GuidelinesEngineDoc) {
+    const hsList: Rule[] = e.extracted_rules?.hard_stops?.map(r => ({
+      id: r.id,
+      description: r.rule_text,
+      type: "Hard Stop" as const,
+      citation: `${r.source_section || "Section"} · p. ${r.source_page || "1"}`
+    })) || [];
+    
+    const wList: Rule[] = e.extracted_rules?.warnings?.map(r => ({
+      id: r.id,
+      description: r.rule_text,
+      type: "Warning" as const,
+      citation: `${r.source_section || "Section"} · p. ${r.source_page || "1"}`
+    })) || [];
+
+    const mockServices = [
+      {
+        id: "srv-hs",
+        name: "Medicaid & Program Hard Stops",
+        category: "Meaningful Day" as const,
+        billingUnit: "15 min" as const,
+        eligibilityRules: [] as Rule[],
+        authorizationRules: [] as Rule[],
+        pcpRequirements: hsList,
+        documentationRequirements: [] as Rule[],
+        limits: [] as Rule[],
+        conflicts: [] as Rule[],
+      },
+      {
+        id: "srv-w",
+        name: "Medicaid & Program Warnings",
+        category: "Support" as const,
+        billingUnit: "15 min" as const,
+        eligibilityRules: [] as Rule[],
+        authorizationRules: [] as Rule[],
+        pcpRequirements: wList,
+        documentationRequirements: [] as Rule[],
+        limits: [] as Rule[],
+        conflicts: [] as Rule[],
+      }
+    ];
+
+    return {
+      id: e.id,
+      name: e.name,
+      state: e.state,
+      program: e.program || e.waiver_type || "DD Waiver",
+      effectiveDate: e.effective_date || "—",
+      version: e.version,
+      status: (e.status === 'published' ? 'Published' : e.status === 'draft' ? 'Draft' : 'Archived') as any,
+      updatedOn: e.published_at ? e.published_at.toDate().toLocaleDateString() : e.created_at ? e.created_at.toDate().toLocaleDateString() : "—",
+      borderTone: (e.status === 'published' ? 'green' : e.status === 'draft' ? 'amber' : 'gray') as any,
+      builderInstructions: e.builder_instructions || "",
+      notes: e.notes || "",
+      services: mockServices,
+      linkedAgents: e.linked_agent_ids?.map(aid => ({
+        id: aid,
+        name: aid === 'agent-pcp-001' ? 'PCP Generation Agent' : aid === 'agent-alignment-001' ? 'PCP Alignment Copilot' : aid === 'agent-billing-001' ? 'Billing Documentation Copilot' : 'Compliance Agent',
+        type: 'pcp_generator',
+        status: 'Active' as const,
+        lastRun: '2/22/2026'
+      })) || [],
+      versions: [] as any[],
+      audit: [] as any[]
+    };
+  }
+
+  useEffect(() => {
+    if (!engineId) return;
+    (async () => {
+      const docData = await getEngineById(engineId);
+      if (docData) {
+        setEngine(toDisplayEngineDetail(docData));
+      }
+      setLoading(false);
+    })();
+  }, [engineId]);
+
   if (!isAdmin) return <AdminOnly />;
 
-  const engine = getEngine(engineId ?? "");
+  if (loading) {
+    return (
+      <ICMShell title="Loading Engine..." showAIPanel={false}>
+        <div className="flex flex-col items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 text-icm-accent animate-spin" />
+          <p className="text-[12px] text-icm-text-dim mt-2 font-geist">Retrieving engine details...</p>
+        </div>
+      </ICMShell>
+    );
+  }
+
   if (!engine) {
     return (
       <ICMShell title="Engine" showAIPanel={false}>
@@ -53,8 +143,8 @@ const EngineDetail = () => {
     );
   }
 
-  const hs = totalHardStops(engine);
-  const wn = totalWarnings(engine);
+  const hs = engine.services.reduce((acc: number, s: any) => acc + s.pcpRequirements.length, 0);
+  const wn = 0;
   const statusCls =
     engine.status === "Published"
       ? "bg-icm-green-soft text-icm-green ring-icm-green/20"
@@ -143,7 +233,7 @@ const EngineDetail = () => {
                 View history
               </button>
               <button
-                onClick={() => navigate("/lifeplan/agent/new")}
+                onClick={() => navigate(`/platform/agents/new?engineId=${engine.id}`)}
                 className="h-9 px-3.5 rounded-xl bg-icm-accent text-white text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
               >
                 Create agent
@@ -509,7 +599,7 @@ function AgentsTab({
         ))
       )}
       <button
-        onClick={() => navigate("/lifeplan/agent/new")}
+        onClick={() => navigate(`/platform/agents/new?engineId=${engine.id}`)}
         className="w-full h-10 rounded-xl border border-dashed border-icm-border text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong inline-flex items-center justify-center gap-1.5"
       >
         <Plus className="w-3.5 h-3.5" />

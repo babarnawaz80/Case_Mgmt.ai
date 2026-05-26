@@ -1012,3 +1012,83 @@ export async function updateServiceAuthorization(
 export async function deleteServiceAuthorization(id: string) {
   return deleteDoc(doc(db, "service_authorizations", id));
 }
+
+// ─── Person-Centered Plans (PCP v2) ───────────────────────────────────────────
+
+export interface PCPRecord {
+  id: string;
+  individual_id: string;
+  plan_type: "annual" | "initial" | "revised";
+  plan_format: "pcp_v2";
+  effective_date: string;
+  annual_plan_date: string;
+  status: "draft" | "pending_signatures" | "submitted" | "approved";
+  created_by?: string;
+  ai_generated: boolean;
+  ai_draft_path: boolean;
+  source_documents?: Array<{ name: string; label: string }>;
+  sections?: Record<string, unknown>;
+  compliance_check?: { hard_stops: number; review_items: number };
+  signatures?: Array<{ name: string; role: string; signed: boolean; signedOn?: string }>;
+  revision_reason?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+export function usePCPs(individualId: string | undefined) {
+  return useSubCollection<PCPRecord>(
+    individualId,
+    "pcps",
+    "created_at",
+    "desc"
+  );
+}
+
+export function usePCP(pcpId: string | undefined) {
+  const [data, setData] = useState<PCPRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pcpId || pcpId === "new") {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsub = onSnapshot(
+      doc(db, "pcps", pcpId),
+      (snap) => {
+        if (snap.exists()) {
+          setData({ id: snap.id, ...snap.data() } as PCPRecord);
+        } else {
+          setData(null);
+        }
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error("[pcp]", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [pcpId]);
+
+  return { data, loading, error };
+}
+
+export async function addPCP(data: Omit<PCPRecord, "id" | "created_at" | "updated_at">) {
+  return addDoc(collection(db, "pcps"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updatePCP(id: string, data: Partial<PCPRecord>) {
+  return updateDoc(doc(db, "pcps", id), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}

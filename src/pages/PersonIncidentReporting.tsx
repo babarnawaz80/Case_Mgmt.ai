@@ -6,6 +6,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useIncidentReports } from "@/hooks/useFirestore";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 type IncidentStatus = "Open" | "In Progress" | "Pending Review" | "Closed" | "Void";
 type IncidentStageId = 1 | 2 | 3 | 4 | 5;
@@ -212,8 +213,8 @@ const PersonIncidentReporting = () => {
                           <td className="px-4 py-3"><StagePill stage={inc.currentStage} /></td>
                           <td className="px-4 py-3"><StatusPill s={inc.status} /></td>
                           <td className="px-4 py-3 text-[11px] text-icm-text-dim font-geist">
-                            <p className="text-icm-text">{inc.lastUpdatedBy}</p>
-                            <p className="font-mono">{inc.lastUpdatedAt}</p>
+                            <AuthorCell name={inc.lastUpdatedBy} size="sm" showName={true} />
+                            <p className="font-mono mt-0.5">{inc.lastUpdatedAt}</p>
                           </td>
                           <td className="px-4 py-3 text-right"><ArrowRight className="w-3.5 h-3.5 text-icm-accent inline" /></td>
                         </tr>

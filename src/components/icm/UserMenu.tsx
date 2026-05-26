@@ -58,14 +58,16 @@ export function UserMenu() {
     }
   };
 
+  const userPhoto = userProfile?.photoURL || currentUser?.photoURL || employeePhoto;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-1.5 pl-1 pr-1 sm:pr-2 py-1 rounded-xl hover:bg-icm-bg transition-colors" aria-label="User menu — account and sign out">
           <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft">
             <img
-              src={employeePhoto}
-              alt="Kathy Adams"
+              src={userPhoto}
+              alt={displayName}
               width={32}
               height={32}
               loading="lazy"
@@ -80,9 +82,19 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
-          <div className="w-10 h-10 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft flex items-center justify-center text-icm-accent font-bold text-sm">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
+          {userPhoto ? (
+            <div className="w-10 h-10 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft shrink-0">
+              <img
+                src={userPhoto}
+                alt={displayName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-lg overflow-hidden border border-icm-accent/20 bg-icm-accent-soft flex items-center justify-center text-icm-accent font-bold text-sm shrink-0">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0">
             <p className="text-[13px] font-semibold leading-tight">{displayName}</p>
             <p className="text-[11px] text-muted-foreground truncate">{displayEmail}</p>

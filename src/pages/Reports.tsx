@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { collection, query, where, getDocs, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -446,15 +447,18 @@ function ReportExportPanel() {
             {EXPORT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
-        {/* From */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wider">From</label>
-          <input type="date" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 px-3 rounded-xl border border-icm-border bg-icm-bg text-[12.5px] font-geist text-icm-text focus:outline-none focus:border-icm-accent" />
-        </div>
-        {/* To */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wider">To</label>
-          <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 px-3 rounded-xl border border-icm-border bg-icm-bg text-[12.5px] font-geist text-icm-text focus:outline-none focus:border-icm-accent" />
+        {/* Date range — grid to prevent overflow on mobile */}
+        <div className="grid grid-cols-2 gap-3 max-w-full overflow-hidden">
+          {/* From */}
+          <div className="flex flex-col gap-1 min-w-0">
+            <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wider">From</label>
+            <input type="date" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} className="w-full min-w-0 h-9 px-2 rounded-xl border border-icm-border bg-icm-bg text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent" />
+          </div>
+          {/* To */}
+          <div className="flex flex-col gap-1 min-w-0">
+            <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wider">To</label>
+            <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} className="w-full min-w-0 h-9 px-2 rounded-xl border border-icm-border bg-icm-bg text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent" />
+          </div>
         </div>
         {/* Format toggle */}
         <div className="flex flex-col gap-1">
@@ -502,7 +506,7 @@ const Reports = () => {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [reports, setReports] = useState<SavedReport[]>(SAVED_REPORTS);
-  const [activeTab, setActiveTab] = useState<"my" | "standard">("my");
+  const [activeTab, setActiveTab] = useState<"my" | "standard" | "audit">("my");
 
   useEffect(() => {
     if (!orgId) return;
@@ -587,9 +591,9 @@ const Reports = () => {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-manrope font-extrabold text-[18px] text-white leading-tight">Create Report with AI</p>
+              <p className="font-manrope font-extrabold text-[18px] text-white leading-tight">Ask AI about your data</p>
               <p className="text-[12.5px] text-white/70 mt-1 font-geist leading-relaxed">
-                Describe what you need in plain language. AI translates it into fields, filters, and grouping instantly.
+                Ask a question or describe what you need — AI translates it into a report instantly.
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-white/80 text-[12px] font-geist font-semibold group-hover:text-white transition-colors shrink-0">
@@ -617,10 +621,16 @@ const Reports = () => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-icm-border flex gap-6">
-          {(["my", "standard"] as const).map((t) => (
-            <button key={t} onClick={() => setActiveTab(t)} className={cn("pb-2.5 text-[13px] font-geist font-semibold border-b-2 transition-colors", activeTab === t ? "border-icm-accent text-icm-accent" : "border-transparent text-icm-text-dim hover:text-icm-text")}>
-              {t === "my" ? "My Reports" : "Standard Reports"}
+        <div className="border-b border-icm-border flex gap-6" role="tablist" aria-label="Report views">
+          {(["my", "standard", "audit"] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={activeTab === t}
+              onClick={() => setActiveTab(t)}
+              className={cn("pb-2.5 text-[13px] font-geist font-semibold border-b-2 transition-colors", activeTab === t ? "border-icm-accent text-icm-accent" : "border-transparent text-icm-text-dim hover:text-icm-text")}
+            >
+              {t === "my" ? "My Reports" : t === "standard" ? "Standard Reports" : "Audit & Export"}
             </button>
           ))}
         </div>
@@ -674,6 +684,52 @@ const Reports = () => {
             ))}
           </div>
         )}
+
+        {/* Audit & Export */}
+        {activeTab === "audit" && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-icm-border bg-icm-panel p-6">
+              <h3 className="font-manrope font-bold text-[16px] text-icm-text mb-1 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-icm-accent" />
+                Audit & Export Center
+              </h3>
+              <p className="text-[13px] text-icm-text-dim font-geist mb-5">
+                Generate audit-ready exports, IPMG evidence packets, and compliance archives.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  onClick={() => navigate("/reports/audit-evidence")}
+                  className="group rounded-xl border border-icm-border bg-icm-bg p-4 text-left hover:border-icm-accent transition-colors flex items-start gap-3"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-icm-accent-soft flex items-center justify-center shrink-0">
+                    <FileText className="w-4.5 h-4.5 text-icm-accent" style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-manrope font-bold text-[13px] text-icm-text">IPMG Audit Evidence Packet</p>
+                    <p className="text-[11.5px] text-icm-text-dim mt-0.5 font-geist">Full audit-ready export per §17.5.5</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-icm-text-faint shrink-0 mt-1 group-hover:text-icm-accent transition-colors" />
+                </button>
+                <button
+                  onClick={() => navigate("/admin/audit-log")}
+                  className="group rounded-xl border border-icm-border bg-icm-bg p-4 text-left hover:border-icm-accent transition-colors flex items-start gap-3"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-icm-amber-soft flex items-center justify-center shrink-0">
+                    <Clock className="w-4.5 h-4.5 text-icm-amber" style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-manrope font-bold text-[13px] text-icm-text">Audit Log</p>
+                    <p className="text-[11.5px] text-icm-text-dim mt-0.5 font-geist">All system events and user actions</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-icm-text-faint shrink-0 mt-1 group-hover:text-icm-accent transition-colors" />
+                </button>
+              </div>
+              <div className="mt-5 pt-4 border-t border-icm-border">
+                <ReportExportPanel />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ICMShell>
   );
@@ -708,7 +764,7 @@ function ReportRow({ report, onToggleStar, onRun, onEdit }: { report: SavedRepor
         <div className="flex items-center gap-3 mt-0.5 text-[10.5px] text-icm-text-faint font-geist">
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {report.lastRun}</span>
           {report.rows && <span>{report.rows} rows</span>}
-          <span>{report.createdBy}</span>
+          <AuthorCell name={report.createdBy} size="sm" showName={true} />
           <span className="font-mono">{report.format}</span>
         </div>
       </div>

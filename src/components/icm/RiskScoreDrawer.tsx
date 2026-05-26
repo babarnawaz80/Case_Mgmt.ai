@@ -16,6 +16,8 @@ import {
   FileBarChart,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   calculateRiskScore,
   loadRiskSettings,
@@ -46,10 +48,19 @@ export function RiskScoreDrawer({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Recompute whenever settings change or drawer opens for a new person
-  const compute = () => {
+  const compute = async () => {
     if (!personId) return;
+    let baseScore: number | undefined = undefined;
+    try {
+      const snap = await getDoc(doc(db, "individuals", personId));
+      if (snap.exists()) {
+        baseScore = snap.data().risk_score;
+      }
+    } catch (err) {
+      console.error("Error fetching individual risk_score:", err);
+    }
     const settings = loadRiskSettings();
-    setResult(calculateRiskScore(personId, settings));
+    setResult(calculateRiskScore(personId, settings, baseScore));
   };
 
   useEffect(() => {
@@ -68,10 +79,24 @@ export function RiskScoreDrawer({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  const triggered  = result?.factors.filter((f) => f.triggered) ?? [];
-  const passing    = result?.factors.filter((f) => !f.triggered) ?? [];
   const level      = result?.level ?? "low";
   const total      = result?.total ?? 0;
+
+  const rawTriggered = result?.factors.filter((f) => f.triggered) ?? [];
+  const triggered = [...rawTriggered];
+  if (total > 0 && rawTriggered.length === 0) {
+    triggered.push({
+      factorId: "base_profile_score",
+      label: "Baseline profile risk score",
+      points: total,
+      triggered: true,
+      detail: "Initial assessment or historical risk score from profile",
+      source: "Individual Profile",
+      sourcePath: `/people/${personId}/profile`,
+    });
+  }
+
+  const passing    = result?.factors.filter((f) => !f.triggered) ?? [];
   const thresholds = loadRiskSettings().thresholds;
   const maxScore   = 100;
 

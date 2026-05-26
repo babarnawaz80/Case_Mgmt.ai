@@ -18,12 +18,15 @@ import {
 import { useIndividual, calcAge, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useProgressNotes } from "@/hooks/useProgressNotes";
 import { cn } from "@/lib/utils";
+import { getProfile } from "@/data/profiles";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const PersonFaceSheet = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
   const { notes } = useProgressNotes(id);
+  const profile = id ? getProfile(id) : null;
 
   // Hooks always called first — no early returns before this
   const age = individual ? calcAge(individual.dob) : null;
@@ -183,6 +186,24 @@ const PersonFaceSheet = () => {
               <Row label="Age" value={age !== null ? `${age} years` : "—"} />
               <Row label="County" value={individual.county ?? "—"} />
               <Row label="Program" value={individual.program ?? "—"} />
+              <Row
+                label="Living Situation"
+                value={
+                  profile?.livingSituation ? (
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5",
+                      (profile.livingSituation === "Homeless" || profile.livingSituation === "Other")
+                        ? "text-icm-amber font-semibold"
+                        : ""
+                    )}>
+                      {(profile.livingSituation === "Homeless" || profile.livingSituation === "Other") && (
+                        <AlertTriangle className="w-3 h-3" />
+                      )}
+                      {profile.livingSituation}
+                    </span>
+                  ) : "—"
+                }
+              />
               <Row label="Level of Care" value={individual.level_of_care ?? "—"} />
               <Row label="Enrollment Status" value={individual.enrollment_status ?? "—"} />
             </div>
@@ -242,8 +263,8 @@ const PersonFaceSheet = () => {
           {/* Section: Care Team */}
           <Section icon={<Building2 className="w-3.5 h-3.5" />} title="Care Team & Administrative">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1.5">
-              <Row label="Case Manager" value={displayName(individual.assigned_case_manager_name, individual.assigned_case_manager)} />
-              <Row label="Supervisor" value={displayName(individual.assigned_supervisor_name, individual.assigned_supervisor)} />
+              <Row label="Case Manager" value={<AuthorCell name={displayName(individual.assigned_case_manager_name, individual.assigned_case_manager)} size="sm" />} />
+              <Row label="Supervisor" value={<AuthorCell name={displayName(individual.assigned_supervisor_name, individual.assigned_supervisor)} size="sm" />} />
               <Row label="Program" value={individual.program ?? "—"} />
               <Row label="Enrollment Status" value={individual.enrollment_status ?? "—"} />
             </div>

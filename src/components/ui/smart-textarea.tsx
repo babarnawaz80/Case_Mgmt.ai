@@ -38,8 +38,8 @@ const REWRITE_ACTIONS: { id: string; label: string; description: string }[] = [
   { id: "grammar",      label: "Fix grammar & spelling", description: "Correct mechanics only" },
   { id: "soap",         label: "Convert to SOAP format", description: "Subjective / Objective / Assessment / Plan" },
 ];
-const GEMINI_API_KEY = "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyBTxu2T_5hNIakbwu1XRvQu_Hwkx2BxTKU";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const REWRITE_PROMPTS: Record<string, string> = {
   improve:      "Improve the clarity and readability of the following clinical case management note. Fix awkward phrasing, tighten sentences, and ensure professional language. Return ONLY the rewritten text, no explanations.",

@@ -4,6 +4,7 @@ import { AlertTriangle, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Fi
 import { ICMShell } from "@/components/icm/ICMShell";
 import { toast } from "sonner";
 import type { ValidationError } from "@/pages/PersonVisitDocument";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 interface ExceptionRecord {
   id: string;
@@ -169,7 +170,7 @@ const ExceptionsQueue = () => {
                   <div>
                     <div className="flex items-center gap-2 text-[11.5px] text-icm-text-dim font-mono"><User2 className="w-3.5 h-3.5" /> {selected.personName} · {selected.docId}</div>
                     <h3 className="font-manrope font-extrabold text-[18px] text-icm-text">{selected.serviceCode} — {selected.units} billable units</h3>
-                    <p className="text-[11.5px] text-icm-text-dim">Filed by {selected.createdBy} · {new Date(selected.createdAt).toLocaleString()}</p>
+                    <div className="text-[11.5px] text-icm-text-dim flex items-center gap-1.5 mt-0.5">Filed by <AuthorCell name={selected.createdBy} size="sm" showName={true} /> · {new Date(selected.createdAt).toLocaleString()}</div>
                   </div>
                   <span className={`px-2 h-6 inline-flex items-center rounded text-[11px] ${selected.status==="Open"?"bg-rose-100 text-rose-700":selected.status==="Override approved"?"bg-amber-100 text-amber-800":selected.status==="Resolved"?"bg-emerald-100 text-emerald-700":"bg-blue-100 text-blue-700"}`}>{selected.status}</span>
                 </div>

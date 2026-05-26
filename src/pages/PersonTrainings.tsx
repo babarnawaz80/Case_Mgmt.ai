@@ -19,6 +19,7 @@ import { addTraining, updateTraining } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -81,6 +82,7 @@ export default function PersonTrainings() {
       status: t.status || "completed",
       hours: t.hours || 0,
       notes: t.notes || "",
+      completedBy: t.completedBy || t.completed_by || "Kathy Martinez",
     }));
   }, [dbTrainings]);
 
@@ -133,6 +135,8 @@ export default function PersonTrainings() {
       hours: hours ? parseFloat(hours) : 0,
       status,
       notes,
+      completedBy: userProfile?.displayName || currentUser?.displayName || "Kathy Martinez",
+      completed_by: userProfile?.displayName || currentUser?.displayName || "Kathy Martinez",
     };
 
     try {
@@ -299,6 +303,10 @@ export default function PersonTrainings() {
                       <p className="flex items-center gap-1.5">
                         <span className="font-semibold text-slate-400 w-16">Hours:</span>
                         <span className="font-medium text-slate-800">{t.hours} hrs</span>
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <span className="font-semibold text-slate-400 w-16">Logged By:</span>
+                        <AuthorCell name={t.completedBy || "Kathy Martinez"} size="sm" showName={true} />
                       </p>
                       {t.completionDate && (
                         <p className="flex items-center gap-1.5">

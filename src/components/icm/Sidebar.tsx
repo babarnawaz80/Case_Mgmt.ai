@@ -11,6 +11,7 @@ import {
   MessageSquare,
   CreditCard,
   FileCheck,
+  Cpu,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrgSettings } from "@/contexts/OrgSettingsContext";
+import { useTaskSummary } from "@/hooks/useTasks";
 
 interface NavItem {
   title: string;
@@ -37,6 +39,7 @@ const items: NavItem[] = [
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
   { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
+  { title: "Platform Hub", url: "/platform", icon: Cpu, roles: ["admin"] },
   { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
 ];
 
@@ -46,8 +49,6 @@ const badgeTone: Record<"red" | "amber" | "accent", string> = {
   accent: "bg-icm-accent text-white",
 };
 
-// Hard-coded count of overdue tasks for the demo (matches myWork seed data).
-const OVERDUE_TASK_COUNT = 3;
 const OPEN_INCIDENT_COUNT = 1;
 
 export function ICMSidebar() {
@@ -58,6 +59,7 @@ export function ICMSidebar() {
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
   const { logoUrl, orgName } = useOrgSettings();
+  const { overdue: OVERDUE_TASK_COUNT } = useTaskSummary();
 
   function getInitials() {
     const f = userProfile?.firstName?.[0] ?? "";

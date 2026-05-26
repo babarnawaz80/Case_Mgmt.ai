@@ -13,6 +13,10 @@ import { aiPrefilledDraft, type YesNoAnswer, type GoalProgress, type Recommended
 import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import BillingSectionFields from "@/components/billing/BillingSectionFields";
+import { createBillingRecord, updateAuthorizationUnits } from "@/hooks/useBillingRecords";
+import { getRateForCode } from "@/hooks/useAuthorizations";
+import { calculateBillingUnits } from "@/services/billingValidation";
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
@@ -52,6 +56,13 @@ const PersonMonitoringFormDetail = () => {
   const [submitted, setSubmitted] = useState(false);
   const [aiPrefilling, setAiPrefilling] = useState(false);
   const prefillCalledRef = useRef(false);
+
+  // Billing state
+  const [mfIsBillable, setMfIsBillable] = useState(false);
+  const [mfServiceCode, setMfServiceCode] = useState("");
+  const [mfUnits, setMfUnits] = useState(0);
+  const [mfAuthId, setMfAuthId] = useState("");
+  const [mfAuthNumber, setMfAuthNumber] = useState("");
 
   useEffect(() => {
     if (initial && !form) {
@@ -245,6 +256,49 @@ const PersonMonitoringFormDetail = () => {
     if (!form || !individual) return;
     try {
       await handleSave("Submitted");
+
+      // Auto-create billing record if billable
+      if (mfIsBillable && mfServiceCode && userProfile?.organizationId) {
+        const { rate, unitType } = getRateForCode(mfServiceCode);
+        const today = form.dueDate || new Date().toISOString().slice(0, 10);
+        const finalUnits = mfUnits > 0 ? mfUnits : 1;
+        try {
+          await createBillingRecord({
+            org_id: userProfile.organizationId,
+            individual_id: id || "",
+            individual_name: `${individual.first_name} ${individual.last_name}`,
+            case_manager_id: userProfile.uid ?? "",
+            case_manager_name: userProfile.displayName ?? "",
+            source_note_id: formId === "new" ? "" : formId,
+            source_note_type: "monitoring_form",
+            source_note_url: `/people/${id}/monitoring-form/${formId}`,
+            service_code: mfServiceCode,
+            service_description: `Monitoring Form — ${form.type}`,
+            billing_unit_type: unitType as any,
+            units: finalUnits,
+            rate_per_unit: rate,
+            total_amount: finalUnits * rate,
+            date_of_service: today,
+            start_time: "",
+            end_time: "",
+            duration_minutes: 0,
+            authorization_id: mfAuthId,
+            authorization_number: mfAuthNumber,
+            funding_stream_id: "",
+            payer_name: "",
+            payer_id: "",
+            validation_status: "passed",
+            billing_status: "scrub_passed",
+            submitted_to_iddbilling: false,
+            remittance_received: false,
+            signed_by: userProfile.uid ?? "",
+          });
+          if (mfAuthId) await updateAuthorizationUnits(mfAuthId, finalUnits, "add");
+        } catch (billingErr) {
+          console.error("[billing] monitoring form billing record error:", billingErr);
+        }
+      }
+
       setSubmitted(true);
       setSubmitOpen(false);
     } catch (err) {
@@ -356,8 +410,42 @@ const PersonMonitoringFormDetail = () => {
 
           {/* Sections */}
           <div className="flex-1 min-w-0 space-y-4">
-            {/* SECTION 1 */}
-            <Section id="s1" num={1} title="Follow Up Form Information" complete={5} total={5}>
+          {/* Billing panel */}
+          {!readOnly && (
+            <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-manrope font-bold text-[14px] text-icm-text">Billing</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] font-geist text-icm-text-dim">Billable?</span>
+                  <button
+                    onClick={() => setMfIsBillable(true)}
+                    className={`px-3 h-7 rounded-lg text-[11.5px] font-medium border ${mfIsBillable ? "bg-icm-green-soft border-icm-green text-icm-green" : "border-icm-border text-icm-text-dim"}`}
+                  >Yes</button>
+                  <button
+                    onClick={() => setMfIsBillable(false)}
+                    className={`px-3 h-7 rounded-lg text-[11.5px] font-medium border ${!mfIsBillable ? "bg-icm-bg border-icm-border-strong text-icm-text" : "border-icm-border text-icm-text-dim"}`}
+                  >No</button>
+                </div>
+              </div>
+              {mfIsBillable && (
+                <BillingSectionFields
+                  individualId={id || ""}
+                  serviceCode={mfServiceCode}
+                  onServiceCodeChange={setMfServiceCode}
+                  units={mfUnits}
+                  onUnitsChange={setMfUnits}
+                  authorizationId={mfAuthId}
+                  authorizationNumber={mfAuthNumber}
+                  onAuthorizationChange={(aid, anum) => { setMfAuthId(aid); setMfAuthNumber(anum); }}
+                  startTime=""
+                  endTime=""
+                />
+              )}
+            </div>
+          )}
+
+          {/* SECTION 1 */}
+          <Section id="s1" num={1} title="Follow Up Form Information" complete={5} total={5}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Type of Review">
                   <select disabled={readOnly} defaultValue={form.type} className={selectClass}>

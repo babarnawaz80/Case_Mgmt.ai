@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import {
@@ -23,30 +23,121 @@ import {
   type StaffStateEnrollment,
 } from "@/data/staffProvider";
 import { useRole } from "@/contexts/RoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle, Camera, Loader2 } from "lucide-react";
+import { db, storage } from "@/lib/firebase";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
 import { demoToast, demoSuccess } from "@/lib/demoToast";
 
 const SettingsUserDetail = () => {
   const { userId = "" } = useParams();
   const navigate = useNavigate();
-  const user = getUser(userId);
+  const mockUser = getUser(userId);
   const [tab, setTab] = useState<"profile" | "access" | "activity" | "permissions">(
     "profile"
   );
   const { isAdmin } = useRole();
+  const { firebaseUser } = useAuth();
   const initialProvider = useMemo(() => getStaffProvider(userId), [userId]);
   const [provider, setProvider] = useState(initialProvider);
   const [enrollments, setEnrollments] = useState<StaffStateEnrollment[]>(initialProvider.enrollments);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [editFirst, setEditFirst] = useState(user?.firstName ?? "");
-  const [editLast, setEditLast] = useState(user?.lastName ?? "");
-  const [editEmail, setEditEmail] = useState(user?.email ?? "");
-  const [editTitle, setEditTitle] = useState(user?.title ?? "");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  
+  const [firestoreUser, setFirestoreUser] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      // Try the real Firebase UID first (for the currently logged-in user's own profile page)
+      const uidToTry = firebaseUser?.uid || userId;
+      if (!uidToTry) return;
+      try {
+        const docRef = doc(db, "users", uidToTry);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setFirestoreUser({ uid: uidToTry, ...docSnap.data() });
+          return;
+        }
+        // Fall back: try the mock userId in case an admin is viewing another user
+        if (uidToTry !== userId && userId) {
+          const fallbackSnap = await getDoc(doc(db, "users", userId));
+          if (fallbackSnap.exists()) {
+            setFirestoreUser({ uid: userId, ...fallbackSnap.data() });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching user from Firestore:", err);
+      }
+    };
+    fetchUser();
+  }, [userId, firebaseUser?.uid]);
+
+  const user = useMemo(() => {
+    if (!mockUser) return null;
+    return {
+      ...mockUser,
+      firstName: firestoreUser?.firstName || firestoreUser?.first_name || mockUser.firstName,
+      lastName: firestoreUser?.lastName || firestoreUser?.last_name || mockUser.lastName,
+      email: firestoreUser?.email || mockUser.email,
+      title: firestoreUser?.title || mockUser.title,
+      photoURL: firestoreUser?.photoURL || firestoreUser?.photo_url || mockUser.photoURL,
+    };
+  }, [mockUser, firestoreUser]);
+
+  const [editFirst, setEditFirst] = useState(mockUser?.firstName ?? "");
+  const [editLast, setEditLast] = useState(mockUser?.lastName ?? "");
+  const [editEmail, setEditEmail] = useState(mockUser?.email ?? "");
+  const [editTitle, setEditTitle] = useState(mockUser?.title ?? "");
+
+  useEffect(() => {
+    if (user) {
+      setEditFirst(user.firstName);
+      setEditLast(user.lastName);
+      setEditEmail(user.email);
+      setEditTitle(user.title ?? "");
+    }
+  }, [user]);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Use real Firebase UID from Firestore doc, or fall back to current auth user
+    const realUid: string = firestoreUser?.uid || firestoreUser?.id || firebaseUser?.uid || userId;
+    if (!file || !realUid) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5 MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const storagePath = `profile_photos/${realUid}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      const task = uploadBytesResumable(storageRef, file, { contentType: file.type });
+
+      await new Promise<void>((resolve, reject) => {
+        task.on("state_changed", null, reject, resolve);
+      });
+      const downloadUrl = await getDownloadURL(storageRef);
+      // Write to Firestore using the real UID
+      await updateDoc(doc(db, "users", realUid), { photoURL: downloadUrl, photo_url: downloadUrl });
+      toast.success("Profile photo updated");
+      if (firestoreUser) setFirestoreUser({ ...firestoreUser, photoURL: downloadUrl });
+    } catch (err: any) {
+      console.error("Avatar upload error:", err);
+      toast.error("Failed to upload photo", { description: err?.message || "Check Storage permissions" });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const supervisors = useMemo(
     () => orgUsers.filter((u) => u.role === "supervisor" || u.role === "admin"),
     []
@@ -95,14 +186,21 @@ const SettingsUserDetail = () => {
     <SettingsLayout title={`${user.firstName} ${user.lastName}`} subtitle={user.email}>
       {/* Identity card */}
       <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-4">
-        <span
-          className={cn(
-            "w-16 h-16 rounded-lg ring-1 flex items-center justify-center text-[18px] font-manrope font-bold",
-            roleAvatarTone(user.role)
+        <label className="relative group cursor-pointer w-16 h-16 shrink-0 block">
+          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} disabled={uploadingAvatar} />
+          {user.photoURL ? (
+            <div className="w-full h-full rounded-lg overflow-hidden border border-icm-border flex items-center justify-center">
+              <img src={user.photoURL} alt={`${user.firstName} ${user.lastName}`} className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <span className={cn("w-full h-full rounded-lg ring-1 flex items-center justify-center text-[18px] font-manrope font-bold", roleAvatarTone(user.role))}>
+              {getInitials(user.firstName, user.lastName)}
+            </span>
           )}
-        >
-          {getInitials(user.firstName, user.lastName)}
-        </span>
+          <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            {uploadingAvatar ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Camera className="w-5 h-5 text-white" />}
+          </div>
+        </label>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {editMode ? (
@@ -171,19 +269,30 @@ const SettingsUserDetail = () => {
             <>
               <button
                 onClick={async () => {
+                  const realUid = firestoreUser?.uid || firestoreUser?.id || firebaseUser?.uid || userId;
                   try {
-                    await updateDoc(doc(db, 'users', userId), {
-                      first_name: editFirst,
-                      last_name: editLast,
-                      display_name: `${editFirst} ${editLast}`,
+                    await updateDoc(doc(db, 'users', realUid), {
+                      firstName: editFirst,
+                      lastName: editLast,
+                      displayName: `${editFirst} ${editLast}`,
                       email: editEmail,
                       title: editTitle
                     });
+                    if (firestoreUser) {
+                      setFirestoreUser({
+                        ...firestoreUser,
+                        firstName: editFirst,
+                        lastName: editLast,
+                        displayName: `${editFirst} ${editLast}`,
+                        email: editEmail,
+                        title: editTitle
+                      });
+                    }
                     toast.success("Profile saved successfully!");
                     setEditMode(false);
-                  } catch (err) {
+                  } catch (err: any) {
                     console.error(err);
-                    toast.error("Failed to save profile changes");
+                    toast.error("Failed to save profile changes", { description: err?.message });
                   }
                 }}
                 className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5"

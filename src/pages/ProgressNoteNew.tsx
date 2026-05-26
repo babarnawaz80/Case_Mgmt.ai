@@ -12,6 +12,13 @@ import {
   ACTIVITY_TYPES, CONTACT_TYPES,
 } from "@/hooks/useProgressNotes";
 import { toast } from "sonner";
+import BillingSectionFields from "@/components/billing/BillingSectionFields";
+import ValidationFailureModal from "@/components/billing/ValidationFailureModal";
+import { runBillingValidation, type ValidationResult } from "@/services/billingValidation";
+import { createBillingRecord } from "@/hooks/useBillingRecords";
+import { updateAuthorizationUnits } from "@/hooks/useBillingRecords";
+import { getRateForCode } from "@/hooks/useAuthorizations";
+import { calculateBillingUnits } from "@/services/billingValidation";
 
 /**
  * New Progress Note — wired to real Firestore.
@@ -39,6 +46,18 @@ const ProgressNoteNew = () => {
   const [purposeOfActivity, setPurpose] = useState("");
   const [additionalObservations, setObservations] = useState("");
   const [nextSteps, setNextSteps] = useState("");
+
+  // ── Billing state ─────────────────────────────────────────────────────────
+  const [serviceCode, setServiceCode] = useState("");
+  const [billingUnits, setBillingUnits] = useState(0);
+  const [authorizationId, setAuthorizationId] = useState("");
+  const [authorizationNumber, setAuthorizationNumber] = useState("");
+
+  // ── Validation state ──────────────────────────────────────────────────────
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [pendingSaveStatus, setPendingSaveStatus] = useState<"draft" | "pending_signature" | null>(null);
 
   // ── AI state ──────────────────────────────────────────────────────────────
   const [aiLoading, setAiLoading] = useState(false);
@@ -82,13 +101,8 @@ const ProgressNoteNew = () => {
     }
   };
 
-  // ── Save draft ────────────────────────────────────────────────────────────
-  const handleSave = async (status: "draft" | "pending_signature" = "draft") => {
-    if (!selectedId && !paramId) { toast.error("Select an individual first."); return; }
-    if (!activityType) { toast.error("Select an activity type."); return; }
-    if (!progressDate) { toast.error("Enter a progress date."); return; }
-    if (!purposeOfActivity.trim()) { toast.error("Enter purpose of activity."); return; }
-
+  // ── Save draft (internal) ─────────────────────────────────────────────────
+  const doSave = async (status: "draft" | "pending_signature" = "draft", skipBilling = false) => {
     const indId = paramId ?? selectedId;
     const ind = individual ?? individuals.find(i => i.id === indId);
     if (!ind) { toast.error("Individual not found."); return; }
@@ -105,7 +119,7 @@ const ProgressNoteNew = () => {
         progressDate,
         startTime,
         endTime,
-        isBillable,
+        isBillable: isBillable && !skipBilling,
         purposeOfActivity,
         goalsProgress: [],
         additionalObservations,
@@ -113,6 +127,54 @@ const ProgressNoteNew = () => {
         status,
         aiDrafted: aiUsed,
       });
+
+      // Auto-create billing record if billable, signed, and validation passed
+      if (isBillable && !skipBilling && status === "pending_signature" && userProfile?.organizationId) {
+        const { rate, unitType } = getRateForCode(serviceCode);
+        const unitCalc = calculateBillingUnits(startTime, endTime, unitType as any, rate);
+        const finalUnits = billingUnits > 0 ? billingUnits : unitCalc.units;
+        if (finalUnits > 0 && serviceCode) {
+          try {
+            await createBillingRecord({
+              org_id: userProfile.organizationId,
+              individual_id: indId,
+              individual_name: `${ind.first_name} ${ind.last_name}`,
+              case_manager_id: userProfile.uid ?? "",
+              case_manager_name: `${userProfile?.firstName ?? ""} ${userProfile?.lastName ?? ""}`.trim(),
+              source_note_id: noteId,
+              source_note_type: "progress_note",
+              source_note_url: `/people/${indId}/progress-note/${noteId}`,
+              service_code: serviceCode,
+              service_description: "",
+              billing_unit_type: unitType as any,
+              units: finalUnits,
+              rate_per_unit: rate,
+              total_amount: finalUnits * rate,
+              date_of_service: progressDate,
+              start_time: startTime,
+              end_time: endTime,
+              duration_minutes: unitCalc.durationMinutes,
+              authorization_id: authorizationId,
+              authorization_number: authorizationNumber,
+              funding_stream_id: "",
+              payer_name: "",
+              payer_id: "",
+              validation_status: "passed",
+              billing_status: "scrub_passed",
+              submitted_to_iddbilling: false,
+              remittance_received: false,
+              signed_by: userProfile.uid ?? "",
+            });
+            if (authorizationId) {
+              await updateAuthorizationUnits(authorizationId, finalUnits, "add");
+            }
+          } catch (billingErr) {
+            console.error("[billing] Failed to create billing record:", billingErr);
+            // Don't block note save
+          }
+        }
+      }
+
       toast.success(status === "draft" ? "Draft saved" : "Submitted for signature", {
         description: `Progress note for ${ind.first_name} ${ind.last_name}`,
       });
@@ -122,6 +184,61 @@ const ProgressNoteNew = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Save / Sign & Submit ───────────────────────────────────────────────────
+  const handleSave = async (status: "draft" | "pending_signature" = "draft") => {
+    if (!selectedId && !paramId) { toast.error("Select an individual first."); return; }
+    if (!activityType) { toast.error("Select an activity type."); return; }
+    if (!progressDate) { toast.error("Enter a progress date."); return; }
+    if (!purposeOfActivity.trim()) { toast.error("Enter purpose of activity."); return; }
+
+    // For draft saves, skip billing validation
+    if (status === "draft") {
+      await doSave(status, true);
+      return;
+    }
+
+    // For Sign & Submit: run billing validation if billable
+    if (isBillable && userProfile?.organizationId) {
+      setValidating(true);
+      const indId = paramId ?? selectedId;
+      const ind = individual ?? individuals.find(i => i.id === indId);
+      try {
+        const result = await runBillingValidation({
+          noteType: "progress_note",
+          individualId: indId,
+          individualName: ind ? `${ind.first_name} ${ind.last_name}` : "",
+          organizationId: userProfile.organizationId,
+          serviceCode,
+          authorizationId,
+          authorizationNumber,
+          dateOfService: progressDate,
+          startTime,
+          endTime,
+          units: billingUnits,
+          isBillable,
+          activityType,
+          contactType,
+          purposeOfActivity,
+          additionalObservations,
+          signature: true,
+        });
+        setValidationResult(result);
+        if (result.status === "failed") {
+          setPendingSaveStatus(status);
+          setShowValidationModal(true);
+          return;
+        }
+      } catch (err) {
+        console.error("[billing] Validation error:", err);
+        // On validation error, still allow save
+      } finally {
+        setValidating(false);
+      }
+    }
+
+    await doSave(status);
   };
 
   const hasIndividual = !!individual;
@@ -281,6 +398,22 @@ const ProgressNoteNew = () => {
           </Grid2>
         </Section>
 
+        {/* Billing Section — visible only when isBillable = Yes */}
+        {isBillable && (
+          <BillingSectionFields
+            individualId={paramId ?? selectedId}
+            serviceCode={serviceCode}
+            onServiceCodeChange={setServiceCode}
+            units={billingUnits}
+            onUnitsChange={setBillingUnits}
+            authorizationId={authorizationId}
+            authorizationNumber={authorizationNumber}
+            onAuthorizationChange={(id, num) => { setAuthorizationId(id); setAuthorizationNumber(num); }}
+            startTime={startTime}
+            endTime={endTime}
+          />
+        )}
+
         {/* Activity Documentation */}
         <Section title="Activity Documentation">
           <Field label="Purpose of Activity" required>
@@ -328,14 +461,46 @@ const ProgressNoteNew = () => {
           </Field>
         </Section>
 
+        {/* Validating indicator */}
+        {validating && (
+          <div className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 flex items-center gap-2 text-[12px] font-geist text-teal-700">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            Running billing validation…
+          </div>
+        )}
+
         {/* Save reminder */}
-        {!isReady && (
+        {!isReady && !validating && (
           <div className="rounded-xl border border-icm-border bg-icm-bg/40 px-4 py-3 flex items-center gap-2 text-[12px] font-geist text-icm-text-dim">
             <AlertCircle className="w-4 h-4 shrink-0" />
             To save: select an individual, choose an activity type, set a date, and fill in the purpose.
           </div>
         )}
       </div>
+
+      {/* Validation failure modal */}
+      {showValidationModal && validationResult && (
+        <ValidationFailureModal
+          result={validationResult}
+          noteType="progress_note"
+          isSaving={saving}
+          onFix={async () => {
+            setShowValidationModal(false);
+            // Save note without billing, then navigate
+            await doSave(pendingSaveStatus ?? "draft", true);
+          }}
+          onSaveWithoutBilling={async () => {
+            setShowValidationModal(false);
+            await doSave(pendingSaveStatus ?? "draft", true);
+          }}
+          onOverride={async () => {
+            setShowValidationModal(false);
+            await doSave(pendingSaveStatus ?? "draft", false);
+          }}
+          onClose={() => setShowValidationModal(false)}
+          isAdmin={userProfile?.role === "admin" || userProfile?.role === "supervisor"}
+        />
+      )}
     </ICMShell>
   );
 };

@@ -18,6 +18,8 @@ import {
   templates,
   getTemplate,
 } from "@/data/assessments";
+import { AuthorCell } from "@/components/icm/AuthorCell";
+
 
 const tabs = ["assessments", "instruments"] as const;
 type Tab = (typeof tabs)[number];
@@ -138,8 +140,8 @@ export default function PersonAssessments() {
                     <p className="font-manrope font-bold text-[14px] text-icm-text">
                       {tpl?.name}
                     </p>
-                    <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">
-                      {a.date} · {tpl?.type} · Completed by {a.completedBy}
+                    <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5 flex items-center gap-1.5">
+                      {a.date} · {tpl?.type} · Completed by <AuthorCell name={a.completedBy} size="sm" showName={true} />
                     </p>
                   </div>
                   <div className="text-right">
@@ -201,7 +203,7 @@ export default function PersonAssessments() {
                       </td>
                       <td className="px-4 py-2 font-mono">{s.score}</td>
                       <td className="px-4 py-2 font-mono text-icm-text-dim">{s.date}</td>
-                      <td className="px-4 py-2 text-icm-text-dim">{s.scoredBy}</td>
+                      <td className="px-4 py-2 text-icm-text-dim"><AuthorCell name={s.scoredBy} size="sm" showName={true} /></td>
                       <td className="px-4 py-2 text-icm-text-dim">{s.source}</td>
                     </tr>
                   ))}

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, AlertTriangle, ChevronDown, ChevronRight, Loader2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type TabKey = "providerSetup" | "general" | "payers" | "funding" | "rates";
+type TabKey = "providerSetup" | "general" | "payers" | "funding" | "rates" | "iddbilling";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "providerSetup", label: "Provider Setup" },
@@ -15,6 +15,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "payers", label: "Payers" },
   { key: "funding", label: "Funding Streams" },
   { key: "rates", label: "Rate Schedules" },
+  { key: "iddbilling", label: "IDD Billing.AI" },
 ];
 
 interface BillingConfig {
@@ -199,6 +200,7 @@ const SettingsBillingConfig = () => {
           {tab === "payers" && <PayersTab payers={payers} setPayers={setPayers} />}
           {tab === "funding" && <FundingTab />}
           {tab === "rates" && <RatesTab />}
+          {tab === "iddbilling" && <IddBillingTab orgId={orgId ?? ""} />}
         </>
       )}
     </SettingsLayout>
@@ -867,3 +869,175 @@ function Toggle({ on, onChange, defaultOn }: { on?: boolean; onChange?: (v: bool
 }
 
 export default SettingsBillingConfig;
+
+// ── IDD Billing.AI Tab ───────────────────────────────────────────────────────────────────────────────
+
+function IddBillingTab({ orgId }: { orgId: string }) {
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiEndpoint, setApiEndpoint] = useState("https://api.iddbilling.ai/v1");
+  const [placeOfService, setPlaceOfService] = useState("11");
+  const [autoSubmit, setAutoSubmit] = useState(false);
+  const [autoScrub, setAutoScrub] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!orgId) return;
+    getDoc(doc(db, "organizations", orgId)).then(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        const idd = d.iddBilling ?? {};
+        setApiKey(idd.apiKey ?? "");
+        setApiEndpoint(idd.apiEndpoint ?? "https://api.iddbilling.ai/v1");
+        setPlaceOfService(idd.placeOfService ?? "11");
+        setAutoSubmit(idd.autoSubmit ?? false);
+        setAutoScrub(idd.autoScrub ?? true);
+      }
+    }).finally(() => setLoading(false));
+  }, [orgId]);
+
+  const handleSave = async () => {
+    if (!orgId) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "organizations", orgId), {
+        iddBillingApiKey: apiKey,
+        "billing.iddBillingApiKey": apiKey,
+        iddBilling: { apiKey, apiEndpoint, placeOfService, autoSubmit, autoScrub },
+        updatedAt: new Date(),
+      });
+      toast.success("IDD Billing.AI configuration saved");
+    } catch {
+      toast.error("Failed to save IDD Billing.AI configuration");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!apiKey) { toast.error("Enter an API key first."); return; }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const response = await fetch(`${apiEndpoint}/ping`, {
+        headers: { "Authorization": `Bearer ${apiKey}`, "X-Source": "CaseManagement.AI" },
+      });
+      if (response.ok) {
+        setTestResult({ success: true, message: "Connected to IDD Billing.AI successfully" });
+        toast.success("Connection successful");
+      } else {
+        setTestResult({ success: false, message: `HTTP ${response.status}: ${response.statusText}` });
+      }
+    } catch {
+      setTestResult({ success: false, message: "Cannot reach IDD Billing.AI. Check API key and network." });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (loading) return <BillingSkeleton />;
+
+  return (
+    <div className="space-y-3 max-w-[1100px]">
+      {/* Connection */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+        <p className="font-manrope font-bold text-[14px] text-icm-text mb-1">IDD Billing.AI Connection</p>
+        <p className="text-[11.5px] font-geist text-icm-text-dim mb-3">
+          Connect to IDD Billing.AI to auto-submit 837P claims and receive 835 remittances.
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">API Key</label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type={apiKeyVisible ? "text" : "password"}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="Enter your IDD Billing.AI API key"
+                className="flex-1 h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-mono text-icm-text focus:outline-none focus:border-icm-border-strong"
+              />
+              <button
+                onClick={() => setApiKeyVisible(v => !v)}
+                className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-geist text-icm-text-dim hover:bg-icm-bg"
+              >
+                {apiKeyVisible ? "Hide" : "Reveal"}
+              </button>
+              <button
+                onClick={handleTestConnection}
+                disabled={testing || !apiKey}
+                className="h-9 px-3 rounded-xl border border-teal-600 text-[12px] font-geist font-semibold text-teal-600 hover:bg-teal-50 disabled:opacity-40 inline-flex items-center gap-1.5"
+              >
+                {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                {testing ? "Testing…" : "Test Connection"}
+              </button>
+            </div>
+            {testResult && (
+              <p className={`mt-1.5 text-[11.5px] font-geist font-medium ${testResult.success ? "text-icm-green" : "text-icm-red"}`}>
+                {testResult.success ? "✓" : "✗"} {testResult.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">API Endpoint URL</label>
+              <input
+                value={apiEndpoint}
+                onChange={e => setApiEndpoint(e.target.value)}
+                className="mt-1 w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-mono text-icm-text focus:outline-none focus:border-icm-border-strong"
+              />
+            </div>
+            <div>
+              <label className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">Default Place of Service</label>
+              <select
+                value={placeOfService}
+                onChange={e => setPlaceOfService(e.target.value)}
+                className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text"
+              >
+                {[
+                  { code: "11", label: "11 — Office" },
+                  { code: "12", label: "12 — Home" },
+                  { code: "21", label: "21 — Inpatient Hospital" },
+                  { code: "99", label: "99 — Other" },
+                ].map(o => <option key={o.code} value={o.code}>{o.label}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Automation */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
+        <p className="font-manrope font-bold text-[14px] text-icm-text mb-1">Automation Settings</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[13px] font-geist font-medium text-icm-text">Auto-scrub on note completion</p>
+            <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">Automatically run AI billing validation when a note is signed.</p>
+          </div>
+          <Toggle on={autoScrub} onChange={setAutoScrub} />
+        </div>
+        <div className="h-px bg-icm-border" />
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[13px] font-geist font-medium text-icm-text">Auto-submit to IDD Billing.AI</p>
+            <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">Automatically submit claims that pass scrub to IDD Billing.AI (no manual review).</p>
+          </div>
+          <Toggle on={autoSubmit} onChange={setAutoSubmit} />
+        </div>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="h-9 px-3 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+      >
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        Save IDD Billing.AI settings
+      </button>
+    </div>
+  );
+}

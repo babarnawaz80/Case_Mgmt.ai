@@ -20,6 +20,7 @@ import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useWorkflows } from "@/hooks/useFirestore";
 import { progressFraction, workflowProgressTone } from "@/data/workflows";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 import {
   CASE_TEMPLATES,
   getTemplate,
@@ -1009,9 +1010,10 @@ const PersonCaseManagement = () => {
                       {entry.reason && (
                         <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">Reason: {entry.reason}</p>
                       )}
-                      <p className="text-[11px] font-mono text-icm-text-faint mt-1">
-                        {entry.changedBy} · {dateStr} {timeStr}
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <AuthorCell name={entry.changedBy} size="sm" showName={true} />
+                        <span className="text-[11px] font-mono text-icm-text-faint">· {dateStr} {timeStr}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1101,7 +1103,9 @@ function TaskRow({ task, overdueDays, onAction }: { task: Task; overdueDays?: nu
           )}
           {task.completedOn && <span className="font-mono text-icm-green">Completed {task.completedOn}</span>}
           <span className="text-icm-text-faint">·</span>
-          <span>Staff: {task.staff ?? "Anyone"}</span>
+          <span className={!task.staff ? "text-icm-amber font-medium" : ""}>
+              {task.staff ? `Staff: ${task.staff}` : "⚠ Unassigned"}
+            </span>
         </div>
       </div>
       <div className="hidden md:block shrink-0"><StatusPill status={task.status} /></div>

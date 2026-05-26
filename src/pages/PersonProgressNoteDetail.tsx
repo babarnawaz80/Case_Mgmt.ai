@@ -13,6 +13,7 @@ import {
 } from "@/data/progressNotes";
 import { useProgressNote, updateProgressNote } from "@/hooks/useProgressNotes";
 import { writeAudit } from "@/lib/auditService";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const PersonProgressNoteDetail = () => {
   const { id, noteId } = useParams<{ id: string; noteId: string }>();
@@ -265,7 +266,7 @@ const PersonProgressNoteDetail = () => {
           <div className="rounded-xl border border-icm-green/20 bg-icm-green-soft px-4 py-2.5 text-[12px] text-icm-green flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
             <span className="font-semibold">Signed &amp; locked.</span>
-            <span className="text-icm-green/80">Signed by {form.signedBy} on {form.signedOn}. Note is read-only.</span>
+            <span className="text-icm-green/80 flex items-center gap-1.5">Signed by <AuthorCell name={form.signedBy} size="sm" showName={true} /> on {form.signedOn}. Note is read-only.</span>
           </div>
         )}
 

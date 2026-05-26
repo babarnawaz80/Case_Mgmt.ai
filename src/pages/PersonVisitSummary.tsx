@@ -3,13 +3,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Sparkles, Plus, Trash2, Eye, Printer, CalendarCheck, Smartphone, Loader2 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { useVisitSummaries } from "@/hooks/useFirestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 const PersonVisitSummary = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { individual, loading: individualLoading } = useIndividual(id);
   const { data: allVisits, loading: visitsLoading } = useVisitSummaries(id);
+  const { userProfile } = useAuth();
+
 
   const [updatedByFilter, setUpdatedByFilter] = useState<"All" | "Me">("All");
   const [fromDate, setFromDate] = useState("");
@@ -77,6 +82,13 @@ const PersonVisitSummary = () => {
           <ChevronLeft className="w-3.5 h-3.5" />
           People · {individual.last_name}, {individual.first_name} · Visit Summary
         </button>
+        <Breadcrumbs
+          items={[
+            { label: "People Supported", to: "/people" },
+            { label: `${individual.last_name}, ${individual.first_name}`, to: `/people/${id}/echart` },
+            { label: "Visit Summary" },
+          ]}
+        />
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
@@ -169,7 +181,9 @@ const PersonVisitSummary = () => {
                     <td className="px-4 py-3 font-mono text-icm-text">{v.visit_date || v.visitDate}</td>
                     <td className="px-4 py-3">{individual.last_name}, {individual.first_name}</td>
                     <td className="px-4 py-3 text-icm-text-dim">{v.purpose_of_support || v.purposeOfSupport || <span className="text-icm-text-faint">—</span>}</td>
-                    <td className="px-4 py-3 text-icm-text-dim">{v.updated_by || v.updatedBy || v.author_name || "Kathy Martinez"}</td>
+                    <td className="px-4 py-3 text-icm-text-dim">
+                      <AuthorCell name={v.updated_by || v.updatedBy || v.author_name || "Kathy Martinez"} />
+                    </td>
                     <td className="px-4 py-3 font-mono text-icm-text-dim">{v.updated_on || v.updatedOn || new Date(v.created_at?.seconds * 1000 || Date.now()).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

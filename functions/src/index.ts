@@ -18,6 +18,11 @@ if (!process.env.GEMINI_API_KEY) {
   process.env.GEMINI_API_KEY = "AIzaSyBxHs_ajRUqk4oTD8XQKDEZcsbPEZKp1_k";
 }
 
+// Deepgram API key — used by ambient transcription endpoint
+if (!process.env.DEEPGRAM_API_KEY) {
+  process.env.DEEPGRAM_API_KEY = "1ea051911af6faacbd09cacef929ab1d7189a48a";
+}
+
 
 // Set global options for all functions
 setGlobalOptions({ region: "us-central1", memory: "512MiB", timeoutSeconds: 300 });

@@ -1,6 +1,14 @@
 // ThemeContext — persistent light/dark mode
 // Reads from localStorage("icm.theme"), applies "dark" class to <html>,
 // exposes toggle from anywhere in the app.
+//
+// Key design decisions:
+// 1. applyTheme runs immediately (not in useEffect) on first render to prevent
+//    a flash of the wrong theme on page load.
+// 2. The "dark" class is the only thing needed — all CSS vars live in the
+//    stylesheet under html.dark { ... } inside @layer base.
+// 3. We deliberately do NOT touch --icm-accent inline styles here; that's
+//    handled by OrgSettingsContext using --icm-accent-brand.
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
@@ -13,7 +21,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "light",
   toggleTheme: () => {},
   setTheme: () => {},
 });
@@ -23,8 +31,8 @@ function getStoredTheme(): Theme {
     const stored = localStorage.getItem("icm.theme");
     if (stored === "light" || stored === "dark") return stored;
   } catch {}
-  // Default: dark (matches existing app design)
-  return "dark";
+  // Default: light — let users opt-in to dark mode via the menu toggle
+  return "light";
 }
 
 function applyTheme(theme: Theme) {
@@ -39,9 +47,14 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getStoredTheme);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const t = getStoredTheme();
+    // Apply synchronously so there's no flash of wrong theme before React renders
+    applyTheme(t);
+    return t;
+  });
 
-  // Apply on first render and whenever theme changes
+  // Re-apply whenever theme state changes
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);

@@ -1,23 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, ShieldCheck, Phone, Loader2, AlertTriangle, Sparkles, Heart } from "lucide-react";
+import { Send, ShieldCheck, Phone, Loader2, AlertTriangle, Heart } from "lucide-react";
 import brandLogo from "@/assets/casemanagement-ai-logo.png";
-import { useIndividual } from "@/hooks/useIndividuals";
 
 const API_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
-
-function decodeToken(token: string | undefined): string | null {
-  if (!token) return null;
-  const raw = token.startsWith("cmp_") ? token.slice(4) : token;
-  try {
-    const decoded = atob(raw);
-    const underscoreIdx = decoded.lastIndexOf("_");
-    return underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
-  } catch {
-    return null;
-  }
-}
 
 type Role = "agent" | "user";
 
@@ -95,10 +82,9 @@ const COMPANION_STYLES = `
 
 const Companion = () => {
   const { token } = useParams<{ token: string }>();
-  const personId = decodeToken(token);
-  const { individual: person, loading } = useIndividual(personId ?? undefined);
 
-  const firstName = person?.preferred_name || person?.first_name || "Friend";
+  // PUBLIC page — no Firebase auth. Backend validates via companion_token.
+  const [firstName, setFirstName] = useState("Friend");
 
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -167,37 +153,6 @@ const Companion = () => {
 
   // ── Always inject styles ───────────────────────────────────────────────────
   const styles = <style>{COMPANION_STYLES}</style>;
-
-  // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="companion-root companion-bg flex items-center justify-center p-6">
-        {styles}
-        <div className="flex items-center gap-3" style={{ color: "var(--comp-muted)" }}>
-          <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--comp-accent)" }} />
-          <span className="text-sm font-geist">Loading your companion…</span>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Invalid token ──────────────────────────────────────────────────────────
-  if (!person) {
-    return (
-      <div className="companion-root companion-bg flex items-center justify-center p-6">
-        {styles}
-        <div className="comp-card max-w-md w-full text-center space-y-5 p-7 rounded-3xl">
-          <img src={brandLogo} alt="CaseManagement AI" className="h-9 mx-auto" />
-          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--comp-text)" }}>
-            Link not valid
-          </h1>
-          <p style={{ color: "var(--comp-muted)" }} className="text-sm leading-relaxed">
-            This companion link has expired or was not recognized. Please ask your case manager for a new link.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // ── Consent / welcome screen ───────────────────────────────────────────────
   if (!started) {

@@ -18,6 +18,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual, riskAvatarClass, initials, updateIndividual } from "@/hooks/useIndividuals";
 import { toast } from "sonner";
+import { AuthorCell } from "@/components/icm/AuthorCell";
 
 export default function PersonEmployment() {
   const { id } = useParams<{ id: string }>();
@@ -176,11 +177,11 @@ export default function PersonEmployment() {
                   <span className="font-semibold text-slate-400 w-20">Phone:</span>
                   <span className="font-medium text-slate-800">{supervisorPhone}</span>
                 </p>
-                <p className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span className="font-semibold text-slate-400 w-20">Job Coach:</span>
-                  <span className="font-medium text-indigo-700 font-semibold">{jobCoach}</span>
-                </p>
+                  <span className="font-semibold text-slate-400 w-20 shrink-0">Job Coach:</span>
+                  <AuthorCell name={jobCoach} size="sm" showName={true} />
+                </div>
               </div>
             </div>
           </div>

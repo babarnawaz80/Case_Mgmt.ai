@@ -30,6 +30,7 @@ import {
   PenSquare,
 } from "lucide-react";
 import { useNavigate, NavLink } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRole, type UserRole } from "@/contexts/RoleContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
@@ -189,6 +190,22 @@ const Index = () => {
   const threadEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { role } = useRole();
+  const { userProfile, currentUser, refreshProfile } = useAuth();
+
+  // Always show live name — re-read Firestore on mount
+  useEffect(() => {
+    refreshProfile?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName =
+    userProfile?.firstName ||
+    userProfile?.displayName?.split(" ")[0] ||
+    currentUser?.displayName?.split(" ")[0] ||
+    currentUser?.email?.split("@")[0] ||
+    "there";
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
   const { totalUnread: fsMessagesUnread } = useFirestoreConversations();
@@ -632,7 +649,7 @@ const Index = () => {
               className="text-center max-w-2xl"
             >
               <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-                Good evening, Kathy
+                {greeting}, {firstName}
               </h1>
               <p className="text-muted-foreground text-lg">
                 Your <span className="text-primary font-medium">AI case manager</span> is ready to assist you

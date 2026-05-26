@@ -52,12 +52,13 @@ const SettingsUserDetail = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      if (!userId) return;
+      if (!userId) { setLoadingUser(false); return; }
       try {
         // Always fetch the TARGET user's document first (userId = their Firestore doc ID / Firebase Auth UID)
         const targetSnap = await getDoc(doc(db, "users", userId));
         if (targetSnap.exists()) {
           setFirestoreUser({ uid: userId, ...targetSnap.data() });
+          setLoadingUser(false);
           return;
         }
         // Fallback: if target not found and we're on our own profile page, try logged-in UID
@@ -69,27 +70,50 @@ const SettingsUserDetail = () => {
         }
       } catch (err) {
         console.error("Error fetching user from Firestore:", err);
+      } finally {
+        setLoadingUser(false);
       }
     };
     fetchUser();
   }, [userId, firebaseUser?.uid]);
 
-  const user = useMemo(() => {
-    if (!mockUser) return null;
-    return {
-      ...mockUser,
-      firstName: firestoreUser?.firstName || firestoreUser?.first_name || mockUser.firstName,
-      lastName: firestoreUser?.lastName || firestoreUser?.last_name || mockUser.lastName,
-      email: firestoreUser?.email || mockUser.email,
-      title: firestoreUser?.title || mockUser.title,
-      photoURL: firestoreUser?.photoURL || firestoreUser?.photo_url || mockUser.photoURL,
-    };
-  }, [mockUser, firestoreUser]);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  const [editFirst, setEditFirst] = useState(mockUser?.firstName ?? "");
-  const [editLast, setEditLast] = useState(mockUser?.lastName ?? "");
-  const [editEmail, setEditEmail] = useState(mockUser?.email ?? "");
-  const [editTitle, setEditTitle] = useState(mockUser?.title ?? "");
+  const user = useMemo(() => {
+    // Build from firestoreUser first (real Firestore data), fall back to static mock
+    if (firestoreUser) {
+      return {
+        id: firestoreUser.uid || userId,
+        firstName: firestoreUser.firstName || firestoreUser.first_name || "",
+        lastName: firestoreUser.lastName || firestoreUser.last_name || "",
+        email: firestoreUser.email || "",
+        title: firestoreUser.title || firestoreUser.credential || "",
+        role: firestoreUser.role || "case_manager",
+        status: firestoreUser.isActive === false ? "inactive" : "active",
+        photoURL: firestoreUser.photoURL || firestoreUser.photo_url || "",
+        lastLogin: firestoreUser.lastLogin || "—",
+        programs: firestoreUser.programs || [],
+        department: firestoreUser.department || "",
+        supervisor: firestoreUser.supervisor || "",
+        credential: firestoreUser.credential || "",
+        ...mockUser, // overlay mock data for any extra static fields
+        // Always trust Firestore for these key fields
+        firstName: firestoreUser.firstName || firestoreUser.first_name || mockUser?.firstName || "",
+        lastName: firestoreUser.lastName || firestoreUser.last_name || mockUser?.lastName || "",
+        email: firestoreUser.email || mockUser?.email || "",
+        title: firestoreUser.title || firestoreUser.credential || mockUser?.title || "",
+        photoURL: firestoreUser.photoURL || firestoreUser.photo_url || mockUser?.photoURL || "",
+        role: firestoreUser.role || mockUser?.role || "case_manager",
+      };
+    }
+    if (mockUser) return { ...mockUser };
+    return null;
+  }, [mockUser, firestoreUser, userId]);
+
+  const [editFirst, setEditFirst] = useState("");
+  const [editLast, setEditLast] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTitle, setEditTitle] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -166,6 +190,20 @@ const SettingsUserDetail = () => {
   };
   const updateProvider = <K extends keyof typeof provider>(key: K, value: (typeof provider)[K]) =>
     setProvider((p) => ({ ...p, [key]: value }));
+
+  if (loadingUser) {
+    return (
+      <SettingsLayout title="Loading..." subtitle="">
+        <div className="flex items-center gap-2 text-[13px] text-icm-text-dim font-geist">
+          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          Loading user profile…
+        </div>
+      </SettingsLayout>
+    );
+  }
 
   if (!user) {
     return (

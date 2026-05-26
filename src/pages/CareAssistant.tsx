@@ -268,8 +268,27 @@ export default function CareAssistant() {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
   }, []);
 
+  // ── Browser speech recognition fallback ──────────────────────────────────
+  // MUST be declared before startListening (which has it in its dep array)
+  const startBrowserListening = useCallback(() => {
+    if (pausedRef.current) return;
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) return;
+    setVoiceState("listening");
+    const rec = new SpeechRec();
+    rec.continuous = false; rec.interimResults = false; rec.lang = "en-US";
+    rec.onresult = (e: any) => {
+      const t = e.results[0][0].transcript?.trim();
+      if (t) handleVoiceInput(t);
+    };
+    rec.onerror = () => { if (!pausedRef.current) setTimeout(() => startBrowserListening(), 1000); };
+    rec.onend = () => { if (!pausedRef.current) setTimeout(() => startBrowserListening(), 500); };
+    try { rec.start(); } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Deepgram STT ──────────────────────────────────────────────────────────
-   const startListening = useCallback(() => {
+  const startListening = useCallback(() => {
     if (pausedRef.current) return;
     const key = dgKeyRef.current;
     if (!key) { startBrowserListening(); return; }
@@ -373,24 +392,6 @@ export default function CareAssistant() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startBrowserListening]);
-
-  // ── Browser speech recognition fallback ──────────────────────────────────
-  const startBrowserListening = useCallback(() => {
-    if (pausedRef.current) return;
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRec) return;
-    setVoiceState("listening");
-    const rec = new SpeechRec();
-    rec.continuous = false; rec.interimResults = false; rec.lang = "en-US";
-    rec.onresult = (e: any) => {
-      const t = e.results[0][0].transcript?.trim();
-      if (t) handleVoiceInput(t);
-    };
-    rec.onerror = () => { if (!pausedRef.current) setTimeout(() => startBrowserListening(), 1000); };
-    rec.onend = () => { if (!pausedRef.current) setTimeout(() => startBrowserListening(), 500); };
-    try { rec.start(); } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const listenAfterSpeak = useCallback(() => {
     if (pausedRef.current) return;

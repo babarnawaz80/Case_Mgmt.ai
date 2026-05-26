@@ -650,7 +650,16 @@ function IndividualPickerModal({
    Dashboard composition — identical to original Lovable design
 ============================================================ */
 const Dashboard = () => {
-  const { userProfile, currentUser } = useAuth();
+  const { userProfile, currentUser, refreshProfile } = useAuth();
+
+  // Always read the latest name from Firestore when Dashboard mounts.
+  // Without this, the name shown is whatever was cached at login time and
+  // won't reflect profile edits made in the same session.
+  useEffect(() => {
+    refreshProfile?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const firstName =
     userProfile?.firstName ||
     userProfile?.displayName?.split(" ")[0] ||

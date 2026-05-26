@@ -13,10 +13,8 @@ admin.initializeApp();
 // individual documents have optional fields that haven't been set yet.
 admin.firestore().settings({ ignoreUndefinedProperties: true });
 
-// Gemini and Deepgram keys must be set via Firebase environment config:
-//   firebase functions:config:set gemini.api_key="YOUR_KEY" deepgram.api_key="YOUR_KEY"
-// or via Secret Manager. Never hardcode API keys in source.
-}
+// Gemini and Deepgram keys are loaded from functions/.env (gitignored)
+// Never hardcode API keys in source code.
 
 
 // Set global options for all functions

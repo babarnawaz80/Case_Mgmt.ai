@@ -95,29 +95,26 @@ const SettingsUserDetail = () => {
     if (firestoreUser) {
       return {
         id: firestoreUser.uid || userId,
-        firstName: firestoreUser.firstName || firestoreUser.first_name || "",
-        lastName: firestoreUser.lastName || firestoreUser.last_name || "",
-        email: firestoreUser.email || "",
-        title: firestoreUser.title || firestoreUser.credential || "",
-        role: firestoreUser.role || "case_manager",
-        status: firestoreUser.isActive === false ? "inactive" : "active",
-        photoURL: firestoreUser.photoURL || firestoreUser.photo_url || "",
-        lastLogin: firestoreUser.lastLogin || "—",
-        programs: firestoreUser.programs || [],
-        department: firestoreUser.department || "",
-        supervisor: firestoreUser.supervisor || "",
-        credential: firestoreUser.credential || "",
-        ...mockUser, // overlay mock data for any extra static fields
-        // Always trust Firestore for these key fields
         firstName: firestoreUser.firstName || firestoreUser.first_name || mockUser?.firstName || "",
         lastName: firestoreUser.lastName || firestoreUser.last_name || mockUser?.lastName || "",
         email: firestoreUser.email || mockUser?.email || "",
         title: firestoreUser.title || firestoreUser.credential || mockUser?.title || "",
-        photoURL: firestoreUser.photoURL || firestoreUser.photo_url || mockUser?.photoURL || "",
         role: firestoreUser.role || mockUser?.role || "case_manager",
+        status: firestoreUser.isActive === false ? "inactive" : "active",
+        photoURL: firestoreUser.photoURL || firestoreUser.photo_url || mockUser?.photoURL || "",
+        lastLogin: firestoreUser.lastLogin || mockUser?.lastLogin || "—",
+        // Always provide safe array defaults — Firestore docs may not have these fields
+        programs: Array.isArray(firestoreUser.programs) ? firestoreUser.programs : (mockUser?.programs ?? []),
+        states: Array.isArray(firestoreUser.states) ? firestoreUser.states : (mockUser?.states ?? []),
+        department: firestoreUser.department || mockUser?.department || "",
+        supervisor: firestoreUser.supervisor || mockUser?.supervisor || "",
+        credential: firestoreUser.credential || mockUser?.credential || "",
+        phone: firestoreUser.phone || firestoreUser.phoneNumber || mockUser?.phone || "",
+        caseload: firestoreUser.caseload ?? mockUser?.caseload ?? 0,
+        caseloadCapacity: firestoreUser.caseloadCapacity ?? mockUser?.caseloadCapacity ?? 0,
       };
     }
-    if (mockUser) return { ...mockUser };
+    if (mockUser) return { ...mockUser, programs: mockUser.programs ?? [], states: mockUser.states ?? [] };
     return null;
   }, [mockUser, firestoreUser, userId]);
 
@@ -490,7 +487,7 @@ const SettingsUserDetail = () => {
           <SectionPanel title="Program access">
             <ul className="divide-y divide-icm-border">
               {programs.map((p) => {
-                const enabled = user.programs.includes(p.name);
+                const enabled = user.programs?.includes(p.name) ?? false;
                 return (
                   <li
                     key={p.id}
@@ -520,7 +517,7 @@ const SettingsUserDetail = () => {
                 >
                   <input
                     type="checkbox"
-                    defaultChecked={user.states.includes(s.code)}
+                    defaultChecked={user.states?.includes(s.code) ?? false}
                     className="accent-icm-accent"
                   />
                   {s.name}

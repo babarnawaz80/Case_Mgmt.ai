@@ -133,7 +133,7 @@ const EngineDetail = () => {
             Engine not found.
           </p>
           <button
-            onClick={() => navigate("/platform/guidelines-engines")}
+            onClick={() => navigate("/agents/guidelines")}
             className="mt-4 text-[12px] font-geist font-semibold text-icm-accent hover:underline"
           >
             ← Back to Guidelines Engines
@@ -158,15 +158,15 @@ const EngineDetail = () => {
         {/* Breadcrumb */}
         <div className="text-[11.5px] font-geist text-icm-text-dim flex items-center gap-1.5 flex-wrap">
           <button
-            onClick={() => navigate("/platform")}
+            onClick={() => navigate("/agents")}
             className="hover:text-icm-text inline-flex items-center gap-1"
           >
             <Layers className="w-3.5 h-3.5" />
-            Platform
+            AI Agents
           </button>
           <ChevronRight className="w-3 h-3 text-icm-text-faint" />
           <button
-            onClick={() => navigate("/platform/guidelines-engines")}
+            onClick={() => navigate("/agents/guidelines")}
             className="hover:text-icm-text"
           >
             Guidelines Engines
@@ -176,7 +176,7 @@ const EngineDetail = () => {
         </div>
 
         <button
-          onClick={() => navigate("/platform/guidelines-engines")}
+          onClick={() => navigate("/agents/guidelines")}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -233,7 +233,7 @@ const EngineDetail = () => {
                 View history
               </button>
               <button
-                onClick={() => navigate(`/platform/agents/new?engineId=${engine.id}`)}
+                onClick={() => navigate(`/agents/new?engineId=${engine.id}`)}
                 className="h-9 px-3.5 rounded-xl bg-icm-accent text-white text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
               >
                 Create agent
@@ -599,7 +599,7 @@ function AgentsTab({
         ))
       )}
       <button
-        onClick={() => navigate(`/platform/agents/new?engineId=${engine.id}`)}
+        onClick={() => navigate(`/agents/new?engineId=${engine.id}`)}
         className="w-full h-10 rounded-xl border border-dashed border-icm-border text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong inline-flex items-center justify-center gap-1.5"
       >
         <Plus className="w-3.5 h-3.5" />

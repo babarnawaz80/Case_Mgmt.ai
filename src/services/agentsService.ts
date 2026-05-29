@@ -130,30 +130,8 @@ export async function updateMasterPrompt(
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
+// Only the PCP Alignment Copilot is seeded — all other dummy agents were removed
 const SEED_AGENTS: Omit<AgentDoc, 'created_at' | 'last_run_at' | 'master_prompt_updated_at'>[] = [
-  {
-    id: 'agent-pcp-001',
-    name: 'PCP Generation Agent',
-    type: 'pcp_generator',
-    description: 'Generates complete Person-Centered Plans from the individual\'s chart and Maryland DDA state guidelines. Reviews all documentation and applies compliance rules automatically.',
-    status: 'active',
-    guidelines_engine_id: 'engine-maryland-dda-v2',
-    guidelines_engine_name: 'Maryland DDA',
-    guidelines_engine_version: 'v2.0',
-    master_prompt: 'Generate all PCP documentation using person-first, strengths-based language. Employment FAE must be completed annually. HRST must be reviewed within 90 days of APD. All risks identified in HRST must have documented mitigation strategies. Flag any individual with HRST score ≥ 3 for clinical review requirement. Do not make clinical recommendations — document what the individual and team have expressed.',
-    master_prompt_updated_by: 'Babar Nawaz',
-    auto_monitor: true,
-    push_mode: 'manual',
-    individuals_count: 24,
-    avg_compliance: 94,
-    active_runs: 0,
-    drafts_pending: 5,
-    created_by: 'system-seed',
-    tone: 'accent',
-    alert_count: 5,
-    version: 'v1.2',
-    schedule: 'Daily',
-  },
   {
     id: 'agent-alignment-001',
     name: 'PCP Alignment Copilot',
@@ -177,96 +155,43 @@ const SEED_AGENTS: Omit<AgentDoc, 'created_at' | 'last_run_at' | 'master_prompt_
     version: 'v1.0',
     schedule: 'Daily',
   },
-  {
-    id: 'agent-billing-001',
-    name: 'Billing Documentation Copilot',
-    type: 'billing_documentation',
-    description: 'Verifies billable requirements, generates compliant note templates, cross-checks conflicts and units.',
-    status: 'active',
-    guidelines_engine_id: 'engine-maryland-dda-v2',
-    guidelines_engine_name: 'Maryland DDA',
-    guidelines_engine_version: 'v2.0',
-    master_prompt: 'Verify all billing documentation meets Maryland DDA requirements. Check for conflicts between CCS and TCM billing. Validate authorization windows. Flag any units approaching monthly caps. Generate compliant contact note templates pre-filled with required fields.',
-    master_prompt_updated_by: 'Babar Nawaz',
-    auto_monitor: false,
-    push_mode: 'manual',
-    individuals_count: 30,
-    avg_compliance: 91,
-    active_runs: 0,
-    drafts_pending: 0,
-    created_by: 'system-seed',
-    tone: 'amber',
-    alert_count: 0,
-    version: 'v1.1',
-    schedule: 'Manual only',
-  },
-  {
-    id: 'agent-monitoring-001',
-    name: 'Monitoring & Reauth Copilot',
-    type: 'monitoring_reauth',
-    description: 'Tracks monitoring deadlines, reauthorization caps, creates monitoring forms and reauth drafts automatically.',
-    status: 'active',
-    guidelines_engine_id: 'engine-virginia-dbhds-v1',
-    guidelines_engine_name: 'Virginia DBHDS',
-    guidelines_engine_version: 'v1.0',
-    master_prompt: 'Monitor all Virginia DBHDS waiver individuals for reauthorization deadlines. Alert 45 days before auth expiration. Create pre-filled monitoring forms. Track quarterly visit requirements and flag any overdue visits. Prioritize individuals with ISP expiration within 60 days.',
-    master_prompt_updated_by: 'Babar Nawaz',
-    auto_monitor: true,
-    push_mode: 'manual',
-    individuals_count: 12,
-    avg_compliance: 96,
-    active_runs: 0,
-    drafts_pending: 2,
-    created_by: 'system-seed',
-    tone: 'purple',
-    alert_count: 4,
-    version: 'v1.0',
-    schedule: 'Every 6 hours',
-  },
-  {
-    id: 'agent-isp-001',
-    name: 'ISP Generator',
-    type: 'isp_generator',
-    description: 'Generates Individual Service Plans from assessments, monitoring data, and state guidelines. Drafts complete ISPs for case manager review.',
-    status: 'active',
-    guidelines_engine_id: 'engine-maryland-dda-v2',
-    guidelines_engine_name: 'Maryland DDA',
-    guidelines_engine_version: 'v2.0',
-    master_prompt: 'Generate complete ISPs using all available assessment data including HRST, SIS-A, and previous monitoring forms. Write goals in person-first language. Ensure all required sections are present. Flag any section where assessment data is missing or outdated. Do not generate employment goals without documented FAE.',
-    master_prompt_updated_by: 'Babar Nawaz',
-    auto_monitor: false,
-    push_mode: 'manual',
-    individuals_count: 15,
-    avg_compliance: 93,
-    active_runs: 0,
-    drafts_pending: 0,
-    created_by: 'system-seed',
-    tone: 'red',
-    alert_count: 0,
-    version: 'v1.0',
-    schedule: 'Manual only',
-  },
 ];
 
-export async function seedAgents(): Promise<void> {
-  const existing = await getDocs(
-    query(collection(db, 'agents'), where('created_by', '==', 'system-seed'))
-  );
-  if (!existing.empty) return;
+// IDs of dummy agents that should be removed from Firestore
+const DUMMY_AGENT_IDS = [
+  'agent-pcp-001',
+  'agent-billing-001',
+  'agent-monitoring-001',
+  'agent-isp-001',
+];
 
+export async function cleanupDummyAgents(): Promise<void> {
   const batch = writeBatch(db);
+  let hasDeletions = false;
+  for (const id of DUMMY_AGENT_IDS) {
+    const ref = doc(db, 'agents', id);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      batch.delete(ref);
+      hasDeletions = true;
+    }
+  }
+  if (hasDeletions) await batch.commit();
+}
+
+export async function seedAgents(): Promise<void> {
+  // Ensure the PCP Alignment Copilot exists
+  const alignmentRef = doc(db, 'agents', 'agent-alignment-001');
+  const alignmentSnap = await getDoc(alignmentRef);
+  if (alignmentSnap.exists()) return;
+
   const now = Timestamp.now();
   const lastRunDate = Timestamp.fromDate(new Date('2026-02-22T09:30:00'));
-
-  for (const agent of SEED_AGENTS) {
-    const ref = doc(db, 'agents', agent.id);
-    batch.set(ref, {
-      ...agent,
-      created_at: now,
-      last_run_at: lastRunDate,
-      master_prompt_updated_at: now,
-    });
-  }
-
-  await batch.commit();
+  const agent = SEED_AGENTS[0];
+  await setDoc(alignmentRef, {
+    ...agent,
+    created_at: now,
+    last_run_at: lastRunDate,
+    master_prompt_updated_at: now,
+  });
 }

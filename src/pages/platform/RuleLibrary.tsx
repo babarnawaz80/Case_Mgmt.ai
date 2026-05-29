@@ -39,7 +39,7 @@ const RuleLibrary = () => {
       <div className="space-y-5 max-w-[1100px]">
         <div className="text-[11.5px] font-geist text-icm-text-dim flex items-center gap-1.5">
           <button
-            onClick={() => navigate("/platform")}
+            onClick={() => navigate("/agents")}
             className="hover:text-icm-text inline-flex items-center gap-1"
           >
             <Layers className="w-3.5 h-3.5" />

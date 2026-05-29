@@ -14,8 +14,8 @@ const BrainOrchestrator = () => {
   const navigate = useNavigate();
   const { role, isAdmin } = useRole();
 
-  // Access guard: supervisor and admin only
-  if (role !== "admin" && role !== "supervisor") {
+  // Access guard: supervisor, admin, and platform_admin
+  if (role !== "admin" && role !== "supervisor" && role !== "platform_admin") {
     navigate("/dashboard", { replace: true });
     return null;
   }
@@ -42,14 +42,14 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
   const { individuals, loading: individualsLoading } = useIndividuals();
 
   return (
-    <ICMShell title="Brain Orchestrator" showAIPanel={false}>
+    <ICMShell title="AI Orchestrator" showAIPanel={false}>
       <div className="space-y-5 max-w-[1280px]">
         <Breadcrumbs
-          backTo="/platform"
-          backLabel="Platform Hub"
+          backTo="/agents"
+          backLabel="AI Agents"
           items={[
-            { label: "Platform Hub", to: "/platform" },
-            { label: "Brain Orchestrator" },
+            { label: "AI Agents", to: "/agents" },
+            { label: "AI Orchestrator" },
           ]}
         />
 
@@ -107,7 +107,7 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
             AI DRAFT
           </span>
           <p className="text-[11.5px] font-geist text-icm-text-dim leading-relaxed">
-            All AI-generated content created by the Brain Orchestrator is labeled "AI DRAFT — Requires Review".
+            All AI-generated content created by the AI Orchestrator is labeled "AI DRAFT — Requires Review".
             The orchestrator <strong className="text-icm-text">prepares everything</strong> — humans{" "}
             <strong className="text-icm-text">approve everything</strong>. Nothing writes to a participant record
             without explicit CM or supervisor confirmation.

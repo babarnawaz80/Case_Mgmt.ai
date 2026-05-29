@@ -42,7 +42,7 @@ export default function AssessmentBuilderList() {
     <ICMShell title="Assessment Builder" showAIPanel={false}>
       <div className="space-y-5 max-w-[1100px]">
         <button
-          onClick={() => navigate("/platform")}
+          onClick={() => navigate("/agents")}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />

@@ -101,12 +101,11 @@ const IncidentsGlobal = lazyWithRetry(() => import("./pages/IncidentsGlobal"));
 const MyWork = lazyWithRetry(() => import("./pages/MyWork"));
 const PersonProfile = lazyWithRetry(() => import("./pages/PersonProfile"));
 const PersonFaceSheet = lazyWithRetry(() => import("./pages/PersonFaceSheet"));
-const PlatformHub = lazyWithRetry(() => import("./pages/platform/PlatformHub"));
+const AIAgentsPage = lazyWithRetry(() => import("./pages/agents/AIAgentsPage"));
 const GuidelinesEnginesList = lazyWithRetry(() => import("./pages/platform/GuidelinesEnginesList"));
 const NewEngineWizard = lazyWithRetry(() => import("./pages/platform/NewEngineWizard"));
 const EngineDetail = lazyWithRetry(() => import("./pages/platform/EngineDetail"));
 const RuleLibrary = lazyWithRetry(() => import("./pages/platform/RuleLibrary"));
-const ComplianceAgentsList = lazyWithRetry(() => import("./pages/platform/ComplianceAgentsList"));
 const NewAgentWizard = lazyWithRetry(() => import("./pages/platform/NewAgentWizard"));
 const AgentDetail = lazyWithRetry(() => import("./pages/platform/AgentDetail"));
 const BrainOrchestrator = lazyWithRetry(() => import("./pages/platform/BrainOrchestrator"));
@@ -150,6 +149,7 @@ const Leads = lazyWithRetry(() => import("./pages/Leads"));
 const LeadForm = lazyWithRetry(() => import("./pages/LeadForm"));
 const LeadDetail = lazyWithRetry(() => import("./pages/LeadDetail"));
 const Messages = lazyWithRetry(() => import("./pages/Messages"));
+const SchedulePage = lazyWithRetry(() => import("./pages/SchedulePage"));
 const VirtualVisit = lazyWithRetry(() => import("./pages/VirtualVisit"));
 const BillingHub = lazyWithRetry(() => import("./pages/BillingHub"));
 const PersonCareTeam = lazyWithRetry(() => import("./pages/PersonCareTeam"));
@@ -296,6 +296,7 @@ const App = () => (
             <Route path="/people/:id/incident-report/new" element={<ProtectedRoute><PersonIncidentReportNew /></ProtectedRoute>} />
             <Route path="/incidents" element={<ProtectedRoute><IncidentsGlobal /></ProtectedRoute>} />
             <Route path="/my-work" element={<ProtectedRoute><MyWork /></ProtectedRoute>} />
+            <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
             <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/people/:id/module/:slug" element={<ProtectedRoute><PersonModule /></ProtectedRoute>} />
@@ -367,18 +368,26 @@ const App = () => (
             <Route path="/reports/builder" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />
             <Route path="/reports/audit-evidence" element={<ProtectedRoute requireRole="admin"><AuditEvidence /></ProtectedRoute>} />
             <Route path="/reports/:reportId" element={<ProtectedRoute><ReportRunner /></ProtectedRoute>} />
-            <Route path="/platform" element={<ProtectedRoute><PlatformHub /></ProtectedRoute>} />
-            <Route path="/platform/guidelines-engines" element={<ProtectedRoute><GuidelinesEnginesList /></ProtectedRoute>} />
-            <Route path="/platform/guidelines-engines/new" element={<ProtectedRoute requireRole="admin"><NewEngineWizard /></ProtectedRoute>} />
-            <Route path="/platform/guidelines-engines/:engineId" element={<ProtectedRoute><EngineDetail /></ProtectedRoute>} />
-            <Route path="/platform/rule-library" element={<ProtectedRoute><RuleLibrary /></ProtectedRoute>} />
-            <Route path="/platform/agents" element={<ProtectedRoute><ComplianceAgentsList /></ProtectedRoute>} />
-            <Route path="/platform/agents/new" element={<ProtectedRoute requireRole="admin"><NewAgentWizard /></ProtectedRoute>} />
-            <Route path="/platform/agents/:agentId" element={<ProtectedRoute><AgentDetail /></ProtectedRoute>} />
-            <Route path="/platform/agents/:agentId/runs" element={<ProtectedRoute><Layer2AgentBuilder /></ProtectedRoute>} />
-            <Route path="/platform/agents/:agentId/drafts" element={<ProtectedRoute><AgentDraftRuns /></ProtectedRoute>} />
-            <Route path="/platform/agents/:agentId/monitoring" element={<ProtectedRoute requireRole="admin"><AgentMonitoringSettings /></ProtectedRoute>} />
-            <Route path="/platform/orchestrator" element={<ProtectedRoute requireRole="supervisor"><BrainOrchestrator /></ProtectedRoute>} />
+            {/* ── AI AGENTS ROUTES ──────────────────────────────────── */}
+            <Route path="/agents" element={<ProtectedRoute requireRole="admin"><AIAgentsPage /></ProtectedRoute>} />
+            <Route path="/agents/orchestrator" element={<ProtectedRoute requireRole="supervisor"><BrainOrchestrator /></ProtectedRoute>} />
+            <Route path="/agents/guidelines" element={<ProtectedRoute><GuidelinesEnginesList /></ProtectedRoute>} />
+            <Route path="/agents/guidelines/new" element={<ProtectedRoute requireRole="admin"><NewEngineWizard /></ProtectedRoute>} />
+            <Route path="/agents/guidelines/:engineId" element={<ProtectedRoute><EngineDetail /></ProtectedRoute>} />
+            <Route path="/agents/new" element={<ProtectedRoute requireRole="admin"><NewAgentWizard /></ProtectedRoute>} />
+            <Route path="/agents/:agentId" element={<ProtectedRoute><AgentDetail /></ProtectedRoute>} />
+            <Route path="/agents/:agentId/runs" element={<ProtectedRoute><Layer2AgentBuilder /></ProtectedRoute>} />
+            <Route path="/agents/:agentId/drafts" element={<ProtectedRoute><AgentDraftRuns /></ProtectedRoute>} />
+            <Route path="/agents/:agentId/monitoring" element={<ProtectedRoute requireRole="admin"><AgentMonitoringSettings /></ProtectedRoute>} />
+            <Route path="/agents/rule-library" element={<ProtectedRoute><RuleLibrary /></ProtectedRoute>} />
+            {/* Legacy /platform/* redirects for backward compatibility */}
+            <Route path="/platform" element={<Navigate to="/agents" replace />} />
+            <Route path="/platform/agents" element={<Navigate to="/agents" replace />} />
+            <Route path="/platform/orchestrator" element={<Navigate to="/agents/orchestrator" replace />} />
+            <Route path="/platform/guidelines-engines" element={<Navigate to="/agents/guidelines" replace />} />
+            <Route path="/platform/guidelines-engines/new" element={<Navigate to="/agents/guidelines/new" replace />} />
+            <Route path="/platform/guidelines-engines/:engineId" element={<Navigate to="/agents/guidelines/:engineId" replace />} />
+            <Route path="/platform/rule-library" element={<Navigate to="/agents/rule-library" replace />} />
 
             {/* Per-person placeholder routes */}
             <Route path="/people/:id/care-tracker" element={<ProtectedRoute><PersonCareTracker /></ProtectedRoute>} />

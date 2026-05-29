@@ -136,7 +136,7 @@ export function AgentDetail() {
           <h2 className="font-manrope font-extrabold text-[18px] text-icm-text">Agent Context Missing</h2>
           <p className="text-[13px] text-icm-text-dim mt-1 font-geist">This agent may have been removed or does not exist in this database.</p>
           <button
-            onClick={() => navigate("/platform/agents")}
+            onClick={() => navigate("/agents")}
             className="mt-5 h-9 px-4 rounded-xl border border-icm-border text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text"
           >
             Back to dashboard
@@ -153,23 +153,23 @@ export function AgentDetail() {
       <div className="space-y-5 max-w-[1100px]">
         {/* Breadcrumb */}
         <div className="text-[11.5px] font-geist text-icm-text-dim flex items-center gap-1.5 flex-wrap">
-          <button onClick={() => navigate("/platform")} className="hover:text-icm-text inline-flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5" /> Platform
+          <button onClick={() => navigate("/agents")} className="hover:text-icm-text inline-flex items-center gap-1">
+            <Layers className="w-3.5 h-3.5" /> AI Agents
           </button>
           <ChevronRight className="w-3 h-3 text-icm-text-faint" />
-          <button onClick={() => navigate("/platform/agents")} className="hover:text-icm-text">
-            Compliance Agents
+          <button onClick={() => navigate("/agents")} className="hover:text-icm-text">
+            AI Agents
           </button>
           <ChevronRight className="w-3 h-3 text-icm-text-faint" />
           <span className="text-icm-text">{agent.name}</span>
         </div>
 
         <button
-          onClick={() => navigate("/platform/agents")}
+          onClick={() => navigate("/agents")}
           className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
-          Compliance Agents
+          AI Agents
         </button>
 
         {/* Header */}

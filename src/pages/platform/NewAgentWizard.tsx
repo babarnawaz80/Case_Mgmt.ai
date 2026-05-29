@@ -230,13 +230,13 @@ const NewAgentWizard = () => {
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
             <button
-              onClick={() => navigate(`/platform/agents/${newAgentId}`)}
+              onClick={() => navigate(`/agents/${newAgentId}`)}
               className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[12.5px] font-geist font-semibold hover:opacity-90"
             >
               View agent →
             </button>
             <button
-              onClick={() => navigate("/platform/agents")}
+              onClick={() => navigate("/agents")}
               className="h-10 px-4 rounded-xl border border-icm-border text-[12.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
             >
               Back to agents dashboard
@@ -253,14 +253,14 @@ const NewAgentWizard = () => {
         {/* Top bar */}
         <div className="flex items-center justify-between gap-3">
           <button
-            onClick={() => navigate("/platform/agents")}
+            onClick={() => navigate("/agents")}
             className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             Compliance Agents
           </button>
           <button
-            onClick={() => navigate("/platform/agents")}
+            onClick={() => navigate("/agents")}
             className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
           >
             Save & exit
@@ -273,7 +273,7 @@ const NewAgentWizard = () => {
           Platform
           <ChevronRight className="w-3 h-3 text-icm-text-faint" />
           <button
-            onClick={() => navigate("/platform/agents")}
+            onClick={() => navigate("/agents")}
             className="hover:text-icm-text"
           >
             Compliance Agents
@@ -613,7 +613,7 @@ function Step2({
           <p className="text-[13px] text-icm-text-dim font-geist">
             No published engines yet.{" "}
             <button
-              onClick={() => navigate("/platform/guidelines-engines/new")}
+              onClick={() => navigate("/agents/guidelines/new")}
               className="text-icm-accent hover:underline font-semibold"
             >
               Create one first →

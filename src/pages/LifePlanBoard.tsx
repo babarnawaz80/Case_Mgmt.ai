@@ -130,7 +130,7 @@ export default function LifePlanBoard() {
                   <button onClick={() => navigate("/platform/guidelines-engines")} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border text-foreground font-medium text-xs hover:bg-secondary transition-all">
                     <Shield className="h-3.5 w-3.5" /> Guidelines Engines
                   </button>
-                  <button onClick={() => navigate("/platform/agents/new")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-xs shadow-lg hover:-translate-y-0.5 transition-all">
+                  <button onClick={() => navigate("/agents/new")} className="flex items-center gap-2 px-4 py-2 rounded-xl gradient-primary text-primary-foreground font-medium text-xs shadow-lg hover:-translate-y-0.5 transition-all">
                     <Plus className="h-3.5 w-3.5" /> Create Agent
                   </button>
                 </>
@@ -295,7 +295,7 @@ function RuntimeAgentsTab({ agents, navigate, isAdmin, onDelete, onClone, active
                     </span>
                     <AgentMenu
                       isAdmin={isAdmin}
-                      onEdit={() => navigate("/platform/agents/new", { state: { editAgent: agent } })}
+                      onEdit={() => navigate("/agents/new", { state: { editAgent: agent } })}
                       onClone={() => onClone(agent)}
                       onDelete={() => onDelete(agent.id)}
                     />

@@ -99,11 +99,11 @@ const GuidelinesEnginesList = () => {
         {/* Breadcrumb */}
         <div className="text-[11.5px] font-geist text-icm-text-dim flex items-center gap-1.5">
           <button
-            onClick={() => navigate("/platform")}
+            onClick={() => navigate("/agents")}
             className="hover:text-icm-text inline-flex items-center gap-1"
           >
             <Layers className="w-3.5 h-3.5" />
-            Platform
+            AI Agents
           </button>
           <ChevronRight className="w-3 h-3 text-icm-text-faint" />
           <span className="text-icm-text">Guidelines Engines</span>
@@ -120,7 +120,7 @@ const GuidelinesEnginesList = () => {
             </p>
           </div>
           <button
-            onClick={() => navigate("/platform/guidelines-engines/new")}
+            onClick={() => navigate("/agents/guidelines/new")}
             className="h-9 px-3.5 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -190,7 +190,7 @@ const GuidelinesEnginesList = () => {
               return (
                 <button
                   key={e.id}
-                  onClick={() => navigate(`/platform/guidelines-engines/${e.id}`)}
+                  onClick={() => navigate(`/agents/guidelines/${e.id}`)}
                   className={`w-full text-left rounded-xl border border-icm-border border-l-[3px] ${borderCls} bg-icm-panel p-4 flex items-center gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all`}
                 >
                   <div
@@ -266,7 +266,7 @@ const GuidelinesEnginesList = () => {
                             onClick={(ev) => {
                               ev.stopPropagation();
                               setOpenMenuId(null);
-                              navigate(`/platform/guidelines-engines/${e.id}`);
+                              navigate(`/agents/guidelines/${e.id}`);
                             }}
                             className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[12.5px] font-geist text-icm-text hover:bg-icm-bg transition-colors"
                           >
@@ -277,7 +277,7 @@ const GuidelinesEnginesList = () => {
                             onClick={(ev) => {
                               ev.stopPropagation();
                               setOpenMenuId(null);
-                              navigate(`/platform/guidelines-engines/${e.id}?edit=true`);
+                              navigate(`/agents/guidelines/${e.id}?edit=true`);
                             }}
                             className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[12.5px] font-geist text-icm-text hover:bg-icm-bg transition-colors"
                           >

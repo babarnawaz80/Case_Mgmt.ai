@@ -1091,7 +1091,7 @@ const NewEngineWizard = () => {
         has_custom_prompt: hasCustomPrompt && !!customExtractionPrompt.trim(),
       });
     }
-    navigate("/platform/guidelines-engines");
+    navigate("/agents/guidelines");
   };
 
   const handlePublishConfirm = async () => {
@@ -1229,7 +1229,7 @@ const NewEngineWizard = () => {
               Create an agent →
             </button>
             <button
-              onClick={() => navigate("/platform/guidelines-engines")}
+              onClick={() => navigate("/agents/guidelines")}
               className="h-10 px-4 rounded-xl border border-icm-border text-[12.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
             >
               View engine
@@ -1246,7 +1246,7 @@ const NewEngineWizard = () => {
         {/* Top bar */}
         <div className="flex items-center justify-between gap-3">
           <button
-            onClick={() => navigate("/platform/guidelines-engines")}
+            onClick={() => navigate("/agents/guidelines")}
             className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
@@ -1266,7 +1266,7 @@ const NewEngineWizard = () => {
           Platform
           <ChevronRight className="w-3 h-3 text-icm-text-faint" />
           <button
-            onClick={() => navigate("/platform/guidelines-engines")}
+            onClick={() => navigate("/agents/guidelines")}
             className="hover:text-icm-text"
           >
             Guidelines Engines

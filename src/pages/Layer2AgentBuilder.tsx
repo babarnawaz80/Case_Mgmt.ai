@@ -43,7 +43,7 @@ export default function Layer2AgentBuilder() {
       title: "Run Complete",
       description: "All outputs have been pushed to iCM modules. Service authorization is ready.",
     });
-    navigate("/platform/agents");
+    navigate("/agents");
   };
 
   const handleStartNew = () => setShowLanding(false);
@@ -53,11 +53,11 @@ export default function Layer2AgentBuilder() {
       <div className="space-y-5">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-[11.5px] font-geist text-icm-text-dim">
-          <button onClick={() => navigate("/platform")} className="hover:text-icm-text">
+          <button onClick={() => navigate("/agents")} className="hover:text-icm-text">
             Platform
           </button>
           <span className="text-icm-text-faint">›</span>
-          <button onClick={() => navigate("/platform/agents")} className="hover:text-icm-text">
+          <button onClick={() => navigate("/agents")} className="hover:text-icm-text">
             Agents
           </button>
           <span className="text-icm-text-faint">›</span>
@@ -68,7 +68,7 @@ export default function Layer2AgentBuilder() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (showLanding ? navigate("/platform/agents") : setShowLanding(true))}
+              onClick={() => (showLanding ? navigate("/agents") : setShowLanding(true))}
               className="inline-flex items-center gap-1 text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -86,7 +86,7 @@ export default function Layer2AgentBuilder() {
             </div>
           </div>
           <button
-            onClick={() => navigate("/platform/agents")}
+            onClick={() => navigate("/agents")}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-all border border-border"
           >
             <Settings className="w-3.5 h-3.5" /> Agent Settings

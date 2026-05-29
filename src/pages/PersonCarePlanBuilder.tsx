@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -962,8 +962,7 @@ const PersonCarePlanBuilder = () => {
       };
 
       if (pcpId) {
-        const { updateDoc, doc: firestoreDoc } = await import("firebase/firestore");
-        await updateDoc(firestoreDoc(db, "care_plans", pcpId), payload);
+        await updateDoc(doc(db, "care_plans", pcpId), payload);
       } else {
         await addDoc(collection(db, "care_plans"), {
           ...payload,
@@ -1006,7 +1005,10 @@ const PersonCarePlanBuilder = () => {
         effective_date: effectiveDate,
         annual_plan_date: annualDate,
         internalDueDate: annualDate || null,
-        goals,
+        goals: goals ?? [],
+        services: [],
+        team: [],
+        history: [{ date: new Date().toLocaleDateString(), user: "Case Manager", action: "Plan created via section builder" }],
         sections: {
           good_life: goodLife,
           important_to: importantTo,
@@ -1024,8 +1026,7 @@ const PersonCarePlanBuilder = () => {
 
       let savedId: string;
       if (pcpId) {
-        const { updateDoc, doc: firestoreDoc } = await import("firebase/firestore");
-        await updateDoc(firestoreDoc(db, "care_plans", pcpId), payload);
+        await updateDoc(doc(db, "care_plans", pcpId), payload);
         savedId = pcpId;
       } else {
         const docRef = await addDoc(collection(db, "care_plans"), {

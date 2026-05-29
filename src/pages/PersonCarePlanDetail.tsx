@@ -10,7 +10,8 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { type CarePlan, type PlanGoal } from "@/data/carePlans";
-import { useCarePlans, updateCarePlan, usePCP } from "@/hooks/useFirestore";
+import { useCarePlans, updateCarePlan, usePCP, useConsents } from "@/hooks/useFirestore";
+import { AttestationSection, EMPTY_ATTESTATION, type AttestationValue } from "@/components/icm/AttestationSection";
 import { writeAudit } from "@/lib/auditService";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,6 +64,15 @@ const PersonCarePlanDetail = () => {
   const [aiBannerVisible, setAiBannerVisible] = useState(true);
   const [printOpen, setPrintOpen] = useState(false);
   const [aiDraftingGoals, setAiDraftingGoals] = useState(false);
+
+  // Guardian consent flag
+  const [guardianConsentRequired, setGuardianConsentRequired] = useState(false);
+  const [planAttestation, setPlanAttestation] = useState<AttestationValue>(EMPTY_ATTESTATION);
+  const { data: consents } = useConsents(id);
+  const hasActiveConsent = consents.some(
+    (c) => c.status === "Active" && c.consent_type === "Guardian Consent for Plan Documents"
+  );
+  const consentBlocked = guardianConsentRequired && !hasActiveConsent;
 
   // ── Loading state (includes PCP v2 loading) ───────────────────────────────────────────
   const loading = individualLoading || plansLoading || (isPcpV2Candidate && pcpLoading);
@@ -195,10 +205,23 @@ const PersonCarePlanDetail = () => {
                 </button>
               </>
             )}
+            {/* Guardian consent toggle */}
+            <label className="flex items-center gap-2 cursor-pointer text-[12px] font-geist text-icm-text-dim select-none">
+              <input
+                type="checkbox"
+                checked={guardianConsentRequired}
+                onChange={(e) => setGuardianConsentRequired(e.target.checked)}
+                className="rounded border-icm-border"
+              />
+              Guardian consent required to share
+            </label>
+
             <div className="relative">
               <button
-                onClick={() => setPrintOpen((o) => !o)}
-                className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5"
+                onClick={() => { if (consentBlocked) { toast.error("Add an active Guardian Consent record before exporting."); return; } setPrintOpen((o) => !o); }}
+                disabled={consentBlocked}
+                title={consentBlocked ? "Guardian consent required before sharing. Add consent record first." : undefined}
+                className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Printer className="w-3.5 h-3.5" /> Print / Export
               </button>
@@ -214,6 +237,18 @@ const PersonCarePlanDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* Guardian consent warning banner */}
+        {consentBlocked && (
+          <div className="rounded-xl border border-icm-amber/40 bg-icm-amber-soft px-4 py-3 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-icm-amber shrink-0 mt-0.5" />
+            <p className="text-[12.5px] font-geist text-icm-text">
+              <span className="font-semibold">Guardian consent required before sharing.</span>{" "}
+              No active "Guardian Consent for Plan Documents" consent record found for this individual.{" "}
+              <a href={`/people/${id}/profile?tab=administrative`} className="text-icm-accent font-semibold underline underline-offset-2">Add consent record first →</a>
+            </p>
+          </div>
+        )}
 
         {/* AI banner */}
         {aiBannerVisible && plan.aiDrafted && !readOnly && (
@@ -270,9 +305,9 @@ const PersonCarePlanDetail = () => {
         </PlanSection>
 
         {/* SECTION 3 — Goals */}
-        <PlanSection icon={ListChecks} title="Goals & Outcomes" complete={plan.goals.length} total={plan.goals.length} open={open.goals} onToggle={() => toggle("goals")} aiBadge>
+        <PlanSection icon={ListChecks} title="Goals & Outcomes" complete={(plan.goals ?? []).length} total={(plan.goals ?? []).length} open={open.goals} onToggle={() => toggle("goals")} aiBadge>
           <div className="space-y-3">
-            {plan.goals.map((g) => <GoalCard key={g.id} goal={g} readOnly={readOnly} />)}
+            {(plan.goals ?? []).map((g) => <GoalCard key={g.id} goal={g} readOnly={readOnly} />)}
           </div>
           {!readOnly && (
             <div className="flex items-center gap-2 mt-4">
@@ -354,8 +389,8 @@ const PersonCarePlanDetail = () => {
         </PlanSection>
 
         {/* SECTION 4 — Services */}
-        <PlanSection icon={Briefcase} title="Services" complete={plan.services.length} total={plan.services.length} open={open.services} onToggle={() => toggle("services")}>
-          {plan.services.length === 0 ? (
+        <PlanSection icon={Briefcase} title="Services" complete={(plan.services ?? []).length} total={(plan.services ?? []).length} open={open.services} onToggle={() => toggle("services")}>
+          {(plan.services ?? []).length === 0 ? (
             <p className="text-[12.5px] text-icm-text-faint">No services on this plan.</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-icm-border">
@@ -368,7 +403,7 @@ const PersonCarePlanDetail = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-icm-border">
-                  {plan.services.map((s) => (
+                  {(plan.services ?? []).map((s) => (
                     <tr key={s.id}>
                       <td className="px-3 py-2 text-icm-text font-medium">{s.name}</td>
                       <td className="px-3 py-2 text-icm-text-dim">{s.provider}</td>
@@ -514,7 +549,7 @@ const PersonCarePlanDetail = () => {
               <Link2 className="w-3.5 h-3.5 text-icm-accent mt-0.5 shrink-0" />
               <p className="text-[12px] text-icm-text leading-snug">
                 <span className="font-semibold">Goal linkage:</span>{" "}
-                <span className="text-icm-text-dim">3 of {plan.goals.length} plan goals are mapped to the Life Trajectory and Integrated Supports Star.</span>
+                <span className="text-icm-text-dim">3 of {(plan.goals ?? []).length} plan goals are mapped to the Life Trajectory and Integrated Supports Star.</span>
               </p>
             </div>
             {!readOnly && (
@@ -648,7 +683,7 @@ const PersonCarePlanDetail = () => {
 
 
         {/* SECTION 6 — Team & Signatures */}
-        <PlanSection icon={Users} title="Team & Signatures" complete={plan.team.filter(t => t.status === "Signed").length} total={plan.team.filter(t => t.status !== "Not required").length} open={open.team} onToggle={() => toggle("team")}>
+        <PlanSection icon={Users} title="Team & Signatures" complete={(plan.team ?? []).filter(t => t.status === "Signed").length} total={(plan.team ?? []).filter(t => t.status !== "Not required").length} open={open.team} onToggle={() => toggle("team")}>
           <div className="overflow-x-auto rounded-lg border border-icm-border">
             <table className="w-full text-[12px] font-geist">
               <thead className="bg-icm-bg/60">
@@ -659,7 +694,7 @@ const PersonCarePlanDetail = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-icm-border">
-                {plan.team.map((t, i) => (
+                {(plan.team ?? []).map((t, i) => (
                   <tr key={i}>
                     <td className="px-3 py-2 text-icm-text font-medium">{t.name}</td>
                     <td className="px-3 py-2 text-icm-text-dim">{t.role}</td>
@@ -679,7 +714,7 @@ const PersonCarePlanDetail = () => {
           </div>
           {!readOnly && (
             <div className="mt-3 flex justify-end">
-              <button onClick={() => toast.success("E-sign requests sent", { description: `${plan.team.filter(t => t.status === "Pending").length} pending signers notified.` })} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+              <button onClick={() => toast.success("E-sign requests sent", { description: `${(plan.team ?? []).filter(t => t.status === "Pending").length} pending signers notified.` })} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" /> Send all for signature
               </button>
             </div>
@@ -687,9 +722,9 @@ const PersonCarePlanDetail = () => {
         </PlanSection>
 
         {/* SECTION 7 — History */}
-        <PlanSection icon={History} title="Plan Notes & History" complete={plan.history.length} total={plan.history.length} open={open.history} onToggle={() => toggle("history")}>
+        <PlanSection icon={History} title="Plan Notes & History" complete={(plan.history ?? []).length} total={(plan.history ?? []).length} open={open.history} onToggle={() => toggle("history")}>
           <ol className="space-y-2">
-            {plan.history.map((h, i) => (
+            {(plan.history ?? []).map((h, i) => (
               <li key={i} className="flex items-start gap-3 text-[12.5px]">
                 <span className="font-mono text-icm-text-faint shrink-0 w-20">{h.date}</span>
                 <span className="text-icm-text-dim shrink-0 w-40">{h.user}</span>
@@ -698,6 +733,13 @@ const PersonCarePlanDetail = () => {
             ))}
           </ol>
         </PlanSection>
+
+        {/* Attestation */}
+        <AttestationSection
+          value={planAttestation}
+          onChange={setPlanAttestation}
+          readOnly={readOnly}
+        />
       </div>
     </ICMShell>
   );

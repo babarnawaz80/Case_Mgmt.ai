@@ -849,7 +849,7 @@ function GoalCard({ goal, readOnly }: { goal: any; readOnly?: boolean }) {
       <div>
         <p className="text-[11px] uppercase tracking-wide font-semibold text-icm-text-faint mb-2">Objectives</p>
         <ul className="space-y-1.5">
-          {goal.objectives.map((o) => (
+          {(goal.objectives ?? []).map((o) => (
             <li key={o.id} className="flex items-center gap-2 text-[12.5px] text-icm-text">
               <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${o.status === "Achieved" ? "text-icm-green" : o.status === "In Progress" ? "text-icm-amber" : "text-icm-text-faint"}`} />
               <span className="flex-1">{o.description}</span>

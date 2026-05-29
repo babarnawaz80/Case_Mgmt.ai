@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
+import { DischargedBanner } from "@/components/icm/DischargedBanner";
 import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useWorkflows } from "@/hooks/useFirestore";
 import { progressFraction, workflowProgressTone } from "@/data/workflows";
@@ -411,6 +412,8 @@ const PersonCaseManagement = () => {
             { label: "Case Management" },
           ]}
         />
+
+        <DischargedBanner individual={individual} />
 
         {/* Person header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">

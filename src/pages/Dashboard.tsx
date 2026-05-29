@@ -256,7 +256,7 @@ function HeroRow() {
     label: "People Needing Attention",
     value: census > 0 ? (attentionCount / census) * 100 : 0,
     centerLabel: `${attentionCount}/${census}`,
-    sub: `${highRisk} high-risk · ${reviewRisk} need review`,
+    sub: `${highRisk} high compliance risk · ${reviewRisk} need review`,
     icon: AlertTriangle,
     to: "/people",
     cta: "View Watchlist",

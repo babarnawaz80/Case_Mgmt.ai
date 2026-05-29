@@ -167,6 +167,7 @@ const PersonCareTracker = lazyWithRetry(() => import("./pages/PersonPlaceholders
 const PersonCommunications = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("communications") })));
 const PersonServices = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("services") })));
 const PersonEmployment = lazyWithRetry(() => import("./pages/PersonEmployment"));
+const PersonMedications = lazyWithRetry(() => import("./pages/PersonMedications"));
 const PersonManagedDocuments = lazyWithRetry(() => import("./pages/PersonManagedDocuments"));
 const PersonOnCall = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("oncall") })));
 const PersonTrainings = lazyWithRetry(() => import("./pages/PersonTrainings"));
@@ -385,6 +386,7 @@ const App = () => (
             <Route path="/people/:id/communications" element={<ProtectedRoute><PersonCommunications /></ProtectedRoute>} />
             <Route path="/people/:id/services" element={<ProtectedRoute><PersonServices /></ProtectedRoute>} />
             <Route path="/people/:id/employment" element={<ProtectedRoute><PersonEmployment /></ProtectedRoute>} />
+            <Route path="/people/:id/medications" element={<ProtectedRoute><PersonMedications /></ProtectedRoute>} />
             <Route path="/people/:id/assigned-staff" element={<ProtectedRoute><PersonCareTeam /></ProtectedRoute>} />
             <Route path="/people/:id/care-team" element={<ProtectedRoute><PersonCareTeam /></ProtectedRoute>} />
             <Route path="/people/:id/managed-documents" element={<ProtectedRoute><PersonManagedDocuments /></ProtectedRoute>} />

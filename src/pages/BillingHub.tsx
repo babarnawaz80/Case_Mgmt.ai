@@ -528,6 +528,12 @@ const BillingHub = () => {
               Clear
             </button>
           )}
+          {/* Result count indicator — always visible so users know the filter is live */}
+          <span className="text-[11px] font-geist text-icm-text-dim shrink-0">
+            {(filterIndividual || filterCode || filterDateFrom || filterDateTo)
+              ? `${filtered.length} of ${records.length} claim${records.length !== 1 ? "s" : ""}`
+              : `${records.length} claim${records.length !== 1 ? "s" : ""}`}
+          </span>
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => exportCSV(selectedIds.size > 0 ? selectedRecords : filtered)}
@@ -786,6 +792,47 @@ const BillingHub = () => {
                   </span>
                 )}
               </div>
+
+              {/* ── Needs Attention — prominently explain what's missing ── */}
+              {drawerRecord.billing_status === "needs_attention" && (() => {
+                const issues: { label: string; fix: string }[] = [];
+                if (!drawerRecord.service_code)
+                  issues.push({ label: "Service code is missing", fix: "Open the source note and select a service code (e.g. T2022, H0038)" });
+                if (!drawerRecord.individual_id)
+                  issues.push({ label: "Individual is not linked", fix: "This claim has no individual ID — check the source note" });
+                if (!drawerRecord.date_of_service)
+                  issues.push({ label: "Date of service is missing", fix: "The source note has no date — edit the note to add one" });
+                if (drawerRecord.units === 0)
+                  issues.push({ label: "Units are zero", fix: "Check that the note has valid start and end times, or manually set the unit count" });
+                if (!drawerRecord.authorization_number)
+                  issues.push({ label: "Authorization number is missing", fix: "Link a service authorization to the note or enter the auth number manually" });
+                if (issues.length === 0)
+                  issues.push({ label: "Scrub validation failed", fix: "Re-run the full scrub after correcting the source note" });
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                    <p className="text-[11px] font-geist font-bold uppercase tracking-[0.08em] text-amber-700">
+                      Action required — {issues.length} issue{issues.length !== 1 ? "s" : ""} found
+                    </p>
+                    {issues.map((issue, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-[11.5px] font-geist font-semibold text-amber-800">{issue.label}</p>
+                          <p className="text-[11px] font-geist text-amber-600 leading-snug">{issue.fix}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {drawerRecord.source_note_url && (
+                      <a
+                        href={drawerRecord.source_note_url}
+                        className="mt-2 w-full h-8 rounded-lg bg-amber-600 text-white text-[11.5px] font-geist font-semibold hover:bg-amber-700 flex items-center justify-center gap-1.5"
+                      >
+                        Open source note to fix <ChevronRight className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Service info */}
               <ClaimSection title="Service Details">

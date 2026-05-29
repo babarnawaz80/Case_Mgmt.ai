@@ -68,9 +68,12 @@ const PeopleSupported = () => {
         fullName.toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q) ||
         (p.county ?? "").toLowerCase().includes(q) ||
-        (p.medicaid_id ?? "").toLowerCase().includes(q);
+        (p.medicaid_id ?? "").toLowerCase().includes(q) ||
+        (p.ltss_id ?? "").toLowerCase().includes(q);
       const matchStatus =
-        status === "All" || statusLabel(p.enrollment_status) === status;
+        status === "All"
+          ? statusLabel(p.enrollment_status) !== "Discharged"
+          : statusLabel(p.enrollment_status) === status;
       const matchCounty = county === "All" || p.county === county;
       const score = computedScores[p.id] ?? p.risk_score ?? 0;
       const matchRisk =
@@ -144,7 +147,7 @@ const PeopleSupported = () => {
             value={risk}
             onChange={(v) => setRisk(v as RiskFilter)}
             options={["All", "High", "Review", "Standard"]}
-            label="Risk"
+            label="Compliance Risk"
           />
           <FilterSelect value={county} onChange={setCounty} options={counties} label="County" />
         </div>
@@ -158,7 +161,7 @@ const PeopleSupported = () => {
             <p className="text-[12.5px] font-geist text-icm-text leading-snug">
               <span className="font-semibold">Your live caseload.</span>{" "}
               <span className="text-icm-text-dim">
-                {loading ? "Loading individuals…" : `${highRiskCount} high-risk · ${alertCount} need attention.`}
+                {loading ? "Loading individuals…" : `${highRiskCount} high compliance risk · ${alertCount} need attention.`}
               </span>
             </p>
           </div>
@@ -334,9 +337,9 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
           onClick={(e) => { e.stopPropagation(); onOpenRisk(); }}
           className="hidden md:block text-right shrink-0 group"
           title="View risk score breakdown"
-          aria-label={`Risk score ${displayScore} — ${getRiskLabel(displayScore)}. Click to view breakdown.`}
+          aria-label={`Compliance Risk score ${displayScore} — ${getRiskLabel(displayScore)}. Click to view breakdown.`}
         >
-          <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">Risk</p>
+          <p className="text-[10px] uppercase tracking-wide text-icm-text-faint font-geist">Compliance Risk</p>
           <p className={`font-mono font-bold text-[16px] leading-tight group-hover:underline ${riskScoreClass(displayScore)}`}>
             {displayScore}
           </p>

@@ -399,16 +399,20 @@ const Messages = () => {
         let dayLabel = "Today";
         if (m.createdAt && typeof m.createdAt === "object" && "seconds" in m.createdAt) {
           const date = new Date((m.createdAt as any).seconds * 1000);
-          timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const timeOnly = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
           const today = new Date();
           const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
           if (date.toDateString() === today.toDateString()) {
             dayBucket = "today"; dayLabel = "Today";
+            timeStr = `Today at ${timeOnly}`;
           } else if (date.toDateString() === yesterday.toDateString()) {
             dayBucket = "yesterday"; dayLabel = "Yesterday";
+            timeStr = `Yesterday at ${timeOnly}`;
           } else {
             dayBucket = "earlier";
+            const dateLabel = date.toLocaleDateString([], { month: "short", day: "numeric" });
             dayLabel = date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+            timeStr = `${dateLabel} at ${timeOnly}`;
           }
         }
 

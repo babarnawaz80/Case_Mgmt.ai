@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { DischargedBanner } from "@/components/icm/DischargedBanner";
 import { demoToast } from "@/lib/demoToast";
 import { PreVisitModal } from "@/components/visit/PreVisitModal";
 import { useRole } from "@/contexts/RoleContext";
@@ -86,6 +87,7 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "assigned-staff",         label: "Assigned Staff",             icon: Users,          route: "assigned-staff",         category: "Care" },
   { slug: "care-notes",             label: "Care Notes",                 icon: FileText,       route: "progress-note",          category: "Care" },
   { slug: "care-tracker",           label: "Care Tracker",               icon: Heart,          route: "care-tracker",           category: "Care" },
+  { slug: "medications",            label: "Medications",                icon: Activity,       route: "medications",            category: "Care" },
   { slug: "esignature",             label: "e-Signature",                icon: CheckSquare,    route: "esignature",             category: "Care" },
   { slug: "employment",             label: "Employment & Education",     icon: GraduationCap,  route: "employment",             category: "Care" },
   { slug: "facesheet",              label: "Face Sheet",                 icon: User,           route: "facesheet",              category: "Care" },
@@ -212,6 +214,7 @@ const EChart = () => {
             { label: `${individual.first_name} ${individual.last_name}` },
           ]}
         />
+        <DischargedBanner individual={individual} />
         {/* Person header card */}
         <div className="rounded-2xl border border-icm-border bg-icm-panel overflow-hidden">
           <div className="p-4 sm:p-5 pt-5 sm:pt-6">

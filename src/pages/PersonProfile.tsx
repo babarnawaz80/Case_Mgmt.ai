@@ -613,6 +613,7 @@ function BasicInfoTab({
       <Section title="Identification" onSave={async (data) => {
         await updateIndividual(personId, {
           ...(data.medicaid_id && { medicaid_id: data.medicaid_id }),
+          ...(data.ltss_id !== undefined && { ltss_id: data.ltss_id }),
         });
       }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
@@ -635,7 +636,7 @@ function BasicInfoTab({
           <EditableField label="Medicaid ID / MA Number" name="medicaid_id" defaultValue={person.medicaid_id ?? profile.medicaidId ?? ""} required />
           <EditableField label="Medicare ID" name="medicare_id" defaultValue={profile.medicareId ?? ""} />
           <EditableField label="State ID / Client ID" name="state_id" defaultValue={profile.stateId ?? ""} />
-          <EditableField label="LTSS ID" name="ltss_id" defaultValue={profile.ltssId ?? ""} />
+          <EditableField label="LTSS ID" name="ltss_id" defaultValue={person.ltss_id ?? profile.ltssId ?? ""} />
           <EditableField label="Date of Admission" name="admitted_on" defaultValue={person.admittedOn ?? ""} required />
           <EditableSelect label="Referral Source" name="referral_source" defaultValue={profile.referralSource ?? ""} options={["", ...REFERRAL_OPTIONS]} />
         </div>

@@ -95,7 +95,7 @@ function extractMentionedUids(text: string, userList: MentionSuggestion[]): stri
   const uids: string[] = [];
   for (const token of tokens) {
     const nameQuery = token.slice(1).trim().toLowerCase();
-    const match = userList.find((u) => u.name.toLowerCase() === nameQuery);
+    const match = userList.find((u) => (u.name ?? "").toLowerCase() === nameQuery);
     if (match && !uids.includes(match.uid)) uids.push(match.uid);
   }
   return uids;
@@ -147,23 +147,24 @@ export default function MentionInput({
             const data = d.data();
             const firstName: string = data.firstName ?? "";
             const lastName: string = data.lastName ?? "";
+            const namePart = `${firstName} ${lastName}`.trim();
             const displayName: string =
-              data.displayName ??
-              `${firstName} ${lastName}`.trim() ??
-              data.email ??
+              data.displayName ||
+              namePart ||
+              data.email ||
               "Unknown";
             const initials =
-              (firstName[0] ?? "") + (lastName[0] ?? "") ||
+              ((firstName[0] ?? "") + (lastName[0] ?? "")).toUpperCase() ||
               displayName.slice(0, 2).toUpperCase();
             return {
               uid: d.id,
               name: displayName,
               role: data.role,
-              initials: initials.toUpperCase(),
+              initials: initials,
             };
           })
           .filter((u) => u.name && u.name !== "Unknown")
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
         setOrgUsers(list);
       } catch (err) {
         console.warn("[MentionInput] Failed to load org users:", err);
@@ -183,7 +184,7 @@ export default function MentionInput({
       if (q !== null) {
         // Filter users by the query text
         const filtered = orgUsers
-          .filter((u) => u.name.toLowerCase().includes(q.toLowerCase()))
+          .filter((u) => (u.name ?? "").toLowerCase().includes(q.toLowerCase()))
           .slice(0, 6);
         setSuggestions(filtered);
         setActiveIdx(0);

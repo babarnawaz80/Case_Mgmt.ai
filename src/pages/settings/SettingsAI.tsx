@@ -17,6 +17,7 @@ interface AISettings {
   sessionTranscriptRetentionDays: number;
   auditAllSessions: boolean;
   autoSuggestPrompts: boolean;
+  writingStylePrompt: string;
   usageStats: {
     aiSessionsThisMonth: number;
     avgSessionDurationMin: number;
@@ -60,6 +61,7 @@ const DEFAULT_SETTINGS: AISettings = {
   sessionTranscriptRetentionDays: 365,
   auditAllSessions: true,
   autoSuggestPrompts: true,
+  writingStylePrompt: "",
   usageStats: {
     aiSessionsThisMonth: 0,
     avgSessionDurationMin: 0,
@@ -104,6 +106,7 @@ const SettingsAI = () => {
               ai.sessionTranscriptRetentionDays ?? DEFAULT_SETTINGS.sessionTranscriptRetentionDays,
             auditAllSessions: ai.auditAllSessions ?? DEFAULT_SETTINGS.auditAllSessions,
             autoSuggestPrompts: ai.autoSuggestPrompts ?? DEFAULT_SETTINGS.autoSuggestPrompts,
+            writingStylePrompt: ai.writingStylePrompt ?? DEFAULT_SETTINGS.writingStylePrompt,
             usageStats: ai.usageStats ?? DEFAULT_SETTINGS.usageStats,
           });
         }
@@ -355,8 +358,56 @@ const SettingsAI = () => {
             </div>
           </div>
 
+          {/* Writing Style Configuration */}
+          <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
+            <div>
+              <p className="font-manrope font-bold text-[14px] text-icm-text">Writing Style Configuration</p>
+              <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
+                Customize how the AI writes notes and suggestions for your organization. This prompt is prepended to all "Help Me Write" requests.
+              </p>
+            </div>
+            <div>
+              <FieldLabel>Organization writing style prompt</FieldLabel>
+              <textarea
+                value={settings.writingStylePrompt}
+                onChange={(e) => set("writingStylePrompt", e.target.value.slice(0, 500))}
+                maxLength={500}
+                rows={4}
+                placeholder="e.g. Use clear, person-first language. Avoid clinical jargon. Keep notes concise and action-focused. Always include the date and case manager initials."
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-icm-border bg-icm-bg text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint resize-none focus:outline-none focus:border-icm-accent/40"
+              />
+              <p className="text-[10.5px] font-geist text-icm-text-faint text-right mt-0.5">
+                {settings.writingStylePrompt.length}/500 characters
+              </p>
+            </div>
+            <div className="rounded-lg border border-icm-border bg-icm-bg p-2.5 flex gap-2">
+              <Info className="w-4 h-4 text-icm-text-dim shrink-0 mt-0.5" />
+              <p className="text-[10.5px] font-geist text-icm-text-dim leading-relaxed">
+                This prompt is shared across your entire organization and applies to all staff using Help Me Write in Contact Notes, Progress Notes, and Messages.
+              </p>
+            </div>
+          </div>
+
           {/* Brain Orchestrator settings */}
           <OrchestratorSettings />
+
+          {/* Coming Soon — Dementia Support */}
+          <div className="rounded-xl border border-dashed border-icm-border bg-icm-panel/50 p-4 flex items-start gap-3 opacity-70">
+            <div className="w-8 h-8 rounded-lg bg-icm-accent-soft flex items-center justify-center shrink-0 mt-0.5">
+              <BrainCircuit className="w-4 h-4 text-icm-accent" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="font-geist font-semibold text-[12.5px] text-icm-text">Dementia &amp; Memory Care Support</p>
+                <span className="px-1.5 py-0.5 rounded-md text-[9.5px] font-geist font-bold uppercase tracking-wide bg-icm-amber-soft text-icm-amber ring-1 ring-icm-amber/20">
+                  Coming Soon
+                </span>
+              </div>
+              <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5 leading-snug">
+                Specialized AI prompts, documentation templates, and behavior tracking tools tailored for individuals with dementia and memory care needs. Available in a future release.
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </SettingsLayout>

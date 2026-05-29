@@ -48,6 +48,7 @@ async function fetchCounts(individualId: string): Promise<EChartCounts> {
     workflows,
     eligibility,
     serviceAuths,
+    medications,
   ] = await Promise.all([
     // progress_notes uses camelCase individualId
     getCountFromServer(query(
@@ -109,6 +110,10 @@ async function fetchCounts(individualId: string): Promise<EChartCounts> {
       collection(db, "service_authorizations"),
       where("individual_id", "==", individualId),
     )).catch(() => null),
+    // medications — subcollection under individuals/{id}/medications
+    getCountFromServer(
+      collection(db, "individuals", individualId, "medications"),
+    ).catch(() => null),
   ]);
 
   const data: EChartCounts = {
@@ -128,6 +133,7 @@ async function fetchCounts(individualId: string): Promise<EChartCounts> {
     "managed-documents":      managedDocuments?.data().count ?? 0,
     "oncall":                 oncallLogs?.data().count ?? 0,
     "authorizations":         serviceAuths?.data().count ?? 0,
+    "medications":            medications?.data().count ?? 0,
   };
 
   cache.set(individualId, { ts: Date.now(), data });

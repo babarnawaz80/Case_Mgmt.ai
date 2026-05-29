@@ -35,6 +35,7 @@ export interface Individual {
   dob?: string;
   gender?: string;
   medicaid_id?: string;
+  ltss_id?: string;
   diagnosis?: string;
   risk_score?: number;
   risk_level?: "low" | "medium" | "high" | string;

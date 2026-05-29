@@ -192,7 +192,7 @@ function buildExtractGroups(ai: {
 
 /** Returns the placeholder extract groups used when no real transcript was captured.
  * Uses the selected individual's first name so AI-demo content is personalized. */
-function getEmptyExtractGroups(firstName: string): ExtractGroup[] {
+function getEmptyExtractGroups(firstName: string, cmName = "Case Manager"): ExtractGroup[] {
   const name = firstName || "the individual";
   return [
     {
@@ -205,7 +205,7 @@ function getEmptyExtractGroups(firstName: string): ExtractGroup[] {
       items: [
         { id: "cn_type", label: "Contact type", value: "In-person visit" },
         { id: "cn_purpose", label: "Purpose", value: "Quarterly check-in, service review" },
-        { id: "cn_present", label: "Who was present", value: `Kathy Adams (CM), ${name}` },
+        { id: "cn_present", label: "Who was present", value: `${cmName} (CM), ${name}` },
         {
           id: "cn_details",
           label: "Details",
@@ -400,13 +400,14 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
     const initFirstName = defaultIndividualName?.split(" ")[0] || "this person";
     return getEmptyExtractGroups(initFirstName);
   });
-  const [tab, setTab] = useState<"items" | "transcript">("items");
+  const [tab, setTab] = useState<"items" | "transcript" | "narrative">("items");
   const [includedItems, setIncludedItems] = useState<Set<string>>(() => {
     const initFirstName = defaultIndividualName?.split(" ")[0] || "this person";
     const eg = getEmptyExtractGroups(initFirstName);
     return new Set(eg.flatMap(g => g.items.map(i => i.id)));
   });
   const [confirmedRisk, setConfirmedRisk] = useState(false);
+  const [sessionNarrative, setSessionNarrative] = useState<string>("");
 
   // Inline field editing state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -476,7 +477,8 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
       // access_token URL approach returns 401 for API keys)
       const ws = new WebSocket(
         `wss://api.deepgram.com/v1/listen?` +
-        `model=nova-2&diarize=true&punctuate=true&language=en-US&interim_results=true`,
+        `model=nova-3&diarize=true&punctuate=true&language=en-US&interim_results=true` +
+        `&smart_format=true&utterance_end_ms=1200&vad_events=false`,
         ["token", key]
       );
       socketRef.current = ws;
@@ -613,18 +615,26 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
                 message:
                   `You are a case management AI assistant. Extract structured data from the following session transcript and return ONLY valid JSON (no markdown, no explanation).
 
-The transcript was captured during a home visit or case management session. Speaker labels are:
-- "Case Manager" = the case worker (observations, questions, notes)
-- Any other name (e.g. "Joseph", "Individual") = the person receiving services (their expressed preferences, concerns, barriers)
+IMPORTANT ACCURACY RULES:
+- Only extract information that is EXPLICITLY stated in the transcript. Do NOT infer, assume, or fabricate anything.
+- If something was not discussed, omit it or use null. Never invent details.
+- If the transcript is unclear or ambiguous, use the exact words spoken rather than paraphrasing.
+- Tasks must be concrete follow-up actions mentioned in the session — do not generate generic tasks.
 
-Attribute information correctly based on who said it.
+The transcript was captured during a home visit or case management session.
+
+SPEAKER IDENTIFICATION:
+- Speaker 0 or "Case Manager" or a name matching "${cmName}" = the case worker (${cmName})
+- Speaker 1 or other speaker = the person receiving services (${personFirst})
+- Attribute statements, preferences, and concerns to the correct speaker.
 
 Return JSON with these keys:
 {
-  "contactNote": "concise narrative summary of the session",
-  "tasks": [{"title": "task description", "priority": "high|medium|low"}],
-  "riskFlags": ["any risk or safety concerns mentioned"],
-  "ispNotes": "any goals or ISP-related notes — especially things the individual expressed",
+  "contactNote": "concise 2-3 sentence narrative summary using only what was explicitly discussed",
+  "narrative": "2-4 paragraph plain English narrative of the session. First paragraph: purpose and who was present. Second paragraph: key topics discussed and individual's expressed preferences/concerns. Third paragraph (if applicable): any risks or follow-up items identified. Final paragraph: next steps and case manager observations. Use person-first language. Only include what was explicitly stated.",
+  "tasks": [{"title": "specific follow-up action from the session", "priority": "high|medium|low"}],
+  "riskFlags": ["only safety/compliance concerns explicitly mentioned — empty array if none"],
+  "ispNotes": "any goals or service plan items explicitly mentioned by the individual or discussed",
   "billable": true
 }
 
@@ -645,13 +655,16 @@ ${fullTranscript}`,
                   setExtractGroups(groups);
                   setIncludedItems(new Set(groups.flatMap((g) => g.items.map((i) => i.id))));
                 }
+                if (parsed.narrative) {
+                  setSessionNarrative(parsed.narrative);
+                }
               } catch {
                 // JSON parse failed — keep EMPTY_EXTRACT_GROUPS, pre-check all items
-                setIncludedItems(new Set(getEmptyExtractGroups(personFirst).flatMap(g => g.items.map(i => i.id))));
+                setIncludedItems(new Set(getEmptyExtractGroups(personFirst, cmName).flatMap(g => g.items.map(i => i.id))));
               }
             } else {
               // AI returned no parseable JSON — keep EMPTY_EXTRACT_GROUPS pre-checked
-              setIncludedItems(new Set(getEmptyExtractGroups(personFirst).flatMap(g => g.items.map(i => i.id))));
+              setIncludedItems(new Set(getEmptyExtractGroups(personFirst, cmName).flatMap(g => g.items.map(i => i.id))));
             }
           }
         } else if (!fullTranscript.trim()) {
@@ -662,7 +675,7 @@ ${fullTranscript}`,
       } catch (err) {
         console.warn("Extraction API call failed (non-blocking):", err);
         // Keep EMPTY_EXTRACT_GROUPS pre-checked so user can still save
-        setIncludedItems(new Set(getEmptyExtractGroups(personFirst).flatMap(g => g.items.map(i => i.id))));
+        setIncludedItems(new Set(getEmptyExtractGroups(personFirst, cmName).flatMap(g => g.items.map(i => i.id))));
       }
 
       const finalTimer = setTimeout(() => setStep("review"), dynamicLines.length * 500 + 500);
@@ -715,6 +728,7 @@ ${fullTranscript}`,
     selectedPerson ? `${selectedFirstName}${selectedPreferredName ? ` (${selectedPreferredName})` : ""} ${selectedLastName}` :
     defaultIndividualName ?? "General / No individual";
   const personFirst = selectedFirstName || defaultIndividualName?.split(" ")[0] || "this person";
+  const cmName = userProfile?.displayName || "Case Manager";
 
   const filteredPeople = (individuals || []).filter((p) => {
     const fname = p.first_name || p.firstName || "";
@@ -872,6 +886,28 @@ ${fullTranscript}`,
       }
       if (taskCount > 0) {
         successLines.push({ icon: ClipboardCheck, text: `${taskCount} task${taskCount > 1 ? "s" : ""} created` });
+      }
+
+      // ── 3b. Persist ambient action items to individuals subcollection ────────
+      // This enables the eChart "Ambient Sessions" tile to show historical action items.
+      if (includedTasks.length > 0 || sessionNarrative) {
+        try {
+          await addDoc(collection(db, "individuals", indId, "ambient_sessions"), {
+            sessionDate:    today,
+            authorId:       uid,
+            authorName,
+            organizationId: orgId,
+            actionItems:    includedTasks.map((t) => ({
+              title: t.value,
+              priority: t.label.toLowerCase().includes("high") ? "high" : t.label.toLowerCase().includes("low") ? "low" : "medium",
+            })),
+            narrative:      sessionNarrative || null,
+            taskCount,
+            createdAt:      serverTimestamp(),
+          });
+        } catch {
+          // non-blocking — don't fail the whole save if this errors
+        }
       }
 
       // ── 4. ISP note — if included separately and no contact note written ───
@@ -1290,6 +1326,14 @@ ${fullTranscript}`,
               >
                 Full transcript
               </button>
+              {sessionNarrative && (
+                <button
+                  onClick={() => setTab("narrative")}
+                  className={`px-3 py-2 text-[13px] font-medium border-b-2 -mb-px ${tab === "narrative" ? "border-icm-text text-icm-text" : "border-transparent text-icm-text-dim hover:text-icm-text"}`}
+                >
+                  Session narrative
+                </button>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -1427,7 +1471,7 @@ ${fullTranscript}`,
                     );
                   })}
                 </div>
-              ) : (
+              ) : tab === "transcript" ? (
                 <div className="bg-white rounded-lg border border-icm-border p-5 relative">
                   <button
                     onClick={() => navigator.clipboard.writeText(liveTranscript.map(l => `${l.speaker}: ${l.text}`).join("\n\n"))}
@@ -1447,6 +1491,33 @@ ${fullTranscript}`,
                       ))}
                     </div>
                   )}
+                </div>
+              ) : (
+                /* Session Narrative tab */
+                <div className="bg-white rounded-lg border border-icm-border p-5 space-y-4 relative">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-icm-accent" />
+                      <p className="text-[12px] font-semibold text-icm-text">AI-generated session narrative</p>
+                    </div>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(sessionNarrative)}
+                      className="flex items-center gap-1 text-[11px] text-icm-text-dim hover:text-icm-text px-2 py-1 rounded border border-icm-border"
+                    >
+                      <Copy className="w-3 h-3" /> Copy
+                    </button>
+                  </div>
+                  <div className="text-[13.5px] leading-relaxed text-icm-text space-y-3">
+                    {sessionNarrative.split(/\n\n+/).map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))}
+                  </div>
+                  <div className="rounded-lg border border-icm-border bg-icm-bg p-2.5 flex gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-icm-amber shrink-0 mt-0.5" />
+                    <p className="text-[10.5px] font-geist text-icm-text-dim">
+                      AI-generated narrative. Review before using in official records. Edit as needed to reflect the actual session.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

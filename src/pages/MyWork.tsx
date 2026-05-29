@@ -211,6 +211,8 @@ function SourceLabel({ task }: { task: MyWorkTask }) {
 // ---------- Page ----------
 const MyWork = () => {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
+  const firstName = userProfile?.firstName || userProfile?.displayName?.split(" ")[0] || "there";
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("tab") as TopView | null) ?? "my_work";
   const [view, setViewRaw] = useState<TopView>(
@@ -522,7 +524,7 @@ const MyWork = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-[18px] md:text-[19px] font-manrope font-bold text-icm-text tracking-tight">
-                    Good morning, Kathy.
+                    Good morning, {firstName}.
                   </h2>
                   <button
                     onClick={() => setBriefDismissed(true)}
@@ -1393,6 +1395,8 @@ function AddTaskModal({ onClose }: { onClose: () => void }) {
 
 // ---------- Focused Session Done ----------
 function FocusedSessionDone({ onClose }: { onClose: () => void }) {
+  const { userProfile } = useAuth();
+  const firstName = userProfile?.firstName || userProfile?.displayName?.split(" ")[0] || "there";
   return (
     <ModalShell onClose={onClose} title="">
       <div className="text-center py-3 space-y-2">
@@ -1400,7 +1404,7 @@ function FocusedSessionDone({ onClose }: { onClose: () => void }) {
           <PartyPopper className="w-7 h-7 text-icm-green" />
         </div>
         <h3 className="text-[16px] font-manrope font-bold text-icm-text">Focused session complete</h3>
-        <p className="text-[12.5px] text-icm-text-dim">4 priority tasks done. Great work, Kathy.</p>
+        <p className="text-[12.5px] text-icm-text-dim">4 priority tasks done. Great work, {firstName}.</p>
         <button
           onClick={onClose}
           className="mt-3 h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90"

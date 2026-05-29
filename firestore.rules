@@ -271,6 +271,14 @@ service cloud.firestore {
       allow delete: if isAdmin() && ownedByOrg();
     }
 
+    // Status Change Log — append-only audit trail for enrollment status changes
+    match /status_change_log/{id} {
+      allow list: if isSupervisor();
+      allow get: if isSupervisor();
+      allow create: if isCaseManager();
+      allow update, delete: if false; // Immutable — never modify audit entries
+    }
+
     // Billing Claims (legacy collection — billing/supervisor role required)
     match /billing_claims/{id} {
       allow list: if isAuth();

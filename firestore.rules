@@ -389,6 +389,143 @@ service cloud.firestore {
       allow write: if isCaseManager();
     }
 
+    // ─── Programs & States (admin-managed org config) ─────────────────────────
+    match /programs/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isAdmin() && newDocInOrg();
+      allow update: if isAdmin() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Care Tracker ─────────────────────────────────────────────────────────
+    match /care_tracker/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Personal Care Plans (PCPs) ───────────────────────────────────────────
+    match /pcps/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Assessments ──────────────────────────────────────────────────────────
+    match /assessments/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Support Notes ────────────────────────────────────────────────────────
+    match /support_notes/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── AI Check-Ins ─────────────────────────────────────────────────────────
+    match /ai_checkins/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Documents (generic managed docs) ────────────────────────────────────
+    match /documents/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Eligibility (legacy alias for eligibility_verifications) ────────────
+    match /eligibility/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Authorizations (legacy alias for service_authorizations) ────────────
+    match /authorizations/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Draft Store (client-side autosave drafts) ────────────────────────────
+    match /draft_store/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isCaseManager();
+    }
+
+    // ─── Reports ──────────────────────────────────────────────────────────────
+    match /reports/{id} {
+      allow list: if isSupervisor();
+      allow get: if isSupervisor();
+      allow create: if isSupervisor() && newDocInOrg();
+      allow update: if isSupervisor() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Billing Batches ──────────────────────────────────────────────────────
+    match /billing_batches/{id} {
+      allow list: if isAuth() && (isBilling() || isSupervisor());
+      allow get: if isAuth() && (isBilling() || isSupervisor()) && ownedByOrg();
+      allow create: if isBilling() && newDocInOrg();
+      allow update: if isBilling() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // ─── Orchestrator (Brain AI) ──────────────────────────────────────────────
+    match /orchestrator_runs/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+    match /orchestrator_tasks/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+    match /orchestrator_logs/{id} {
+      allow list: if isSupervisor();
+      allow get: if isSupervisor() && ownedByOrg();
+      allow create: if isCaseManager();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ─── Compliance Engines (Platform) ────────────────────────────────────────
+    match /compliance_engines/{id} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
     // ─── Default: Deny All ───────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

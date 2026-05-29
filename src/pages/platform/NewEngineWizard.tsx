@@ -1035,6 +1035,19 @@ const NewEngineWizard = () => {
     return () => clearTimeout(t);
   }, [processing, processedSteps, isApiLoading, geminiResult]);
 
+  // Update document title to reflect processing state (visible in browser tab + favicon label)
+  useEffect(() => {
+    if (isApiLoading) {
+      document.title = "⟳ Extracting rules… | AI Agents";
+    } else if (processed) {
+      document.title = "✓ Rules extracted | AI Agents";
+      const t = setTimeout(() => { document.title = "AI Agents | CaseManagement.AI"; }, 3000);
+      return () => clearTimeout(t);
+    } else {
+      document.title = "New Guidelines Engine | AI Agents";
+    }
+  }, [isApiLoading, processed]);
+
   useEffect(() => {
     if (processed && !engineId && name && state) {
       (async () => {
@@ -1321,6 +1334,7 @@ const NewEngineWizard = () => {
             processing={processing}
             processedSteps={processedSteps}
             processed={processed}
+            isApiLoading={isApiLoading}
             previewOpen={previewOpen}
             setPreviewOpen={setPreviewOpen}
             extracted={extracted}
@@ -1688,6 +1702,7 @@ function Step1(props: {
   processing: boolean;
   processedSteps: number;
   processed: boolean;
+  isApiLoading: boolean;
   previewOpen: boolean;
   setPreviewOpen: (v: boolean) => void;
   extracted: ExtractedService[];
@@ -1874,26 +1889,49 @@ function Step1(props: {
               </div>
 
               {props.processing && (
-                <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft p-4">
-                  <div className="flex items-center gap-2 mb-2.5">
+                <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft p-4 space-y-3">
+                  <div className="flex items-center gap-2">
                     <Sparkles className="w-3.5 h-3.5 text-icm-accent animate-pulse" />
                     <p className="text-[12px] font-geist font-semibold text-icm-text">
                       AI is reading your document...
                     </p>
                   </div>
                   <ul className="space-y-1.5">
-                    {PROCESSING_STEPS.slice(0, props.processedSteps).map(
-                      (s, i) => (
-                        <li
-                          key={i}
-                          className="text-[11.5px] font-mono text-icm-text-dim flex items-center gap-1.5"
-                        >
-                          <Check className="w-3 h-3 text-icm-green" />
-                          {s}
-                        </li>
-                      ),
-                    )}
+                    {PROCESSING_STEPS.slice(0, props.processedSteps).map((s, i) => (
+                      <li key={i} className="text-[11.5px] font-mono text-icm-text-dim flex items-center gap-1.5">
+                        <Check className="w-3 h-3 text-icm-green" />
+                        {s}
+                      </li>
+                    ))}
                   </ul>
+
+                  {/* Waiting-for-AI state: all steps done but API still in flight */}
+                  {props.isApiLoading && props.processedSteps >= PROCESSING_STEPS.length - 1 && (
+                    <div className="border-t border-icm-accent/20 pt-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-3.5 h-3.5 text-icm-accent animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        </svg>
+                        <p className="text-[12px] font-geist font-semibold text-icm-accent">
+                          Generating compliance rules with Gemini…
+                        </p>
+                      </div>
+                      <p className="text-[11px] font-geist text-icm-text-dim pl-5">
+                        Reading the full PDF and structuring all rules. This usually takes 20–40 seconds for large documents.
+                      </p>
+                      {/* Animated progress bar */}
+                      <div className="h-1 w-full bg-icm-accent/20 rounded-full overflow-hidden pl-5 pr-0">
+                        <div
+                          className="h-full bg-icm-accent rounded-full"
+                          style={{
+                            animation: "shimmer-progress 2.4s ease-in-out infinite",
+                            width: "60%",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

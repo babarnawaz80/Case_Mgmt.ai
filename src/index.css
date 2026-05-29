@@ -221,6 +221,12 @@
     animation: float 4s ease-in-out infinite;
   }
 
+  @keyframes shimmer-progress {
+    0%   { transform: translateX(-100%); width: 40%; }
+    50%  { transform: translateX(80%);  width: 60%; }
+    100% { transform: translateX(200%); width: 40%; }
+  }
+
   .ai-gradient {
     background: linear-gradient(135deg, hsl(265 85% 55%), hsl(330 70% 55%));
   }

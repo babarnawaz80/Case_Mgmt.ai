@@ -2182,7 +2182,52 @@ const DEFAULT_MAPPINGS = [
   },
 ];
 
+// All available source options for the mapping editor
+const ALL_SOURCE_OPTIONS = [
+  "Profile (Medicaid ID)", "Profile (Diagnoses)", "Profile (DOB)",
+  "Eligibility Verification (MA Status)", "Program (Waiver Enrollment)",
+  "Care Plan / ISP (Goals)", "Care Plan / ISP (Services)",
+  "Contact Notes (Date)", "Contact Notes (Type)", "Contact Notes (Narrative)",
+  "Progress Notes", "Visit Summary (Type)", "Visit Summary (Date)",
+  "Monitoring Form", "Monitoring Form (Date)", "Incident Reports",
+  "Case Management Tasks", "Service Authorizations", "Service Authorizations (Units)",
+];
+
 function Step3() {
+  // Per-check overrides: check name → custom source array
+  const [overrides, setOverrides] = useState<Record<string, string[]>>({});
+  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
+  const [customInput, setCustomInput] = useState("");
+
+  function getSourcesFor(check: string): string[] {
+    if (overrides[check]) return overrides[check];
+    return DEFAULT_MAPPINGS.find((m) => m.check === check)?.sources ?? [];
+  }
+
+  function toggleSource(check: string, source: string) {
+    const current = getSourcesFor(check);
+    const updated = current.includes(source)
+      ? current.filter((s) => s !== source)
+      : [...current, source];
+    setOverrides((o) => ({ ...o, [check]: updated }));
+  }
+
+  function addCustom(check: string) {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    const current = getSourcesFor(check);
+    if (!current.includes(trimmed)) {
+      setOverrides((o) => ({ ...o, [check]: [...current, trimmed] }));
+    }
+    setCustomInput("");
+  }
+
+  function resetCheck(check: string) {
+    setOverrides((o) => { const n = { ...o }; delete n[check]; return n; });
+  }
+
+  const isOverridden = (check: string) => !!overrides[check];
+
   return (
     <div className="space-y-5">
       <div>
@@ -2190,28 +2235,21 @@ function Step3() {
           Step 3 — Default Data Mapping
         </h2>
         <p className="text-[13px] text-icm-text-dim font-geist mt-1">
-          Map organization-wide module defaults. This tells the compliance
-          agent where to find and write data across iCM modules.
+          Map organization-wide module defaults. This tells the compliance agent where to find data across iCM modules. Click any row to customize its sources.
         </p>
       </div>
 
+      {/* Source → Check overview */}
       <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-3.5 h-3.5 text-icm-text-dim" />
-              <h3 className="text-[12px] uppercase tracking-wide font-geist font-semibold text-icm-text-faint">
-                Data Sources
-              </h3>
+              <h3 className="text-[12px] uppercase tracking-wide font-geist font-semibold text-icm-text-faint">Data Sources</h3>
             </div>
             <ul className="space-y-1.5">
               {SOURCES.map((s) => (
-                <li
-                  key={s}
-                  className="px-3 py-2 rounded-lg bg-icm-bg border border-icm-border text-[12px] font-geist text-icm-text"
-                >
-                  {s}
-                </li>
+                <li key={s} className="px-3 py-2 rounded-lg bg-icm-bg border border-icm-border text-[12px] font-geist text-icm-text">{s}</li>
               ))}
             </ul>
           </div>
@@ -2222,60 +2260,124 @@ function Step3() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <ShieldCheck className="w-3.5 h-3.5 text-icm-text-dim" />
-              <h3 className="text-[12px] uppercase tracking-wide font-geist font-semibold text-icm-text-faint">
-                Compliance Checks
-              </h3>
+              <h3 className="text-[12px] uppercase tracking-wide font-geist font-semibold text-icm-text-faint">Compliance Checks</h3>
             </div>
             <ul className="space-y-1.5">
               {CHECKS.map((c) => (
-                <li
-                  key={c}
-                  className="px-3 py-2 rounded-lg bg-icm-accent-soft border border-icm-accent/20 text-[12px] font-geist text-icm-text"
-                >
-                  {c}
-                </li>
+                <li key={c} className="px-3 py-2 rounded-lg bg-icm-accent-soft border border-icm-accent/20 text-[12px] font-geist text-icm-text">{c}</li>
               ))}
             </ul>
           </div>
         </div>
       </div>
 
+      {/* Interactive mapping table */}
       <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
-        <div className="px-4 py-3 border-b border-icm-border bg-icm-bg">
-          <h3 className="text-[13px] font-geist font-semibold text-icm-text">
-            Default field mappings
-          </h3>
-          <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">
-            Click any row to override the source fields for a specific check.
-          </p>
+        <div className="px-4 py-3 border-b border-icm-border bg-icm-bg flex items-center justify-between">
+          <div>
+            <h3 className="text-[13px] font-geist font-semibold text-icm-text">Default field mappings</h3>
+            <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">Click any row to customize which sources feed each compliance check.</p>
+          </div>
+          {Object.keys(overrides).length > 0 && (
+            <span className="text-[10.5px] font-geist font-semibold text-icm-accent">
+              {Object.keys(overrides).length} override{Object.keys(overrides).length > 1 ? "s" : ""} active
+            </span>
+          )}
         </div>
         <table className="w-full text-[12px] font-geist">
           <thead className="bg-icm-bg">
-            <tr className="text-left text-icm-text-faint">
-              <th className="px-4 py-2 w-[260px]">Compliance Check</th>
+            <tr className="text-left text-icm-text-faint text-[10.5px] uppercase tracking-wider">
+              <th className="px-4 py-2 w-[240px]">Compliance Check</th>
               <th className="px-4 py-2">Reads from</th>
+              <th className="px-4 py-2 w-[80px]" />
             </tr>
           </thead>
           <tbody className="divide-y divide-icm-border">
-            {DEFAULT_MAPPINGS.map((m) => (
-              <tr key={m.check} className="hover:bg-icm-bg/60 cursor-pointer">
-                <td className="px-4 py-3 font-medium text-icm-text">
-                  {m.check}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    {m.sources.map((s) => (
-                      <span
-                        key={s}
-                        className="inline-flex items-center px-2 py-0.5 rounded-md bg-icm-bg border border-icm-border text-[11px] font-mono text-icm-text-dim"
-                      >
-                        {s}
+            {DEFAULT_MAPPINGS.map((m) => {
+              const sources = getSourcesFor(m.check);
+              const overridden = isOverridden(m.check);
+              const isOpen = expandedCheck === m.check;
+              return (
+                <>
+                  <tr
+                    key={m.check}
+                    onClick={() => setExpandedCheck(isOpen ? null : m.check)}
+                    className="hover:bg-icm-bg/60 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium text-icm-text">
+                      <div className="flex items-center gap-2">
+                        {m.check}
+                        {overridden && (
+                          <span className="text-[9px] font-geist font-bold px-1.5 py-0.5 rounded bg-icm-amber-soft text-icm-amber">CUSTOM</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {sources.map((s) => (
+                          <span key={s} className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-mono ${overridden ? "bg-icm-amber-soft border-icm-amber/30 text-icm-amber" : "bg-icm-bg border-icm-border text-icm-text-dim"}`}>
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-[11px] font-geist text-icm-accent hover:underline">
+                        {isOpen ? "Close ↑" : "Edit →"}
                       </span>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                    </td>
+                  </tr>
+
+                  {/* Inline editor */}
+                  {isOpen && (
+                    <tr key={`${m.check}-editor`}>
+                      <td colSpan={3} className="bg-icm-bg px-4 py-4 border-t border-icm-border">
+                        <div className="space-y-3">
+                          <p className="text-[11.5px] font-geist font-semibold text-icm-text">
+                            Sources for: <span className="text-icm-accent">{m.check}</span>
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                            {ALL_SOURCE_OPTIONS.map((src) => {
+                              const active = sources.includes(src);
+                              return (
+                                <button
+                                  key={src}
+                                  onClick={() => toggleSource(m.check, src)}
+                                  className={`text-left px-2.5 py-1.5 rounded-lg border text-[11px] font-geist transition-colors ${
+                                    active
+                                      ? "bg-icm-accent-soft border-icm-accent/40 text-icm-accent font-semibold"
+                                      : "bg-icm-panel border-icm-border text-icm-text-dim hover:border-icm-border-strong"
+                                  }`}
+                                >
+                                  {active ? "✓ " : ""}{src}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Custom source */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <input
+                              value={customInput}
+                              onChange={(e) => setCustomInput(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") addCustom(m.check); }}
+                              placeholder="Add a custom source field..."
+                              className="flex-1 h-8 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/40"
+                            />
+                            <button onClick={() => addCustom(m.check)} className="h-8 px-3 rounded-lg bg-icm-accent text-white text-[11.5px] font-geist font-semibold hover:opacity-90">Add</button>
+                            {overridden && (
+                              <button onClick={() => resetCheck(m.check)} className="h-8 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist text-icm-text-dim hover:text-icm-red hover:border-icm-red/30">
+                                Reset to default
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
           </tbody>
         </table>
       </div>

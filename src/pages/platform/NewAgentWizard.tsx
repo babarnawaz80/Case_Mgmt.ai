@@ -148,8 +148,9 @@ const NewAgentWizard = () => {
   useEffect(() => {
     (async () => {
       const docs = await getGuidelinesEngines();
-      setPublishedEngines(docs.filter((e) => e.status === "published"));
-      setDraftEngines(docs.filter((e) => e.status === "draft"));
+      // Show all engines — published ones are selectable, draft ones show a "publish first" CTA
+      setPublishedEngines(docs);
+      setDraftEngines([]); // handled inline now
     })();
   }, []);
 
@@ -611,7 +612,7 @@ function Step2({
       {publishedEngines.length === 0 && (
         <div className="rounded-xl border border-dashed border-icm-border bg-icm-panel py-10 text-center">
           <p className="text-[13px] text-icm-text-dim font-geist">
-            No published engines yet.{" "}
+            No guidelines engines yet.{" "}
             <button
               onClick={() => navigate("/agents/guidelines/new")}
               className="text-icm-accent hover:underline font-semibold"
@@ -627,17 +628,20 @@ function Step2({
           const selected = engineId === e.id;
           const hs = e.hard_stop_count || 0;
           const wn = e.warning_count || 0;
+          const isDraft = e.status !== "published";
           return (
-            <button
+            <div
               key={e.id}
-              onClick={() => setEngineId(e.id)}
               className={`w-full text-left rounded-xl border bg-icm-panel p-4 flex items-center gap-3 transition-all ${
-                selected
-                  ? "border-icm-accent ring-1 ring-icm-accent/20"
-                  : "border-icm-border hover:border-icm-border-strong"
+                isDraft
+                  ? "border-icm-border opacity-70"
+                  : selected
+                  ? "border-icm-accent ring-1 ring-icm-accent/20 cursor-pointer"
+                  : "border-icm-border hover:border-icm-border-strong cursor-pointer"
               }`}
+              onClick={() => { if (!isDraft) setEngineId(e.id); }}
             >
-              <div className="w-9 h-9 rounded-lg bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20 flex items-center justify-center shrink-0">
+              <div className={`w-9 h-9 rounded-lg ring-1 flex items-center justify-center shrink-0 ${isDraft ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" : "bg-icm-green-soft text-icm-green ring-icm-green/20"}`}>
                 <BookOpen className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
@@ -645,9 +649,15 @@ function Step2({
                   <h3 className="font-tight font-semibold text-[14px] text-icm-text truncate">
                     {e.name}
                   </h3>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-icm-green-soft text-icm-green ring-icm-green/20">
-                    PUBLISHED
-                  </span>
+                  {isDraft ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-icm-amber-soft text-icm-amber ring-icm-amber/20">
+                      DRAFT
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-icm-green-soft text-icm-green ring-icm-green/20">
+                      PUBLISHED
+                    </span>
+                  )}
                   <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-icm-bg border border-icm-border text-icm-text-dim">
                     {e.version}
                   </span>
@@ -655,9 +665,21 @@ function Step2({
                 <p className="text-[11.5px] font-geist text-icm-text-dim mt-1 truncate">
                   {e.state} · {e.program} · Effective {e.effective_date}
                 </p>
-                <p className="text-[11px] font-mono text-icm-text-faint mt-0.5">
-                  {e.extracted_rules?.required_sections?.length || 0} services · {hs} hard stops · {wn} warnings
-                </p>
+                {isDraft ? (
+                  <p className="text-[11px] font-geist text-icm-amber mt-0.5">
+                    Finish publishing this engine before linking it to an agent.{" "}
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); navigate(`/agents/guidelines/${e.id}`); }}
+                      className="underline font-semibold hover:text-icm-amber/80"
+                    >
+                      Open engine →
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-mono text-icm-text-faint mt-0.5">
+                    {e.extracted_rules?.required_sections?.length || 0} services · {hs} hard stops · {wn} warnings
+                  </p>
+                )}
               </div>
               {selected ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-icm-accent text-white text-[11px] font-geist font-semibold shrink-0">
@@ -669,32 +691,9 @@ function Step2({
                   Select
                 </span>
               )}
-            </button>
+            </div>
           );
         })}
-
-        {draftEngines.map((e) => (
-          <div
-            key={e.id}
-            title="Publish this engine first to use it here."
-            className="rounded-xl border border-icm-border bg-icm-bg p-4 flex items-center gap-3 opacity-60 cursor-not-allowed"
-          >
-            <div className="w-9 h-9 rounded-lg bg-icm-amber-soft text-icm-amber ring-1 ring-icm-amber/20 flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-geist font-semibold text-icm-text truncate">
-                {e.name}{" "}
-                <span className="ml-1 text-[10px] font-geist font-semibold text-icm-amber">
-                  DRAFT
-                </span>
-              </p>
-              <p className="text-[11px] font-geist text-icm-text-dim">
-                Publish this engine first to use it here.
-              </p>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

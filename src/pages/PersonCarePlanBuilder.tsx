@@ -932,10 +932,48 @@ const PersonCarePlanBuilder = () => {
   };
 
   const handleSaveDraft = async () => {
+    if (!id) return;
     setSaving(true);
     try {
-      await new Promise((r) => setTimeout(r, 800)); // mock save
+      const payload = {
+        individual_id: id,
+        personId: id,
+        organizationId: individual?.organizationId ?? null,
+        plan_type: planType.toLowerCase().replace(" plan", ""),
+        plan_format: "pcp_v2",
+        effective_date: effectiveDate,
+        annual_plan_date: annualDate,
+        status: "draft",
+        ai_generated: false,
+        isCompleted: false,
+        sections: {
+          good_life: goodLife,
+          important_to: importantTo,
+          important_for: importantFor,
+          goals,
+          focus_areas: focusValues,
+          emergency_plan: emergencyPlan,
+          services_notes: servicesNotes,
+          rights_notes: rightsNotes,
+          team_notes: teamNotes,
+          bsp_notes: bspNotes,
+        },
+        updated_at: serverTimestamp(),
+      };
+
+      if (pcpId) {
+        const { updateDoc, doc: firestoreDoc } = await import("firebase/firestore");
+        await updateDoc(firestoreDoc(db, "care_plans", pcpId), payload);
+      } else {
+        await addDoc(collection(db, "care_plans"), {
+          ...payload,
+          created_at: serverTimestamp(),
+        });
+      }
       toast.success("Draft saved");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save draft — check connection.");
     } finally {
       setSaving(false);
     }
@@ -953,35 +991,57 @@ const PersonCarePlanBuilder = () => {
   const allComplete = complete === SECTIONS.length;
 
   const handleFinish = async () => {
+    if (!id) return;
+    setSaving(true);
     try {
-      // If no pcpId, create a new PCP record
-      const ref = pcpId
-        ? { id: pcpId }
-        : await addDoc(collection(db, "pcps"), {
-            individual_id: id,
-            plan_type: "annual",
-            plan_format: "pcp_v2",
-            status: "draft",
-            ai_generated: false,
-            ai_draft_path: false,
-            effective_date: effectiveDate,
-            annual_plan_date: annualDate,
-            sections: {
-              good_life: goodLife,
-              important_to: importantTo,
-              important_for: importantFor,
-              goals,
-            },
-            created_by: "kathy-adams",
-            created_at: serverTimestamp(),
-            updated_at: serverTimestamp(),
-          });
-      toast.success("PCP saved successfully!", {
-        description: "Navigating to plan viewer…",
-      });
-      navigate(`/people/${id}/care-plan/${ref.id}`);
-    } catch {
-      toast.error("Failed to save — check connection.");
+      const payload = {
+        individual_id: id,
+        personId: id,
+        organizationId: individual?.organizationId ?? null,
+        plan_type: planType.toLowerCase().replace(" plan", ""),
+        plan_format: "pcp_v2",
+        status: "In Progress",
+        ai_generated: false,
+        isCompleted: false,
+        effective_date: effectiveDate,
+        annual_plan_date: annualDate,
+        internalDueDate: annualDate || null,
+        goals,
+        sections: {
+          good_life: goodLife,
+          important_to: importantTo,
+          important_for: importantFor,
+          goals,
+          focus_areas: focusValues,
+          emergency_plan: emergencyPlan,
+          services_notes: servicesNotes,
+          rights_notes: rightsNotes,
+          team_notes: teamNotes,
+          bsp_notes: bspNotes,
+        },
+        updated_at: serverTimestamp(),
+      };
+
+      let savedId: string;
+      if (pcpId) {
+        const { updateDoc, doc: firestoreDoc } = await import("firebase/firestore");
+        await updateDoc(firestoreDoc(db, "care_plans", pcpId), payload);
+        savedId = pcpId;
+      } else {
+        const docRef = await addDoc(collection(db, "care_plans"), {
+          ...payload,
+          created_at: serverTimestamp(),
+        });
+        savedId = docRef.id;
+      }
+
+      toast.success("PCP saved successfully!", { description: "Navigating to plan viewer…" });
+      navigate(`/people/${id}/care-plan/${savedId}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save — check Firestore connection.");
+    } finally {
+      setSaving(false);
     }
   };
 

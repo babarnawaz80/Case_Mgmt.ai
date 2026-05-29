@@ -199,7 +199,7 @@ interface TopNavItem {
 const topNavItems: TopNavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
-  { title: "Individuals", url: "/people", icon: Users },
+  { title: "People", url: "/people", icon: Users },
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Billing", url: "/billing", icon: CreditCard, roles: ["admin", "billing"] },
@@ -331,7 +331,14 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   }
 
   return (
-    <header className="h-14 border-b border-icm-border flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2" style={{ backgroundColor: "hsl(var(--icm-topbar))" }}>
+    <header
+      className="border-b border-icm-border flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2"
+      style={{
+        backgroundColor: "hsl(var(--icm-topbar))",
+        paddingTop: "env(safe-area-inset-top)",
+        minHeight: "calc(3.5rem + env(safe-area-inset-top))",
+      }}
+    >
       {/* Left: CaseManagement.ai brand + org logo side-by-side */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
         <NavLink to="/home" className="flex items-center gap-2 shrink-0" title="Home">

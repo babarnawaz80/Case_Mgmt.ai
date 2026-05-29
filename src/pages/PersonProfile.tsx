@@ -35,12 +35,13 @@ import { useIndividual, updateIndividual, initials, riskAvatarClass, riskScoreCl
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { demoToast } from "@/lib/demoToast";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, onSnapshot, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
 import { getProfile, tabCompleteness, overallCompleteness, type TabKey, type ProfileData, LIVING_SITUATION_OPTIONS } from "@/data/profiles";
-import { useServiceAuthorizations } from "@/hooks/useFirestore";
+import { useServiceAuthorizations, useConsents, addConsent, updateConsent, computeConsentStatus, type ConsentRecord, type ConsentType } from "@/hooks/useFirestore";
+import { useAuth } from "@/contexts/AuthContext";
 import { calculateRiskScore } from "@/lib/riskEngine";
 import { getRiskLabel } from "@/lib/formatDate";
 
@@ -1127,49 +1128,237 @@ function CourtTab({ profile }: { profile: ProfileData }) {
   );
 }
 
-// =============================================================
 // TAB 5 — Program
 // =============================================================
 function ProgramTab({ profile }: { profile: ProfileData }) {
+  const { id: individualId } = useParams<{ id: string }>();
+  const { userProfile } = useAuth();
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+
+  // Live enrollments from Firestore subcollection
+  const [fsEnrollments, setFsEnrollments] = useState<Array<{
+    id: string; program: string; serviceCategory: string;
+    startDate: string; status: string; caseManager: string;
+  }>>([]);
+
+  useEffect(() => {
+    if (!individualId) return;
+    const q = collection(db, "individuals", individualId, "program_enrollments");
+    const unsub = onSnapshot(q, (snap) => {
+      setFsEnrollments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+    });
+    return unsub;
+  }, [individualId]);
+
+  // Merge Firestore enrollments with static seed data (Firestore wins if any exist)
+  const displayEnrollments = fsEnrollments.length > 0 ? fsEnrollments : profile.enrollments;
+
   return (
     <div className="space-y-4">
       <Section title="Current Programs">
         <DataTable
           columns={["Program", "Service Category", "Start", "Status", "Case Manager"]}
-          rows={profile.enrollments.map((e) => [
+          rows={displayEnrollments.map((e) => [
             <span key="p" className="font-semibold">{e.program}</span>,
             e.serviceCategory,
             e.startDate,
-            <ProgramStatusBadge key="s" status={e.status} />,
+            <ProgramStatusBadge key="s" status={e.status as any} />,
             e.caseManager,
           ])}
           emptyText="Not enrolled in any program yet."
           addLabel="Enroll in program"
+          onAdd={() => setEnrollModalOpen(true)}
         />
       </Section>
 
       <Section title="Service Categories">
-        {profile.enrollments.map((e) => (
+        {displayEnrollments.map((e) => (
           <div
             key={e.serviceCategory}
             className="rounded-lg border border-icm-border bg-icm-bg p-3 mb-2 last:mb-0"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-icm-text font-geist">{e.serviceCategory}</p>
-              <span className="text-[11px] font-mono text-icm-text-dim">3 of 4 visits this year</span>
             </div>
             <p className="text-[11.5px] text-icm-text-dim mt-0.5">
-              Required visits: 4 per year (quarterly) · Required forms: Quarterly monitoring, Annual ISP
+              Program: {e.program} · Status: {e.status} · Started: {e.startDate}
             </p>
-            <div className="h-1.5 rounded-full bg-icm-border mt-2 overflow-hidden">
-              <div className="h-full bg-icm-accent" style={{ width: "75%" }} />
-            </div>
           </div>
         ))}
       </Section>
 
       <FundingStreamsSection profile={profile} />
 
+      {enrollModalOpen && individualId && (
+        <EnrollProgramModal
+          individualId={individualId}
+          caseManagerName={userProfile?.displayName ?? "Case Manager"}
+          onClose={() => setEnrollModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- Enroll in Program Modal ----------
+function EnrollProgramModal({
+  individualId,
+  caseManagerName,
+  onClose,
+}: {
+  individualId: string;
+  caseManagerName: string;
+  onClose: () => void;
+}) {
+  const { userProfile } = useAuth();
+  const [programs, setPrograms] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    programId: "",
+    programName: "",
+    serviceCategory: "",
+    startDate: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
+    status: "Active" as "Active" | "Pending" | "On Hold",
+  });
+
+  // Load org programs from Firestore
+  useEffect(() => {
+    if (!userProfile?.organizationId) return;
+    const q = query(
+      collection(db, "programs"),
+      where("organizationId", "==", userProfile.organizationId)
+    );
+    getDocs(q).then((snap) => {
+      setPrograms(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+      setLoadingPrograms(false);
+    }).catch(() => setLoadingPrograms(false));
+  }, [userProfile?.organizationId]);
+
+  const handleSave = async () => {
+    if (!form.programName) { toast.error("Select a program"); return; }
+    setSaving(true);
+    try {
+      await addDoc(collection(db, "individuals", individualId, "program_enrollments"), {
+        program: form.programName,
+        serviceCategory: form.serviceCategory || form.programName,
+        startDate: form.startDate,
+        status: form.status,
+        caseManager: caseManagerName,
+        enrolledAt: serverTimestamp(),
+        enrolledBy: userProfile?.uid ?? "",
+        organizationId: userProfile?.organizationId ?? "",
+      });
+      toast.success("Enrolled in " + form.programName);
+      onClose();
+    } catch (err: any) {
+      toast.error("Failed to save: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md bg-icm-panel rounded-2xl border border-icm-border shadow-xl p-5 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-[15px] font-manrope font-bold text-icm-text">Enroll in Program</h3>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-icm-bg text-icm-text-dim">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Program selector */}
+        <div className="space-y-1.5">
+          <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Program *</label>
+          {loadingPrograms ? (
+            <div className="flex items-center gap-2 py-2 text-[12px] text-icm-text-dim font-geist">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading programs…
+            </div>
+          ) : programs.length === 0 ? (
+            <p className="text-[12px] text-icm-text-dim font-geist py-2">
+              No programs configured. Go to <span className="font-semibold">Settings → Programs</span> to add programs first.
+            </p>
+          ) : (
+            <select
+              value={form.programId}
+              onChange={(e) => {
+                const prog = programs.find((p) => p.id === e.target.value);
+                setForm((f) => ({ ...f, programId: e.target.value, programName: prog?.name ?? "" }));
+              }}
+              className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
+            >
+              <option value="">Select a program…</option>
+              {programs.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} {p.code ? `(${p.code})` : ""}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Service Category */}
+        <div className="space-y-1.5">
+          <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Service Category</label>
+          <input
+            type="text"
+            placeholder="e.g. Medicaid | Case Management"
+            value={form.serviceCategory}
+            onChange={(e) => setForm((f) => ({ ...f, serviceCategory: e.target.value }))}
+            className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
+          />
+        </div>
+
+        {/* Start Date + Status row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Start Date</label>
+            <input
+              type="date"
+              value={form.startDate.split("/").length === 3
+                ? `${form.startDate.split("/")[2]}-${form.startDate.split("/")[0].padStart(2,"0")}-${form.startDate.split("/")[1].padStart(2,"0")}`
+                : form.startDate}
+              onChange={(e) => {
+                const d = new Date(e.target.value + "T12:00:00");
+                setForm((f) => ({ ...f, startDate: d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }) }));
+              }}
+              className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Status</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}
+              className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
+            >
+              <option value="Active">Active</option>
+              <option value="Pending">Pending</option>
+              <option value="On Hold">On Hold</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="h-8 px-4 rounded-lg border border-icm-border text-[12.5px] font-geist font-semibold text-icm-text-dim hover:text-icm-text"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !form.programName}
+            className="h-8 px-4 rounded-lg bg-icm-accent text-white text-[12.5px] font-geist font-semibold hover:bg-icm-accent/90 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            Enroll
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1609,6 +1798,9 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
           </div>
         )}
       </Section>
+
+      {/* Communication Preferences */}
+      <CommunicationPreferencesSection person={person} />
     </div>
   );
 }
@@ -1823,6 +2015,9 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
         />
       </Section>
 
+      {/* Consent Records */}
+      <ConsentSection individualId={person.id} />
+
       {/* Discharge Management — only visible if not already discharged */}
       {person.status !== "Discharged" && !dischargeDone && (
         <div className="rounded-xl border border-icm-red/30 bg-icm-red-soft p-4">
@@ -1897,6 +2092,314 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
         </div>
       )}
     </div>
+  );
+}
+
+// =============================================================
+// Communication Preferences Section (ContactsTab)
+// =============================================================
+function CommunicationPreferencesSection({ person }: { person: Individual }) {
+  const [prefs, setPrefs] = useState({
+    preferred_contact_method: (person as any).communication_preferences?.preferred_contact_method ?? "",
+    best_time_to_contact:     (person as any).communication_preferences?.best_time_to_contact ?? "",
+    guardian_must_be_present: (person as any).communication_preferences?.guardian_must_be_present ?? false,
+    consent_sms:              (person as any).communication_preferences?.consent_sms ?? "",
+    consent_email:            (person as any).communication_preferences?.consent_email ?? "",
+    do_not_contact_directly:  (person as any).communication_preferences?.do_not_contact_directly ?? false,
+    communication_notes:      (person as any).communication_preferences?.communication_notes ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  function patch(key: string, value: string | boolean) {
+    setPrefs((p) => ({ ...p, [key]: value }));
+    setDirty(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await updateIndividual(person.id, { communication_preferences: prefs } as any);
+      toast.success("Communication preferences saved.");
+      setDirty(false);
+    } catch {
+      toast.error("Failed to save preferences.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Section title="Communication Preferences">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <label className="block">
+          <span className="text-[10.5px] uppercase tracking-wider font-semibold text-icm-text-faint mb-1 block">Preferred Contact Method</span>
+          <select
+            value={prefs.preferred_contact_method}
+            onChange={(e) => patch("preferred_contact_method", e.target.value)}
+            className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text appearance-none"
+          >
+            <option value="">— Select —</option>
+            <option value="Phone">Phone</option>
+            <option value="Email">Email</option>
+            <option value="Secure Portal">Secure Portal</option>
+            <option value="SMS">SMS</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[10.5px] uppercase tracking-wider font-semibold text-icm-text-faint mb-1 block">Best Time to Contact</span>
+          <input
+            type="text"
+            value={prefs.best_time_to_contact}
+            onChange={(e) => patch("best_time_to_contact", e.target.value)}
+            placeholder="e.g. Mornings after 9 AM"
+            className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10.5px] uppercase tracking-wider font-semibold text-icm-text-faint mb-1 block">Consent to Contact via SMS</span>
+          <select
+            value={prefs.consent_sms}
+            onChange={(e) => patch("consent_sms", e.target.value)}
+            className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text appearance-none"
+          >
+            <option value="">— Select —</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="Not obtained">Not obtained</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[10.5px] uppercase tracking-wider font-semibold text-icm-text-faint mb-1 block">Consent to Contact via Email</span>
+          <select
+            value={prefs.consent_email}
+            onChange={(e) => patch("consent_email", e.target.value)}
+            className="w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text appearance-none"
+          >
+            <option value="">— Select —</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="Not obtained">Not obtained</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="space-y-2 mb-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={prefs.guardian_must_be_present}
+            onChange={(e) => patch("guardian_must_be_present", e.target.checked)}
+            className="mt-0.5 rounded border-icm-border w-4 h-4"
+          />
+          <span className="text-[12.5px] font-geist text-icm-text leading-snug">
+            Guardian must be present for all communications
+          </span>
+        </label>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={prefs.do_not_contact_directly}
+            onChange={(e) => patch("do_not_contact_directly", e.target.checked)}
+            className="mt-0.5 rounded border-icm-border w-4 h-4"
+          />
+          <span className="text-[12.5px] font-geist text-icm-text leading-snug">
+            Do not contact individual directly — route all contact through guardian
+          </span>
+        </label>
+      </div>
+
+      <label className="block mb-3">
+        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-icm-text-faint mb-1 block">Communication Notes</span>
+        <textarea
+          value={prefs.communication_notes}
+          onChange={(e) => patch("communication_notes", e.target.value)}
+          rows={3}
+          placeholder="Any additional notes about how to communicate with this individual…"
+          className="w-full px-3 py-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text leading-relaxed"
+        />
+      </label>
+
+      {dirty && (
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="h-9 px-4 rounded-xl bg-icm-accent text-white text-[12px] font-semibold hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save Preferences"}
+        </button>
+      )}
+    </Section>
+  );
+}
+
+// =============================================================
+// Consent Section (AdminTab)
+// =============================================================
+const CONSENT_TYPES: ConsentType[] = [
+  "General Consent",
+  "Release of Information",
+  "Guardian Consent for Plan Documents",
+  "Photo/Video Consent",
+  "Communication Consent",
+];
+
+const CONSENT_STATUS_TONE: Record<string, string> = {
+  Active:  "bg-icm-green-soft text-icm-green",
+  Expired: "bg-icm-amber-soft text-icm-amber",
+  Revoked: "bg-icm-red-soft text-icm-red",
+};
+
+function ConsentSection({ individualId }: { individualId: string }) {
+  const { data: consents, loading } = useConsents(individualId);
+  const { userProfile } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const emptyForm = {
+    consent_type: "General Consent" as ConsentType,
+    given_by_name: "",
+    relationship: "",
+    date_obtained: new Date().toISOString().slice(0, 10),
+    expiration_date: "",
+    notes: "",
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  function field(name: string) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm((f) => ({ ...f, [name]: e.target.value }));
+  }
+
+  async function handleSave() {
+    if (!form.given_by_name.trim() || !form.relationship.trim() || !form.date_obtained) {
+      toast.error("Name, relationship, and date obtained are required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const status = computeConsentStatus({ expiration_date: form.expiration_date || undefined, status: "Active", revoked_date: undefined });
+      await addConsent(individualId, {
+        ...form,
+        individual_id: individualId,
+        expiration_date: form.expiration_date || undefined,
+        status,
+        created_by_uid: userProfile?.uid,
+        created_by_name: userProfile?.displayName ?? userProfile?.email ?? "",
+      });
+      toast.success("Consent record added.");
+      setOpen(false);
+      setForm(emptyForm);
+    } catch {
+      toast.error("Failed to save consent record.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRevoke(c: ConsentRecord) {
+    if (!confirm(`Revoke "${c.consent_type}"? This cannot be undone.`)) return;
+    try {
+      await updateConsent(individualId, c.id, {
+        status: "Revoked",
+        revoked_date: new Date().toISOString().slice(0, 10),
+        revoked_by: userProfile?.displayName ?? userProfile?.email ?? "User",
+      });
+      toast.success("Consent revoked.");
+    } catch {
+      toast.error("Failed to revoke consent.");
+    }
+  }
+
+  return (
+    <Section
+      title="Consent Records"
+      onSave={undefined}
+    >
+      {loading ? (
+        <p className="text-[12px] text-icm-text-dim italic">Loading…</p>
+      ) : consents.length === 0 ? (
+        <p className="text-[12px] text-icm-text-dim italic">No consent records on file.</p>
+      ) : (
+        <div className="space-y-2 mb-3">
+          {consents.map((c) => (
+            <div key={c.id} className="rounded-lg border border-icm-border bg-icm-bg p-3 flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13px] font-semibold text-icm-text">{c.consent_type}</span>
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${CONSENT_STATUS_TONE[c.status] ?? "bg-icm-bg text-icm-text-dim"}`}>
+                    {c.status}
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-icm-text-dim mt-0.5">
+                  {c.given_by_name} · {c.relationship} · Obtained: <span className="font-mono">{c.date_obtained}</span>
+                  {c.expiration_date && ` · Expires: `}{c.expiration_date && <span className="font-mono">{c.expiration_date}</span>}
+                </p>
+                {c.notes && <p className="text-[11px] text-icm-text-faint mt-0.5 italic">{c.notes}</p>}
+              </div>
+              {c.status === "Active" && (
+                <button
+                  onClick={() => handleRevoke(c)}
+                  className="text-[11px] text-icm-red hover:underline shrink-0 font-medium"
+                >
+                  Revoke
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => setOpen(true)}
+        className="h-8 px-3 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5"
+      >
+        <Plus className="w-3.5 h-3.5" /> Add Consent
+      </button>
+
+      {/* Add Consent Modal */}
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
+          <div className="bg-icm-panel rounded-xl border border-icm-border w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-manrope font-bold text-[15px] text-icm-text">Add Consent Record</h3>
+              <button onClick={() => setOpen(false)} className="text-icm-text-dim hover:text-icm-text">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <ModalField label="Consent Type">
+                <select className="modal-input" value={form.consent_type} onChange={field("consent_type")}>
+                  {CONSENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </ModalField>
+              <ModalField label="Consent Given By (Name)">
+                <input className="modal-input" value={form.given_by_name} onChange={field("given_by_name")} placeholder="Full name" />
+              </ModalField>
+              <ModalField label="Relationship">
+                <input className="modal-input" value={form.relationship} onChange={field("relationship")} placeholder="e.g. Guardian, Individual, Parent" />
+              </ModalField>
+              <ModalField label="Date Obtained">
+                <input type="date" className="modal-input" value={form.date_obtained} onChange={field("date_obtained")} />
+              </ModalField>
+              <ModalField label="Expiration Date (leave blank if no expiry)">
+                <input type="date" className="modal-input" value={form.expiration_date} onChange={field("expiration_date")} />
+              </ModalField>
+              <ModalField label="Notes (optional)">
+                <textarea className="modal-input min-h-[60px]" value={form.notes} onChange={field("notes")} placeholder="Any additional context…" />
+              </ModalField>
+            </div>
+            <div className="flex items-center gap-2 mt-5 justify-end">
+              <button onClick={() => setOpen(false)} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-semibold text-icm-text-dim hover:text-icm-text">Cancel</button>
+              <button onClick={handleSave} disabled={saving} className="h-9 px-4 rounded-xl bg-icm-accent text-white text-[12px] font-semibold hover:opacity-90 disabled:opacity-50">
+                {saving ? "Saving…" : "Save Consent"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -2006,12 +2509,14 @@ function DataTable({
   emptyText,
   addLabel,
   compact,
+  onAdd,
 }: {
   columns: string[];
   rows: React.ReactNode[][];
   emptyText: string;
   addLabel?: string;
   compact?: boolean;
+  onAdd?: () => void;
 }) {
   return (
     <div>
@@ -2052,7 +2557,10 @@ function DataTable({
         </div>
       )}
       {addLabel && (
-        <button className="mt-2 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1">
+        <button
+          onClick={onAdd}
+          className="mt-2 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1"
+        >
           <Plus className="w-3.5 h-3.5" /> {addLabel}
         </button>
       )}

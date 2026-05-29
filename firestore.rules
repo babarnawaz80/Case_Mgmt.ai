@@ -108,6 +108,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Program enrollments subcollection
+    match /individuals/{id}/program_enrollments/{enrollId} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
     // ─── Clinical Collections (PHI) ───────────────────────────────────────────
     // Progress Notes
     match /progress_notes/{id} {
@@ -524,6 +533,18 @@ service cloud.firestore {
     match /compliance_engines/{id} {
       allow read: if isAuth();
       allow write: if isAdmin();
+    }
+
+    // ─── Scheduled Visits ────────────────────────────────────────────────────
+    // Created by case managers when scheduling a visit. Updated when visit
+    // is started (status → in_progress), completed (status → completed),
+    // or cancelled. Admins can delete.
+    match /scheduled_visits/{id} {
+      allow list: if isAuth();
+      allow get:    if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
     }
 
     // ─── Default: Deny All ───────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   Phone, AlertTriangle, Folder, ArrowRight,
   Loader2, Sparkles, User, Shield, X,
   Bell, Building2, Link, Upload, Clock,
+  MapPin, Activity, ClipboardList, HeartPulse,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ interface CommandItem {
   sublabel?: string;
   icon: LucideIcon;
   action: () => void;
-  category: "Navigation" | "People" | "Actions" | "Settings";
+  category: "Navigation" | "People" | "Actions" | "Settings" | "Sections";
   keywords?: string[];
 }
 
@@ -158,6 +159,389 @@ export const SETTINGS_ROUTES: Record<string, string> = {
   "set-import":        "/settings/import",
 };
 
+// ─── Section / Field items — profile fields, eChart modules, features ────────
+// These allow users to search for ANY concept in the system and jump there.
+// Items that need a person first link to /people; module-level pages have
+// their own routes (incidents, referrals, billing, etc.)
+
+export const SECTION_ITEMS: Omit<CommandItem, "action">[] = [
+
+  // ── Individual Profile ────────────────────────────────────────────────────
+  {
+    id: "sec-personal-info",
+    label: "Personal Information",
+    sublabel: "Individual Profile · Name, date of birth, gender, SSN",
+    icon: User, category: "Sections",
+    keywords: ["personal", "personal info", "name", "first name", "last name", "date of birth", "dob", "birthday", "age", "gender", "sex", "ssn", "social security", "full name"],
+  },
+  {
+    id: "sec-address",
+    label: "Address & Location",
+    sublabel: "Individual Profile · Home address, city, state, zip, county",
+    icon: MapPin, category: "Sections",
+    keywords: ["address", "street", "city", "state", "zip", "zipcode", "postal", "county", "location", "home address", "mailing address", "residence", "where they live"],
+  },
+  {
+    id: "sec-contact-info",
+    label: "Contact Information",
+    sublabel: "Individual Profile · Phone, mobile, email",
+    icon: Phone, category: "Sections",
+    keywords: ["contact", "phone", "mobile", "cell", "telephone", "email", "email address", "call", "number", "reach"],
+  },
+  {
+    id: "sec-emergency-contacts",
+    label: "Emergency Contacts",
+    sublabel: "Individual Profile · Emergency contact, next of kin, family",
+    icon: Phone, category: "Sections",
+    keywords: ["emergency", "emergency contact", "next of kin", "family", "parent", "spouse", "relative", "in case of emergency", "ice", "contact person"],
+  },
+  {
+    id: "sec-insurance",
+    label: "Insurance & Medicaid ID",
+    sublabel: "Individual Profile · Medicaid ID, LTSS ID, Medicare, payer",
+    icon: CreditCard, category: "Sections",
+    keywords: ["insurance", "medicaid", "medicare", "payer", "coverage", "medicaid id", "ltss", "ltss id", "member id", "insurance plan", "health insurance", "ma", "ma number"],
+  },
+  {
+    id: "sec-diagnosis",
+    label: "Diagnoses & Medical Conditions",
+    sublabel: "Individual Profile · ICD-10 codes, primary and secondary diagnoses",
+    icon: Activity, category: "Sections",
+    keywords: ["diagnosis", "diagnoses", "icd", "icd-10", "icd10", "medical condition", "condition", "primary diagnosis", "secondary diagnosis", "medical history", "dx", "disability", "intellectual disability", "autism", "asd", "cerebral palsy", "seizure", "epilepsy", "mental health", "psychiatric", "bi-polar", "schizophrenia", "depression", "anxiety"],
+  },
+  {
+    id: "sec-allergies",
+    label: "Allergies",
+    sublabel: "Individual Profile · Known allergies and adverse reactions",
+    icon: AlertTriangle, category: "Sections",
+    keywords: ["allergy", "allergies", "reaction", "allergic", "food allergy", "medication allergy", "drug allergy", "latex", "bee sting", "anaphylaxis", "adverse reaction"],
+  },
+  {
+    id: "sec-pcp",
+    label: "Primary Care Physician",
+    sublabel: "Individual Profile · PCP, doctor, specialist, provider",
+    icon: User, category: "Sections",
+    keywords: ["pcp", "primary care", "physician", "doctor", "provider", "healthcare provider", "medical provider", "specialist", "psychiatrist", "neurologist", "pediatrician", "gp", "general practitioner"],
+  },
+  {
+    id: "sec-program-enrollment",
+    label: "Program & Waiver Enrollment",
+    sublabel: "Individual Profile · Waiver program, level of care, service type",
+    icon: Folder, category: "Sections",
+    keywords: ["program", "waiver", "enrollment", "level of care", "loc", "hcbs", "idd", "dda", "ccs", "service program", "waiver program", "enrolled", "service type", "service category", "ltss waiver", "community living", "supported living"],
+  },
+  {
+    id: "sec-enrollment-status",
+    label: "Enrollment Status",
+    sublabel: "Individual Profile · Active, discharged, pending, transition",
+    icon: CheckSquare, category: "Sections",
+    keywords: ["enrollment status", "status", "active", "discharged", "discharge", "pending", "transition", "enrollment", "disenrollment", "terminated", "closed case", "open case"],
+  },
+  {
+    id: "sec-legal",
+    label: "Court & Legal Status",
+    sublabel: "Individual Profile · Court involvement, guardianship, conservatorship",
+    icon: Shield, category: "Sections",
+    keywords: ["court", "court involvement", "legal", "legal status", "guardianship", "guardian", "legal guardian", "power of attorney", "poa", "rep payee", "representative payee", "custody", "conservatorship", "judge", "attorney", "court order", "probation", "parole", "criminal", "dss", "dcfs"],
+  },
+  {
+    id: "sec-consent",
+    label: "Consent Forms & Releases",
+    sublabel: "Individual Profile · Consent, ROI, HIPAA authorization",
+    icon: FileText, category: "Sections",
+    keywords: ["consent", "consent form", "release", "roi", "release of information", "hipaa", "authorization", "signed consent", "release form", "disclosure", "privacy", "signature"],
+  },
+  {
+    id: "sec-housing",
+    label: "Housing Status",
+    sublabel: "Individual Profile · Living situation, home type, residential setting",
+    icon: Home, category: "Sections",
+    keywords: ["housing", "housing status", "living situation", "home", "residence", "residential", "homeless", "group home", "independent living", "supported living", "living arrangement", "apartment", "family home", "foster", "community residence", "icf"],
+  },
+  {
+    id: "sec-demographics",
+    label: "Demographics",
+    sublabel: "Individual Profile · Race, ethnicity, language, interpreter needs",
+    icon: Users, category: "Sections",
+    keywords: ["demographics", "race", "ethnicity", "language", "preferred language", "interpreter", "translation", "culture", "hispanic", "latino", "spanish", "bilingual", "english", "lep", "limited english"],
+  },
+  {
+    id: "sec-service-dates",
+    label: "Service Dates & History",
+    sublabel: "Individual Profile · Start date, discharge date, enrollment history",
+    icon: CalendarCheck, category: "Sections",
+    keywords: ["service start", "start date", "enrollment date", "effective date", "admission date", "discharge date", "service dates", "service history", "anniversary", "renewal"],
+  },
+
+  // ── eChart Modules ────────────────────────────────────────────────────────
+  {
+    id: "sec-progress-notes",
+    label: "Progress Notes",
+    sublabel: "eChart · Session documentation, case notes",
+    icon: Pencil, category: "Sections",
+    keywords: ["progress note", "progress notes", "note", "documentation", "case notes", "session notes", "daily note", "weekly note", "monthly note", "t2041", "h2015", "h0038"],
+  },
+  {
+    id: "sec-contact-notes",
+    label: "Contact Notes",
+    sublabel: "eChart · Phone calls, emails, face-to-face contacts logged",
+    icon: Phone, category: "Sections",
+    keywords: ["contact note", "contact notes", "phone call", "face to face", "f2f", "email contact", "interaction", "outreach", "attempted contact", "voicemail", "left message"],
+  },
+  {
+    id: "sec-visit-summaries",
+    label: "Visit Summaries",
+    sublabel: "eChart · Home visits, field visits, in-person documentation",
+    icon: CalendarCheck, category: "Sections",
+    keywords: ["visit", "visit summary", "home visit", "field visit", "in person", "scheduled visit", "visit documentation", "monthly visit", "quarterly visit"],
+  },
+  {
+    id: "sec-care-plan",
+    label: "Care Plans",
+    sublabel: "eChart · Person-centered plans, ISP, goals, objectives",
+    icon: ClipboardList, category: "Sections",
+    keywords: ["care plan", "isp", "person centered plan", "service plan", "goals", "care goals", "life plan", "individual support plan", "objective", "outcome", "care planning", "annual plan", "plan of care"],
+  },
+  {
+    id: "sec-monitoring",
+    label: "Monitoring Forms",
+    sublabel: "eChart · Health monitoring, behavioral data, vital signs",
+    icon: Activity, category: "Sections",
+    keywords: ["monitoring", "monitoring form", "health monitoring", "vital signs", "weight", "blood pressure", "bp", "behavioral monitoring", "bmi", "temperature", "pulse", "data collection", "monthly monitoring"],
+  },
+  {
+    id: "sec-service-authorizations",
+    label: "Service Authorizations",
+    sublabel: "eChart · Auth numbers, approved units, prior authorizations",
+    icon: Shield, category: "Sections",
+    keywords: ["authorization", "service authorization", "auth", "prior auth", "pa", "approved units", "billing authorization", "auth number", "prior authorization", "approved hours"],
+  },
+  {
+    id: "sec-eligibility",
+    label: "Eligibility Verification",
+    sublabel: "eChart · MA status checks, Medicaid eligibility records",
+    icon: CheckSquare, category: "Sections",
+    keywords: ["eligibility", "eligibility verification", "ma status", "medicaid eligibility", "evs", "eligibility check", "coverage verification", "ma check", "verify coverage"],
+  },
+  {
+    id: "sec-medications",
+    label: "Medications",
+    sublabel: "eChart · Medication list, dosage, prescriber, reminders",
+    icon: HeartPulse, category: "Sections",
+    keywords: ["medication", "medications", "prescription", "prescriptions", "med", "meds", "drug", "drugs", "pharmacy", "dosage", "dose", "pill", "tablet", "metformin", "lisinopril", "prescriber", "refill"],
+  },
+  {
+    id: "sec-managed-documents",
+    label: "Managed Documents",
+    sublabel: "eChart · Uploaded files, evaluations, legal docs, consent forms",
+    icon: Folder, category: "Sections",
+    keywords: ["managed documents", "documents", "document", "uploads", "files", "attachments", "evaluations", "assessment", "psychological evaluation", "legal documents", "consent forms", "releases", "upload file", "attach", "psychosocial"],
+  },
+  {
+    id: "sec-oncall-log",
+    label: "On-Call Log",
+    sublabel: "eChart · After-hours calls, crisis contacts, on-call notes",
+    icon: Phone, category: "Sections",
+    keywords: ["on call", "oncall", "on-call", "after hours", "after-hours", "emergency call", "crisis", "on call log", "night call", "weekend call"],
+  },
+  {
+    id: "sec-incidents",
+    label: "Incident Reports",
+    sublabel: "eChart · Critical incidents, adverse events, behavioral incidents",
+    icon: AlertTriangle, category: "Sections",
+    keywords: ["incident", "incident report", "critical incident", "adverse event", "behavioral incident", "injury", "abuse", "neglect", "fall", "elopement", "restraint", "altercation", "sei", "serious event", "reportable incident"],
+  },
+  {
+    id: "sec-referrals-echart",
+    label: "Referrals",
+    sublabel: "eChart · Service referrals, specialist referrals, referral tracking",
+    icon: ArrowRight, category: "Sections",
+    keywords: ["referral", "referrals", "service referral", "specialist referral", "mental health referral", "refer", "referred", "referral status", "referral source"],
+  },
+  {
+    id: "sec-workflow",
+    label: "Workflow Manager",
+    sublabel: "eChart · Task workflows, checklists, automated reminders",
+    icon: CheckSquare, category: "Sections",
+    keywords: ["workflow", "workflows", "task workflow", "checklist", "automated task", "template task", "task template"],
+  },
+
+  // ── Billing ───────────────────────────────────────────────────────────────
+  {
+    id: "sec-claims",
+    label: "Claims & Billing Records",
+    sublabel: "Billing Hub · Claims status, submitted, paid, denied",
+    icon: CreditCard, category: "Sections",
+    keywords: ["claim", "claims", "billing record", "submit claim", "claim status", "paid", "denied", "pending claim", "remittance", "835", "837", "edi", "claim submission", "rejected"],
+  },
+  {
+    id: "sec-service-codes",
+    label: "Service Codes & Rates",
+    sublabel: "Settings · Procedure codes, unit rates, billing codes",
+    icon: CreditCard, category: "Sections",
+    keywords: ["service code", "procedure code", "billing code", "rate", "unit rate", "t2022", "h0038", "t2041", "h2015", "cpt", "hcpcs", "revenue code", "billing rate", "fee schedule"],
+  },
+  {
+    id: "sec-payers",
+    label: "Payers & Funding Sources",
+    sublabel: "Settings · Medicaid payers, managed care, private pay",
+    icon: CreditCard, category: "Sections",
+    keywords: ["payer", "payers", "funding", "funding source", "medicaid payer", "managed care", "mco", "insurance payer", "private pay", "self pay", "third party"],
+  },
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  {
+    id: "sec-org-logo",
+    label: "Organization Logo & Branding",
+    sublabel: "Settings · Upload logo, set brand colors",
+    icon: Building2, category: "Sections",
+    keywords: ["logo", "brand", "branding", "organization logo", "color", "brand color", "upload logo", "letterhead"],
+  },
+  {
+    id: "sec-npi",
+    label: "NPI & License Numbers",
+    sublabel: "Settings · Organization NPI, license number, taxonomy",
+    icon: Building2, category: "Sections",
+    keywords: ["npi", "national provider", "license", "license number", "taxonomy", "provider number", "ein", "tax id", "tin", "organization npi"],
+  },
+  {
+    id: "sec-staff-roles",
+    label: "Staff Roles & Permissions",
+    sublabel: "Settings · Admin, supervisor, case manager roles",
+    icon: Shield, category: "Sections",
+    keywords: ["role", "roles", "permission", "permissions", "access", "staff role", "case manager role", "admin role", "supervisor role", "billing role", "restrict access"],
+  },
+  {
+    id: "sec-staff-profiles",
+    label: "Staff Profiles",
+    sublabel: "Settings · View or edit staff member details",
+    icon: Users, category: "Sections",
+    keywords: ["staff", "employee", "team member", "case worker", "staff profile", "worker", "coordinator", "care coordinator", "employee profile"],
+  },
+  {
+    id: "sec-invite-user",
+    label: "Invite Team Member",
+    sublabel: "Settings · Send invite to add a new staff user",
+    icon: Users, category: "Sections",
+    keywords: ["invite", "add user", "new user", "add staff", "invite staff", "send invite", "add team member", "onboard staff"],
+  },
+  {
+    id: "sec-writing-style",
+    label: "AI Writing Style",
+    sublabel: "Settings · Configure how AI writes notes and summaries",
+    icon: Sparkles, category: "Sections",
+    keywords: ["writing style", "ai style", "note style", "ai writing", "writing config", "help me write", "ai tone", "ai voice", "writing configuration"],
+  },
+  {
+    id: "sec-ambient",
+    label: "Ambient AI / Session Recording",
+    sublabel: "eChart · Record and transcribe case management sessions",
+    icon: Sparkles, category: "Sections",
+    keywords: ["ambient", "recording", "transcribe", "transcription", "session recording", "voice", "ambient ai", "audio", "deepgram", "session note", "auto note"],
+  },
+  {
+    id: "sec-face-sheet",
+    label: "Face Sheet",
+    sublabel: "eChart · One-page summary with key individual details",
+    icon: FileText, category: "Sections",
+    keywords: ["face sheet", "facesheet", "summary page", "quick view", "overview", "snapshot", "one pager"],
+  },
+  {
+    id: "sec-assigned-staff",
+    label: "Assigned Staff / Case Manager",
+    sublabel: "eChart · Who is assigned to support this individual",
+    icon: Users, category: "Sections",
+    keywords: ["assigned staff", "case manager", "assigned", "care team", "team", "who is assigned", "change case manager", "reassign", "caseload assignment"],
+  },
+  {
+    id: "sec-ai-checkins",
+    label: "AI Check-Ins",
+    sublabel: "eChart · Automated digital check-in conversations",
+    icon: Sparkles, category: "Sections",
+    keywords: ["check in", "checkin", "ai check-in", "digital check-in", "automated check-in", "check-in link", "survey", "daily check"],
+  },
+  {
+    id: "sec-compliance-risk",
+    label: "Compliance Risk Score",
+    sublabel: "People Supported · Risk score, monitoring level",
+    icon: Shield, category: "Sections",
+    keywords: ["compliance risk", "risk score", "risk", "high risk", "compliance", "monitoring level", "risk level", "low risk", "moderate risk"],
+  },
+  {
+    id: "sec-import",
+    label: "Import Individuals or Staff",
+    sublabel: "Settings · CSV import for bulk data upload",
+    icon: Upload, category: "Sections",
+    keywords: ["import", "upload", "csv", "bulk import", "import individuals", "import staff", "bulk upload", "data import", "spreadsheet"],
+  },
+  {
+    id: "sec-reports-overview",
+    label: "Reports & Analytics",
+    sublabel: "Reports · Caseload, compliance, billing analytics",
+    icon: BarChart3, category: "Sections",
+    keywords: ["report", "reports", "analytics", "dashboard analytics", "caseload report", "compliance report", "billing report", "statistics", "data", "export", "summary report"],
+  },
+  {
+    id: "sec-new-participant",
+    label: "New Participant / Intake Form",
+    sublabel: "Enroll a new individual in the system",
+    icon: User, category: "Sections",
+    keywords: ["intake", "new participant", "enroll", "new individual", "add person", "new client", "new admission", "registration", "intake form", "onboarding"],
+  },
+];
+
+export const SECTION_ROUTES: Record<string, string> = {
+  // Profile fields → /people (user selects person then navigates)
+  "sec-personal-info":       "/people",
+  "sec-address":             "/people",
+  "sec-contact-info":        "/people",
+  "sec-emergency-contacts":  "/people",
+  "sec-insurance":           "/people",
+  "sec-diagnosis":           "/people",
+  "sec-allergies":           "/people",
+  "sec-pcp":                 "/people",
+  "sec-program-enrollment":  "/settings/programs",
+  "sec-enrollment-status":   "/people",
+  "sec-legal":               "/people",
+  "sec-consent":             "/people",
+  "sec-housing":             "/people",
+  "sec-demographics":        "/people",
+  "sec-service-dates":       "/people",
+  // eChart modules → /people (user selects person first)
+  "sec-progress-notes":      "/people",
+  "sec-contact-notes":       "/people",
+  "sec-visit-summaries":     "/people",
+  "sec-care-plan":           "/people",
+  "sec-monitoring":          "/people",
+  "sec-service-authorizations": "/people",
+  "sec-eligibility":         "/people",
+  "sec-medications":         "/people",
+  "sec-managed-documents":   "/people",
+  "sec-oncall-log":          "/people",
+  "sec-incidents":           "/incidents",
+  "sec-referrals-echart":    "/referrals",
+  "sec-workflow":            "/people",
+  // Billing
+  "sec-claims":              "/billing",
+  "sec-service-codes":       "/settings/billing-config",
+  "sec-payers":              "/settings/billing-config",
+  // Settings
+  "sec-org-logo":            "/settings/organization",
+  "sec-npi":                 "/settings/organization",
+  "sec-staff-roles":         "/settings/users",
+  "sec-staff-profiles":      "/settings/users",
+  "sec-invite-user":         "/settings/users",
+  "sec-writing-style":       "/settings/ai",
+  "sec-ambient":             "/people",
+  "sec-face-sheet":          "/people",
+  "sec-assigned-staff":      "/people",
+  "sec-ai-checkins":         "/people",
+  "sec-compliance-risk":     "/people",
+  "sec-import":              "/settings/import",
+  "sec-reports-overview":    "/reports",
+  "sec-new-participant":     "/people/new",
+};
+
 // ─── Recent items helpers ─────────────────────────────────────────────────────
 
 const RECENT_KEY = "cp_recent_v1";
@@ -287,6 +671,11 @@ export function CommandPalette() {
       action: () => navigate(SETTINGS_ROUTES[s.id]),
     }));
 
+    const sectionItems: CommandItem[] = SECTION_ITEMS.map((s) => ({
+      ...s,
+      action: () => navigate(SECTION_ROUTES[s.id] ?? "/people"),
+    }));
+
     const peopleItems: CommandItem[] = individuals
       .filter((p) => p.enrollment_status === "active")
       .slice(0, 100)
@@ -297,16 +686,25 @@ export function CommandPalette() {
         icon: User,
         category: "People" as const,
         action: () => navigate(`/people/${p.id}/echart`),
-        keywords: [p.first_name, p.last_name, p.county ?? "", p.medicaid_id ?? ""].filter(Boolean),
+        // Expanded keywords: Medicaid ID, LTSS ID, program, county, status
+        keywords: [
+          p.first_name, p.last_name,
+          p.county ?? "",
+          p.medicaid_id ?? "",
+          p.ltss_id ?? "",
+          p.program ?? "",
+          p.enrollment_status ?? "",
+        ].filter(Boolean),
       }));
 
-    return [...actionItems, ...navItems, ...settingsItems, ...peopleItems];
+    return [...actionItems, ...navItems, ...settingsItems, ...sectionItems, ...peopleItems];
   }, [individuals, navigate]);
 
   // Filter by query
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) {
+      // Empty state: show Actions + top Nav + top People. No Sections (too many).
       const actions = allItems.filter((i) => i.category === "Actions");
       const nav     = allItems.filter((i) => i.category === "Navigation").slice(0, 6);
       const people  = allItems.filter((i) => i.category === "People").slice(0, 5);
@@ -319,7 +717,7 @@ export function CommandPalette() {
           .toLowerCase();
         return searchable.includes(term);
       })
-      .slice(0, 20);
+      .slice(0, 30);
   }, [allItems, q]);
 
   // Resolve recent ids to full CommandItems (for display when query is empty)
@@ -339,7 +737,7 @@ export function CommandPalette() {
       result.push({ category: "Recent", items: recentItems });
     }
 
-    const order: CommandItem["category"][] = ["Actions", "People", "Navigation", "Settings"];
+    const order: CommandItem["category"][] = ["Actions", "Sections", "People", "Navigation", "Settings"];
     const map = new Map<string, CommandItem[]>();
     filtered.forEach((item) => {
       if (!map.has(item.category)) map.set(item.category, []);

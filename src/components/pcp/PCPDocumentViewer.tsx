@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { PCPSendModal } from "./PCPSendModal";
 import type { PCPRecord } from "@/data/pcpMockData";
+import { OrgPrintHeader } from "@/components/icm/OrgPrintHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,10 @@ interface PCPDocumentViewerProps {
   individualId: string;
   individualName: string;
   isAiGenerated?: boolean;
+  /** Organization ID — used to render the org letterhead on printed/PDF output */
+  orgId?: string;
+  /** Individual's photo URL for headshot on the print header */
+  individualPhotoUrl?: string | null;
 }
 
 interface NavSection {
@@ -266,6 +271,8 @@ export function PCPDocumentViewer({
   individualId,
   individualName,
   isAiGenerated,
+  orgId,
+  individualPhotoUrl,
 }: PCPDocumentViewerProps) {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("1");
@@ -400,6 +407,16 @@ export function PCPDocumentViewer({
 
         {/* Document sections */}
         <div className="px-6 py-4">
+
+          {/* Org letterhead — visible on screen and always printed */}
+          {orgId && (
+            <OrgPrintHeader
+              orgId={orgId}
+              individualName={individualName}
+              individualPhotoUrl={individualPhotoUrl ?? undefined}
+              documentTitle="Care Plan / ISP"
+            />
+          )}
 
           {/* Section 1: Individual Profile */}
           <SectionCard number={1} title="Individual Profile Summary" aiGenerated={aiGen} onEdit={() => toast("Edit section 1")}>
@@ -735,6 +752,24 @@ export function PCPDocumentViewer({
           onClose={() => setSendModalOpen(false)}
         />
       )}
+
+      {/* Print styles: hide nav chrome, ensure org header prints */}
+      <style>{`
+        @media print {
+          /* Hide sidebar nav, topbar, AI panel, action bar */
+          aside,
+          nav,
+          header,
+          [data-testid="topbar"],
+          .sticky { display: none !important; }
+
+          /* Let the main content fill the page */
+          body { background: white; margin: 0; }
+
+          /* Ensure org print header is always visible */
+          .org-print-header { display: flex !important; }
+        }
+      `}</style>
     </div>
   );
 }

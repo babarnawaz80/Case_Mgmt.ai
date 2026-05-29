@@ -11,7 +11,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { writeAudit } from "@/lib/auditService";
@@ -110,8 +110,8 @@ const SettingsUsers = () => {
           const data = d.data();
           return {
             id: d.id,
-            firstName: data.firstName ?? "",
-            lastName: data.lastName ?? "",
+            firstName: data.firstName || data.first_name || "",
+            lastName: data.lastName || data.last_name || "",
             email: data.email ?? "",
             role: (data.role ?? "case_manager") as RoleKey,
             status: (data.status ?? "active") as UserStatus,
@@ -655,19 +655,31 @@ function generateTempPassword(): string {
   return base.join("");
 }
 
-/** Create a Firebase Auth user via the Identity Toolkit REST API */
-async function createFirebaseAuthUser(email: string, password: string, displayName: string): Promise<string> {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, displayName, returnSecureToken: false }),
-    }
-  );
+const STAFF_CREATE_URL = "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/staff/create-or-update";
+
+/**
+ * Create or re-link a staff user via the Admin SDK Cloud Function.
+ * Handles EMAIL_EXISTS gracefully — if the Firebase Auth account already
+ * exists, the Cloud Function just reconnects it to this org in Firestore.
+ * Returns { uid, isNew, tempPassword? }
+ */
+async function upsertStaffUser(
+  email: string,
+  firstName: string,
+  lastName: string,
+  role: string,
+  orgId: string,
+): Promise<{ uid: string; isNew: boolean; tempPassword?: string }> {
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) throw new Error("Not signed in. Please reload and try again.");
+  const res = await fetch(STAFF_CREATE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ email, firstName, lastName, role, organizationId: orgId }),
+  });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message ?? "Could not create account");
-  return data.localId as string; // new user's UID
+  if (!res.ok) throw new Error(data.error ?? "Could not create staff account");
+  return data as { uid: string; isNew: boolean; tempPassword?: string };
 }
 
 // ─── Create User Modal ───────────────────────────────────────────────────────
@@ -690,41 +702,23 @@ function CreateUserModal({ orgId, onClose }: { orgId: string; onClose: () => voi
     if (!email.trim()) { toast.error("Email is required"); return; }
     if (!firstName.trim() || !lastName.trim()) { toast.error("First and last name are required"); return; }
     const trimEmail = email.trim().toLowerCase();
-    const dispName = `${firstName.trim()} ${lastName.trim()}`;
-    const pw = generateTempPassword();
     setSaving(true);
     try {
-      // 1. Create Firebase Auth account
-      const uid = await createFirebaseAuthUser(trimEmail, pw, dispName);
+      // Cloud Function handles both new and existing Firebase Auth accounts.
+      // If the account already exists, it re-links it to this org in Firestore
+      // without creating a duplicate — no more EMAIL_EXISTS errors.
+      const result = await upsertStaffUser(trimEmail, firstName.trim(), lastName.trim(), role, orgId);
 
-      // 2. Write Firestore user doc with the known UID
-      await setDoc(doc(db, "users", uid), {
-        uid,
-        organizationId: orgId,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: trimEmail,
-        displayName: dispName,
-        role,
-        status: "active",
-        isActive: true,
-        mustChangePw: true,   // flag so we can prompt on first login
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        lastLogin: null,
-      });
-
-      setGeneratedPw(pw);
-      setCreatedUid(uid);
+      setGeneratedPw(result.tempPassword ?? "");
+      setCreatedUid(result.uid);
+      // isNew=false means the account already existed — they keep their password
+      if (!result.isNew) {
+        setGeneratedPw("(existing account — they keep their current password)");
+      }
       setStep("created");
     } catch (err: any) {
       console.error("Create user error:", err);
-      const msg = err?.message ?? "Unknown error";
-      if (msg.includes("EMAIL_EXISTS")) {
-        toast.error("That email is already registered in Firebase Auth.");
-      } else {
-        toast.error("Failed to create account", { description: msg });
-      }
+      toast.error("Failed to create account", { description: err?.message ?? "Unknown error" });
     } finally {
       setSaving(false);
     }

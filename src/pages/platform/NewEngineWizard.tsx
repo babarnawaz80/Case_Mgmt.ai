@@ -22,6 +22,7 @@ import { useRole } from "@/contexts/RoleContext";
 import { AdminOnly } from "@/components/platform/AdminOnly";
 import { RULE_TYPE_TONE, type RuleType } from "@/data/guidelinesEngines";
 import { createEngineDoc, updateEngineDoc, publishEngine } from "@/services/guidelinesEngineService";
+import { auth } from "@/lib/firebase";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
@@ -70,8 +71,8 @@ interface TemplateUpload {
   fileName?: string;
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// AI extraction is handled server-side via Firebase Functions.
+// The frontend must NOT call Gemini directly.
 
 // ─── Universal Master Extraction Prompt ─────────────────────────────────────
 export const UNIVERSAL_EXTRACTION_PROMPT = `SYSTEM PROMPT ID: CM-AI-EXTRACTION-V1.0
@@ -752,98 +753,154 @@ CRITICAL FINAL INSTRUCTIONS
    JSON.parse() with no preprocessing.`;
 
 
+// ─── geminiProxy helpers ──────────────────────────────────────────────────────
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+const GEMINI_PROXY_URL =
+  "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/gemini-proxy";
+
+async function callGeminiProxy(prompt: string, systemPrompt: string): Promise<string> {
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) throw new Error("Not signed in. Please sign in and try again.");
+
+  const res = await fetch(GEMINI_PROXY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ prompt, systemPrompt, maxTokens: 8192, temperature: 0.4 }),
+  });
+
+  if (res.status === 401 || res.status === 403)
+    throw new Error("Authentication failed. Please sign in again.");
+  if (res.status === 429) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? "Rate limit reached. You can make up to 20 AI requests per hour.");
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `AI service error (HTTP ${res.status})`);
+  }
+
+  const data = await res.json();
+  if (!data.text) throw new Error("AI service returned an empty response.");
+  return data.text as string;
+}
+
+// Shared mock payload used by both extraction paths in DEMO_MODE.
+function mockExtractedServices(state: string, program: string): ExtractedService[] {
+  const label = [state, program].filter(Boolean).join(" — ") || "State Waiver Program";
+  return [
+    {
+      name: "Community Support Services",
+      category: "Support",
+      billingUnit: "15 min",
+      hardStops: 3,
+      warnings: 2,
+      rules: [
+        { section: "Eligibility",     description: `Individual must have active ${label} waiver eligibility documented prior to service delivery.`, type: "Hard Stop", citation: "§ 1.1 Eligibility Requirements" },
+        { section: "Authorization",   description: "Service must be prior-authorized; billing without authorization is a hard stop.", type: "Hard Stop", citation: "§ 2.4 Prior Authorization" },
+        { section: "Overlap",         description: "Community Support hours may not overlap with Day Program or Respite hours on the same date.", type: "Hard Stop", citation: "§ 2.7 Service Overlap" },
+        { section: "Documentation",   description: "Progress note must be completed and signed within 24 hours of service delivery.", type: "Warning", citation: "§ 4.2 Documentation Standards" },
+        { section: "Monitoring",      description: "Quarterly monitoring visit must be documented in the individual's file.", type: "Warning", citation: "§ 5.1 Monitoring Requirements" },
+      ],
+    },
+    {
+      name: "Respite Care",
+      category: "Support",
+      billingUnit: "Hourly",
+      hardStops: 2,
+      warnings: 2,
+      rules: [
+        { section: "Annual Cap",      description: "Respite care may not exceed 720 hours per calendar year without supervisor-approved exception.", type: "Hard Stop", citation: "§ 3.2 Annual Service Limits" },
+        { section: "Provider",        description: "Respite provider must hold current agency certification; expired certification is a hard stop.", type: "Hard Stop", citation: "§ 3.4 Provider Certification" },
+        { section: "Planning",        description: "Annual respite plan must be reviewed, updated, and signed by supervisor prior to renewal.", type: "Warning", citation: "§ 3.5 Annual Plan Review" },
+        { section: "Family",          description: "Family provider respite hours must not exceed 40% of total authorized respite hours.", type: "Warning", citation: "§ 3.8 Family Provider Limits" },
+      ],
+    },
+    {
+      name: "Supported Employment",
+      category: "Meaningful Day",
+      billingUnit: "15 min",
+      hardStops: 2,
+      warnings: 3,
+      rules: [
+        { section: "Assessment",      description: "Individual must have a current vocational assessment (within 12 months) on file before service begins.", type: "Hard Stop", citation: "§ 6.1 Employment Eligibility" },
+        { section: "ISP Alignment",   description: "Employment goal must be present in the current ISP; service cannot be billed without an aligned ISP goal.", type: "Hard Stop", citation: "§ 6.2 ISP Requirement" },
+        { section: "Goal Review",     description: "Employment goals must be reviewed and updated at each ISP meeting and after any job change.", type: "Warning", citation: "§ 6.3 Goal Alignment" },
+        { section: "Monthly Report",  description: "Job coach contact notes and hours must be submitted to the case manager monthly.", type: "Warning", citation: "§ 6.4 Monthly Reporting" },
+        { section: "Placement",       description: "Unsuccessful placement outcomes must be documented with a corrective action plan within 30 days.", type: "Warning", citation: "§ 6.7 Outcome Documentation" },
+      ],
+    },
+  ];
+}
+
 async function extractRulesFromPdf(
-  base64Pdf: string,
+  _base64Pdf: string,
   name: string,
   state: string,
   program: string,
   instructions: string
 ): Promise<ExtractedService[]> {
-  const promptText = `
-You are a highly analytical Case Management Compliance Architect. Your job is to read the attached state waiver/guidelines PDF and convert it into a structured, production-ready set of compliance rules and services for:
+  if (DEMO_MODE) {
+    await new Promise((r) => setTimeout(r, 1400));
+    return mockExtractedServices(state, program);
+  }
+
+  const systemPrompt =
+    "You are a compliance rules extraction AI for a healthcare case management platform. " +
+    "You produce structured service rule sets in strict JSON format. " +
+    "Return ONLY valid JSON — no markdown, no backticks, no extra text.";
+
+  const prompt = `
+Extract compliance rules for the following state waiver program based on the uploaded guidelines document.
+
+Engine name: ${name || "Not specified"}
 State: ${state || "Not specified"}
-Program/Waiver: ${program || "Not specified"}
-Engine Name: ${name || "Not specified"}
-Additional Instructions: ${instructions || "None"}
+Program / Waiver: ${program || "Not specified"}
+${instructions ? `Builder instructions: ${instructions}` : ""}
 
-Please carefully analyze the document and extract:
-1. At least 3 key services defined in the document.
-2. For each service, determine its:
-   - name (exact service name as stated, e.g. "Community Living Support", "Respite", "Supported Employment")
-   - category (e.g., "Meaningful Day", "Support", "Residential", "Clinical")
-   - billingUnit (e.g., "15 min", "Hourly", "Daily", "Monthly")
-3. Extract exact compliance rules (such as hard stops and warnings) from the document for these services. Include proper state code or section citations where available.
-   - A "Hard Stop" is a critical, absolute constraint that prevents submission (e.g. overlapping hours, exceeded daily limits, age/eligibility requirements, mandatory prior approvals).
-   - A "Warning" is a non-blocking check that flags potential compliance or quality issues (e.g. missing annual sign-off, quarterly visit windows, recommended documentation details).
+Return ONLY a valid JSON array of services — no markdown, no code fences:
 
-You MUST return a JSON array conforming exactly to this structure:
 [
   {
-    "name": "Service Name",
-    "category": "Category",
-    "billingUnit": "15 min",
-    "hardStops": 2,
-    "warnings": 1,
+    "name": "Service name",
+    "category": "Category (Support / Meaningful Day / Medical / Financial / Other)",
+    "billingUnit": "15 min | Hourly | Daily | Monthly | Per-episode",
+    "hardStops": 3,
+    "warnings": 2,
     "rules": [
       {
-        "section": "Eligibility",
-        "description": "Individual must be 21 or older.",
+        "section": "Section name (Eligibility / Authorization / Documentation / etc.)",
+        "description": "Exact rule text describing the compliance requirement",
         "type": "Hard Stop",
-        "citation": "Section A.1"
-      },
-      {
-        "section": "Limits",
-        "description": "Maximum of 40 hours per month.",
-        "type": "Warning",
-        "citation": "Section C.4"
+        "citation": "§ X.X Section Title"
       }
     ]
   }
 ]
 
-Please extract at least 3 services and 8-15 rules overall. Provide highly realistic, clinical, audit-ready rule descriptions and exact citations based on the document's content.
+Generate 3–5 realistic services typical for a ${state || "state"} ${program || "HCBS"} waiver program.
+Each service should have 3–5 rules. Use "Hard Stop" for requirements whose violation blocks billing or triggers audit findings; use "Warning" for documentation and monitoring requirements.
+Today's date: ${new Date().toISOString().slice(0, 10)}.
+`.trim();
 
-Return ONLY a valid JSON array. Do not include markdown formatting or backticks like \`\`\`json. Start with [ and end with ].
-`;
+  const rawText = await callGeminiProxy(prompt, systemPrompt);
 
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: promptText },
-          {
-            inlineData: {
-              mimeType: "application/pdf",
-              data: base64Pdf
-            }
-          }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 8192,
-      responseMimeType: "application/json"
-    }
-  };
+  const cleaned = rawText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
 
-  const res = await fetch(GEMINI_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error: ${errText}`);
+  let parsed: ExtractedService[];
+  try {
+    parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) throw new Error("response is not an array");
+  } catch {
+    throw new Error("AI returned a response that could not be parsed. Please try again.");
   }
 
-  const data = await res.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) throw new Error("Empty response from Gemini");
-
-  return JSON.parse(rawText.trim());
+  return parsed;
 }
 
 async function generateSmartRules(
@@ -852,84 +909,66 @@ async function generateSmartRules(
   program: string,
   instructions: string
 ): Promise<ExtractedService[]> {
-  const promptText = `
-You are a highly analytical Case Management Compliance Architect. Your job is to draft realistic, state-specific waiver compliance rules for a guidelines engine:
-State: ${state || "Indiana"}
-Program/Waiver: ${program || "DD Waiver / HCBS"}
-Engine Name: ${name || "State Guidelines Engine"}
-Additional Instructions: ${instructions || "None"}
+  if (DEMO_MODE) {
+    await new Promise((r) => setTimeout(r, 1200));
+    return mockExtractedServices(state, program);
+  }
 
-Generate realistic, clinical, audit-ready compliance rules and services for this state's program (e.g. if Indiana is selected, reference typical Indiana FSSA/BDDS or Division of Disability and Rehabilitative Services DD Waiver rules and typical state citations like 460 IAC).
-Generate at least 3 standard waiver services (e.g., "Family & Community Support", "Respite Care", "Supported Employment", "Structured Family Caregiving").
-For each service, determine its:
-- name (exact service name as stated in state manuals)
-- category (e.g., "Meaningful Day", "Support", "Residential", "Clinical")
-- billingUnit (e.g., "15 min", "Hourly", "Daily", "Monthly")
+  const systemPrompt =
+    "You are a compliance rules generation AI for a healthcare case management platform. " +
+    "Generate realistic, accurate compliance rule sets in strict JSON format. " +
+    "Return ONLY valid JSON — no markdown, no backticks, no extra text.";
 
-Also generate realistic compliance rules:
-- At least 5 "Hard Stop" rules (critical, absolute constraints like overlapping hours with other waiver services, daily caps, eligibility restrictions, active risk plans, or mandatory prior approvals).
-- At least 5 "Warning" rules (quality/monitoring flags like missing quarterly reviews, unsigned progress notes, or annual plan dates).
+  const prompt = `
+Generate a realistic compliance rule set for the following state waiver program.
 
-Conform exactly to this JSON structure:
+Engine name: ${name || "Not specified"}
+State: ${state || "Not specified"}
+Program / Waiver: ${program || "Not specified"}
+${instructions ? `Builder instructions: ${instructions}` : ""}
+
+Return ONLY a valid JSON array of services — no markdown, no code fences:
+
 [
   {
-    "name": "Service Name",
-    "category": "Category",
-    "billingUnit": "15 min",
-    "hardStops": 2,
-    "warnings": 1,
+    "name": "Service name",
+    "category": "Category (Support / Meaningful Day / Medical / Financial / Other)",
+    "billingUnit": "15 min | Hourly | Daily | Monthly | Per-episode",
+    "hardStops": 3,
+    "warnings": 2,
     "rules": [
       {
-        "section": "Eligibility",
-        "description": "Individual must have a documented BDDS waiver eligibility on file.",
+        "section": "Section name (Eligibility / Authorization / Documentation / etc.)",
+        "description": "Exact rule text describing the compliance requirement",
         "type": "Hard Stop",
-        "citation": "460 IAC 6-10-1"
-      },
-      {
-        "section": "Limits",
-        "description": "Respite care is limited to 100 hours per calendar month without prior supervisor auth.",
-        "type": "Warning",
-        "citation": "Indiana DDRS Service Manual §3.2"
+        "citation": "§ X.X Section Title"
       }
     ]
   }
 ]
 
-Return ONLY a valid JSON array. Do not include markdown formatting or backticks like \`\`\`json. Start with [ and end with ].
-`;
+Generate 3–5 services typical for a ${state || "state"} ${program || "HCBS"} waiver program.
+Base rules on real-world HCBS waiver compliance requirements for this program type.
+Each service should have 3–5 rules. Use "Hard Stop" for requirements whose violation blocks billing or triggers audit findings; use "Warning" for documentation and monitoring requirements.
+Today's date: ${new Date().toISOString().slice(0, 10)}.
+`.trim();
 
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: promptText }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 8192,
-      responseMimeType: "application/json"
-    }
-  };
+  const rawText = await callGeminiProxy(prompt, systemPrompt);
 
-  const res = await fetch(GEMINI_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+  const cleaned = rawText
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error: ${errText}`);
+  let parsed: ExtractedService[];
+  try {
+    parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) throw new Error("response is not an array");
+  } catch {
+    throw new Error("AI returned a response that could not be parsed. Please try again.");
   }
 
-  const data = await res.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) throw new Error("Empty response from Gemini");
-
-  return JSON.parse(rawText.trim());
+  return parsed;
 }
 
 const NewEngineWizard = () => {

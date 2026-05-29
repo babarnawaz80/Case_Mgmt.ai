@@ -69,13 +69,14 @@
     --sidebar-ring: 200 80% 44%;
 
     /* iCM Dashboard tokens */
-    --icm-bg: 220 14% 97%;
-    --icm-panel: 0 0% 100%;
-    --icm-border: 0 0% 93%;
-    --icm-border-strong: 0 0% 83%;
-    --icm-text: 0 0% 4%;
-    --icm-text-dim: 220 15% 28%;
-    --icm-text-faint: 220 12% 45%;
+    --icm-bg: 245 22% 97%;          /* subtle cool-purple tint — not pure gray */
+    --icm-panel: 0 0% 100%;         /* cards stay pure white for contrast */
+    --icm-border: 220 16% 87%;      /* more visible borders = cards look like cards */
+    --icm-border-strong: 220 16% 74%;
+    --icm-text: 220 28% 9%;         /* deeper ink — stronger contrast */
+    --icm-text-dim: 220 16% 34%;    /* body text — readable, not competing */
+    --icm-text-faint: 220 12% 52%;  /* captions — clearly secondary */
+    --icm-topbar: 248 40% 99%;      /* topbar: just a whisper of purple */
     --icm-accent: 215 94% 58%;
     --icm-accent-soft: 214 100% 97%;
     --icm-green: 160 84% 39%;
@@ -130,6 +131,7 @@
     /* iCM Dashboard tokens — dark values */
     --icm-bg: 222 47% 9%;
     --icm-panel: 222 40% 12%;
+    --icm-topbar: 222 38% 11%;   /* dark topbar: slightly lighter than bg */
     --icm-border: 222 30% 20%;
     --icm-border-strong: 222 25% 30%;
     --icm-text: 210 40% 96%;
@@ -231,7 +233,7 @@
   }
 
   .shadow-elevated {
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px -4px rgba(15, 23, 42, 0.10);
   }
 
   .card-elevated {
@@ -253,6 +255,51 @@
 
   .font-body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* ── Option A: Typography & Section utilities ─────────────────── */
+
+  /* Page-level heading (h1 on each screen) */
+  .icm-page-title {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    color: hsl(var(--icm-text));
+  }
+
+  /* Section / card header with a left purple accent bar */
+  .icm-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: hsl(var(--icm-text));
+    padding-left: 8px;
+    border-left: 3px solid hsl(var(--icm-accent));
+  }
+
+  /* Tiny caption / meta label */
+  .icm-meta-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--icm-text-faint));
+  }
+
+  /* Sub-section heading (within a card) */
+  .icm-card-title {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: hsl(var(--icm-text));
   }
 }
 

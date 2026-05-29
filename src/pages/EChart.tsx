@@ -70,38 +70,38 @@ interface ModuleTile {
   roles?: ("admin" | "case_manager" | "billing" | "supervisor")[];
 }
 
-// Grouped tiles per the screenshot. Counts mirror the original demo data.
+// Tile definitions — counts come from liveCounts (Firestore), never hardcoded here
 const ALL_TILES: ModuleTile[] = [
   // Documentation (blue)
-  { slug: "contact-note", label: "Contact Notes", icon: FileText, route: "contact-note", count: 36, category: "Documentation" },
-  { slug: "case-management", label: "Case Management", icon: Briefcase, route: "case-management", count: 8, category: "Documentation" },
-  { slug: "eligibility-verification", label: "MA Status Verification", icon: ShieldCheck, route: "eligibility-verification", category: "Documentation" },
-  { slug: "monitoring-form", label: "Monitoring Form", icon: ClipboardList, route: "monitoring-form", count: 4, category: "Documentation" },
-  { slug: "care-plan", label: "PCP", icon: Heart, route: "care-plan", count: 1, category: "Documentation" },
-  { slug: "progress-note", label: "Progress Note", icon: Pencil, route: "progress-note", count: 14, category: "Documentation" },
-  { slug: "visit-summary", label: "Visit Summary", icon: CalendarCheck, route: "visit-summary", count: 6, category: "Documentation" },
-  { slug: "workflow-manager", label: "Workflow Manager", icon: LayoutIcon, route: "workflow-manager", count: 2, category: "Documentation" },
+  { slug: "contact-note",           label: "Contact Notes",              icon: FileText,       route: "contact-note",           category: "Documentation" },
+  { slug: "case-management",        label: "Case Management",            icon: Briefcase,      route: "case-management",        category: "Documentation" },
+  { slug: "eligibility-verification", label: "MA Status Verification",  icon: ShieldCheck,    route: "eligibility-verification", category: "Documentation" },
+  { slug: "monitoring-form",        label: "Monitoring Form",            icon: ClipboardList,  route: "monitoring-form",        category: "Documentation" },
+  { slug: "care-plan",              label: "PCP",                        icon: Heart,          route: "care-plan",              category: "Documentation" },
+  { slug: "progress-note",          label: "Progress Note",              icon: Pencil,         route: "progress-note",          category: "Documentation" },
+  { slug: "visit-summary",          label: "Visit Summary",              icon: CalendarCheck,  route: "visit-summary",          category: "Documentation" },
+  { slug: "workflow-manager",       label: "Workflow Manager",           icon: LayoutIcon,     route: "workflow-manager",       category: "Documentation" },
 
   // Care (green)
-  { slug: "assigned-staff", label: "Assigned Staff", icon: Users, route: "assigned-staff", count: 5, category: "Care" },
-  { slug: "care-notes", label: "Care Notes", icon: FileText, route: "progress-note", count: 18, category: "Care" },
-  { slug: "care-tracker", label: "Care Tracker", icon: Heart, route: "care-tracker", category: "Care" },
-  { slug: "esignature", label: "e-Signature", icon: CheckSquare, route: "esignature", count: 3, category: "Care" },
-  { slug: "employment", label: "Employment & Education", icon: GraduationCap, route: "employment", category: "Care" },
-  { slug: "facesheet", label: "Face Sheet", icon: User, route: "facesheet", count: 1, category: "Care" },
-  { slug: "monitors-baselines", label: "Monitors & Baselines", icon: Activity, route: "monitors-baselines", category: "Care" },
-  { slug: "referrals", label: "Referrals", icon: Phone, route: "referrals", category: "Care", count: 3 },
+  { slug: "assigned-staff",         label: "Assigned Staff",             icon: Users,          route: "assigned-staff",         category: "Care" },
+  { slug: "care-notes",             label: "Care Notes",                 icon: FileText,       route: "progress-note",          category: "Care" },
+  { slug: "care-tracker",           label: "Care Tracker",               icon: Heart,          route: "care-tracker",           category: "Care" },
+  { slug: "esignature",             label: "e-Signature",                icon: CheckSquare,    route: "esignature",             category: "Care" },
+  { slug: "employment",             label: "Employment & Education",     icon: GraduationCap,  route: "employment",             category: "Care" },
+  { slug: "facesheet",              label: "Face Sheet",                 icon: User,           route: "facesheet",              category: "Care" },
+  { slug: "monitors-baselines",     label: "Monitors & Baselines",       icon: Activity,       route: "monitors-baselines",     category: "Care" },
+  { slug: "referrals",              label: "Referrals",                  icon: Phone,          route: "referrals",              category: "Care" },
 
   // Operations (amber)
-  { slug: "incident-reporting", label: "Incident Reporting", icon: AlertTriangle, route: "incident-reporting", count: 2, category: "Operations" },
-  { slug: "discharge-transfer", label: "Discharge & Transfer", icon: ArrowRightCircle, route: "managed-documents", category: "Operations" },
-  { slug: "managed-documents", label: "Managed Documents", icon: Folder, route: "managed-documents", count: 8, category: "Operations" },
-  { slug: "oncall", label: "On Call Log", icon: PhoneCall, route: "oncall", count: 3, category: "Operations" },
-  { slug: "trainings", label: "Person Supported Trainings", icon: BookOpen, route: "trainings", count: 4, category: "Operations" },
-  { slug: "services", label: "Services", icon: Briefcase, route: "services", category: "Operations" },
-  { slug: "service-plan", label: "Service Plan", icon: LayoutIcon, route: "service-plan", count: 1, category: "Operations" },
-  { slug: "billing", label: "General Ledger", icon: CreditCard, route: "billing", category: "Operations", roles: ["billing", "admin"] },
-  { slug: "authorizations", label: "Authorizations", icon: FileCheck, route: "authorizations", category: "Operations" },
+  { slug: "incident-reporting",     label: "Incident Reporting",         icon: AlertTriangle,  route: "incident-reporting",     category: "Operations" },
+  { slug: "discharge-transfer",     label: "Discharge & Transfer",       icon: ArrowRightCircle, route: "managed-documents",    category: "Operations" },
+  { slug: "managed-documents",      label: "Managed Documents",          icon: Folder,         route: "managed-documents",      category: "Operations" },
+  { slug: "oncall",                 label: "On Call Log",                icon: PhoneCall,      route: "oncall",                 category: "Operations" },
+  { slug: "trainings",              label: "Person Supported Trainings", icon: BookOpen,       route: "trainings",              category: "Operations" },
+  { slug: "services",               label: "Services",                   icon: Briefcase,      route: "services",               category: "Operations" },
+  { slug: "service-plan",           label: "Service Plan",               icon: LayoutIcon,     route: "service-plan",           category: "Operations" },
+  { slug: "billing",                label: "General Ledger",             icon: CreditCard,     route: "billing",                category: "Operations", roles: ["billing", "admin"] },
+  { slug: "authorizations",         label: "Authorizations",             icon: FileCheck,      route: "authorizations",         category: "Operations" },
 ];
 
 // Category visual language
@@ -151,8 +151,9 @@ const EChart = () => {
   const [filter, setFilter] = useState<"All" | Category>("All");
   const liveCounts = useEChartCounts(id);
   const liveStats = useEChartStats(id);
-
   // ALL hooks must be called before any early returns (Rules of Hooks)
+  const { openDrawer } = useRiskScore();
+
   const visibleTiles = ALL_TILES.filter(
     (t) => !t.roles || t.roles.includes(role as "admin" | "case_manager" | "billing" | "supervisor"),
   );
@@ -198,7 +199,6 @@ const EChart = () => {
   const allergies = "Document in Face Sheet";
   const specialInstructions = individual.diagnosis ?? "See care plan for details";
 
-  const { openDrawer } = useRiskScore();
   const computedRisk = calculateRiskScore(individual.id, loadRiskSettings(), individual.risk_score);
   const computedScore = computedRisk.total;
   const computedLevel = computedRisk.level;
@@ -207,12 +207,9 @@ const EChart = () => {
     <ICMShell title="eChart" showAIPanel={false}>
       <div className="space-y-4">
         <Breadcrumbs
-          backTo="/people"
-          backLabel="People Supported"
           items={[
             { label: "People Supported", to: "/people" },
-            { label: `${individual.first_name} ${individual.last_name}`, to: `/people/${individual.id}/profile` },
-            { label: "eChart" },
+            { label: `${individual.first_name} ${individual.last_name}` },
           ]}
         />
         {/* Person header card */}
@@ -348,17 +345,7 @@ const EChart = () => {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {tiles.map((t) => {
-                // Certain slugs navigate to the global list page instead of individual-scoped route
-                const globalRouteMap: Record<string, string> = {
-                  "monitoring-form": "/monitoring-form",
-                  "progress-note": "/progress-note",
-                  "visit-summary": "/visit-summary",
-                  "contact-note": "/modules/contact-note",
-                  "care-notes": "/modules/contact-note",
-                };
-                const destination = globalRouteMap[t.slug]
-                  ? globalRouteMap[t.slug]
-                  : `/people/${individual.id}/${t.route}`;
+                const destination = `/people/${individual.id}/${t.route}`;
                 return t.slug === "authorizations" ? (
                   <AuthorizationTileCard
                     key={t.slug}

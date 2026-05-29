@@ -5,8 +5,8 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ICMSpinner } from "@/components/icm/ICMSpinner";
 import { AppRole } from "@/lib/auth";
 import { isMFAEnrolled } from "@/lib/mfa";
 import { MFAEnrollModal } from "@/components/auth/MFAEnrollModal";
@@ -55,7 +55,7 @@ export default function ProtectedRoute({ children, requireRole }: ProtectedRoute
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf7ff]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+          <ICMSpinner size={48} />
           <p className="text-sm text-slate-500">Loading your workspace…</p>
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function ProtectedRoute({ children, requireRole }: ProtectedRoute
   if (isAuthenticated && !mfaCheckDone) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf7ff]">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+        <ICMSpinner size={48} />
       </div>
     );
   }

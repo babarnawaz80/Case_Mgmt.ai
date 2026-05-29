@@ -15,6 +15,10 @@ import { useProgressNote, updateProgressNote, saveProgressNote } from "@/hooks/u
 import { writeAudit } from "@/lib/auditService";
 import { AuthorCell } from "@/components/icm/AuthorCell";
 import { useAuth } from "@/contexts/AuthContext";
+import MentionInput from "@/components/icm/MentionInput";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { createBillingRecord } from "@/hooks/useBillingRecords";
 
 const PersonProgressNoteDetail = () => {
   const { id, noteId } = useParams<{ id: string; noteId: string }>();
@@ -33,6 +37,8 @@ const PersonProgressNoteDetail = () => {
   const [confirmReviewed, setConfirmReviewed] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
+  /** UIDs of staff members @-mentioned in the Next Steps field */
+  const [nextStepsMentions, setNextStepsMentions] = useState<string[]>([]);
 
   useEffect(() => {
     if (initialized) return;
@@ -227,6 +233,72 @@ const PersonProgressNoteDetail = () => {
         goalsProgress,
       });
       await writeAudit('edit_note', 'note', resolvedNoteId, { status: 'signed' });
+
+      // Auto-create billing record if note is billable
+      if (form.isBillable && userProfile?.organizationId && id) {
+        try {
+          const svcCode = form.serviceCode ?? "";
+          const computedUnitCount = (() => {
+            if (!form.startTime || !form.endTime) return 0;
+            const [sh, sm] = form.startTime.split(":").map(Number);
+            const [eh, em] = form.endTime.split(":").map(Number);
+            const mins = (eh * 60 + em) - (sh * 60 + sm);
+            return mins > 0 ? Math.floor(mins / 15) : 0;
+          })();
+          const noteUnits = (form.units ?? 0) > 0 ? (form.units ?? 0) : (computedUnitCount > 0 ? computedUnitCount : 1);
+          const rate = 28.5;
+          const hasComplete = !!svcCode && noteUnits > 0 && !!form.authorizationId;
+
+          // Check for existing record first (avoid duplicates if note was previously submitted)
+          // If the read fails due to permissions (shouldn't happen after rules fix), we proceed anyway
+          let alreadyExists = false;
+          try {
+            const existingSnap = await getDocs(
+              query(collection(db, "billing_records"), where("source_note_id", "==", resolvedNoteId))
+            );
+            alreadyExists = !existingSnap.empty;
+          } catch {
+            // If read check fails, attempt the create anyway — Firestore will reject duplicates
+            alreadyExists = false;
+          }
+
+          if (!alreadyExists) {
+            await createBillingRecord({
+              org_id: userProfile.organizationId,
+              individual_id: id,
+              individual_name: `${individual.last_name}, ${individual.first_name}`,
+              case_manager_id: userProfile.uid ?? "",
+              case_manager_name: authorName,
+              source_note_id: resolvedNoteId,
+              source_note_type: "progress_note",
+              source_note_url: `/people/${id}/progress-note/${resolvedNoteId}`,
+              service_code: svcCode,
+              service_description: "",
+              billing_unit_type: "15_min",
+              units: noteUnits,
+              rate_per_unit: rate,
+              total_amount: noteUnits * rate,
+              date_of_service: form.date ?? "",
+              start_time: form.startTime ?? "",
+              end_time: form.endTime ?? "",
+              duration_minutes: 0,
+              authorization_id: form.authorizationId ?? "",
+              authorization_number: form.authorizationId ?? "",
+              funding_stream_id: "",
+              payer_name: "",
+              payer_id: "",
+              validation_status: hasComplete ? "passed" : "pending",
+              billing_status: hasComplete ? "pending_scrub" : "needs_attention",
+              submitted_to_iddbilling: false,
+              remittance_received: false,
+              signed_by: userProfile.uid ?? "",
+            });
+          }
+        } catch (billingErr) {
+          console.error("[billing] Failed to create billing record on sign:", billingErr);
+          // Don't block note signing
+        }
+      }
 
       setForm({ ...form, status: "Signed", signedBy, signedOn: today });
       toast.success("Progress note signed successfully");
@@ -468,7 +540,20 @@ const PersonProgressNoteDetail = () => {
             <textarea disabled={isReadOnly} maxLength={4000} value={form.additionalObservations ?? ""} onChange={(e) => update("additionalObservations", e.target.value)} rows={4} className={textareaCls} placeholder="Any additional observations, concerns, or context not captured above" />
           </Field>
           <Field label="Next steps" aiSource={aiSourceFor("nextSteps")}>
-            <textarea disabled={isReadOnly} maxLength={4000} value={form.nextSteps ?? ""} onChange={(e) => update("nextSteps", e.target.value)} rows={4} className={textareaCls} placeholder="What follow-up actions are planned?" />
+            {isReadOnly ? (
+              <textarea disabled maxLength={4000} value={form.nextSteps ?? ""} rows={4} className={textareaCls} placeholder="What follow-up actions are planned?" />
+            ) : (
+              <MentionInput
+                value={form.nextSteps ?? ""}
+                onChange={(val, uids) => {
+                  update("nextSteps", val);
+                  setNextStepsMentions(uids);
+                }}
+                rows={4}
+                placeholder="What follow-up actions are planned? Type @ to mention a teammate"
+                className={textareaCls}
+              />
+            )}
           </Field>
         </Section>
 

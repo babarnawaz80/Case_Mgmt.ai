@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ChevronLeft, Sparkles, Save, Printer, Upload, X, AlertTriangle,
-  CheckCircle2, FileText, ShieldCheck, History, Plus, Trash2, Loader2,
+  CheckCircle2, FileText, ShieldCheck, History, Plus, Trash2, Loader2, Lock,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { AuthorCell } from "@/components/icm/AuthorCell";
@@ -53,6 +53,7 @@ const PersonEligibilityVerificationDetail = () => {
   const [docProcessing, setDocProcessing] = useState<"idle" | "processing" | "done">("idle");
   const [reminderCreated, setReminderCreated] = useState(false);
   const [showFundingForm, setShowFundingForm] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initialized) return;
@@ -94,12 +95,18 @@ const PersonEligibilityVerificationDetail = () => {
   const overdue = days !== undefined && days < 0;
   const tone = complianceToneFor(days);
 
-  const simulateUpload = () => {
-    update("documentName", "MA_Verification_Upload.pdf");
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    update("documentName", file.name);
     update("documentUploadedOn", new Date().toLocaleDateString("en-US"));
     setDocProcessing("processing");
     setTimeout(() => setDocProcessing("done"), 2000);
+    // Reset so the same file can be selected again
+    e.target.value = "";
   };
+
+  const simulateUpload = () => fileInputRef.current?.click();
 
   const fillFromDocument = () => {
     setForm((prev) => prev ? {
@@ -273,15 +280,48 @@ const PersonEligibilityVerificationDetail = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={handleSave} disabled={saving} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-50">
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
-            </button>
+            {/* Hidden real file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            {form.recordStatus === "Submitted" ? (
+              <>
+                <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-icm-border bg-icm-bg text-[12px] font-medium text-icm-text-dim">
+                  <Lock className="w-3.5 h-3.5" /> Read-only
+                </span>
+                <button
+                  onClick={() => { update("recordStatus", "Active"); toast("Record reopened for editing"); }}
+                  className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5"
+                >
+                  Reopen
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={handleSave} disabled={saving} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
+                </button>
+                <button
+                  onClick={() => { update("recordStatus", "Submitted"); setTimeout(handleSave, 50); }}
+                  disabled={saving}
+                  className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Submit
+                </button>
+              </>
+            )}
             <button onClick={() => window.print()} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
               <Printer className="w-3.5 h-3.5" /> Print
             </button>
-            <button onClick={simulateUpload} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
-              <Upload className="w-3.5 h-3.5" /> Upload document
-            </button>
+            {form.recordStatus !== "Submitted" && (
+              <button onClick={simulateUpload} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
+                <Upload className="w-3.5 h-3.5" /> Upload document
+              </button>
+            )}
           </div>
         </div>
 
@@ -305,6 +345,19 @@ const PersonEligibilityVerificationDetail = () => {
             </button>
           </div>
         )}
+
+        {/* Read-only banner for Submitted records */}
+        {form.recordStatus === "Submitted" && (
+          <div className="rounded-xl border border-icm-green/20 bg-icm-green-soft px-4 py-3 flex items-center gap-2.5">
+            <Lock className="w-4 h-4 text-icm-green shrink-0" />
+            <p className="text-[12.5px] font-geist text-icm-text">
+              <span className="font-semibold">This record has been submitted</span> — it is read-only. Click <strong>Reopen</strong> in the toolbar to make edits.
+            </p>
+          </div>
+        )}
+
+        {/* Wrap all form sections in a fieldset that disables when Submitted */}
+        <fieldset disabled={form.recordStatus === "Submitted"} className={form.recordStatus === "Submitted" ? "pointer-events-none opacity-80" : ""}>
 
         {/* SECTION 1: Eligibility Status */}
         <Section title="Current Eligibility Status" titleIcon={<ShieldCheck className="w-4 h-4 text-icm-accent" />}>
@@ -479,6 +532,8 @@ const PersonEligibilityVerificationDetail = () => {
         </Section>
 
         {/* HISTORY TIMELINE */}
+        </fieldset>{/* end read-only fieldset */}
+
         <Section title="Eligibility History" titleIcon={<History className="w-4 h-4 text-icm-text-dim" />}>
           <Timeline personId={individual.id} />
         </Section>

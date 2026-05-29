@@ -48,11 +48,27 @@ app.post("/api/billing/webhook", stripeWebhook);
 app.post("/api/billing/simulate-webhook", simulateWebhookPayment);
 
 // ─── Care Companion Bot API ────────────────────────────────────────────────
-import { companionGet, companionMessage, companionEndSession, companionDeepgramToken } from "./api/companion";
+import { companionGet, companionMessage, companionEndSession, companionDeepgramToken, companionAgentConfig, companionLLMProxy } from "./api/companion";
 app.get("/care-assistant/:token", companionGet);
 app.post("/care-assistant/:token/message", companionMessage);
 app.post("/care-assistant/:token/end-session", companionEndSession);
 app.post("/care-assistant/:token/deepgram-token", companionDeepgramToken);
+app.post("/care-assistant/:token/agent-config", companionAgentConfig);
+app.options("/care-assistant/:token/llm", companionLLMProxy);
+app.post("/care-assistant/:token/llm", companionLLMProxy);
+
+// ─── Gemini Proxy API ─────────────────────────────────────────────────────
+// Auth-protected. Uses Vertex AI ADC — no API key in any file.
+// Rate limit: 20 calls per authenticated user per hour (tracked in Firestore).
+import { geminiProxy } from "./api/geminiProxy";
+app.post("/api/gemini-proxy", geminiProxy);
+
+// ─── Staff User Management API ────────────────────────────────────────────
+// Uses Admin SDK so existing Firebase Auth accounts can be re-linked to an
+// org without hitting EMAIL_EXISTS errors.
+import { createOrUpdateStaffUser } from "./api/staffUsers";
+app.options("/api/staff/create-or-update", createOrUpdateStaffUser);
+app.post("/api/staff/create-or-update", createOrUpdateStaffUser);
 
 // ─── Compliance Agents API ────────────────────────────────────────────────
 import { runPcpRenewalAgent } from "./api/agents";
@@ -70,3 +86,6 @@ export { onNewBillingClaim, onWorkflowTaskDailyCheck } from "./triggers/billing-
 
 // ─── Scheduled Functions ──────────────────────────────────────────────────
 export { dailyAuthRenewalCheck } from "./api/authorizationRenewal";
+
+// ─── Brain Orchestrator ───────────────────────────────────────────────────────
+export { scheduledOrchestrator, manualOrchestratorRun } from "./orchestrator/brainOrchestrator";

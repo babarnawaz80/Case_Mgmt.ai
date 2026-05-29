@@ -95,7 +95,14 @@ const IncidentsGlobal = () => {
   const maxType = Math.max(1, ...typeBreak.map((t) => t[1]));
 
   const inReview = incidents.filter((i) => i.status === "in_review").length;
-  const closedTotal = incidents.filter((i) => i.status === "closed").length;
+  const now = new Date();
+  const closedThisMonth = incidents.filter((i) => {
+    if (i.status !== "closed") return false;
+    const ts = (i as any).closedAt ?? (i as any).updatedAt ?? (i as any).reportedAt;
+    if (!ts) return false;
+    const d = typeof ts === "object" && "seconds" in ts ? new Date(ts.seconds * 1000) : new Date(ts);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
 
   // Person picker list
   const pickerPeople = useMemo(() => {
@@ -203,7 +210,7 @@ const IncidentsGlobal = () => {
             <SummaryChip label="Total open" value={totalOpen} tone="red" />
             <SummaryChip label="Step 1 Pending" value={inReview} tone="amber" />
             <SummaryChip label="Overdue (7d+)" value={overdue} tone="red" />
-            <SummaryChip label="Closed" value={closedTotal} tone="green" />
+            <SummaryChip label="Closed This Month" value={closedThisMonth} tone="green" />
           </div>
         )}
 

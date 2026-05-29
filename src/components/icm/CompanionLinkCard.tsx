@@ -494,6 +494,16 @@ function PromptModal({
   );
 }
 
+// ── Voice model options ─────────────────────────────────────────────────────
+const VOICE_OPTIONS = [
+  { value: "aura-luna-en",   label: "Luna (default)"  },
+  { value: "aura-stella-en", label: "Stella"           },
+  { value: "aura-athena-en", label: "Athena"           },
+  { value: "aura-hera-en",   label: "Hera"             },
+  { value: "aura-orion-en",  label: "Orion"            },
+  { value: "aura-arcas-en",  label: "Arcas"            },
+];
+
 // ── Main card component ─────────────────────────────────────────────────────
 export function CompanionLinkCard({ individual, individualId }: CompanionLinkCardProps) {
   const { currentUser } = useAuth();
@@ -502,8 +512,23 @@ export function CompanionLinkCard({ individual, individualId }: CompanionLinkCar
   const [deactivating, setDeactivating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const [savingVoice, setSavingVoice] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  const currentVoice = (individual as any).companion_voice || "aura-luna-en";
+
+  const saveVoice = async (voice: string) => {
+    setSavingVoice(true);
+    try {
+      await updateDoc(doc(db, "individuals", individual.id), { companion_voice: voice });
+      toast.success("Voice updated.");
+    } catch {
+      toast.error("Failed to save voice selection.");
+    } finally {
+      setSavingVoice(false);
+    }
+  };
 
   const isActive = individual.companion_link_active === true;
   const token = individual.companion_token;
@@ -679,6 +704,27 @@ export function CompanionLinkCard({ individual, individualId }: CompanionLinkCar
               </div>
             </div>
           )}
+
+          {/* Voice selector */}
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide shrink-0">
+              Voice
+            </p>
+            <div className="relative">
+              <select
+                value={currentVoice}
+                disabled={savingVoice}
+                onChange={(e) => saveVoice(e.target.value)}
+                className="h-7 pl-2.5 pr-7 rounded-lg text-[11.5px] font-geist font-medium border border-icm-border bg-icm-bg text-icm-text appearance-none cursor-pointer hover:border-purple-500/40 hover:text-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 transition-colors disabled:opacity-50"
+              >
+                {VOICE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-icm-text-dim" />
+            </div>
+            <span className="text-[10.5px] font-geist text-icm-text-faint">AI voice for the companion</span>
+          </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-wrap">

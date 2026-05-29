@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Sparkles, Mic, MicOff, Loader2, Wand2, ChevronDown, Check, Globe2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
 
 // ─── Web Speech API typings (browsers expose this globally) ─────────────────
 type SpeechRecognitionAlt = any;
@@ -38,8 +39,7 @@ const REWRITE_ACTIONS: { id: string; label: string; description: string }[] = [
   { id: "grammar",      label: "Fix grammar & spelling", description: "Correct mechanics only" },
   { id: "soap",         label: "Convert to SOAP format", description: "Subjective / Objective / Assessment / Plan" },
 ];
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+// AI rewrite calls are handled server-side. The frontend must NOT call Gemini directly.
 
 const REWRITE_PROMPTS: Record<string, string> = {
   improve:      "Improve the clarity and readability of the following clinical case management note. Fix awkward phrasing, tighten sentences, and ensure professional language. Return ONLY the rewritten text, no explanations.",
@@ -50,39 +50,50 @@ const REWRITE_PROMPTS: Record<string, string> = {
   soap:         "Convert the following clinical note into SOAP format (Subjective, Objective, Assessment, Plan). Label each section clearly. Return ONLY the SOAP-formatted note, no explanations.",
 };
 
-async function callGeminiRewrite(text: string, action: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("AI writing assistant is not configured. Please contact your administrator to set up the VITE_GEMINI_API_KEY.");
-  }
-  const systemPrompt = REWRITE_PROMPTS[action] ?? REWRITE_PROMPTS.improve;
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `${systemPrompt}\n\n---\n\n${text}` }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 2048,
-    },
-  };
+// ─── AI rewrite via geminiProxy Cloud Function ────────────────────────────────
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+const GEMINI_PROXY_URL =
+  "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/gemini-proxy";
 
-  const res = await fetch(GEMINI_ENDPOINT, {
+async function callGeminiRewrite(text: string, action: string): Promise<string> {
+  // Demo mode: simulate rewrite delay without an API call
+  if (DEMO_MODE) {
+    await new Promise((r) => setTimeout(r, 700));
+    return text;
+  }
+
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) throw new Error("Not signed in. Please sign in and try again.");
+
+  const systemPrompt =
+    "You are a clinical documentation assistant for a healthcare case management platform. " +
+    "Follow the instruction exactly. Return ONLY the rewritten text — no preamble, no labels, no explanations.";
+
+  const prompt = `${REWRITE_PROMPTS[action] ?? REWRITE_PROMPTS.improve}\n\n---\n\n${text}`;
+
+  const res = await fetch(GEMINI_PROXY_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ prompt, systemPrompt, maxTokens: 4096, temperature: 0.3 }),
   });
 
+  if (res.status === 401 || res.status === 403)
+    throw new Error("Authentication failed. Please sign in again.");
+  if (res.status === 429) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? "Rate limit reached. You can make up to 20 AI requests per hour.");
+  }
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errText}`);
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `AI service error (HTTP ${res.status})`);
   }
 
   const data = await res.json();
-  const output = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!output) throw new Error("Empty response from Gemini");
-  return output.trim();
+  if (!data.text) throw new Error("AI service returned an empty response.");
+  return data.text as string;
 }
 
 export interface SmartTextareaProps

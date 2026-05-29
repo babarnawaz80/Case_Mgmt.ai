@@ -23,6 +23,7 @@ exports.COLLECTIONS = {
     CREDIT_HISTORY: "credit_history",
     AUDIT_LOG: "audit_log",
     NOTIFICATIONS: "notifications",
+    GEMINI_RATE_LIMITS: "geminiRateLimits",
 };
 exports.CONFIG_DOCS = {
     AI_ROUTING: "ai_routing",

@@ -109,6 +109,7 @@ const RuleLibrary = lazyWithRetry(() => import("./pages/platform/RuleLibrary"));
 const ComplianceAgentsList = lazyWithRetry(() => import("./pages/platform/ComplianceAgentsList"));
 const NewAgentWizard = lazyWithRetry(() => import("./pages/platform/NewAgentWizard"));
 const AgentDetail = lazyWithRetry(() => import("./pages/platform/AgentDetail"));
+const BrainOrchestrator = lazyWithRetry(() => import("./pages/platform/BrainOrchestrator"));
 const AssessmentBuilderList = lazyWithRetry(() => import("./pages/admin/AssessmentBuilderList"));
 const AssessmentBuilderEdit = lazyWithRetry(() => import("./pages/admin/AssessmentBuilderEdit"));
 const PersonAssessments = lazyWithRetry(() => import("./pages/PersonAssessments"));
@@ -376,6 +377,7 @@ const App = () => (
             <Route path="/platform/agents/:agentId/runs" element={<ProtectedRoute><Layer2AgentBuilder /></ProtectedRoute>} />
             <Route path="/platform/agents/:agentId/drafts" element={<ProtectedRoute><AgentDraftRuns /></ProtectedRoute>} />
             <Route path="/platform/agents/:agentId/monitoring" element={<ProtectedRoute requireRole="admin"><AgentMonitoringSettings /></ProtectedRoute>} />
+            <Route path="/platform/orchestrator" element={<ProtectedRoute requireRole="supervisor"><BrainOrchestrator /></ProtectedRoute>} />
 
             {/* Per-person placeholder routes */}
             <Route path="/people/:id/care-tracker" element={<ProtectedRoute><PersonCareTracker /></ProtectedRoute>} />

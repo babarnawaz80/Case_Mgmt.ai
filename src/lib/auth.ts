@@ -187,7 +187,15 @@ function getFriendlyAuthError(code: string): string {
       return 'Too many attempts. Try again later.';
     case 'auth/network-request-failed':
       return 'Network error. Please check your connection and try again.';
+    case 'auth/project-not-found':
+    case 'auth/quota-exceeded':
+      return 'This Firebase project is currently suspended. Please contact support. (auth/quota-exceeded)';
+    case 'auth/internal-error':
+      return 'Firebase internal error — the project may be suspended or misconfigured. (auth/internal-error)';
+    case 'auth/operation-not-allowed':
+      return 'Email/password sign-in is disabled for this project. Enable it in the Firebase Console.';
     default:
-      return 'Authentication failed. Please try again.';
+      // Show the raw code so we can diagnose unexpected errors
+      return `Authentication error (${code}). Please contact support.`;
   }
 }

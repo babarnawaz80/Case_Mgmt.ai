@@ -68,6 +68,7 @@ const PersonProfile = () => {
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [echartOpen, setEchartOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<"active" | "transition" | "discharged" | "pending" | null>(null);
 
   const getStatusStyles = (status?: string) => {
     const s = (status ?? "active").toLowerCase();
@@ -95,23 +96,43 @@ const PersonProfile = () => {
     };
   };
 
-  const handleStatusChange = async (newStatus: "active" | "transition" | "discharged" | "pending") => {
+  const handleStatusChange = async (
+    newStatus: "active" | "transition" | "discharged" | "pending",
+    extra?: { reason: string; effectiveDate: string; notes: string; notified: string[] }
+  ) => {
     if (!person) return;
     try {
       const friendlyStatus =
-        newStatus === "active"
-          ? "Active"
-          : newStatus === "transition"
-          ? "Transition"
-          : newStatus === "discharged"
-          ? "Discharged"
-          : "Pending";
+        newStatus === "active" ? "Active" :
+        newStatus === "transition" ? "Transition" :
+        newStatus === "discharged" ? "Discharged" : "Pending";
       await updateIndividual(person.id, {
         enrollment_status: newStatus,
         status: friendlyStatus,
+        ...(extra ? {
+          status_change_reason: extra.reason,
+          status_change_date: extra.effectiveDate,
+          status_change_notes: extra.notes,
+          status_notified: extra.notified,
+          status_changed_at: new Date().toISOString(),
+        } : {}),
       });
+      // Log to audit trail in Firestore
+      if (extra) {
+        await addDoc(collection(db, "status_change_log"), {
+          individualId: person.id,
+          individualName: `${person.first_name} ${person.last_name}`,
+          newStatus: friendlyStatus,
+          reason: extra.reason,
+          effectiveDate: extra.effectiveDate,
+          notes: extra.notes,
+          notified: extra.notified,
+          changedAt: serverTimestamp(),
+        });
+      }
       toast.success(`Status updated to ${friendlyStatus}`);
       setStatusOpen(false);
+      setPendingStatus(null);
     } catch (err: any) {
       toast.error(`Failed to update status: ${err.message}`);
     }
@@ -222,19 +243,19 @@ const PersonProfile = () => {
                     <div className="absolute left-0 top-10 z-30 w-[150px] rounded-xl border border-icm-border bg-icm-panel shadow-elevated overflow-hidden">
                       <DropdownItem
                         label="Active"
-                        onClick={() => handleStatusChange("active")}
+                        onClick={() => { setStatusOpen(false); setPendingStatus("active"); }}
                       />
                       <DropdownItem
                         label="Pending"
-                        onClick={() => handleStatusChange("pending")}
+                        onClick={() => { setStatusOpen(false); setPendingStatus("pending"); }}
                       />
                       <DropdownItem
                         label="Transition"
-                        onClick={() => handleStatusChange("transition")}
+                        onClick={() => { setStatusOpen(false); setPendingStatus("transition"); }}
                       />
                       <DropdownItem
                         label="Discharged"
-                        onClick={() => handleStatusChange("discharged")}
+                        onClick={() => { setStatusOpen(false); setPendingStatus("discharged"); }}
                       />
                     </div>
                   )}
@@ -363,11 +384,11 @@ const PersonProfile = () => {
         {tab === "basic" && (
             <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} personId={person.id} />
         )}
-        {tab === "medical" && <MedicalInfoTab profile={profile} />}
+        {tab === "medical" && <MedicalInfoTab profile={profile} person={person} />}
         {tab === "monitors" && <MonitorsTab profile={profile} />}
         {tab === "court" && <CourtTab profile={profile} />}
         {tab === "program" && <ProgramTab profile={profile} />}
-        {tab === "contacts" && <ContactsTab profile={profile} />}
+        {tab === "contacts" && <ContactsTab profile={profile} person={person} />}
         {tab === "documents" && <DocumentsTab profile={profile} />}
         {tab === "administrative" && <AdminTab profile={profile} person={person} />}
 
@@ -381,6 +402,14 @@ const PersonProfile = () => {
           />
         )}
       </div>
+      {pendingStatus && person && (
+        <StatusChangeModal
+          personName={`${person.first_name} ${person.last_name}`}
+          newStatus={pendingStatus}
+          onConfirm={(extra) => handleStatusChange(pendingStatus, extra)}
+          onClose={() => setPendingStatus(null)}
+        />
+      )}
     </ICMShell>
   );
 };
@@ -492,19 +521,32 @@ function BasicInfoTab({
 
   return (
     <div className="space-y-4">
-      <Section title="Personal Information">
+      <Section title="Personal Information" onSave={async (data) => {
+        await updateIndividual(personId, {
+          ...(data.first_name && { first_name: data.first_name }),
+          ...(data.last_name && { last_name: data.last_name }),
+          preferred_name: data.preferred_name ?? "",
+          ...(data.dob && { dob: data.dob }),
+          ...(data.gender && { gender: data.gender }),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-          <EditableField label="First Name" defaultValue={person.first_name} required />
-          <EditableField label="Middle Name" defaultValue={profile.middleName ?? ""} />
-          <EditableField label="Last Name" defaultValue={person.last_name} required />
-          <EditableField label="Preferred Name / Also Known As" defaultValue={profile.preferredName ?? ""} />
-          <EditableField label="Date of Birth" defaultValue={person.dob} required hint={`Age: ${calcAge(person.dob)}y`} />
-          <EditableSelect label="Gender" defaultValue={person.gender === "M" ? "Male" : "Female"} options={GENDER_OPTIONS} />
-          <EditableField label="Pronouns" defaultValue={profile.pronouns ?? ""} />
-          <EditableSelect label="Primary Language" defaultValue={profile.primaryLanguage} options={LANGUAGE_OPTIONS} required />
-          <EditableSelect label="Secondary Language" defaultValue={profile.secondaryLanguage ?? ""} options={["—", ...LANGUAGE_OPTIONS]} />
+          <EditableField label="First Name" name="first_name" defaultValue={person.first_name} required />
+          <EditableField label="Middle Name" name="middle_name" defaultValue={profile.middleName ?? ""} />
+          <EditableField label="Last Name" name="last_name" defaultValue={person.last_name} required />
+          <EditableField label="Preferred Name / Also Known As" name="preferred_name" defaultValue={profile.preferredName ?? person.preferred_name ?? ""} />
+          <EditableField label="Date of Birth" name="dob" defaultValue={person.dob ?? ""} required hint={`Age: ${calcAge(person.dob)}y`} />
+          <EditableSelect label="Gender" name="gender" defaultValue={person.gender === "M" ? "Male" : person.gender ?? "Female"} options={GENDER_OPTIONS} />
+          <EditableField label="Pronouns" name="pronouns" defaultValue={profile.pronouns ?? ""} />
+          <EditableSelect label="Primary Language" name="primary_language" defaultValue={profile.primaryLanguage} options={LANGUAGE_OPTIONS} required />
+          <EditableSelect label="Secondary Language" name="secondary_language" defaultValue={profile.secondaryLanguage ?? ""} options={["—", ...LANGUAGE_OPTIONS]} />
           <div className="md:col-span-2">
-            <EditableField label="Communication Needs" defaultValue={profile.communicationNeeds ?? ""} multiline />
+            <EditableField label="Communication Needs" name="communication_needs" defaultValue={profile.communicationNeeds ?? ""} multiline />
+          </div>
+          <EditableField label="Marital Status" name="marital_status" defaultValue={person.marital_status ?? ""} />
+          <EditableField label="Religion" name="religion" defaultValue={person.religion ?? ""} />
+          <div className="md:col-span-2">
+            <EditableField label="Communication Notes" name="communication_notes" defaultValue={person.communication_notes ?? ""} multiline />
           </div>
           <div className="md:col-span-2">
             <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">Race / Ethnicity</label>
@@ -523,15 +565,21 @@ function BasicInfoTab({
         </div>
       </Section>
 
-      <Section title="Address & Location">
+      <Section title="Address & Location" onSave={async (data) => {
+        const parts = [data.street, data.city, data.state, data.zip].filter(Boolean);
+        await updateIndividual(personId, {
+          address: parts.join(", ") || undefined,
+          ...(data.county && { county: data.county }),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <div className="md:col-span-2">
-            <EditableField label="Street Address" defaultValue={profile.street ?? ""} />
+            <EditableField label="Street Address" name="street" defaultValue={profile.street ?? ""} />
           </div>
-          <EditableField label="City" defaultValue={profile.city ?? ""} />
-          <EditableSelect label="State" defaultValue={profile.state ?? ""} options={US_STATES} />
-          <EditableField label="ZIP Code" defaultValue={profile.zip ?? ""} />
-          <EditableField label="County" defaultValue={person.county} required hint="Drives program assignment" />
+          <EditableField label="City" name="city" defaultValue={profile.city ?? ""} />
+          <EditableSelect label="State" name="state" defaultValue={profile.state ?? ""} options={US_STATES} />
+          <EditableField label="ZIP Code" name="zip" defaultValue={profile.zip ?? ""} />
+          <EditableField label="County" name="county" defaultValue={person.county ?? ""} required hint="Drives program assignment" />
           {/* Living Situation — connected field */}
           <div className="md:col-span-2">
             <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">
@@ -562,7 +610,11 @@ function BasicInfoTab({
         </div>
       </Section>
 
-      <Section title="Identification">
+      <Section title="Identification" onSave={async (data) => {
+        await updateIndividual(personId, {
+          ...(data.medicaid_id && { medicaid_id: data.medicaid_id }),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <div className="flex items-center gap-2">
             <div className="flex-1">
@@ -580,21 +632,28 @@ function BasicInfoTab({
               </div>
             </div>
           </div>
-          <EditableField label="Medicaid ID / MA Number" defaultValue={profile.medicaidId ?? ""} required />
-          <EditableField label="Medicare ID" defaultValue={profile.medicareId ?? ""} />
-          <EditableField label="State ID / Client ID" defaultValue={profile.stateId ?? ""} />
-          <EditableField label="LTSS ID" defaultValue={profile.ltssId ?? ""} />
-          <EditableField label="Date of Admission" defaultValue={person.admittedOn} required />
-          <EditableSelect label="Referral Source" defaultValue={profile.referralSource ?? ""} options={["", ...REFERRAL_OPTIONS]} />
+          <EditableField label="Medicaid ID / MA Number" name="medicaid_id" defaultValue={person.medicaid_id ?? profile.medicaidId ?? ""} required />
+          <EditableField label="Medicare ID" name="medicare_id" defaultValue={profile.medicareId ?? ""} />
+          <EditableField label="State ID / Client ID" name="state_id" defaultValue={profile.stateId ?? ""} />
+          <EditableField label="LTSS ID" name="ltss_id" defaultValue={profile.ltssId ?? ""} />
+          <EditableField label="Date of Admission" name="admitted_on" defaultValue={person.admittedOn ?? ""} required />
+          <EditableSelect label="Referral Source" name="referral_source" defaultValue={profile.referralSource ?? ""} options={["", ...REFERRAL_OPTIONS]} />
         </div>
       </Section>
 
-      <Section title="Contact">
+      <Section title="Contact" onSave={async (data) => {
+        await updateIndividual(personId, {
+          ...(data.primary_phone && { phone: data.primary_phone }),
+          ...(data.email && { email: data.email }),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-          <EditableField label="Primary Phone" defaultValue={profile.primaryPhone ?? ""} required />
-          <EditableField label="Secondary Phone" defaultValue={profile.secondaryPhone ?? ""} />
-          <EditableField label="Email Address" defaultValue={profile.email ?? ""} />
-          <EditableSelect label="Preferred Contact Method" defaultValue={profile.preferredContact ?? ""} options={["", ...CONTACT_PREF_OPTIONS]} />
+          <EditableField label="Primary Phone" name="primary_phone" defaultValue={person.phone ?? profile.primaryPhone ?? ""} required />
+          <EditableField label="Secondary Phone" name="secondary_phone" defaultValue={profile.secondaryPhone ?? ""} />
+          <EditableField label="Home Phone" name="phone_home" defaultValue={person.phone_home ?? ""} />
+          <EditableField label="Cell Phone" name="phone_cell" defaultValue={person.phone_cell ?? ""} />
+          <EditableField label="Email Address" name="email" defaultValue={person.email ?? profile.email ?? ""} />
+          <EditableSelect label="Preferred Contact Method" name="preferred_contact" defaultValue={profile.preferredContact ?? ""} options={["", ...CONTACT_PREF_OPTIONS]} />
         </div>
       </Section>
     </div>
@@ -603,8 +662,8 @@ function BasicInfoTab({
 
 // Small reusable editable field (reads disabled state from parent fieldset)
 function EditableField({
-  label, defaultValue, required, hint, multiline,
-}: { label: string; defaultValue: string; required?: boolean; hint?: string; multiline?: boolean }) {
+  label, defaultValue, required, hint, multiline, name,
+}: { label: string; defaultValue: string; required?: boolean; hint?: string; multiline?: boolean; name?: string }) {
   return (
     <div>
       <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">
@@ -612,23 +671,23 @@ function EditableField({
         {hint && <span className="ml-1.5 normal-case text-[10px] text-icm-text-faint">({hint})</span>}
       </label>
       {multiline ? (
-        <textarea className="modal-input min-h-[60px] py-1.5 px-2" defaultValue={defaultValue} />
+        <textarea className="modal-input min-h-[60px] py-1.5 px-2" name={name} defaultValue={defaultValue} />
       ) : (
-        <input className="modal-input" defaultValue={defaultValue} />
+        <input className="modal-input" name={name} defaultValue={defaultValue} />
       )}
     </div>
   );
 }
 
 function EditableSelect({
-  label, defaultValue, options, required,
-}: { label: string; defaultValue: string; options: string[]; required?: boolean }) {
+  label, defaultValue, options, required, name,
+}: { label: string; defaultValue: string; options: string[]; required?: boolean; name?: string }) {
   return (
     <div>
       <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">
         {label}{required && <span className="text-icm-red ml-0.5">*</span>}
       </label>
-      <select className="modal-input" defaultValue={defaultValue}>
+      <select className="modal-input" name={name} defaultValue={defaultValue}>
         {options.map((opt) => <option key={opt} value={opt}>{opt || "— Select —"}</option>)}
       </select>
     </div>
@@ -638,7 +697,7 @@ function EditableSelect({
 // =============================================================
 // TAB 2 — Medical Info
 // =============================================================
-function MedicalInfoTab({ profile }: { profile: ProfileData }) {
+function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Individual }) {
   return (
     <div className="space-y-4">
       <Section title="Diagnoses">
@@ -764,6 +823,48 @@ function MedicalInfoTab({ profile }: { profile: ProfileData }) {
           emptyText="No insurance on file."
           addLabel="Add insurance"
         />
+      </Section>
+
+      <Section title="Clinical Summary">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <div className="md:col-span-2">
+            <EditableField label="Primary Diagnosis" name="primary_diagnosis" defaultValue={person.primary_diagnosis ?? ""} />
+          </div>
+          <div className="md:col-span-2">
+            <EditableField label="Secondary Diagnoses" name="secondary_diagnoses" defaultValue={person.secondary_diagnoses ?? ""} />
+          </div>
+          <div className="md:col-span-2">
+            <EditableField label="ICD-10 Codes" name="icd10_codes" defaultValue={person.icd10_codes ?? ""} />
+          </div>
+          <div className="md:col-span-2">
+            <EditableField label="Medical Notes" name="medical_notes" defaultValue={person.medical_notes ?? ""} multiline />
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Primary Physician">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Physician Name" name="primary_physician_name" defaultValue={person.primary_physician_name ?? ""} />
+          <EditableField label="Physician Phone" name="primary_physician_phone" defaultValue={person.primary_physician_phone ?? ""} />
+          <EditableField label="Hospital Preference" name="hospital_preference" defaultValue={person.hospital_preference ?? ""} />
+        </div>
+      </Section>
+
+      <Section title="Medicaid (MA) Details">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="MA Status" name="ma_status" defaultValue={person.ma_status ?? ""} />
+          <EditableField label="MA ID" name="ma_id" defaultValue={person.ma_id ?? ""} />
+          <EditableField label="MA Type" name="ma_type" defaultValue={person.ma_type ?? ""} />
+          <EditableField label="MA Effective Date" name="ma_effective_date" defaultValue={person.ma_effective_date ?? ""} />
+          <EditableField label="MA Redetermination Date" name="ma_redetermination_date" defaultValue={person.ma_redetermination_date ?? ""} />
+        </div>
+      </Section>
+
+      <Section title="Secondary Insurance">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Secondary Insurance Name" name="secondary_insurance_name" defaultValue={person.secondary_insurance_name ?? ""} />
+          <EditableField label="Secondary Insurance ID" name="secondary_insurance_id" defaultValue={person.secondary_insurance_id ?? ""} />
+        </div>
       </Section>
     </div>
   );
@@ -1371,7 +1472,7 @@ function ModalField({ label, children }: { label: string; children: React.ReactN
 // =============================================================
 // TAB 6 — Contacts
 // =============================================================
-function ContactsTab({ profile }: { profile: ProfileData }) {
+function ContactsTab({ profile, person }: { profile: ProfileData; person: Individual }) {
   const stale = profile.professionalContacts.filter((c) => c.lastContacted && monthsAgo(c.lastContacted) >= 3);
   return (
     <div className="space-y-4">
@@ -1404,6 +1505,27 @@ function ContactsTab({ profile }: { profile: ProfileData }) {
           <button className="mt-1 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1" id="add-emergency-contact">
             <Plus className="w-3.5 h-3.5" /> Add contact
           </button>
+        </div>
+      </Section>
+
+      <Section title="Emergency Contact (Primary)">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Name" name="emergency_contact_name" defaultValue={person.emergency_contact_name ?? ""} />
+          <EditableField label="Relationship" name="emergency_contact_relation" defaultValue={person.emergency_contact_relation ?? ""} />
+          <EditableField label="Phone" name="emergency_contact_phone" defaultValue={person.emergency_contact_phone ?? ""} />
+          <EditableField label="Alternate Phone" name="emergency_contact_phone2" defaultValue={person.emergency_contact_phone2 ?? ""} />
+          <EditableField label="Email" name="emergency_contact_email" defaultValue={person.emergency_contact_email ?? ""} />
+        </div>
+      </Section>
+
+      <Section title="Guardian / POA">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Guardian Name" name="guardian_name" defaultValue={person.guardian_name ?? ""} />
+          <EditableField label="Guardian Relationship" name="guardian_relationship" defaultValue={person.guardian_relationship ?? ""} />
+          <EditableField label="Guardian Phone" name="guardian_phone" defaultValue={person.guardian_phone ?? ""} />
+          <EditableField label="Guardian Email" name="guardian_email" defaultValue={person.guardian_email ?? ""} />
+          <EditableField label="POA Name" name="poa_name" defaultValue={person.poa_name ?? ""} />
+          <EditableField label="POA Phone" name="poa_phone" defaultValue={person.poa_phone ?? ""} />
         </div>
       </Section>
 
@@ -1560,7 +1682,7 @@ function DocumentsTab({ profile }: { profile: ProfileData }) {
 // =============================================================
 // TAB 8 — Administrative
 // =============================================================
-const DISCHARGE_REASONS = [
+const ADMIN_DISCHARGE_REASONS = [
   "Completed services", "Individual request", "Non-compliance",
   "Moved out of area", "Deceased", "Other",
 ];
@@ -1619,11 +1741,36 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
       <Section title="Intake & Discharge">
         <KvGrid
           rows={[
-            ["Referral date", profile.referralDate ?? "—"],
+            ["Referral date", person.referral_date ?? profile.referralDate ?? "—"],
+            ["Referral source", person.referral_source ?? "—"],
+            ["Admission date", person.admission_date ?? person.admittedOn ?? "—"],
             ["Admission type", profile.admissionType ?? "—"],
             ["Previous agency", profile.previousAgency ?? "—"],
-            ["Discharge date", profile.dischargeDate ?? (dischargeDone ? dischargeDate : "—")],
+            ["Discharge date", person.discharge_date ?? profile.dischargeDate ?? (dischargeDone ? dischargeDate : "—")],
             ["Discharge reason", profile.dischargeReason ?? (dischargeDone ? dischargeReason : "—")],
+          ]}
+        />
+      </Section>
+
+      <Section title="Program & Service">
+        <KvGrid
+          rows={[
+            ["Program type", person.program_type ?? "—"],
+            ["Waiver type", person.waiver_type ?? "—"],
+            ["Service category", person.service_category ?? "—"],
+            ["Funding stream", person.funding_stream ?? "—"],
+            ["Case number", person.case_number ?? "—"],
+          ]}
+        />
+      </Section>
+
+      <Section title="Legal & Care Planning">
+        <KvGrid
+          rows={[
+            ["Legal status", person.legal_status ?? "—"],
+            ["PCP status", person.pcp_status ?? "—"],
+            ["Next ISP date", person.next_isp_date ?? "—"],
+            ["Last annual plan date", person.last_annual_plan_date ?? "—"],
           ]}
         />
       </Section>
@@ -1717,7 +1864,7 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
               <ModalField label="Reason for Discharge (required)">
                 <select className="modal-input" value={dischargeReason} onChange={(e) => setDischargeReason(e.target.value)}>
                   <option value="">— Select —</option>
-                  {DISCHARGE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {ADMIN_DISCHARGE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </ModalField>
               <ModalField label="Notes (optional)">
@@ -1755,15 +1902,22 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
 // =============================================================
 // Reusable bits
 // =============================================================
-function Section({ title, children, onSave }: { title: string; children: React.ReactNode; onSave?: () => Promise<void> }) {
+function Section({ title, children, onSave }: {
+  title: string;
+  children: React.ReactNode;
+  onSave?: (data: Record<string, string>) => Promise<void>;
+}) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const handleSave = async () => {
     if (onSave) {
       setSaving(true);
       try {
-        await onSave();
+        const formData = formRef.current ? new FormData(formRef.current) : new FormData();
+        const data = Object.fromEntries(formData.entries()) as Record<string, string>;
+        await onSave(data);
         toast.success(`${title} saved`);
       } catch (err) {
         console.error(`Failed to save ${title}:`, err);
@@ -1783,7 +1937,7 @@ function Section({ title, children, onSave }: { title: string; children: React.R
       editing ? "border-icm-accent ring-1 ring-icm-accent/30" : "border-icm-border"
     )}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">
+        <h3 className="icm-section-title">
           {title}
           {editing && <span className="ml-2 text-[10px] font-geist font-medium uppercase tracking-wide text-icm-accent">Editing</span>}
         </h3>
@@ -1816,9 +1970,11 @@ function Section({ title, children, onSave }: { title: string; children: React.R
           </button>
         )}
       </div>
-      <fieldset disabled={!editing} className={cn(!editing && "pointer-events-none select-text")}>
-        {children}
-      </fieldset>
+      <form ref={formRef} onSubmit={(e) => e.preventDefault()}>
+        <fieldset disabled={!editing} className={cn(!editing && "pointer-events-none select-text")}>
+          {children}
+        </fieldset>
+      </form>
       <style>{`.modal-input { width:100%; height:32px; padding:0 8px; border-radius:8px; border:1px solid hsl(var(--icm-border)); background:white; font-size:12px; color:hsl(var(--icm-text)); font-family: inherit; }
       textarea.modal-input { padding:8px; height:auto; }
       fieldset:disabled .modal-input { background: hsl(var(--icm-bg)); color: hsl(var(--icm-text)); cursor: default; }`}</style>
@@ -2296,6 +2452,242 @@ function monthsAgo(mdy: string): number {
   const target = new Date(y, m - 1, d);
   const today = new Date();
   return (today.getFullYear() - target.getFullYear()) * 12 + (today.getMonth() - target.getMonth());
+}
+
+// ── Status Change Modal ───────────────────────────────────────────────────────
+const DISCHARGE_REASONS = [
+  "Completed Services",
+  "Voluntary Discharge",
+  "Moved Out of Area / Jurisdiction",
+  "Non-Compliance",
+  "Transferred to Another Agency",
+  "Hospitalization / Residential Placement",
+  "Incarceration",
+  "Deceased",
+  "Administrative Closure",
+  "No Longer Meets Eligibility",
+  "Other",
+];
+const TRANSITION_REASONS = [
+  "Moving to New Program",
+  "Level of Care Change",
+  "Provider Transfer",
+  "Graduation / Step-Down",
+  "Step-Up to Higher Level of Care",
+  "Other",
+];
+const PENDING_REASONS = [
+  "Awaiting Authorization Approval",
+  "Awaiting Documentation",
+  "On Hold — Client Request",
+  "On Hold — Administrative",
+  "Intake in Progress",
+  "Other",
+];
+const REACTIVATION_REASONS = [
+  "Returned from Discharge",
+  "Authorization Reinstated",
+  "Administrative Correction",
+  "New Referral / Re-enrollment",
+  "Other",
+];
+
+function StatusChangeModal({
+  personName,
+  newStatus,
+  onConfirm,
+  onClose,
+}: {
+  personName: string;
+  newStatus: "active" | "transition" | "discharged" | "pending";
+  onConfirm: (extra: { reason: string; effectiveDate: string; notes: string; notified: string[] }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const today = new Date().toISOString().split("T")[0];
+  const [reason, setReason] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(today);
+  const [notes, setNotes] = useState("");
+  const [notified, setNotified] = useState<string[]>(["Case Manager", "Supervisor"]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const friendlyStatus =
+    newStatus === "active" ? "Active" :
+    newStatus === "transition" ? "Transition" :
+    newStatus === "discharged" ? "Discharged" : "Pending";
+
+  const reasons =
+    newStatus === "discharged" ? DISCHARGE_REASONS :
+    newStatus === "transition" ? TRANSITION_REASONS :
+    newStatus === "pending" ? PENDING_REASONS : REACTIVATION_REASONS;
+
+  const statusColor =
+    newStatus === "active" ? "text-icm-green bg-icm-green-soft ring-icm-green/20" :
+    newStatus === "discharged" ? "text-icm-red bg-icm-red-soft ring-icm-red/20" :
+    newStatus === "transition" ? "text-icm-amber bg-icm-amber-soft ring-icm-amber/20" :
+    "text-icm-accent bg-icm-accent-soft ring-icm-accent/20";
+
+  const NOTIFY_OPTIONS = ["Case Manager", "Supervisor", "Billing Team", "Service Providers", "Primary Contact"];
+
+  const toggleNotify = (opt: string) => {
+    setNotified((prev) =>
+      prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newStatus === "discharged" && !reason) {
+      setError("Please select a reason for discharge.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onConfirm({ reason, effectiveDate, notes, notified });
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-border w-full max-w-lg mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[15px] font-bold text-foreground">Status Change</h2>
+            <p className="text-[12px] text-muted-foreground mt-0.5">
+              {personName} →{" "}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${statusColor}`}>
+                {friendlyStatus}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {/* Reason */}
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Reason{newStatus === "discharged" && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            <div className="relative mt-1">
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full h-10 pl-3 pr-8 rounded-xl border border-border bg-background text-[13px] text-foreground outline-none focus:border-primary appearance-none"
+              >
+                <option value="">Select a reason…</option>
+                {reasons.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Effective Date */}
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Effective Date <span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <input
+              type="date"
+              value={effectiveDate}
+              onChange={(e) => setEffectiveDate(e.target.value)}
+              required
+              className="mt-1 w-full h-10 px-3 rounded-xl border border-border bg-background text-[13px] text-foreground outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Notes / Comments
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any relevant notes about this status change…"
+              rows={3}
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-[13px] text-foreground resize-none outline-none focus:border-primary placeholder:text-muted-foreground/50"
+            />
+          </div>
+
+          {/* Notifications */}
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
+              Notify
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {NOTIFY_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => toggleNotify(opt)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11.5px] font-medium transition-colors",
+                    notified.includes(opt)
+                      ? "bg-primary/10 border-primary/30 text-primary"
+                      : "bg-background border-border text-muted-foreground hover:border-primary/20"
+                  )}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${notified.includes(opt) ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                  {opt}
+                </button>
+              ))}
+            </div>
+            {notified.length > 0 && (
+              <p className="text-[10.5px] text-muted-foreground mt-1.5">
+                A notification record will be created for: {notified.join(", ")}
+              </p>
+            )}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[12px] text-red-700 dark:text-red-400">
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 h-10 rounded-xl border border-border text-[13px] font-medium text-muted-foreground hover:bg-secondary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+              ) : (
+                `Confirm — ${friendlyStatus}`
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 export default PersonProfile;

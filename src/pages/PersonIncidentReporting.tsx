@@ -139,21 +139,41 @@ const PersonIncidentReporting = () => {
         </div>
 
         {/* AI ribbon (red — open incidents) */}
-        {!bannerDismissed && open.length > 0 && (
-          <div className="rounded-xl border border-icm-red/20 bg-icm-red-soft px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Siren className="w-5 h-5 text-icm-red shrink-0" />
-              <p className="text-[12.5px] font-geist text-icm-text leading-snug">
-                <span className="font-semibold">{individual.first_name} has {open.length} open incident{open.length === 1 ? "" : "s"} (ID {open.map((i) => i.id).join(", ")}) at Step {open[0].currentStage} of 5.</span>{" "}
-                <span className="text-icm-text-dim">Initial report was filed {open[0].incidentDate}. This incident requires follow-up documentation.</span>
-              </p>
+        {!bannerDismissed && open.length > 0 && (() => {
+          const FOLLOWUP_DAYS = 7;
+          const overdueIncidents = open.filter((i) => {
+            if (!i.incidentDate || i.incidentDate === "—") return false;
+            const filed = new Date(i.incidentDate);
+            const deadlinePassed = (Date.now() - filed.getTime()) / (1000 * 60 * 60 * 24) > FOLLOWUP_DAYS;
+            return deadlinePassed;
+          });
+          return (
+            <div className="rounded-xl border border-icm-red/20 bg-icm-red-soft px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Siren className="w-5 h-5 text-icm-red shrink-0" />
+                <p className="text-[12.5px] font-geist text-icm-text leading-snug">
+                  <span className="font-semibold">
+                    {individual.first_name} has {open.length} open incident{open.length === 1 ? "" : "s"} requiring action.
+                    {overdueIncidents.length > 0 && ` ${overdueIncidents.length} ${overdueIncidents.length === 1 ? "is" : "are"} past the required follow-up deadline.`}
+                  </span>{" "}
+                  <span className="text-icm-text-dim">Initial report was filed {open[0].incidentDate}. Follow-up documentation required within {FOLLOWUP_DAYS} days.</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {overdueIncidents.length > 0 && (
+                  <button
+                    onClick={() => navigate(`/people/${individual.id}/incident-reporting/${overdueIncidents[0].id}`)}
+                    className="text-[11.5px] font-geist font-semibold text-icm-red hover:underline"
+                  >
+                    Show overdue →
+                  </button>
+                )}
+                <button onClick={() => navigate(`/people/${individual.id}/incident-reporting/${open[0].id}`)} className="text-[11.5px] font-geist font-semibold text-icm-text-dim hover:underline">View incident →</button>
+                <button onClick={() => setBannerDismissed(true)} className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
+              </div>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <button onClick={() => navigate(`/people/${individual.id}/incident-reporting/${open[0].id}`)} className="text-[11.5px] font-geist font-semibold text-icm-red hover:underline">View incident →</button>
-              <button onClick={() => setBannerDismissed(true)} className="text-[11.5px] font-geist text-icm-text-dim hover:text-icm-text">Dismiss</button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Tabs */}
         <div className="flex items-center gap-1 border-b border-icm-border">

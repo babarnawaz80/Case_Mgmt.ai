@@ -37,12 +37,14 @@ import {
   GitMerge, MinusCircle, CopyPlus, Users, Eye, EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ICMSpinner } from "@/components/icm/ICMSpinner";
 
 // ─── Field Definitions ────────────────────────────────────────────────────────
 
 export interface SystemField { key: string; label: string; required?: boolean; hint?: string; }
 
 export const INDIVIDUAL_FIELDS: SystemField[] = [
+  // ── Identity ────────────────────────────────────────────────────────────────
   { key: "first_name",              label: "First Name",                required: true },
   { key: "last_name",               label: "Last Name",                 required: true },
   { key: "middle_name",             label: "Middle Name" },
@@ -50,52 +52,168 @@ export const INDIVIDUAL_FIELDS: SystemField[] = [
   { key: "dob",                     label: "Date of Birth",             hint: "YYYY-MM-DD or MM/DD/YYYY" },
   { key: "gender",                  label: "Gender" },
   { key: "pronouns",                label: "Pronouns" },
-  { key: "primary_language",        label: "Primary Language" },
   { key: "race",                    label: "Race" },
   { key: "ethnicity",               label: "Ethnicity" },
+  { key: "race_ethnicity",          label: "Race / Ethnicity (combined)" },
+  { key: "primary_language",        label: "Primary Language" },
+  { key: "secondary_language",      label: "Secondary Language" },
   { key: "marital_status",          label: "Marital Status" },
+  { key: "religion",                label: "Religion" },
+  { key: "living_situation",        label: "Living Situation" },
+  { key: "communication_notes",     label: "Communication Notes" },
+
+  // ── Identifiers ─────────────────────────────────────────────────────────────
   { key: "medicaid_id",             label: "Medicaid ID" },
   { key: "ssn_last4",               label: "SSN (Last 4 digits)" },
   { key: "secondary_state_id",      label: "Secondary State ID" },
+  { key: "case_number",             label: "Case Number" },
+
+  // ── Address ─────────────────────────────────────────────────────────────────
   { key: "street",                  label: "Street Address" },
   { key: "city",                    label: "City" },
   { key: "state",                   label: "State" },
   { key: "zip",                     label: "ZIP Code" },
   { key: "county",                  label: "County" },
+
+  // ── Contact ─────────────────────────────────────────────────────────────────
   { key: "phone",                   label: "Phone Number" },
+  { key: "phone_home",              label: "Home Phone" },
+  { key: "phone_cell",              label: "Cell Phone" },
   { key: "email",                   label: "Email Address" },
-  { key: "diagnosis",               label: "Primary Diagnosis (ICD-10)" },
-  { key: "level_of_care",           label: "Level of Need Score" },
+
+  // ── Enrollment & Status ──────────────────────────────────────────────────────
   { key: "enrollment_status",       label: "Enrollment Status",         hint: "active, pending, transition, discharged" },
+  { key: "admission_date",          label: "Admission Date",            hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "discharge_date",          label: "Discharge Date",            hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "referral_date",           label: "Referral Date",             hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "referral_source",         label: "Referral Source" },
+
+  // ── Program & Service ────────────────────────────────────────────────────────
   { key: "program",                 label: "Program / Service Line" },
+  { key: "program_type",            label: "Program Type" },
+  { key: "waiver_type",             label: "Waiver Type" },
+  { key: "service_category",        label: "Service Category" },
+  { key: "funding_stream",          label: "Funding Stream" },
+  { key: "level_of_care",           label: "Level of Care / Need Score" },
   { key: "program_start_date",      label: "Program Start Date" },
   { key: "waiver_effective_date",   label: "Waiver Effective Date" },
   { key: "assigned_case_manager_name", label: "Assigned Case Manager" },
   { key: "assigned_supervisor_name",   label: "Assigned Supervisor" },
+
+  // ── Clinical ─────────────────────────────────────────────────────────────────
+  { key: "diagnosis",               label: "Primary Diagnosis (ICD-10)" },
+  { key: "primary_diagnosis",       label: "Primary Diagnosis" },
+  { key: "secondary_diagnoses",     label: "Secondary Diagnoses" },
+  { key: "icd10_codes",             label: "ICD-10 Codes" },
+  { key: "primary_physician_name",  label: "Primary Physician Name" },
+  { key: "primary_physician_phone", label: "Primary Physician Phone" },
+  { key: "hospital_preference",     label: "Hospital Preference" },
+  { key: "medical_notes",           label: "Medical Notes" },
+  { key: "allergies",               label: "Allergies" },
+  { key: "special_instructions",    label: "Special Instructions" },
+
+  // ── Care Planning ────────────────────────────────────────────────────────────
   { key: "pcp_due_date",            label: "PCP Due Date" },
+  { key: "pcp_status",              label: "PCP Status" },
+  { key: "next_isp_date",           label: "Next ISP Date",             hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "last_annual_plan_date",   label: "Last Annual Plan Date",     hint: "YYYY-MM-DD or MM/DD/YYYY" },
+
+  // ── Medicaid / Insurance ─────────────────────────────────────────────────────
+  { key: "ma_status",               label: "Medicaid (MA) Status" },
+  { key: "ma_id",                   label: "Medicaid (MA) ID" },
+  { key: "ma_type",                 label: "Medicaid (MA) Type" },
+  { key: "ma_effective_date",       label: "MA Effective Date",         hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "ma_redetermination_date", label: "MA Redetermination Date",   hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "secondary_insurance_name",label: "Secondary Insurance Name" },
+  { key: "secondary_insurance_id",  label: "Secondary Insurance ID" },
+
+  // ── Legal / Guardian ─────────────────────────────────────────────────────────
+  { key: "legal_status",            label: "Legal Status" },
+  { key: "guardian_name",           label: "Guardian Name" },
+  { key: "guardian_relationship",   label: "Guardian Relationship" },
+  { key: "guardian_phone",          label: "Guardian Phone" },
+  { key: "guardian_email",          label: "Guardian Email" },
+  { key: "poa_name",                label: "POA Name" },
+  { key: "poa_phone",               label: "POA Phone" },
+
+  // ── Emergency Contact ────────────────────────────────────────────────────────
+  { key: "emergency_contact_name",      label: "Emergency Contact Name" },
+  { key: "emergency_contact_relation",  label: "Emergency Contact Relationship" },
+  { key: "emergency_contact_phone",     label: "Emergency Contact Phone" },
+  { key: "emergency_contact_phone2",    label: "Emergency Contact Phone 2" },
+  { key: "emergency_contact_email",     label: "Emergency Contact Email" },
+
+  // ── Notes ───────────────────────────────────────────────────────────────────
   { key: "notes",                   label: "Intake Notes" },
 ];
 
 export const STAFF_FIELDS: SystemField[] = [
-  { key: "first_name",      label: "First Name",            required: true },
-  { key: "last_name",       label: "Last Name",             required: true },
-  { key: "email",           label: "Email Address",         required: true },
-  { key: "phone",           label: "Phone Number" },
-  { key: "role",            label: "Role",                  hint: "admin, supervisor, case_manager" },
-  { key: "title",           label: "Job Title" },
-  { key: "hire_date",       label: "Hire Date" },
-  { key: "department",      label: "Department" },
-  { key: "supervisor_name", label: "Supervisor Name" },
-  { key: "address",         label: "Address" },
-  { key: "city",            label: "City" },
-  { key: "state",           label: "State" },
-  { key: "zip",             label: "ZIP Code" },
-  { key: "county",          label: "County" },
-  { key: "npi",             label: "NPI Number" },
-  { key: "license_number",  label: "License Number" },
-  { key: "license_type",    label: "License Type" },
-  { key: "credential",      label: "Credential (e.g. QIDP, LSW)" },
-  { key: "status",          label: "Employment Status",     hint: "active, inactive, terminated" },
+  // ── Required ────────────────────────────────────────────────────────────────
+  { key: "first_name",               label: "First Name",               required: true },
+  { key: "last_name",                label: "Last Name",                required: true },
+  { key: "work_email",               label: "Work Email",               required: true },
+
+  // ── Basic Identity ───────────────────────────────────────────────────────────
+  { key: "preferred_name",           label: "Preferred Name" },
+  { key: "date_of_birth",            label: "Date of Birth" },
+  { key: "gender",                   label: "Gender",                   hint: "Male, Female, Non-binary, Other, Prefer not to say" },
+  { key: "race_ethnicity",           label: "Race / Ethnicity" },
+  { key: "primary_language",         label: "Primary Language" },
+
+  // ── Contact ──────────────────────────────────────────────────────────────────
+  { key: "personal_email",           label: "Personal Email" },
+  { key: "work_phone",               label: "Work Phone" },
+  { key: "cell_phone",               label: "Cell Phone" },
+  { key: "address_street",           label: "Street Address" },
+  { key: "address_city",             label: "City" },
+  { key: "address_state",            label: "State" },
+  { key: "address_zip",              label: "ZIP Code" },
+  { key: "county",                   label: "County" },
+
+  // ── Employment ───────────────────────────────────────────────────────────────
+  { key: "role",                     label: "Role",                     hint: "case_manager, supervisor, admin" },
+  { key: "job_title",                label: "Job Title" },
+  { key: "department",               label: "Department" },
+  { key: "employment_type",          label: "Employment Type",          hint: "Full-Time, Part-Time, Contract, Per Diem" },
+  { key: "hire_date",                label: "Hire Date" },
+  { key: "termination_date",         label: "Termination Date" },
+  { key: "supervisor_name",          label: "Supervisor Name" },
+  { key: "office_location",          label: "Office Location" },
+  { key: "caseload_capacity",        label: "Caseload Capacity" },
+  { key: "program_assignment",       label: "Program Assignment" },
+  { key: "states_licensed_in",       label: "States Licensed In" },
+  { key: "languages_spoken",         label: "Languages Spoken" },
+  { key: "areas_of_specialization",  label: "Areas of Specialization" },
+
+  // ── Credentials ───────────────────────────────────────────────────────────────
+  { key: "credential",               label: "Credential",               hint: "BSW, MSW, LCSW, LMSW, LGSW, MA, BA, MS, PhD, QDDP, BCBA" },
+  { key: "license_number",           label: "License Number" },
+  { key: "license_state",            label: "License State" },
+  { key: "license_expiration_date",  label: "License Expiration Date" },
+  { key: "npi_type1",                label: "NPI Type 1" },
+  { key: "supervising_provider_npi", label: "Supervising Provider NPI" },
+  { key: "education_degree",         label: "Education Degree" },
+  { key: "education_field",          label: "Field of Study" },
+  { key: "education_school",         label: "School / University" },
+  { key: "education_grad_year",      label: "Graduation Year" },
+
+  // ── Compliance & Training ─────────────────────────────────────────────────────
+  { key: "background_check_date",    label: "Background Check Date" },
+  { key: "hipaa_training_date",      label: "HIPAA Training Date" },
+  { key: "mandatory_reporter_date",  label: "Mandatory Reporter Date" },
+  { key: "first_aid_expiration",     label: "First Aid Expiration" },
+  { key: "other_certifications",     label: "Other Certifications" },
+
+  // ── Emergency Contact ─────────────────────────────────────────────────────────
+  { key: "emergency_contact_name",   label: "Emergency Contact Name" },
+  { key: "emergency_relationship",   label: "Emergency Relationship" },
+  { key: "emergency_phone",          label: "Emergency Phone" },
+  { key: "emergency_phone2",         label: "Emergency Phone 2" },
+
+  // ── System ────────────────────────────────────────────────────────────────────
+  { key: "is_active",                label: "Account Active",           hint: "true, false" },
+  { key: "send_welcome_email",       label: "Send Welcome Email",       hint: "Yes, No" },
+  { key: "notes",                    label: "Notes" },
 ];
 
 // ─── Auto-Mapping ─────────────────────────────────────────────────────────────
@@ -134,21 +252,106 @@ const ALIASES: Record<string, string[]> = {
   program:           ["program","programname","serviceline","waiver","programtype","service","program_type","waiver_type"],
   program_start_date:["programstartdate","startdate","enrollmentdate","waiverstart","servicestart","admission_date","admission_date_*","admissiondate"],
   pcp_due_date:      ["pcpduedate","pcpdue","planofduedate","reviewdate","planreview","next_isp_date","last_annual_plan_date","nextispdate"],
-  notes:             ["notes","comments","intakenotes","remarks","additionalnotes","memo","medical_notes","medicalnotes","special_instructions","specialinstructions","living_situation","livingsituation","communication_notes","communicationnotes"],
-  assigned_case_manager_name: ["assignedcasemanager","assignedcasemanagername","casemanager","casemanagername","assigned_case_manager","assigned_case_manager_*","assignedcasemanager*"],
+  notes:                    ["notes","comments","intakenotes","remarks","additionalnotes","memo"],
+  assigned_case_manager_name: ["assignedcasemanager","assignedcasemanagername","casemanager","casemanagername","assigned_case_manager","assignedcasemanager*"],
   assigned_supervisor_name: ["assignedsupervisor","assignedsupervisorname","supervisor","supervisorname","assigned_supervisor"],
+  // Demographics
+  race_ethnicity:           ["raceethnicity","race/ethnicity","raceandethnicity","race_ethnicity","ethnicity_race"],
+  secondary_language:       ["secondarylanguage","otherlanguage","additionallanguage","secondary_language","lang2"],
+  religion:                 ["religion","faith","religiousaffiliation","religiouspreference"],
+  living_situation:         ["livingsituation","livingsetting","residentialsetting","housingstatus","living_situation","housingtype"],
+  communication_notes:      ["communicationnotes","communicationneeds","communicationpreferences","communication_notes","commneeds"],
+  // Contact
+  phone_home:               ["homephone","phonehome","residentialphone","landline","home_phone","phone_home"],
+  phone_cell:               ["cellphone","mobilephone","phonecell","cellular","cell","phone_cell","mobile"],
+  // Identifiers
+  case_number:              ["casenumber","caseno","casenum","caseid","case_number","case_id"],
+  // Enrollment
+  admission_date:           ["admissiondate","admitdate","dateofadmission","admittedon","startdate","admission_date","admissiondt"],
+  discharge_date:           ["dischargedate","dischdate","dateofdischarge","discharge_date","dischargedt","exitdate"],
+  referral_date:            ["referraldate","dateofreferral","referreddate","referral_date","referraldt"],
+  referral_source:          ["referralsource","referredby","referredfrom","referralorigin","referral_source","source"],
+  // Program
+  program_type:             ["programtype","program_type","typeofprogram","servicetype"],
+  waiver_type:              ["waivertype","waiver_type","waiverprogram","typeofwaiver","waivercat"],
+  service_category:         ["servicecategory","service_category","servicecat","categoryofservice"],
+  funding_stream:           ["fundingstream","funding_stream","fundingsource","payersource","fundingtype"],
+  // Clinical
+  primary_diagnosis:        ["primarydiagnosis","primarydx","maindx","primary_diagnosis","primaryicd","primarydiagnosis"],
+  secondary_diagnoses:      ["secondarydiagnosis","secondarydiagnoses","secondary_diagnoses","additionaldx","addldiagnosis","secondarydx"],
+  icd10_codes:              ["icd10","icd10codes","icdcodes","icd_codes","icd10_codes","icdcodes","diagnosiscodes"],
+  primary_physician_name:   ["primaryphysician","physicianname","doctorname","pcp","pcpname","primary_physician_name","primarymd","primarydoctor"],
+  primary_physician_phone:  ["primaryphysicianphone","physicianphone","doctorphone","pcpphone","primary_physician_phone","primarymdphone"],
+  hospital_preference:      ["hospitalpreference","preferredhospital","hospital_preference","hospitalpref"],
+  medical_notes:            ["medicalnotes","medical_notes","healthnotes","clinicalnotes","medicalcomments"],
+  allergies:                ["allergies","allergy","allergylist","knownallergies"],
+  special_instructions:     ["specialinstructions","special_instructions","specialneeds","careinstruct","specialcare"],
+  pcp_status:               ["pcpstatus","pcp_status","planstatus","pcpcompliancestatus"],
+  next_isp_date:            ["nextispdate","next_isp_date","ispdue","ispduedate","annualreviewdate","annualplandate","nextannualplan"],
+  last_annual_plan_date:    ["lastannualplandate","last_annual_plan_date","lastplandate","lastannualreview","lastreviewdate"],
+  // Medicaid / Insurance
+  ma_status:                ["mastatus","ma_status","medicaidstatus","medicaid_status","mastatus"],
+  ma_id:                    ["maid","ma_id","medicaidid","medicaid_id","medicaidnumber"],
+  ma_type:                  ["matype","ma_type","medicaidtype","medicaid_type","waivertype2"],
+  ma_effective_date:        ["maeffectivedate","ma_effective_date","medicaideffectivedate","mastart"],
+  ma_redetermination_date:  ["maredeterminationdate","ma_redetermination_date","medicaidredetermination","maredetermdate","maredetermination"],
+  secondary_insurance_name: ["secondaryinsurance","secondary_insurance_name","secondaryinsurancename","secinsurance","addlinsurance"],
+  secondary_insurance_id:   ["secondaryinsuranceid","secondary_insurance_id","secinsuranceid","addlinsuranceid"],
+  // Legal / Guardian
+  legal_status:             ["legalstatus","legal_status","guardianshipstatus","courtinvolvement"],
+  guardian_name:            ["guardianname","guardian_name","legalguardian","guardianfullname"],
+  guardian_relationship:    ["guardianrelationship","guardian_relationship","guardianrelation","guardianrel"],
+  guardian_phone:           ["guardianphone","guardian_phone","guardiancontact","guardiantel"],
+  guardian_email:           ["guardianemail","guardian_email","guardianemailaddr"],
+  poa_name:                 ["poaname","poa_name","powersofattorneyname","poa","attorneyinfact"],
+  poa_phone:                ["poapone","poa_phone","poaphone","powersofattorneyphone"],
+  // Emergency Contact
+  emergency_contact_name:   ["emergencycontactname","emergency_contact_name","emergencycontact","ecname","emergencyname"],
+  emergency_contact_relation: ["emergencycontactrelation","emergency_contact_relation","emergencycontactrelationship","ecrelation","emergencyrelation"],
+  emergency_contact_phone:  ["emergencycontactphone","emergency_contact_phone","ecphone","emergencyphone","emergencycontactnumber"],
+  emergency_contact_phone2: ["emergencycontactphone2","emergency_contact_phone2","ecphone2","emergencyphone2","emergencycontact2number"],
+  emergency_contact_email:  ["emergencycontactemail","emergency_contact_email","ecemail","emergencyemail"],
   // Staff-specific
-  role:              ["role","jobrole","accessrole","systemrole","userrole","position"],
-  title:             ["jobtitle","title","positiontitle","jobrole"],
-  role_status:       ["status","employmentstatus","status_*","active"],
-  hire_date:         ["hiredate","startdate","dateofhire","employmentstartdate","hireddate"],
-  department:        ["department","dept","division","team"],
-  supervisor_name:   ["supervisor","supervisorname","manager","managername","reportsto"],
-  npi:               ["npi","npinumber","nationalproviderid"],
-  license_number:    ["licensenumber","license","licnum","licno","professionallicense"],
-  license_type:      ["licensetype","lictype","licensecat","licenseclass"],
-  credential:        ["credential","credentials","certification","certifications","qidp","lsw","lpc"],
-  status:            ["status","employmentstatus","status_*","active"],
+  role:                     ["role","jobrole","accessrole","systemrole","userrole","position"],
+  job_title:                ["jobtitle","title","positiontitle","stafftitle","jobtitlename"],
+  work_email:               ["workemail","work_email","primaryemail","officeemail","businessemail","emailaddress","email"],
+  personal_email:           ["personalemail","personal_email","homeemail","privateemail","alternatemail","alternativeemail"],
+  work_phone:               ["workphone","work_phone","officephone","businessphone","mainphone","phone","phonenumber"],
+  cell_phone:               ["cellphone","cell_phone","mobilephone","personalphone","mobile","cellular","phonecell","phonemobile"],
+  address_street:           ["streetaddress","address1","addr1","street","streetaddr","address_street","addressstreet","primaryaddress","address"],
+  address_city:             ["city","cityname","town","address_city","addresscity"],
+  address_state:            ["state","statecode","address_state","addressstate","st"],
+  address_zip:              ["zipcode","zip","postalcode","postal","address_zip","addresszip"],
+  employment_type:          ["employmenttype","employment_type","emptype","jobtype","workertype","contracttype"],
+  hire_date:                ["hiredate","startdate","dateofhire","employmentstartdate","hireddate","employmentstart"],
+  termination_date:         ["terminationdate","termination_date","enddate","dateoftermination","separationdate","lastday","exitdate"],
+  supervisor_name:          ["supervisorname","supervisor","manager","managername","reportsto","supervisingmanager"],
+  office_location:          ["officelocation","office_location","location","worklocation","site","officename","branch"],
+  caseload_capacity:        ["caseloadcapacity","caseload_capacity","caseloadmax","maxcaseload","caseloadlimit","capacity"],
+  program_assignment:       ["programassignment","program_assignment","assignedprogram","programs","programname"],
+  states_licensed_in:       ["stateslicensedin","states_licensed_in","licensedstates","licensedinstates","licstates"],
+  languages_spoken:         ["languagesspoken","languages_spoken","languages","langspoken","spokenlanguages","stafflanguages"],
+  areas_of_specialization:  ["areasofspecialization","areas_of_specialization","specialization","specializations","specialty","areaofexpertise"],
+  credential:               ["credential","credentials","certification","credentialtype","licenseclass","qidp","lsw","lpc","bcba","credtype"],
+  license_number:           ["licensenumber","license_number","licnum","licno","professionallicense","licensenum"],
+  license_state:            ["licensestate","license_state","licstate","licst","stateoflic","licensingstate"],
+  license_expiration_date:  ["licenseexpirationdate","license_expiration_date","licexpdate","licenseexpiry","licexpiration","licenseexp"],
+  npi_type1:                ["npitype1","npi_type1","npi1","individualnpi","npinumber","npi","nationalproviderid","npinum"],
+  supervising_provider_npi: ["supervisingprovidernpi","supervising_provider_npi","supervisingnpi","supervisornpi","supervisingprovider"],
+  education_degree:         ["educationdegree","education_degree","degree","academicdegree","highestdegree","degreeearned"],
+  education_field:          ["educationfield","education_field","fieldofstudy","major","studyfield","studyarea"],
+  education_school:         ["educationschool","education_school","school","university","college","institution","schoolname"],
+  education_grad_year:      ["educationgradyear","education_grad_year","graduationyear","gradyear","yearofgrad","yeargraduated"],
+  background_check_date:    ["backgroundcheckdate","background_check_date","bgcheckdate","bgcheck","backgroundcheck","backgroundclearancedate"],
+  hipaa_training_date:      ["hipaatrainingdate","hipaa_training_date","hipaadate","hipaatraining","hipaacompliance","hipaatrainingcomplete"],
+  mandatory_reporter_date:  ["mandatoryreporterdate","mandatory_reporter_date","mandreporterdate","mandatoryreporter","mandreporter","mandrepdate"],
+  first_aid_expiration:     ["firstaidexpiration","first_aid_expiration","firstaiddate","firstaid","firstaidexp","firstaidcertexpiration"],
+  other_certifications:     ["othercertifications","other_certifications","addlcertifications","additionalcerts","othercerts"],
+  emergency_relationship:   ["emergencyrelationship","emergency_relationship","ecrelationship","emergencycontactrelation","emergencyrelation"],
+  emergency_phone:          ["emergencyphone","emergency_phone","ecphone","emergencycontactphone","emergencycontactnumber"],
+  emergency_phone2:         ["emergencyphone2","emergency_phone2","ecphone2","emergencyphone2nd","emergencycontactphone2"],
+  is_active:                ["isactive","is_active","active","accountactive","activeaccount","accountstatus","staffactive"],
+  send_welcome_email:       ["sendwelcomeemail","send_welcome_email","welcomeemail","sendwelcome"],
 };
 
 type MatchConfidence = "auto" | "review" | "none";
@@ -216,7 +419,28 @@ function extractMappedData(
     if (val !== undefined && val !== "") out[m.systemField] = formatDateValue(val);
   }
   if (type === "individuals") out.enrollment_status = out.enrollment_status ?? "active";
-  if (type === "staff") { out.role = out.role ?? "case_manager"; }
+  if (type === "staff") {
+    out.role = out.role ?? "case_manager";
+    // Mirror snake_case name fields → camelCase for avatar/display compatibility
+    if (out.first_name && !out.firstName) out.firstName = out.first_name;
+    if (out.last_name  && !out.lastName)  out.lastName  = out.last_name;
+    // Mirror work_email → email so Firebase Auth lookup & app reads both fields
+    if (out.work_email && !out.email) out.email = out.work_email;
+    // Mirror job_title → title for legacy compatibility
+    if (out.job_title && !out.title) out.title = out.job_title;
+    // Mirror address fields to legacy keys used in some queries
+    if (out.address_street && !out.address) out.address = out.address_street;
+    if (out.address_city   && !out.city)    out.city    = out.address_city;
+    if (out.address_state  && !out.state)   out.state   = out.address_state;
+    if (out.address_zip    && !out.zip)     out.zip     = out.address_zip;
+    // Mirror npi_type1 → npi for provider billing
+    if (out.npi_type1 && !out.npi) out.npi = out.npi_type1;
+    // Normalise is_active string → boolean-like string
+    if (out.is_active !== undefined) {
+      const v = out.is_active.toLowerCase();
+      out.is_active = (v === "true" || v === "yes" || v === "active" || v === "1") ? "true" : "false";
+    }
+  }
   return out;
 }
 
@@ -834,9 +1058,7 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
           {/* ── CHECKING DUPES (loading) ───────────────────────────────────── */}
           {checkingDupes && (
             <div className="flex flex-col items-center justify-center py-16 gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              </div>
+              <ICMSpinner size={48} />
               <div className="text-center">
                 <p className="font-semibold text-icm-text text-[15px]">Scanning for duplicates…</p>
                 <p className="text-[12px] text-icm-text-dim mt-1">Comparing against existing records</p>
@@ -945,7 +1167,7 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
                 /* Progress view */
                 <div className="py-8 space-y-6 max-w-lg mx-auto">
                   <div className="text-center space-y-2">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+                    <ICMSpinner size={48} className="mx-auto" />
                     <p className="font-semibold text-icm-text text-[15px]">Importing {typeLabel}…</p>
                     <p className="text-[12px] text-icm-text-dim">
                       {importProgress.done.toLocaleString()} of {importProgress.total.toLocaleString()} records written

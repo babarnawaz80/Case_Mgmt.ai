@@ -203,12 +203,14 @@ const SettingsSecurity = () => {
             onChange={(v) => set("requireSpecialChars", v)}
           />
           <SelectRow
-            label="Password expiration"
+            label="Password expiration (renewal)"
             value={settings.passwordExpirationDays?.toString() ?? "never"}
             onChange={(v) => set("passwordExpirationDays", v === "never" ? null : parseInt(v))}
             options={[
               { value: "never", label: "Never" },
-              { value: "90", label: "90 days" },
+              { value: "30",  label: "30 days" },
+              { value: "60",  label: "60 days" },
+              { value: "90",  label: "90 days" },
               { value: "180", label: "180 days" },
               { value: "365", label: "1 year" },
             ]}
@@ -221,7 +223,7 @@ const SettingsSecurity = () => {
             max={24}
           />
           <p className="text-[10.5px] text-icm-text-faint font-geist italic mt-1">
-            Displayed only. Actual enforcement requires backend integration.
+            When expired, users are blocked from the app and prompted to set a new password before continuing.
           </p>
         </Panel>
 
@@ -300,14 +302,20 @@ const SettingsSecurity = () => {
             value={settings.sessionTimeoutMinutes.toString()}
             onChange={(v) => set("sessionTimeoutMinutes", parseInt(v))}
             options={[
-              { value: "15", label: "15 min" },
-              { value: "30", label: "30 min" },
-              { value: "60", label: "1 hour" },
+              { value: "5",   label: "5 min" },
+              { value: "7",   label: "7 min" },
+              { value: "10",  label: "10 min" },
+              { value: "15",  label: "15 min" },
+              { value: "30",  label: "30 min" },
+              { value: "60",  label: "1 hour" },
               { value: "120", label: "2 hours" },
               { value: "240", label: "4 hours" },
               { value: "480", label: "8 hours" },
             ]}
           />
+          <p className="text-[10.5px] text-icm-text-faint font-geist italic">
+            Users receive a 60-second warning before being signed out. Enforced in the browser automatically.
+          </p>
           <SelectRow
             label="Maximum session length"
             value={settings.maxSessionHours.toString()}

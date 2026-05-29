@@ -41,6 +41,8 @@ import {
   updateDoc,
   getDocs,
   doc,
+  setDoc,
+  deleteDoc,
   serverTimestamp,
   increment,
   type DocumentData,
@@ -60,9 +62,29 @@ export interface FSConversation {
   lastMessageAt?: unknown;
   lastMessageBy?: string;
   unreadCounts: Record<string, number>;
+  memberReadAt?: Record<string, unknown>;
   organizationId: string;
   createdAt?: unknown;
   createdBy: string;
+  archivedBy?: Record<string, boolean>;
+  deletedBy?: Record<string, boolean>;
+  mutedBy?: Record<string, boolean>;
+  pinnedBy?: Record<string, boolean>;
+}
+
+export interface FSLinkedRecord {
+  moduleIcon: string;
+  moduleLabel: string;
+  individualName: string;
+  detail: string;
+  href: string;
+}
+
+export interface FSFileAttachment {
+  fileName: string;
+  fileSize: number;
+  fileUrl: string;
+  mimeType: string;
 }
 
 export interface FSMessage {
@@ -75,6 +97,9 @@ export interface FSMessage {
   type: "text" | "system";
   createdAt?: unknown;
   readBy: string[];
+  deleted?: boolean;
+  linkedRecord?: FSLinkedRecord;
+  attachment?: FSFileAttachment;
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -90,9 +115,14 @@ function toConversation(id: string, data: DocumentData): FSConversation {
     lastMessageAt: data.lastMessageAt,
     lastMessageBy: data.lastMessageBy,
     unreadCounts: data.unreadCounts ?? {},
+    memberReadAt: data.memberReadAt ?? {},
     organizationId: data.organizationId ?? "",
     createdAt: data.createdAt,
     createdBy: data.createdBy ?? "",
+    archivedBy: data.archivedBy ?? {},
+    deletedBy: data.deletedBy ?? {},
+    mutedBy: data.mutedBy ?? {},
+    pinnedBy: data.pinnedBy ?? {},
   };
 }
 
@@ -107,6 +137,9 @@ function toMessage(id: string, conversationId: string, data: DocumentData): FSMe
     type: data.type ?? "text",
     createdAt: data.createdAt,
     readBy: data.readBy ?? [],
+    deleted: data.deleted ?? false,
+    linkedRecord: data.linkedRecord ?? undefined,
+    attachment: data.attachment ?? undefined,
   };
 }
 
@@ -229,21 +262,30 @@ export async function sendFSMessage(
   conversationId: string,
   senderId: string,
   senderName: string,
-  body: string
+  body: string,
+  senderAvatar?: string | null,
+  linkedRecord?: FSLinkedRecord | null,
+  attachment?: FSFileAttachment | null
 ): Promise<void> {
   try {
+    // 1. Build the message payload — only include optional fields when set
+    const msgPayload: Record<string, unknown> = {
+      body,
+      senderId,
+      senderName,
+      senderAvatar: senderAvatar ?? null,
+      type: "text",
+      createdAt: serverTimestamp(),
+      read: false,
+      readBy: [senderId], // sender has already "read" their own message
+    };
+    if (linkedRecord) msgPayload.linkedRecord = linkedRecord;
+    if (attachment)   msgPayload.attachment   = attachment;
+
     // 1. Add the message document
     await addDoc(
       collection(db, "conversations", conversationId, "messages"),
-      {
-        body,
-        senderId,
-        senderName,
-        type: "text",
-        createdAt: serverTimestamp(),
-        read: false,
-        readBy: [senderId], // sender has already "read" their own message
-      }
+      msgPayload
     );
 
     // 2. Fetch current conversation to get the members list
@@ -266,9 +308,15 @@ export async function sendFSMessage(
       }
     }
 
-    // 3. Update the conversation meta
+    // 3. Compute a human-readable preview for the conversation list
+    let preview = body;
+    if (!preview && linkedRecord) preview = `📎 ${linkedRecord.moduleLabel} — ${linkedRecord.individualName}`;
+    if (!preview && attachment)   preview = `📎 ${attachment.fileName}`;
+    if (!preview) preview = "Sent a message";
+
+    // 4. Update the conversation meta
     await updateDoc(doc(db, "conversations", conversationId), {
-      lastMessage: body.length > 120 ? body.slice(0, 120) + "…" : body,
+      lastMessage: preview.length > 120 ? preview.slice(0, 120) + "…" : preview,
       lastMessageAt: serverTimestamp(),
       lastMessageBy: senderId,
       ...unreadIncrements,
@@ -292,6 +340,24 @@ export async function markConversationRead(
     });
   } catch (err) {
     console.warn("[markConversationRead]", err);
+  }
+}
+
+// ─── markConversationReadAt ───────────────────────────────────────────────────
+/**
+ * Updates memberReadAt.{uid} with a server timestamp and resets unreadCounts.{uid} to 0.
+ */
+export async function markConversationReadAt(
+  conversationId: string,
+  uid: string
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, "conversations", conversationId), {
+      [`memberReadAt.${uid}`]: serverTimestamp(),
+      [`unreadCounts.${uid}`]: 0,
+    });
+  } catch (err) {
+    console.warn("[markConversationReadAt]", err);
   }
 }
 
@@ -347,6 +413,73 @@ export async function createOrGetDirectConversation(
   }
 }
 
+// ─── archiveConversation ──────────────────────────────────────────────────────
+export async function archiveConversation(conversationId: string, uid: string): Promise<void> {
+  try {
+    await updateDoc(doc(db, "conversations", conversationId), {
+      [`archivedBy.${uid}`]: true,
+    });
+  } catch (err) {
+    console.warn("[archiveConversation]", err);
+  }
+}
+
+// ─── unarchiveConversation ────────────────────────────────────────────────────
+export async function unarchiveConversation(conversationId: string, uid: string): Promise<void> {
+  try {
+    await updateDoc(doc(db, "conversations", conversationId), {
+      [`archivedBy.${uid}`]: false,
+    });
+  } catch (err) {
+    console.warn("[unarchiveConversation]", err);
+  }
+}
+
+// ─── deleteConversationForUser (soft) ─────────────────────────────────────────
+export async function deleteConversationForUser(conversationId: string, uid: string): Promise<void> {
+  try {
+    await updateDoc(doc(db, "conversations", conversationId), {
+      [`deletedBy.${uid}`]: true,
+    });
+  } catch (err) {
+    console.warn("[deleteConversationForUser]", err);
+  }
+}
+
+// ─── muteConversation ─────────────────────────────────────────────────────────
+export async function muteConversation(conversationId: string, uid: string, muted: boolean): Promise<void> {
+  try {
+    await updateDoc(doc(db, "conversations", conversationId), {
+      [`mutedBy.${uid}`]: muted,
+    });
+  } catch (err) {
+    console.warn("[muteConversation]", err);
+  }
+}
+
+// ─── pinConversation ──────────────────────────────────────────────────────────
+export async function pinConversation(conversationId: string, uid: string, pinned: boolean): Promise<void> {
+  try {
+    await updateDoc(doc(db, "conversations", conversationId), {
+      [`pinnedBy.${uid}`]: pinned,
+    });
+  } catch (err) {
+    console.warn("[pinConversation]", err);
+  }
+}
+
+// ─── deleteMessage ────────────────────────────────────────────────────────────
+export async function deleteMessage(conversationId: string, messageId: string): Promise<void> {
+  try {
+    await updateDoc(
+      doc(db, "conversations", conversationId, "messages", messageId),
+      { deleted: true, body: "" }
+    );
+  } catch (err) {
+    console.warn("[deleteMessage]", err);
+  }
+}
+
 // ─── createGroupConversation ──────────────────────────────────────────────────
 /**
  * Creates a new group conversation and returns its ID.
@@ -386,4 +519,68 @@ export async function createGroupConversation(
     console.warn("[createGroupConversation]", err);
     throw err;
   }
+}
+
+// ─── Typing indicators ────────────────────────────────────────────────────────
+//
+// Data model: conversations/{convId}/typing/{userId}
+//   { name: string, typingAt: Timestamp }
+//
+// A user is considered "typing" when their typingAt is ≤ 5 seconds ago.
+
+const TYPING_TTL_MS = 5000;
+
+/**
+ * Writes (or clears) the current user's typing record.
+ */
+export async function setTypingStatus(
+  conversationId: string,
+  userId: string,
+  displayName: string,
+  isTyping: boolean
+): Promise<void> {
+  const ref = doc(db, "conversations", conversationId, "typing", userId);
+  try {
+    if (isTyping) {
+      await setDoc(ref, { name: displayName, typingAt: serverTimestamp() }, { merge: true });
+    } else {
+      await deleteDoc(ref);
+    }
+  } catch {
+    // Silently ignore — typing indicators are best-effort
+  }
+}
+
+/**
+ * Subscribes to the typing subcollection and returns the names of users who
+ * are currently typing (excluding the current user).
+ */
+export function useTypingUsers(
+  conversationId: string | null,
+  currentUserId: string
+): string[] {
+  const [typingNames, setTypingNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const ref = collection(db, "conversations", conversationId, "typing");
+    const unsub = onSnapshot(ref, (snap) => {
+      const now = Date.now();
+      const names: string[] = [];
+      snap.docs.forEach((d) => {
+        if (d.id === currentUserId) return; // skip self
+        const data = d.data();
+        const typingAt = data.typingAt?.toDate?.()?.getTime() ?? 0;
+        if (now - typingAt < TYPING_TTL_MS) {
+          names.push(data.name ?? "Someone");
+        }
+      });
+      setTypingNames(names);
+    });
+
+    return unsub;
+  }, [conversationId, currentUserId]);
+
+  return typingNames;
 }

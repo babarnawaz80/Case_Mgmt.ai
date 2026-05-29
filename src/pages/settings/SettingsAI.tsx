@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
+import { OrchestratorSettings } from "@/components/orchestrator/OrchestratorSettings";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -353,6 +354,9 @@ const SettingsAI = () => {
               </div>
             </div>
           </div>
+
+          {/* Brain Orchestrator settings */}
+          <OrchestratorSettings />
         </div>
       )}
     </SettingsLayout>

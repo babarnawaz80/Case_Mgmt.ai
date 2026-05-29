@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dailyAuthRenewalCheck = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
+exports.manualOrchestratorRun = exports.scheduledOrchestrator = exports.dailyAuthRenewalCheck = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const v2_1 = require("firebase-functions/v2");
@@ -45,14 +45,8 @@ admin.initializeApp();
 // Silently drop undefined fields instead of throwing — prevents crashes when
 // individual documents have optional fields that haven't been set yet.
 admin.firestore().settings({ ignoreUndefinedProperties: true });
-// Gemini Developer API key — linked to casemanagement-ai project with billing enabled
-if (!process.env.GEMINI_API_KEY) {
-    process.env.GEMINI_API_KEY = "AIzaSyBxHs_ajRUqk4oTD8XQKDEZcsbPEZKp1_k";
-}
-// Deepgram API key — used by ambient transcription endpoint
-if (!process.env.DEEPGRAM_API_KEY) {
-    process.env.DEEPGRAM_API_KEY = "1ea051911af6faacbd09cacef929ab1d7189a48a";
-}
+// Gemini and Deepgram keys are loaded from functions/.env (gitignored)
+// Never hardcode API keys in source code.
 // Set global options for all functions
 (0, v2_1.setGlobalOptions)({ region: "us-central1", memory: "512MiB", timeoutSeconds: 300 });
 // ─── Express API App ───────────────────────────────────────────────────────
@@ -83,6 +77,20 @@ app.get("/care-assistant/:token", companion_1.companionGet);
 app.post("/care-assistant/:token/message", companion_1.companionMessage);
 app.post("/care-assistant/:token/end-session", companion_1.companionEndSession);
 app.post("/care-assistant/:token/deepgram-token", companion_1.companionDeepgramToken);
+app.post("/care-assistant/:token/agent-config", companion_1.companionAgentConfig);
+app.options("/care-assistant/:token/llm", companion_1.companionLLMProxy);
+app.post("/care-assistant/:token/llm", companion_1.companionLLMProxy);
+// ─── Gemini Proxy API ─────────────────────────────────────────────────────
+// Auth-protected. Uses Vertex AI ADC — no API key in any file.
+// Rate limit: 20 calls per authenticated user per hour (tracked in Firestore).
+const geminiProxy_1 = require("./api/geminiProxy");
+app.post("/api/gemini-proxy", geminiProxy_1.geminiProxy);
+// ─── Staff User Management API ────────────────────────────────────────────
+// Uses Admin SDK so existing Firebase Auth accounts can be re-linked to an
+// org without hitting EMAIL_EXISTS errors.
+const staffUsers_1 = require("./api/staffUsers");
+app.options("/api/staff/create-or-update", staffUsers_1.createOrUpdateStaffUser);
+app.post("/api/staff/create-or-update", staffUsers_1.createOrUpdateStaffUser);
 // ─── Compliance Agents API ────────────────────────────────────────────────
 const agents_1 = require("./api/agents");
 app.post("/api/agents/pcp-renewal/run", agents_1.runPcpRenewalAgent);
@@ -98,4 +106,8 @@ Object.defineProperty(exports, "onWorkflowTaskDailyCheck", { enumerable: true, g
 // ─── Scheduled Functions ──────────────────────────────────────────────────
 var authorizationRenewal_1 = require("./api/authorizationRenewal");
 Object.defineProperty(exports, "dailyAuthRenewalCheck", { enumerable: true, get: function () { return authorizationRenewal_1.dailyAuthRenewalCheck; } });
+// ─── Brain Orchestrator ───────────────────────────────────────────────────────
+var brainOrchestrator_1 = require("./orchestrator/brainOrchestrator");
+Object.defineProperty(exports, "scheduledOrchestrator", { enumerable: true, get: function () { return brainOrchestrator_1.scheduledOrchestrator; } });
+Object.defineProperty(exports, "manualOrchestratorRun", { enumerable: true, get: function () { return brainOrchestrator_1.manualOrchestratorRun; } });
 //# sourceMappingURL=index.js.map

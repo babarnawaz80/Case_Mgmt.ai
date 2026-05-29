@@ -20,10 +20,13 @@ import { useProgressNotes } from "@/hooks/useProgressNotes";
 import { cn } from "@/lib/utils";
 import { getProfile } from "@/data/profiles";
 import { AuthorCell } from "@/components/icm/AuthorCell";
+import { useAuth } from "@/contexts/AuthContext";
+import { OrgPrintHeader } from "@/components/icm/OrgPrintHeader";
 
 const PersonFaceSheet = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const { individual, loading } = useIndividual(id);
   const { notes } = useProgressNotes(id);
   const profile = id ? getProfile(id) : null;
@@ -97,6 +100,16 @@ const PersonFaceSheet = () => {
         </div>
 
         <article className="rounded-xl border border-icm-border bg-icm-panel p-7 print:border-0 print:shadow-none print:p-0">
+          {/* Org letterhead — shown at top of every printed face sheet */}
+          {userProfile?.organizationId && (
+            <OrgPrintHeader
+              orgId={userProfile.organizationId}
+              individualName={`${individual.first_name} ${individual.last_name}`}
+              individualPhotoUrl={individual.photo_url ?? undefined}
+              documentTitle="Face Sheet"
+            />
+          )}
+
           {/* Header */}
           <header className="flex items-start gap-5 pb-5 border-b border-icm-border">
             <div
@@ -327,8 +340,9 @@ const PersonFaceSheet = () => {
       <style>{`
         @media print {
           body { background: white; }
-          aside, .print\\:hidden { display: none !important; }
+          aside, nav, header, .print\\:hidden { display: none !important; }
           article { page-break-inside: auto; }
+          .org-print-header { display: flex !important; }
         }
       `}</style>
     </ICMShell>

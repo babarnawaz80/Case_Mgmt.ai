@@ -1,15 +1,13 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
 import {
   FileText, DollarSign, ClipboardList, Search, StickyNote, FileCheck, Workflow,
   Bell, Calendar, FolderOpen, Heart, Users, AlertTriangle,
-  Building2, GraduationCap, Send, Tag, Shield, ArrowRight, X,
+  Building2, GraduationCap, Send, Tag, Shield, ArrowRight,
   BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { people, initials, riskAvatarClass, type Person } from "@/data/people";
 
 const categoryStyles = {
   documentation: { bg: "#EBF4FD", text: "#1a5f8a", iconBg: "rgba(26, 95, 138, 0.12)" },
@@ -17,20 +15,18 @@ const categoryStyles = {
   care: { bg: "#F0EEFF", text: "#5b3fa6", iconBg: "rgba(91, 63, 166, 0.12)" },
 };
 
-type FormRoute = (personId: string) => string;
-
 const quickActions: Array<{
   title: string;
   icon: typeof FileText;
   category: "documentation" | "operations" | "care";
-  route?: FormRoute;
+  directTo?: string;
 }> = [
-  { title: "Activity Note", icon: FileText, category: "documentation", route: (id) => `/people/${id}/contact-note` },
+  { title: "Activity Note", icon: FileText, category: "documentation", directTo: "/modules/contact-note" },
   { title: "Billable Note", icon: DollarSign, category: "operations" },
   { title: "Assessment", icon: ClipboardList, category: "documentation" },
-  { title: "Monitoring", icon: Search, category: "operations", route: (id) => `/people/${id}/monitoring-form/new` },
-  { title: "Progress Note", icon: StickyNote, category: "documentation", route: (id) => `/people/${id}/progress-note/new` },
-  { title: "Visit Summary", icon: FileCheck, category: "operations", route: (id) => `/people/${id}/visit-summary/new` },
+  { title: "Monitoring", icon: Search, category: "operations", directTo: "/monitoring-form" },
+  { title: "Progress Note", icon: StickyNote, category: "documentation", directTo: "/progress-note" },
+  { title: "Visit Summary", icon: FileCheck, category: "operations", directTo: "/visit-summary" },
   { title: "Workflow", icon: Workflow, category: "documentation" },
 ];
 
@@ -52,11 +48,10 @@ const modules = [
 
 export function QuickActions() {
   const navigate = useNavigate();
-  const [picker, setPicker] = useState<{ title: string; route: FormRoute } | null>(null);
 
   const handleQuickAction = (action: typeof quickActions[number]) => {
-    if (action.route) {
-      setPicker({ title: action.title, route: action.route });
+    if (action.directTo) {
+      navigate(action.directTo);
     } else {
       toast({
         title: action.title,
@@ -159,108 +154,7 @@ export function QuickActions() {
         </div>
       </div>
 
-      {picker && (
-        <IndividualPickerModal
-          title={picker.title}
-          onClose={() => setPicker(null)}
-          onSelect={(personId) => {
-            const target = picker.route(personId);
-            setPicker(null);
-            navigate(target);
-          }}
-        />
-      )}
     </div>
   );
 }
 
-function IndividualPickerModal({
-  title,
-  onClose,
-  onSelect,
-}: {
-  title: string;
-  onClose: () => void;
-  onSelect: (personId: string) => void;
-}) {
-  const [q, setQ] = useState("");
-  const list = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    const active = people.filter((p) => p.status === "Active");
-    const fullName = (p: Person) => `${p.firstName} ${p.lastName}`;
-    if (!term) return active.slice(0, 60);
-    return active
-      .filter((p) => fullName(p).toLowerCase().includes(term) || p.id.toLowerCase().includes(term))
-      .slice(0, 60);
-  }, [q]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl bg-card border border-border shadow-xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div>
-            <h2 className="font-display font-bold text-[15px] text-foreground">Start {title}</h2>
-            <p className="text-[11.5px] text-muted-foreground mt-0.5">
-              Select the individual this {title.toLowerCase()} is for
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="p-3 border-b border-border">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search individuals…"
-              className="w-full h-9 pl-8 pr-2 rounded-lg border border-border bg-background text-[12px] text-foreground"
-            />
-          </div>
-        </div>
-        <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
-          {list.length === 0 && (
-            <div className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              No individuals found
-            </div>
-          )}
-          {list.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onSelect(p.id)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/60 transition-colors"
-            >
-              <div
-                className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold",
-                  riskAvatarClass(p.riskScore)
-                )}
-              >
-                {initials(p)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] font-medium text-foreground truncate">
-                  {p.firstName} {p.lastName}
-                </p>
-                <p className="text-[10.5px] font-mono text-muted-foreground truncate">{p.id}</p>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-primary shrink-0" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}

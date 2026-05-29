@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
-import { BookOpen, Bot, ArrowRight, ClipboardList, Building2, BarChart3 } from "lucide-react";
+import { BookOpen, Bot, ArrowRight, ClipboardList, Building2, BarChart3, Brain } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { engineSummary } from "@/data/guidelinesEngines";
 import { AdminOnly } from "@/components/platform/AdminOnly";
@@ -38,6 +38,19 @@ const PlatformHub = () => {
           <span className="px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/20">
             ADMIN AREA
           </span>
+        </div>
+
+        {/* Brain Orchestrator — full-width hero card */}
+        <div>
+          <PlatformCard
+            icon={Brain}
+            title="Brain Orchestrator"
+            description="Autonomous AI engine that runs nightly to check compliance, generate documentation drafts, flag billing gaps, and escalate overdue items across your entire caseload."
+            stat="Runs nightly at 2:00 AM ET · Admin & supervisor access"
+            onClick={() => navigate("/platform/orchestrator")}
+            tone="accent"
+            size="large"
+          />
         </div>
 
         {/* Two large cards — AI/Compliance */}

@@ -324,6 +324,25 @@ const toneClass = (tone?: string) => {
 const renderTranscriptLine = (line: TranscriptLine) => line.text;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helper sub-components (must be declared before AmbientFlowV2 to avoid TDZ)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SummaryRow = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
+  <div className="flex items-center justify-between">
+    <span className="text-[12.5px] text-icm-text-dim">{label}</span>
+    <span className={`text-[12.5px] font-semibold ${accent ? "text-amber-600" : "text-icm-text"}`}>{value}</span>
+  </div>
+);
+
+const SuccessLine = ({ icon: Icon, text }: { icon: typeof FileText; text: string }) => (
+  <div className="flex items-center gap-2.5 text-[13px] text-icm-text">
+    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+    <Icon className="w-3.5 h-3.5 text-icm-text-dim shrink-0" />
+    <span>{text}</span>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main flow
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -374,10 +393,17 @@ const AmbientFlowV2 = ({ defaultIndividualId, defaultIndividualName, onClose, in
   ];
 
   // Step 4 state — extractGroups is populated by AI response in processing step
-  const [extractGroups, setExtractGroups] = useState<ExtractGroup[]>(() => getEmptyExtractGroups(personFirst));
+  // NOTE: personFirst is computed later in the component, so we use the prop-based
+  // fallback directly here to avoid a Temporal Dead Zone (TDZ) crash ("Cannot access
+  // 'personFirst' before initialization") when the bundler minifies the variable name.
+  const [extractGroups, setExtractGroups] = useState<ExtractGroup[]>(() => {
+    const initFirstName = defaultIndividualName?.split(" ")[0] || "this person";
+    return getEmptyExtractGroups(initFirstName);
+  });
   const [tab, setTab] = useState<"items" | "transcript">("items");
   const [includedItems, setIncludedItems] = useState<Set<string>>(() => {
-    const eg = getEmptyExtractGroups(personFirst);
+    const initFirstName = defaultIndividualName?.split(" ")[0] || "this person";
+    const eg = getEmptyExtractGroups(initFirstName);
     return new Set(eg.flatMap(g => g.items.map(i => i.id)));
   });
   const [confirmedRisk, setConfirmedRisk] = useState(false);
@@ -1584,24 +1610,5 @@ ${fullTranscript}`,
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SummaryRow = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
-  <div className="flex items-center justify-between">
-    <span className="text-[12.5px] text-icm-text-dim">{label}</span>
-    <span className={`text-[12.5px] font-semibold ${accent ? "text-amber-600" : "text-icm-text"}`}>{value}</span>
-  </div>
-);
-
-const SuccessLine = ({ icon: Icon, text }: { icon: typeof FileText; text: string }) => (
-  <div className="flex items-center gap-2.5 text-[13px] text-icm-text">
-    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-    <Icon className="w-3.5 h-3.5 text-icm-text-dim shrink-0" />
-    <span>{text}</span>
-  </div>
-);
 
 export default AmbientFlowV2;

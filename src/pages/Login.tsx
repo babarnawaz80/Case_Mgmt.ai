@@ -84,8 +84,10 @@ export default function Login() {
         setMfaResolver(getMFAResolver(error as MultiFactorError));
         setLoading(null);
       } else {
-        setAuthError("Invalid email or password. Please try again.");
-        toast.error((error as Error).message);
+        // Show the actual error message from getFriendlyAuthError so the user
+        // (and developers) can see the real reason — wrong password, account
+        // disabled, network failure, project suspended, etc.
+        setAuthError((error as Error).message ?? "Sign-in failed. Please try again.");
         setLoading(null);
       }
     }

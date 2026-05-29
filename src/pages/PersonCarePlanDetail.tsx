@@ -89,6 +89,8 @@ const PersonCarePlanDetail = () => {
             individualId={id ?? ""}
             individualName={`${individual.first_name} ${individual.last_name}`}
             isAiGenerated={isAiParam || resolvedPcp.ai_generated}
+            orgId={userProfile?.organizationId}
+            individualPhotoUrl={individual.photo_url}
           />
         </div>
       </ICMShell>

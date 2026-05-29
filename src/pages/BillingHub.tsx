@@ -1,18 +1,18 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
   Sparkles, Clock, CheckCircle2, AlertTriangle, Send,
   X, ArrowRight, Loader2, Download, RefreshCw, Filter,
-  ChevronRight, ExternalLink, DollarSign,
+  ChevronRight, ExternalLink, DatabaseZap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useBillingRecords, updateBillingRecord, markRecordsSubmitted, type BillingRecord, type BillingStatus } from "@/hooks/useBillingRecords";
+import { useBillingRecords, createBillingRecord, updateBillingRecord, markRecordsSubmitted, type BillingRecord, type BillingStatus } from "@/hooks/useBillingRecords";
 import { useBillingRecordsSummary } from "@/hooks/useBillingRecords";
-import { submitToIddBilling, generate837P, createBillingBatch, type OrgBillingInfo } from "@/services/iddBillingService";
+import { submitToIddBilling, generate837P, type OrgBillingInfo } from "@/services/iddBillingService";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 type TabKey = "all" | "pending_scrub" | "scrub_passed" | "needs_attention" | "submitted" | "denied";
@@ -24,6 +24,7 @@ const BillingHub = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Filters
   const [filterIndividual, setFilterIndividual] = useState("");
@@ -48,15 +49,24 @@ const BillingHub = () => {
       case "denied": base = base.filter(r => r.billing_status === "denied"); break;
     }
 
-    // Text filters
+    // Text filters — use broad matching so records with empty fields are never silently hidden
     if (filterIndividual) {
-      base = base.filter(r => r.individual_name?.toLowerCase().includes(filterIndividual.toLowerCase()));
+      const term = filterIndividual.toLowerCase();
+      base = base.filter(r =>
+        (r.individual_name || "").toLowerCase().includes(term) ||
+        (r.individual_id  || "").toLowerCase().includes(term) ||
+        (r.case_manager_name || "").toLowerCase().includes(term)
+      );
     }
     if (filterCode) {
-      base = base.filter(r => r.service_code?.toLowerCase().includes(filterCode.toLowerCase()));
+      const term = filterCode.toLowerCase();
+      base = base.filter(r =>
+        (r.service_code || "").toLowerCase().includes(term) ||
+        (r.service_description || "").toLowerCase().includes(term)
+      );
     }
-    if (filterDateFrom) base = base.filter(r => r.date_of_service >= filterDateFrom);
-    if (filterDateTo) base = base.filter(r => r.date_of_service <= filterDateTo);
+    if (filterDateFrom) base = base.filter(r => (r.date_of_service || "") >= filterDateFrom);
+    if (filterDateTo)   base = base.filter(r => (r.date_of_service || "") <= filterDateTo);
 
     return base;
   }, [records, tab, filterIndividual, filterCode, filterDateFrom, filterDateTo]);
@@ -94,18 +104,216 @@ const BillingHub = () => {
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  // ── CSV Export ────────────────────────────────────────────────────────────
+  const exportCSV = (exportRecords: BillingRecord[]) => {
+    if (exportRecords.length === 0) {
+      toast.info("No records to export.");
+      return;
+    }
+    const headers = [
+      "Claim ID", "Individual Name", "Individual ID",
+      "Date of Service", "Service Code", "Service Description",
+      "Units", "Unit Type", "Rate Per Unit ($)", "Total Amount ($)",
+      "Authorization Number", "Payer Name", "Payer ID",
+      "Case Manager", "Note Type",
+      "Billing Status", "Submitted", "Submission Date",
+      "Start Time", "End Time",
+    ];
+
+    const escape = (val: string | number | boolean | null | undefined) => {
+      const s = String(val ?? "");
+      return (s.includes(",") || s.includes('"') || s.includes("\n"))
+        ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const rows = exportRecords.map(r => {
+      const submittedDate = r.submitted_at
+        ? ((r.submitted_at as any)?.toDate?.()?.toISOString?.()?.slice(0, 10) ?? "")
+        : "";
+      return [
+        r.id, r.individual_name, r.individual_id,
+        r.date_of_service, r.service_code, r.service_description || "",
+        r.units, r.billing_unit_type,
+        (r.rate_per_unit || 0).toFixed(2), (r.total_amount || 0).toFixed(2),
+        r.authorization_number || "", r.payer_name || "", r.payer_id || "",
+        r.case_manager_name, r.source_note_type,
+        r.billing_status, r.submitted_to_iddbilling ? "Yes" : "No", submittedDate,
+        r.start_time || "", r.end_time || "",
+      ].map(escape).join(",");
+    });
+
+    const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }); // BOM for Excel
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `billing_claims_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${exportRecords.length} claim${exportRecords.length !== 1 ? "s" : ""} to CSV`);
+  };
+
+  // ── Sync existing signed billable notes into billing queue ────────────────
+  const syncFromNotes = async () => {
+    if (!userProfile?.organizationId) return;
+    setSyncing(true);
+    try {
+      const orgId = userProfile.organizationId;
+
+      // Fetch all progress notes for this org (filter billable+signed in JS to avoid composite index)
+      const notesSnap = await getDocs(
+        query(collection(db, "progress_notes"), where("organizationId", "==", orgId))
+      );
+
+      const signedBillable = notesSnap.docs.filter(d => {
+        const data = d.data();
+        return data.isBillable === true && data.status === "signed";
+      });
+
+      if (signedBillable.length === 0) {
+        toast.info("No signed billable notes found for this organization.");
+        setSyncing(false);
+        return;
+      }
+
+      // Fetch existing billing records to detect duplicates
+      const existingSnap = await getDocs(
+        query(collection(db, "billing_records"), where("org_id", "==", orgId))
+      );
+      const existingNoteIds = new Set(
+        existingSnap.docs.map(d => d.data().source_note_id).filter(Boolean)
+      );
+
+      let created = 0;
+      let skipped = 0;
+
+      for (const noteDoc of signedBillable) {
+        const noteId = noteDoc.id;
+        if (existingNoteIds.has(noteId)) { skipped++; continue; }
+
+        const note = noteDoc.data();
+        const svcCode: string = note.serviceCode ?? "";
+        const startTime: string = note.startTime ?? "";
+        const endTime: string = note.endTime ?? "";
+        const authId: string = note.authorizationId ?? "";
+
+        // Compute units from time range
+        let units: number = note.units ?? note.billingUnits ?? 0;
+        if (units === 0 && startTime && endTime) {
+          const [sh, sm] = startTime.split(":").map(Number);
+          const [eh, em] = endTime.split(":").map(Number);
+          const mins = (eh * 60 + em) - (sh * 60 + sm);
+          units = mins > 0 ? Math.floor(mins / 15) : 1;
+        }
+        if (units === 0) units = 1;
+
+        // Resolve individual name — try note first, then Firestore, then fall back to ID so it's always searchable
+        let individualName: string = (note.individualName ?? "").trim();
+        if (!individualName && note.individualId) {
+          try {
+            const indSnap = await getDoc(doc(db, "individuals", note.individualId));
+            if (indSnap.exists()) {
+              const ind = indSnap.data();
+              const last  = (ind.last_name  ?? ind.lastName  ?? "").trim();
+              const first = (ind.first_name ?? ind.firstName ?? "").trim();
+              if (last || first) individualName = [last, first].filter(Boolean).join(", ");
+            }
+          } catch { /* Firestore read failed — keep empty, handled below */ }
+        }
+        // Final fallback: use the individual ID so the record is always searchable
+        if (!individualName) individualName = note.individualId ?? "";
+
+        const rate = 28.5;
+        const hasComplete = !!svcCode && units > 0 && !!authId;
+
+        try {
+          await createBillingRecord({
+            org_id: orgId,
+            individual_id: note.individualId ?? "",
+            individual_name: individualName,
+            case_manager_id: note.authorId ?? "",
+            case_manager_name: note.authorName ?? "",
+            source_note_id: noteId,
+            source_note_type: "progress_note",
+            source_note_url: `/people/${note.individualId}/progress-note/${noteId}`,
+            service_code: svcCode,
+            service_description: note.activityType ?? "",
+            billing_unit_type: "15_min",
+            units,
+            rate_per_unit: rate,
+            total_amount: units * rate,
+            date_of_service: note.progressDate ?? note.date ?? "",
+            start_time: startTime,
+            end_time: endTime,
+            duration_minutes: 0,
+            authorization_id: authId,
+            authorization_number: authId,
+            funding_stream_id: "",
+            payer_name: "",
+            payer_id: "",
+            validation_status: hasComplete ? "passed" : "pending",
+            billing_status: hasComplete ? "pending_scrub" : "needs_attention",
+            submitted_to_iddbilling: false,
+            remittance_received: false,
+            signed_by: note.authorId ?? "",
+          });
+          created++;
+        } catch (createErr) {
+          console.error(`[billing sync] failed for note ${noteId}:`, createErr);
+        }
+      }
+
+      if (created > 0) {
+        toast.success(
+          `Synced ${created} note${created !== 1 ? "s" : ""} into billing queue` +
+          (skipped > 0 ? ` · ${skipped} already existed` : "")
+        );
+      } else if (skipped > 0) {
+        toast.info(`All ${skipped} signed billable notes are already in the billing queue.`);
+      } else {
+        toast.info("Nothing to sync.");
+      }
+    } catch (err) {
+      toast.error("Sync error: " + (err as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const runScrub = async () => {
     setScrubbing(true);
-    // Simulate AI scrub — marks pending_scrub records as scrub_passed or needs_attention
+    // AI scrub — validates pending_scrub AND needs_attention records
     try {
-      const pending = records.filter(r => r.billing_status === "pending_scrub");
-      for (const r of pending) {
-        const hasAuth = !!r.authorization_number;
-        const hasUnits = r.units > 0;
-        const newStatus: BillingStatus = (hasAuth && hasUnits) ? "scrub_passed" : "needs_attention";
-        await updateBillingRecord(r.id, { billing_status: newStatus });
+      const toReview = records.filter(
+        r => r.billing_status === "pending_scrub" || r.billing_status === "needs_attention"
+      );
+      if (toReview.length === 0) {
+        toast.info("No claims pending review — all claims are already processed.");
+        setScrubbing(false);
+        return;
       }
-      toast.success(`Scrub complete — ${pending.length} claims reviewed`);
+      let passed = 0;
+      let attention = 0;
+      for (const r of toReview) {
+        const hasServiceCode = !!r.service_code;
+        const hasUnits = r.units > 0;
+        const hasDate = !!r.date_of_service;
+        const hasIndividual = !!r.individual_id;
+        const newStatus: BillingStatus = (hasServiceCode && hasUnits && hasDate && hasIndividual)
+          ? "scrub_passed"
+          : "needs_attention";
+        await updateBillingRecord(r.id, {
+          billing_status: newStatus,
+          validation_status: newStatus === "scrub_passed" ? "passed" : "failed",
+        });
+        if (newStatus === "scrub_passed") passed++;
+        else attention++;
+      }
+      if (attention > 0) {
+        toast.success(`Scrub complete — ${passed} passed, ${attention} need attention`);
+      } else {
+        toast.success(`Scrub complete — ${passed} claim${passed !== 1 ? "s" : ""} ready to submit`);
+      }
     } catch (err) {
       toast.error("Scrub error: " + (err as Error).message);
     } finally {
@@ -241,14 +449,25 @@ const BillingHub = () => {
                 Reviewing completed notes. {pending_scrub > 0 ? `${pending_scrub} claims awaiting scrub.` : "All claims reviewed."} Click to run full scrub now.
               </p>
             </div>
-            <button
-              onClick={runScrub}
-              disabled={scrubbing}
-              className="h-8 px-3 rounded-lg border border-teal-600 bg-white text-[11.5px] font-geist font-semibold text-teal-600 inline-flex items-center gap-1.5 hover:bg-teal-50 disabled:opacity-60"
-            >
-              {scrubbing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Run full scrub
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={syncFromNotes}
+                disabled={syncing}
+                className="h-8 px-3 rounded-lg border border-slate-300 bg-white text-[11.5px] font-geist font-semibold text-slate-600 inline-flex items-center gap-1.5 hover:bg-slate-50 disabled:opacity-60"
+                title="Pull all existing signed billable notes into the billing queue"
+              >
+                {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DatabaseZap className="w-3.5 h-3.5" />}
+                Sync from Notes
+              </button>
+              <button
+                onClick={runScrub}
+                disabled={scrubbing}
+                className="h-8 px-3 rounded-lg border border-teal-600 bg-white text-[11.5px] font-geist font-semibold text-teal-600 inline-flex items-center gap-1.5 hover:bg-teal-50 disabled:opacity-60"
+              >
+                {scrubbing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Run full scrub
+              </button>
+            </div>
           </div>
         </div>
 
@@ -309,6 +528,17 @@ const BillingHub = () => {
               Clear
             </button>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => exportCSV(selectedIds.size > 0 ? selectedRecords : filtered)}
+              disabled={filtered.length === 0}
+              className="h-8 px-3 rounded-lg border border-icm-border bg-white text-[11.5px] font-geist font-semibold text-icm-text inline-flex items-center gap-1.5 hover:bg-icm-bg disabled:opacity-40"
+              title={selectedIds.size > 0 ? `Export ${selectedIds.size} selected claims` : `Export all ${filtered.length} claims in this view`}
+            >
+              <Download className="w-3.5 h-3.5" />
+              {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export CSV"}
+            </button>
+          </div>
         </div>
 
         {/* Batch submit bar */}
@@ -429,8 +659,34 @@ const BillingHub = () => {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-12 text-center text-icm-text-dim text-[12px]">
-                        {loading ? "Loading…" : "No claims in this view."}
+                      <td colSpan={9} className="px-3 py-12 text-center text-[12px]">
+                        {loading ? (
+                          <span className="text-icm-text-dim">Loading…</span>
+                        ) : (filterIndividual || filterCode || filterDateFrom || filterDateTo) ? (
+                          <div className="space-y-1">
+                            <p className="text-icm-text font-semibold">No claims match your filters.</p>
+                            <p className="text-icm-text-dim text-[11px]">
+                              {records.length > 0
+                                ? `${records.length} total claim${records.length !== 1 ? "s" : ""} — try adjusting the filters above.`
+                                : "No claims found. Run ‘Sync from Notes’ to pull in signed billable notes."}
+                            </p>
+                            <button
+                              onClick={() => { setFilterIndividual(""); setFilterCode(""); setFilterDateFrom(""); setFilterDateTo(""); }}
+                              className="mt-2 text-[11.5px] font-geist font-semibold text-icm-accent hover:underline"
+                            >
+                              Clear all filters
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="text-icm-text-dim">No claims in this view.</p>
+                            {records.length === 0 && (
+                              <p className="text-[11px] text-icm-text-faint">
+                                Click <strong>Sync from Notes</strong> above to pull signed billable notes into the queue.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )}

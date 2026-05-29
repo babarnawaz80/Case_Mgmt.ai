@@ -19,6 +19,7 @@ interface OrgData {
   primaryContactName: string;
   primaryContactEmail: string;
   phone: string;
+  fax: string;
   npi: string;
   licenseNumber: string;
   brandColor: string;
@@ -27,12 +28,56 @@ interface OrgData {
 
 const ORG_TYPES = ["IDD Provider", "Case Management Agency", "MCO", "State Agency", "Other"];
 const ALL_STATES = [
-  { code: "MD", name: "Maryland" },
-  { code: "VA", name: "Virginia" },
-  { code: "TX", name: "Texas" },
-  { code: "PA", name: "Pennsylvania" },
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
   { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
   { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" },
 ];
 
 const DEFAULT: OrgData = {
@@ -46,6 +91,7 @@ const DEFAULT: OrgData = {
   primaryContactName: "",
   primaryContactEmail: "",
   phone: "",
+  fax: "",
   npi: "",
   licenseNumber: "",
   brandColor: "#2563eb",
@@ -84,6 +130,7 @@ const SettingsOrganization = () => {
             primaryContactName: d.primaryContactName ?? "",
             primaryContactEmail: d.primaryContactEmail ?? "",
             phone: d.phone ?? "",
+            fax: d.fax ?? "",
             npi: d.npi ?? "",
             licenseNumber: d.licenseNumber ?? "",
             brandColor: d.brandColor ?? "#0d9488",
@@ -109,15 +156,6 @@ const SettingsOrganization = () => {
   const handleColorChange = (color: string) => {
     set("brandColor", color);
     applyColorVar(color);
-  };
-
-  const toggleState = (code: string) => {
-    setForm((prev) => ({
-      ...prev,
-      states: prev.states.includes(code)
-        ? prev.states.filter((s) => s !== code)
-        : [...prev.states, code],
-    }));
   };
 
   const handleLogoUpload = async (file: File) => {
@@ -165,6 +203,7 @@ const SettingsOrganization = () => {
           county: form.county,
         },
         phone: form.phone,
+        fax: form.fax,
         states_of_operation: form.states,
         updatedAt: serverTimestamp(),
       };
@@ -240,6 +279,12 @@ const SettingsOrganization = () => {
                     value={form.phone}
                     onChange={(v) => set("phone", v)}
                     placeholder="(555) 555-5555"
+                  />
+                  <Field
+                    label="Fax"
+                    value={form.fax}
+                    onChange={(v) => set("fax", v)}
+                    placeholder="(555) 555-5566"
                   />
                 </div>
               </Panel>
@@ -425,22 +470,10 @@ const SettingsOrganization = () => {
               </Panel>
 
               <Panel title="States of operation">
-                <div className="space-y-2">
-                  {ALL_STATES.map((s) => (
-                    <label
-                      key={s.code}
-                      className="flex items-center gap-2 text-[12px] font-geist text-icm-text cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.states.includes(s.code)}
-                        onChange={() => toggleState(s.code)}
-                        className="accent-icm-accent"
-                      />
-                      {s.name}
-                    </label>
-                  ))}
-                </div>
+                <StateMultiSelect
+                  selected={form.states}
+                  onChange={(codes) => set("states", codes)}
+                />
               </Panel>
             </div>
           </div>
@@ -449,6 +482,154 @@ const SettingsOrganization = () => {
     </SettingsLayout>
   );
 };
+
+function StateMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (codes: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const filtered = ALL_STATES.filter(
+    (s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.code.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (code: string) => {
+    onChange(
+      selected.includes(code)
+        ? selected.filter((c) => c !== code)
+        : [...selected, code]
+    );
+  };
+
+  const selectAll = () => onChange(filtered.map((s) => s.code));
+  const clearAll = () => onChange(selected.filter((c) => !filtered.some((s) => s.code === c)));
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-left flex items-center justify-between focus:outline-none focus:border-icm-accent/60 transition-colors"
+      >
+        <span className={selected.length === 0 ? "text-icm-text-faint" : "text-icm-text"}>
+          {selected.length === 0 ? "Select states…" : `${selected.length} state${selected.length !== 1 ? "s" : ""} selected`}
+        </span>
+        <svg
+          className={`w-3.5 h-3.5 text-icm-text-faint transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-xl border border-icm-border bg-icm-panel shadow-lg overflow-hidden">
+          {/* Search input */}
+          <div className="p-2 border-b border-icm-border">
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search states…"
+              className="w-full h-8 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/60"
+            />
+          </div>
+
+          {/* Select all / Clear all */}
+          <div className="px-3 py-1.5 flex items-center gap-3 border-b border-icm-border">
+            <button
+              type="button"
+              onClick={selectAll}
+              className="text-[11px] font-geist font-semibold text-icm-accent hover:underline"
+            >
+              Select all
+            </button>
+            <span className="text-icm-text-faint text-[10px]">·</span>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-[11px] font-geist font-semibold text-icm-text-dim hover:underline"
+            >
+              Clear all
+            </button>
+          </div>
+
+          {/* State list */}
+          <div className="max-h-52 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-[12px] font-geist text-icm-text-faint">No states found.</p>
+            ) : (
+              filtered.map((s) => (
+                <label
+                  key={s.code}
+                  className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-icm-bg transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(s.code)}
+                    onChange={() => toggle(s.code)}
+                    className="accent-icm-accent shrink-0"
+                  />
+                  <span className="text-[12px] font-geist text-icm-text">{s.name}</span>
+                  <span className="ml-auto text-[10.5px] font-geist text-icm-text-faint">{s.code}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected chips */}
+      {selected.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {selected.map((code) => {
+            const st = ALL_STATES.find((s) => s.code === code);
+            return (
+              <span
+                key={code}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-icm-accent-soft border border-icm-border text-[11px] font-geist font-medium text-icm-accent"
+              >
+                {st?.name ?? code}
+                <button
+                  type="button"
+                  onClick={() => toggle(code)}
+                  className="ml-0.5 text-icm-accent/60 hover:text-icm-accent transition-colors"
+                  aria-label={`Remove ${st?.name ?? code}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function OrgSkeleton() {
   return (

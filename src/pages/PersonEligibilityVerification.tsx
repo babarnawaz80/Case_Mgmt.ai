@@ -185,7 +185,7 @@ const PersonEligibilityVerification = () => {
         {/* Filters */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex flex-wrap items-center gap-2">
           <FilterSelect label="MA Type" value={filterType} onChange={(v) => setFilterType(v as "All" | MAType)} options={["All", "Waiver Related", "SSI Related", "Medicare/Medicaid Dual", "Spend-Down", "Other"]} />
-          <FilterSelect label="Status" value={filterStatus} onChange={(v) => setFilterStatus(v as "All" | RecordStatus)} options={["All", "Active", "Pending", "Inactive", "Draft"]} />
+          <FilterSelect label="Status" value={filterStatus} onChange={(v) => setFilterStatus(v as "All" | RecordStatus)} options={["All", "Active", "Pending", "Inactive", "Draft", "Submitted"]} />
           <div className="flex items-center gap-1.5 ml-auto">
             <span className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint">From</span>
             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[11.5px] text-icm-text" />
@@ -200,7 +200,7 @@ const PersonEligibilityVerification = () => {
             <table className="w-full text-[12px] font-geist">
               <thead className="bg-icm-bg/60">
                 <tr>
-                  {["ID", "Verification Date", "MA Number", "MA Type", "MA Status", "Updated By", "Updated On", ""].map((c, i) => (
+                  {["ID", "Verification Date", "MA Number", "MA Type", "MA Status", "Record Status", "Updated By", "Updated On", ""].map((c, i) => (
                     <th key={i} className="text-left px-4 py-2 text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint whitespace-nowrap">{c}</th>
                   ))}
                 </tr>
@@ -213,6 +213,7 @@ const PersonEligibilityVerification = () => {
                     <td className="px-4 py-3 font-mono text-icm-text-dim">{r.maNumber ?? "—"}</td>
                     <td className="px-4 py-3 text-icm-text-dim">{r.maType ?? "—"}</td>
                     <td className="px-4 py-3"><StatusPill status={r.maStatus} /></td>
+                    <td className="px-4 py-3"><RecordStatusPill status={r.recordStatus ?? "Draft"} /></td>
                     <td className="px-4 py-3 text-icm-text-dim">
                       <AuthorCell name={r.updatedBy || "Kathy Martinez"} />
                     </td>
@@ -311,6 +312,20 @@ function StatusPill({ status }: { status: MAStatus }) {
     status.startsWith("MA Eligible — Active") ? "bg-icm-green-soft text-icm-green ring-icm-green/20" :
     status.startsWith("MA Eligible") ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" :
     status.startsWith("MA Ineligible") ? "bg-icm-red-soft text-icm-red ring-icm-red/20" :
+    "bg-icm-bg text-icm-text-dim ring-icm-border";
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold ring-1 ${tone}`}>
+      {status}
+    </span>
+  );
+}
+
+function RecordStatusPill({ status }: { status: RecordStatus }) {
+  const tone =
+    status === "Submitted" ? "bg-icm-green-soft text-icm-green ring-icm-green/20" :
+    status === "Active" ? "bg-blue-50 text-blue-600 ring-blue-200" :
+    status === "Draft" ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" :
+    status === "Pending" ? "bg-icm-amber-soft text-icm-amber ring-icm-amber/20" :
     "bg-icm-bg text-icm-text-dim ring-icm-border";
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold ring-1 ${tone}`}>

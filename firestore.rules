@@ -217,6 +217,15 @@ service cloud.firestore {
       allow delete: if isAdmin() && ownedByOrg();
     }
 
+    // Meeting Notes
+    match /meeting_notes/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth() && ownedByOrg();
+      allow create: if isCaseManager() && newDocInOrg();
+      allow update: if isCaseManager() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
     // Trainings
     match /trainings/{id} {
       allow list: if isAuth();
@@ -262,13 +271,26 @@ service cloud.firestore {
       allow delete: if isAdmin() && ownedByOrg();
     }
 
-    // Billing (billing role + supervisors)
+    // Billing Claims (legacy collection — billing/supervisor role required)
     match /billing_claims/{id} {
       allow list: if isAuth();
       allow get: if isAuth() && ownedByOrg() && (isBilling() || isSupervisor());
       allow create: if isBilling() && newDocInOrg();
       allow update: if isBilling() && ownedByOrg();
       allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Billing Records — created automatically when billable notes are signed.
+    // Case managers write them; billing/supervisors manage status transitions.
+    match /billing_records/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager() && (
+        request.resource.data.org_id == myOrgId() ||
+        request.resource.data.organizationId == myOrgId()
+      );
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
     }
 
     // ─── Audit Log (APPEND-ONLY — immutable forever) ──────────────────────────

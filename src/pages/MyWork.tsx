@@ -24,6 +24,7 @@ import {
   Check,
   RotateCcw,
   Send,
+  Search,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ import type { Task } from "@/hooks/useTasks";
 import { useIndividuals } from "@/hooks/useIndividuals";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthorCell } from "@/components/icm/AuthorCell";
+import MentionInput from "@/components/icm/MentionInput";
 
 // ---------- Shape adapter: Firestore Task → MyWorkTask ----------
 function mapTaskToMyWork(t: Task): MyWorkTask {
@@ -103,6 +105,21 @@ function mapTaskToMyWork(t: Task): MyWorkTask {
   const status = statusMap[t.status] ?? "Open";
   const isOverdue = diff !== null && diff < 0 && status !== "Completed";
 
+  // Map task type → the individual-scoped module route + label
+  const MODULE_MAP: Record<string, { label: string; slug: string }> = {
+    "Progress Note Due":      { label: "Progress Note",         slug: "progress-note" },
+    "Monitoring Form":        { label: "Monitoring Form",        slug: "monitoring-form" },
+    "Eligibility Verification":{ label: "Eligibility Verification", slug: "eligibility-verification" },
+    "Contact Required":       { label: "Contact Note",           slug: "contact-note" },
+    "Care Plan Review":       { label: "Care Plan",              slug: "care-plan" },
+    "Plan Renewal":           { label: "Service Authorizations", slug: "authorizations" },
+    "Visit Scheduled":        { label: "Visit Summary",          slug: "visit-summary" },
+    "AI Care Companion":      { label: "AI Check-In Transcript", slug: "companion-transcripts" },
+    "Incident Report":        { label: "Incident Report",        slug: "incident-reporting" },
+    "Referral":               { label: "Referrals",              slug: "referrals" },
+  };
+  const linkedModule = MODULE_MAP[t.type ?? ""] ?? null;
+
   return {
     id: t.id,
     name: t.title,
@@ -120,17 +137,15 @@ function mapTaskToMyWork(t: Task): MyWorkTask {
     priority: priorityMap[t.priority] ?? "Medium",
     createdOn: toMDY(t.createdAt),
     createdBy: t.assignedTo ?? "",
+    ...(linkedModule ? { linkedModule } : {}),
   };
 }
-import { AlertsTab } from "@/components/notifications/AlertsTab";
-import { MentionsTab } from "@/components/notifications/MentionsTab";
 import { AICheckInsTab } from "@/components/icm/AICheckInsTab";
 import { StatCard } from "@/components/icm/StatCard";
-import { useNotifications } from "@/hooks/useNotifications";
 import { useSearchParams } from "react-router-dom";
 import { loadCheckIns } from "@/lib/aiCheckIns";
 
-type TopView = "my_work" | "alerts" | "mentions" | "ai_checkins" | "completed";
+type TopView = "my_work" | "ai_checkins" | "completed";
 type TabKey = "today" | "week" | "all" | "completed";
 type GroupMode = "individual" | "due";
 
@@ -199,7 +214,7 @@ const MyWork = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("tab") as TopView | null) ?? "my_work";
   const [view, setViewRaw] = useState<TopView>(
-    initialView === "alerts" || initialView === "mentions" || initialView === "completed" || initialView === "ai_checkins"
+    initialView === "completed" || initialView === "ai_checkins"
       ? initialView
       : "my_work"
   );
@@ -208,6 +223,13 @@ const MyWork = () => {
     if (v === "my_work") setSearchParams({}, { replace: true });
     else setSearchParams({ tab: v }, { replace: true });
   }
+
+  // --- Individual photo lookup ---
+  const { individuals } = useIndividuals();
+  const photoMap = useMemo(
+    () => Object.fromEntries(individuals.map((ind) => [ind.id, ind.photo_url ?? ""])),
+    [individuals]
+  );
 
   // --- Real Firestore tasks ---
   const { tasks: firestoreTasks, loading: tasksLoading } = useTasks();
@@ -245,8 +267,6 @@ const MyWork = () => {
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [focused, setFocused] = useState(false);
   const [showSessionDone, setShowSessionDone] = useState(false);
-
-  const notif = useNotifications();
 
   // Use optimistic tasks everywhere below
   // (aliased for backwards compat with existing code that references `tasks`)
@@ -342,6 +362,7 @@ const MyWork = () => {
         label: items[0].individualName,
         sub: "",
         initials: items[0].individualInitials,
+        photoUrl: photoMap[id] ?? "",
         items,
         overdueCount: items.filter((i) => bucketForTask(i) === "overdue").length,
       }));
@@ -411,6 +432,7 @@ const MyWork = () => {
 
   function goToLinkedModule(t: MyWorkTask) {
     if (!t.linkedModule) return;
+    setActionTask(null); // close modal first
     navigate(`/people/${t.individualId}/${t.linkedModule.slug}`);
   }
 
@@ -546,8 +568,6 @@ const MyWork = () => {
                 const pendingAI = checkInsList.filter((c) => c.status === "Pending Review").length;
                 return [
                   { key: "my_work" as const, label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
-                  { key: "alerts" as const, label: "Alerts", count: notif.unreadAlerts, alert: notif.unreadAlerts > 0 },
-                  { key: "mentions" as const, label: "Mentions", count: notif.unreadMentions, alert: notif.unreadMentions > 0 },
                   { key: "ai_checkins" as const, label: "AI Check-Ins", count: pendingAI, alert: pendingAI > 0 },
                   { key: "completed" as const, label: "Completed", count: counts.completed, alert: false },
                 ];
@@ -595,26 +615,7 @@ const MyWork = () => {
           )}
         </div>
 
-        {/* Alerts / Mentions take over the page when active */}
-        {view === "alerts" && (
-          <AlertsTab
-            alerts={notif.alerts}
-            onMarkRead={notif.markAlertRead}
-            onMarkUnread={notif.markAlertUnread}
-            onDismiss={notif.dismissAlert}
-            onMarkAllRead={notif.markAllAlertsRead}
-            onClearDismissed={notif.clearDismissedAlerts}
-          />
-        )}
-        {view === "mentions" && (
-          <MentionsTab
-            mentions={notif.mentions}
-            onMarkRead={notif.markMentionRead}
-            onMarkUnread={notif.markMentionUnread}
-            onDismiss={notif.dismissMention}
-            onMarkAllRead={notif.markAllMentionsRead}
-          />
-        )}
+        {/* AI Check-Ins tab */}
         {view === "ai_checkins" && <AICheckInsTab />}
 
 
@@ -632,121 +633,171 @@ const MyWork = () => {
 
         {/* Unified toolbar: timeframe + sort/filter */}
         {view === "my_work" && (
-          <div className="rounded-2xl border border-icm-border bg-icm-panel px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
-            <div className="inline-flex items-center p-0.5 rounded-lg bg-icm-bg">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Time tabs */}
+            <div className="inline-flex items-center p-0.5 rounded-xl bg-icm-bg ring-1 ring-icm-border/50">
               {innerTabs.map((t) => {
                 const active = tab === t.key;
-                const badge =
-                  t.key === "today" ? counts.today : t.key === "week" ? counts.week : counts.total;
+                const badge = t.key === "today" ? counts.today : t.key === "week" ? counts.week : counts.total;
                 return (
                   <button
                     key={t.key}
                     onClick={() => setTab(t.key)}
                     className={cn(
-                      "h-7 px-3 rounded-md text-[11.5px] font-geist flex items-center gap-1.5 transition-colors",
+                      "h-8 px-3.5 rounded-lg text-[12px] font-geist flex items-center gap-1.5 transition-all",
                       active
-                        ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
-                        : "text-icm-text-dim hover:text-icm-text"
+                        ? "bg-white text-icm-text font-bold shadow-sm ring-1 ring-icm-border/40"
+                        : "text-icm-text-dim hover:text-icm-text font-medium"
                     )}
                   >
                     {t.label}
-                    <span className="text-icm-text-faint font-mono text-[10px]">{badge}</span>
+                    {badge > 0 && (
+                      <span className={cn(
+                        "min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1",
+                        active ? "bg-icm-bg text-icm-text-dim" : "bg-transparent text-icm-text-faint"
+                      )}>{badge}</span>
+                    )}
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <div className="inline-flex items-center p-0.5 rounded-lg bg-icm-bg">
-                <button
-                  onClick={() => setGroupMode("individual")}
-                  className={cn(
-                    "h-7 px-2.5 rounded-md text-[11px] font-geist flex items-center gap-1.5",
-                    groupMode === "individual"
-                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
-                      : "text-icm-text-dim hover:text-icm-text"
-                  )}
-                >
-                  <UsersIcon className="w-3.5 h-3.5" /> By person
-                </button>
-                <button
-                  onClick={() => setGroupMode("due")}
-                  className={cn(
-                    "h-7 px-2.5 rounded-md text-[11px] font-geist flex items-center gap-1.5",
-                    groupMode === "due"
-                      ? "bg-icm-panel text-icm-text font-semibold shadow-sm"
-                      : "text-icm-text-dim hover:text-icm-text"
-                  )}
-                >
-                  <CalendarIcon className="w-3.5 h-3.5" /> By date
-                </button>
-              </div>
+            {/* Divider */}
+            <div className="h-6 w-px bg-icm-border hidden sm:block" />
+
+            {/* Group mode */}
+            <div className="inline-flex items-center p-0.5 rounded-xl bg-icm-bg ring-1 ring-icm-border/50">
+              <button
+                onClick={() => setGroupMode("individual")}
+                className={cn(
+                  "h-8 px-3 rounded-lg text-[12px] font-geist flex items-center gap-1.5 transition-all",
+                  groupMode === "individual"
+                    ? "bg-white text-icm-text font-bold shadow-sm ring-1 ring-icm-border/40"
+                    : "text-icm-text-dim hover:text-icm-text"
+                )}
+              >
+                <UsersIcon className="w-3.5 h-3.5" /> By person
+              </button>
+              <button
+                onClick={() => setGroupMode("due")}
+                className={cn(
+                  "h-8 px-3 rounded-lg text-[12px] font-geist flex items-center gap-1.5 transition-all",
+                  groupMode === "due"
+                    ? "bg-white text-icm-text font-bold shadow-sm ring-1 ring-icm-border/40"
+                    : "text-icm-text-dim hover:text-icm-text"
+                )}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" /> By date
+              </button>
+            </div>
+
+            {/* Sort */}
+            <div className="relative">
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="h-7 px-2 rounded-md border border-icm-border bg-icm-panel text-[11px] text-icm-text-dim hover:text-icm-text"
+                className="h-8 pl-3 pr-7 rounded-xl border border-icm-border bg-icm-panel text-[12px] text-icm-text-dim hover:text-icm-text appearance-none cursor-pointer focus:outline-none focus:border-icm-accent/50"
               >
-                <option value="priority">Priority</option>
-                <option value="due">Due date</option>
-                <option value="name">Individual</option>
-                <option value="type">Task type</option>
-                <option value="created">Created</option>
+                <option value="priority">Priority ↕</option>
+                <option value="due">Due date ↕</option>
+                <option value="name">Name ↕</option>
+                <option value="type">Task type ↕</option>
+                <option value="created">Created ↕</option>
               </select>
-              <button
-                onClick={() => setShowFilters((s) => !s)}
-                className={cn(
-                  "h-7 px-2.5 rounded-md text-[11px] font-geist flex items-center gap-1.5 border",
-                  showFilters
-                    ? "bg-icm-text text-icm-panel border-icm-text"
-                    : "border-icm-border text-icm-text-dim hover:text-icm-text"
-                )}
-              >
-                <FilterIcon className="w-3.5 h-3.5" /> Filter
-              </button>
+              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-icm-text-faint pointer-events-none" />
             </div>
+
+            {/* Filter toggle */}
+            {(() => {
+              const activeFilters = [
+                filterIndividual,
+                filterCounty !== "All" ? filterCounty : "",
+                filterSource !== "All" ? filterSource : "",
+                filterStatus !== "All" ? filterStatus : "",
+              ].filter(Boolean).length;
+              return (
+                <button
+                  onClick={() => setShowFilters((s) => !s)}
+                  className={cn(
+                    "h-8 px-3 rounded-xl text-[12px] font-geist flex items-center gap-1.5 border transition-all",
+                    showFilters || activeFilters > 0
+                      ? "bg-icm-accent text-white border-icm-accent shadow-sm"
+                      : "border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
+                  )}
+                >
+                  <FilterIcon className="w-3.5 h-3.5" />
+                  {activeFilters > 0 ? `${activeFilters} filter${activeFilters > 1 ? "s" : ""}` : "Filter"}
+                </button>
+              );
+            })()}
+
+            {/* Clear filters shortcut */}
+            {(filterIndividual || filterCounty !== "All" || filterSource !== "All" || filterStatus !== "All") && (
+              <button
+                onClick={() => { setFilterIndividual(""); setFilterCounty("All"); setFilterSource("All"); setFilterStatus("All"); }}
+                className="h-8 px-2.5 rounded-xl text-[11.5px] font-geist text-icm-text-dim hover:text-icm-red border border-icm-border hover:border-icm-red/30 transition-colors flex items-center gap-1"
+              >
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
           </div>
         )}
 
         {/* Filters panel */}
         {view === "my_work" && showFilters && (
-          <div className="rounded-2xl border border-icm-border bg-icm-panel p-3 grid grid-cols-1 md:grid-cols-4 gap-2">
-            <input
-              value={filterIndividual}
-              onChange={(e) => setFilterIndividual(e.target.value)}
-              placeholder="Search individual…"
-              className="h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
-            />
-            <select
-              value={filterCounty}
-              onChange={(e) => setFilterCounty(e.target.value)}
-              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
-            >
-              <option value="All">All counties</option>
-              {counties.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <select
-              value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value as typeof filterSource)}
-              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
-            >
-              <option value="All">All sources</option>
-              <option value="Case Management">Case Management</option>
-              <option value="Workflow">Workflow</option>
-              <option value="AI">AI-generated</option>
-            </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-              className="h-8 px-2 rounded-lg border border-icm-border bg-white text-[12px] text-icm-text"
-            >
-              <option value="All">All statuses</option>
-              <option value="Open">Open</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Pending Start">Pending Start</option>
-              <option value="Overdue">Overdue</option>
-            </select>
+          <div className="rounded-2xl border border-icm-border/70 bg-icm-panel p-3 grid grid-cols-1 md:grid-cols-4 gap-2.5">
+            <div className="relative">
+              <input
+                value={filterIndividual}
+                onChange={(e) => setFilterIndividual(e.target.value)}
+                placeholder="Search by name…"
+                className="h-9 w-full pl-8 pr-3 rounded-xl border border-icm-border bg-white text-[12.5px] text-icm-text focus:outline-none focus:border-icm-accent/50 focus:ring-2 focus:ring-icm-accent/10 transition-all"
+              />
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-icm-text-faint pointer-events-none" />
+              {filterIndividual && (
+                <button onClick={() => setFilterIndividual("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-icm-text-faint hover:text-icm-text">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <select
+                value={filterCounty}
+                onChange={(e) => setFilterCounty(e.target.value)}
+                className="h-9 w-full px-3 rounded-xl border border-icm-border bg-white text-[12.5px] text-icm-text appearance-none focus:outline-none focus:border-icm-accent/50 cursor-pointer"
+              >
+                <option value="All">All counties</option>
+                {counties.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-icm-text-faint pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value as typeof filterSource)}
+                className="h-9 w-full px-3 rounded-xl border border-icm-border bg-white text-[12.5px] text-icm-text appearance-none focus:outline-none focus:border-icm-accent/50 cursor-pointer"
+              >
+                <option value="All">All sources</option>
+                <option value="Case Management">Case Management</option>
+                <option value="Workflow">Workflow</option>
+                <option value="AI">AI-generated</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-icm-text-faint pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+                className="h-9 w-full px-3 rounded-xl border border-icm-border bg-white text-[12.5px] text-icm-text appearance-none focus:outline-none focus:border-icm-accent/50 cursor-pointer"
+              >
+                <option value="All">All statuses</option>
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Pending Start">Pending Start</option>
+                <option value="Overdue">Overdue</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-icm-text-faint pointer-events-none" />
+            </div>
           </div>
         )}
 
@@ -754,7 +805,7 @@ const MyWork = () => {
         {view !== "ai_checkins" && (grouped.length === 0 ? (
           <EmptyState tab={tab} onJumpWeek={() => setTab("week")} />
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-2">
 
             {grouped.map((g) => {
               const collapsed = groupMode === "individual" ? (collapsedGroups[g.id] ?? true) : collapsedGroups[g.id];
@@ -763,8 +814,8 @@ const MyWork = () => {
                 <div
                   key={g.id}
                   className={cn(
-                    "bg-icm-panel border border-icm-border/60 rounded-[2rem] overflow-hidden transition-all duration-500",
-                    "shadow-[0_25px_70px_-20px_rgba(15,23,42,0.08),0_4px_10px_-2px_rgba(15,23,42,0.02)] hover:shadow-[0_35px_80px_-20px_rgba(15,23,42,0.1)]"
+                    "bg-icm-panel border border-icm-border/60 rounded-2xl overflow-hidden transition-all duration-300",
+                    "shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] hover:shadow-[0_6px_20px_-4px_rgba(15,23,42,0.09)]"
                   )}
                 >
                   {/* Group header */}
@@ -773,14 +824,25 @@ const MyWork = () => {
                     className="w-full px-4 py-2 flex items-center gap-3 hover:bg-icm-bg/40 transition-colors text-left border-b border-icm-border/40 bg-icm-bg/20"
                   >
                     {groupMode === "individual" ? (
+                      (g as any).photoUrl ? (
+                        <img
+                          src={(g as any).photoUrl}
+                          alt={g.label}
+                          className={cn(
+                            "w-8 h-8 rounded-full object-cover shrink-0 ring-2",
+                            hasOverdue ? "ring-icm-red/30" : "ring-icm-accent/20"
+                          )}
+                        />
+                      ) : (
                       <div className={cn(
-                        "w-7 h-7 rounded-lg flex items-center justify-center text-[10.5px] font-manrope font-black shrink-0",
+                        "w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-manrope font-black shrink-0",
                         hasOverdue
-                          ? "bg-icm-red-soft text-icm-red ring-1 ring-icm-red/15"
-                          : "bg-icm-accent-soft text-icm-accent ring-1 ring-icm-accent/15"
+                          ? "bg-icm-red-soft text-icm-red ring-2 ring-icm-red/20"
+                          : "bg-icm-accent-soft text-icm-accent ring-2 ring-icm-accent/15"
                       )}>
                         {g.initials}
                       </div>
+                      )
                     ) : (
                       <div className="w-7 h-7 rounded-lg bg-icm-bg border border-icm-border flex items-center justify-center shrink-0">
                         <CalendarIcon
@@ -830,9 +892,9 @@ const MyWork = () => {
                           onToggleExpand={() =>
                             setExpandedTask(expandedTask === t.id ? null : t.id)
                           }
-                          onComplete={() => openTask(t)}
+                          onComplete={() => t.linkedModule ? goToLinkedModule(t) : openTask(t)}
                           onLinkedModule={() => goToLinkedModule(t)}
-                          onAdvance={focused ? () => openTask(t) : undefined}
+                          onAdvance={focused ? () => (t.linkedModule ? goToLinkedModule(t) : openTask(t)) : undefined}
                           showIndividualName={groupMode === "due"}
                         />
                       ))}
@@ -891,6 +953,7 @@ function TaskRow({
 }) {
   const { userProfile } = useAuth();
   const [commentText, setCommentText] = useState("");
+  const [commentMentionedUids, setCommentMentionedUids] = useState<string[]>([]);
   const [commentPosting, setCommentPosting] = useState(false);
   const tone = statusTone(task.status);
   const due = parseMDY(task.dueDate);
@@ -898,97 +961,127 @@ function TaskRow({
   const isOver = diff !== null && diff < 0 && task.status !== "Completed";
 
   return (
-    <div className={cn("px-4 py-2 transition-colors hover:bg-icm-bg/40 group/row", isOver && "bg-icm-red/[0.015]")}>
-      <div className="flex items-center gap-3">
-        {/* Status rail */}
-        <div className="shrink-0">
+    <div className={cn(
+      "px-4 py-3 transition-all hover:bg-icm-bg/40 group/row",
+      isOver && "bg-red-50/40",
+      task.status === "Completed" && "opacity-60"
+    )}>
+      <div className="flex items-start gap-3">
+        {/* Status indicator */}
+        <div className="shrink-0 mt-0.5 cursor-pointer" onClick={task.status !== "Completed" ? (onAdvance ?? onComplete) : undefined}>
           {isOver ? (
-            <div className="w-4 h-4 rounded-md border-[2px] border-icm-red/30 bg-white flex items-center justify-center">
-              <div className="w-1.5 h-1.5 bg-icm-red rounded-[2px]" />
+            <div className="w-5 h-5 rounded-full border-2 border-icm-red/50 bg-icm-red-soft flex items-center justify-center hover:bg-icm-red hover:border-icm-red transition-colors group/check">
+              <div className="w-2 h-2 bg-icm-red rounded-full group-hover/check:bg-white" />
             </div>
           ) : task.status === "Completed" ? (
-            <div className="w-4 h-4 rounded-md bg-icm-green-soft flex items-center justify-center">
-              <CheckCircle2 className="w-2.5 h-2.5 text-icm-green" />
-            </div>
+            <CheckCircle2 className="w-5 h-5 text-icm-green" />
           ) : task.status === "In Progress" ? (
-            <div className="w-4 h-4 rounded-md border-[2px] border-icm-amber/35 bg-white flex items-center justify-center">
-              <div className="w-1.5 h-1.5 bg-icm-amber rounded-[2px]" />
+            <div className="w-5 h-5 rounded-full border-2 border-icm-amber bg-icm-amber-soft flex items-center justify-center hover:bg-icm-amber hover:border-icm-amber transition-colors group/check">
+              <div className="w-2 h-2 bg-icm-amber rounded-full group-hover/check:bg-white" />
             </div>
           ) : (
-            <div className="w-4 h-4 rounded-md border-[2px] border-icm-border bg-white" />
+            <div className="w-5 h-5 rounded-full border-2 border-icm-border/60 bg-white hover:border-icm-accent/60 hover:bg-icm-accent-soft transition-colors" />
           )}
         </div>
 
-        {/* Body — single line */}
-        <button onClick={onToggleExpand} className="text-left flex-1 min-w-0 flex items-center gap-2.5 flex-wrap">
-          <span className="text-[13px] font-manrope font-semibold text-icm-text leading-tight tracking-tight truncate max-w-[260px]">
-            {task.name}
-          </span>
-          {showIndividualName && (
-            <span className="text-[11px] text-icm-text-dim font-geist">· {task.individualName}</span>
-          )}
-          {task.priority === "Critical" && (
-            <span className="px-1.5 py-0 bg-icm-red-soft text-icm-red text-[9px] font-black rounded uppercase tracking-wider">
-              Critical
+        {/* Main content — click to expand */}
+        <button onClick={onToggleExpand} className="text-left flex-1 min-w-0">
+          {/* Name + badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={cn(
+              "text-[13.5px] font-manrope font-semibold leading-snug tracking-tight",
+              task.status === "Completed" ? "line-through text-icm-text-dim" : "text-icm-text"
+            )}>
+              {task.name}
             </span>
-          )}
-          <span className={cn("inline-flex items-center gap-1 text-[11.5px] font-geist font-medium", isOver ? "text-icm-red font-semibold" : "text-icm-text-dim")}>
-            {isOver && <Clock className="w-3 h-3" />}
-            Due {task.dueDate}{isOver && task.daysOverdue ? ` (${task.daysOverdue}d)` : ""}
-          </span>
-          <span className="text-[11px] text-icm-text-faint font-geist">· {task.staffResponsible}</span>
-          {task.linkedModule && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onLinkedModule(); }}
-              className="px-1.5 py-0.5 rounded text-icm-accent text-[9.5px] font-bold uppercase tracking-tight bg-icm-accent-soft/70 border border-icm-accent/15 hover:bg-icm-accent hover:text-white transition-colors inline-flex items-center gap-1"
-            >
-              {task.linkedModule.label} <ArrowRight className="w-2.5 h-2.5" />
-            </button>
-          )}
-          {task.aiDraftReady && (
-            <span className="px-1.5 py-0.5 rounded bg-white text-indigo-600 text-[9.5px] font-bold uppercase tracking-tight border border-indigo-100 inline-flex items-center gap-1">
-              <Sparkle className="w-2.5 h-2.5 fill-indigo-500 text-indigo-500" /> AI Draft
+            {task.priority === "Critical" && (
+              <span className="px-1.5 h-4 bg-icm-red-soft text-icm-red text-[9px] font-black rounded-md uppercase tracking-wider flex items-center">Critical</span>
+            )}
+            {task.priority === "High" && (
+              <span className="px-1.5 h-4 bg-orange-50 text-orange-600 text-[9px] font-semibold rounded-md uppercase tracking-wider flex items-center">High</span>
+            )}
+            {task.aiDraftReady && (
+              <span className="px-1.5 h-4 bg-indigo-50 text-indigo-600 text-[9px] font-semibold rounded-md border border-indigo-100 flex items-center gap-1">
+                <Sparkle className="w-2.5 h-2.5" /> AI Draft
+              </span>
+            )}
+          </div>
+          {/* Meta line */}
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            {showIndividualName && (
+              <span className="text-[11.5px] text-icm-text font-geist font-medium">{task.individualName}</span>
+            )}
+            <span className={cn(
+              "text-[11.5px] font-geist flex items-center gap-1",
+              isOver ? "text-icm-red font-semibold" : "text-icm-text-dim"
+            )}>
+              {isOver ? <AlertCircle className="w-3 h-3" /> : <CalendarIcon className="w-3 h-3 opacity-50" />}
+              {isOver ? `${task.daysOverdue ?? ""}d overdue` : `Due ${task.dueDate}`}
             </span>
-          )}
+            {task.linkedModule && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onLinkedModule(); }}
+                className="px-2 h-5 rounded-md text-icm-accent text-[10.5px] font-semibold bg-icm-accent-soft/60 border border-icm-accent/15 hover:bg-icm-accent hover:text-white transition-colors inline-flex items-center gap-1"
+              >
+                {task.linkedModule.label} <ArrowRight className="w-2.5 h-2.5" />
+              </button>
+            )}
+            <span className="text-[11px] font-geist text-icm-text-faint">{task.source}</span>
+          </div>
         </button>
 
-        {/* Action */}
-        <div className="shrink-0">
-          {task.status === "Completed" ? (
-            <span className="text-[11px] text-icm-green font-bold flex items-center gap-1 px-2">
-              <CheckCircle2 className="w-3 h-3" /> Done
-            </span>
-          ) : (
-            <button
-              onClick={onAdvance ?? onComplete}
-              className="h-7 px-3 rounded-lg text-[11px] font-geist font-bold text-icm-text bg-white border border-icm-border hover:bg-icm-text hover:text-white hover:border-icm-text transition-colors"
-            >
-              {task.status === "Pending Start" ? "Start" : "Complete"}
-            </button>
+        {/* Action button — appears on hover */}
+        <div className="shrink-0 self-center opacity-0 group-hover/row:opacity-100 transition-opacity">
+          {task.status !== "Completed" && (
+            task.linkedModule ? (
+              <button
+                onClick={onAdvance ?? onComplete}
+                className="h-8 px-4 rounded-xl text-[11.5px] font-geist font-semibold transition-all bg-icm-accent text-white hover:bg-icm-accent/90 flex items-center gap-1.5"
+              >
+                {task.status === "Pending Start" ? "Start" : "Open"} {task.linkedModule.label} →
+              </button>
+            ) : (
+              <button
+                onClick={onAdvance ?? onComplete}
+                className={cn(
+                  "h-8 px-4 rounded-xl text-[11.5px] font-geist font-semibold transition-all",
+                  isOver
+                    ? "bg-icm-red text-white hover:bg-icm-red/90"
+                    : "bg-icm-text text-white hover:opacity-80"
+                )}
+              >
+                {task.status === "Pending Start" ? "Start" : "Complete"}
+              </button>
+            )
           )}
         </div>
       </div>
 
       {expanded && (
-        <div className="mt-2 ml-7 rounded-lg border border-icm-border bg-icm-bg/60 p-3 space-y-2">
+        <div className="mt-3 ml-8 rounded-xl border border-icm-border/60 bg-white/70 p-3.5 space-y-3">
           {task.description && (
-            <p className="text-[12px] text-icm-text font-geist leading-relaxed">
+            <p className="text-[12.5px] text-icm-text font-geist leading-relaxed">
               {task.description}
             </p>
           )}
-          <div className="text-[10.5px] text-icm-text-dim font-geist flex items-center gap-1.5 mt-0.5">
-            Created by <AuthorCell name={task.createdBy} size="sm" showName={true} /> on {task.createdOn} · Source: {task.source}{task.sourceDetail ? ` · ${task.sourceDetail}` : ""}
+          <div className="flex items-center gap-1.5 text-[11px] text-icm-text-faint font-geist">
+            Created by <AuthorCell name={task.createdBy} size="sm" showName={true} /> · {task.createdOn}{task.sourceDetail ? ` · ${task.sourceDetail}` : ""}
           </div>
           <div className="flex items-center gap-2">
-            <input
+            <MentionInput
+              singleLine
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
+              onChange={(val, uids) => {
+                setCommentText(val);
+                setCommentMentionedUids(uids);
+              }}
               onKeyDown={async (e) => {
                 if (e.key === "Enter" && !commentPosting && commentText.trim()) {
                   setCommentPosting(true);
                   try {
-                    await addTaskComment(task.id, commentText.trim(), userProfile?.uid ?? "", userProfile?.displayName ?? "Unknown");
+                    await addTaskComment(task.id, commentText.trim(), userProfile?.uid ?? "", userProfile?.displayName ?? "Unknown", commentMentionedUids);
                     setCommentText("");
+                    setCommentMentionedUids([]);
                     toast.success("Comment posted");
                   } catch { toast.error("Failed to post comment."); }
                   finally { setCommentPosting(false); }
@@ -1003,8 +1096,9 @@ function TaskRow({
                 if (!commentText.trim() || commentPosting) return;
                 setCommentPosting(true);
                 try {
-                  await addTaskComment(task.id, commentText.trim(), userProfile?.uid ?? "", userProfile?.displayName ?? "Unknown");
+                  await addTaskComment(task.id, commentText.trim(), userProfile?.uid ?? "", userProfile?.displayName ?? "Unknown", commentMentionedUids);
                   setCommentText("");
+                  setCommentMentionedUids([]);
                   toast.success("Comment posted");
                 } catch { toast.error("Failed to post comment."); }
                 finally { setCommentPosting(false); }

@@ -11,7 +11,7 @@ export type MAStatus =
 
 export type MAType = "Waiver Related" | "SSI Related" | "Medicare/Medicaid Dual" | "Spend-Down" | "Other";
 
-export type RecordStatus = "Active" | "Pending" | "Inactive" | "Draft";
+export type RecordStatus = "Active" | "Pending" | "Inactive" | "Draft" | "Submitted";
 
 export interface FundingSource {
   id: string;

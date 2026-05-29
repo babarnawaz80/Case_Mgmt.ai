@@ -162,7 +162,7 @@ const ContactNote = () => {
     const q = id
       ? query(
           collection(db, "contact_notes"),
-          where("individualId", "==", id),
+          where("individual_id", "==", id),
         )
       : query(
           collection(db, "contact_notes"),

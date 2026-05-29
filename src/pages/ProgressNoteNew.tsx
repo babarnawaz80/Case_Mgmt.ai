@@ -128,50 +128,51 @@ const ProgressNoteNew = () => {
         aiDrafted: aiUsed,
       });
 
-      // Auto-create billing record if billable, signed, and validation passed
+      // Auto-create billing record if billable and submitted for signature
       if (isBillable && !skipBilling && status === "pending_signature" && userProfile?.organizationId) {
-        const { rate, unitType } = getRateForCode(serviceCode);
+        const { rate, unitType } = getRateForCode(serviceCode || "T2022");
         const unitCalc = calculateBillingUnits(startTime, endTime, unitType as any, rate);
-        const finalUnits = billingUnits > 0 ? billingUnits : unitCalc.units;
-        if (finalUnits > 0 && serviceCode) {
-          try {
-            await createBillingRecord({
-              org_id: userProfile.organizationId,
-              individual_id: indId,
-              individual_name: `${ind.first_name} ${ind.last_name}`,
-              case_manager_id: userProfile.uid ?? "",
-              case_manager_name: `${userProfile?.firstName ?? ""} ${userProfile?.lastName ?? ""}`.trim(),
-              source_note_id: noteId,
-              source_note_type: "progress_note",
-              source_note_url: `/people/${indId}/progress-note/${noteId}`,
-              service_code: serviceCode,
-              service_description: "",
-              billing_unit_type: unitType as any,
-              units: finalUnits,
-              rate_per_unit: rate,
-              total_amount: finalUnits * rate,
-              date_of_service: progressDate,
-              start_time: startTime,
-              end_time: endTime,
-              duration_minutes: unitCalc.durationMinutes,
-              authorization_id: authorizationId,
-              authorization_number: authorizationNumber,
-              funding_stream_id: "",
-              payer_name: "",
-              payer_id: "",
-              validation_status: "passed",
-              billing_status: "scrub_passed",
-              submitted_to_iddbilling: false,
-              remittance_received: false,
-              signed_by: userProfile.uid ?? "",
-            });
-            if (authorizationId) {
-              await updateAuthorizationUnits(authorizationId, finalUnits, "add");
-            }
-          } catch (billingErr) {
-            console.error("[billing] Failed to create billing record:", billingErr);
-            // Don't block note save
+        // Use manually entered units first, then auto-calculated, then default to 1
+        const finalUnits = billingUnits > 0 ? billingUnits : (unitCalc.units > 0 ? unitCalc.units : 1);
+        // Determine if record has enough info to go straight to pending_scrub
+        const hasComplete = !!serviceCode && finalUnits > 0 && !!authorizationId;
+        try {
+          await createBillingRecord({
+            org_id: userProfile.organizationId,
+            individual_id: indId,
+            individual_name: `${ind.first_name} ${ind.last_name}`,
+            case_manager_id: userProfile.uid ?? "",
+            case_manager_name: `${userProfile?.firstName ?? ""} ${userProfile?.lastName ?? ""}`.trim(),
+            source_note_id: noteId,
+            source_note_type: "progress_note",
+            source_note_url: `/people/${indId}/progress-note/${noteId}`,
+            service_code: serviceCode || "",
+            service_description: "",
+            billing_unit_type: unitType as any,
+            units: finalUnits,
+            rate_per_unit: rate,
+            total_amount: finalUnits * rate,
+            date_of_service: progressDate,
+            start_time: startTime,
+            end_time: endTime,
+            duration_minutes: unitCalc.durationMinutes,
+            authorization_id: authorizationId,
+            authorization_number: authorizationNumber,
+            funding_stream_id: "",
+            payer_name: "",
+            payer_id: "",
+            validation_status: hasComplete ? "passed" : "pending",
+            billing_status: hasComplete ? "pending_scrub" : "needs_attention",
+            submitted_to_iddbilling: false,
+            remittance_received: false,
+            signed_by: userProfile.uid ?? "",
+          });
+          if (authorizationId && finalUnits > 0) {
+            await updateAuthorizationUnits(authorizationId, finalUnits, "add");
           }
+        } catch (billingErr) {
+          console.error("[billing] Failed to create billing record:", billingErr);
+          // Don't block note save
         }
       }
 

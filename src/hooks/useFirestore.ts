@@ -40,26 +40,60 @@ function useSubCollection<T>(
       return;
     }
     setLoading(true);
-    const constraints: QueryConstraint[] = [
+
+    // Track all active subscriptions so cleanup always catches them
+    const unsubs: Array<() => void> = [];
+
+    const startFallback = () => {
+      // Index not ready yet — fetch without ordering and sort client-side
+      const fallbackQ = query(
+        collection(db, collectionName),
+        where("individual_id", "==", individualId),
+      );
+      const u = onSnapshot(fallbackQ, (snap) => {
+        const sorted = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as T))
+          .sort((a: any, b: any) => {
+            const av = a[orderField] ?? "";
+            const bv = b[orderField] ?? "";
+            return orderDir === "desc"
+              ? String(bv).localeCompare(String(av))
+              : String(av).localeCompare(String(bv));
+          });
+        setData(sorted);
+        setLoading(false);
+        setError(null);
+      }, (err2) => {
+        console.error(`[${collectionName}] fallback failed:`, err2.message);
+        setError(err2.message);
+        setLoading(false);
+      });
+      unsubs.push(u);
+    };
+
+    // Primary query: ordered
+    const primaryQ = query(
+      collection(db, collectionName),
       where("individual_id", "==", individualId),
       orderBy(orderField, orderDir),
       ...extraConstraints,
-    ];
-    const q = query(collection(db, collectionName), ...constraints);
-    const unsub = onSnapshot(
-      q,
+    );
+    const u = onSnapshot(
+      primaryQ,
       (snap) => {
         setData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
         setLoading(false);
         setError(null);
       },
       (err) => {
-        console.error(`[${collectionName}]`, err);
-        setError(err.message);
-        setLoading(false);
+        // Composite index not yet built — fall back gracefully
+        console.warn(`[${collectionName}] ordered query error, using fallback:`, err.message);
+        startFallback();
       }
     );
-    return unsub;
+    unsubs.push(u);
+
+    return () => { unsubs.forEach((fn) => fn()); };
   }, [individualId, collectionName, orderField, orderDir]);
 
   return { data, loading, error };
@@ -311,12 +345,77 @@ export interface IncidentReport {
 }
 
 export function useIncidentReports(individualId: string | undefined) {
-  return useSubCollection<IncidentReport>(
-    individualId,
-    "incident_reports",
-    "incident_date",
-    "desc"
-  );
+  const [data, setData] = useState<IncidentReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!individualId) { setLoading(false); return; }
+    setLoading(true);
+
+    // Incidents are stored in "incidents" collection with camelCase individualId
+    const q = query(
+      collection(db, "incidents"),
+      where("individualId", "==", individualId),
+      orderBy("reportedAt", "desc"),
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      setData(snap.docs.map((d) => {
+        const raw = d.data();
+        // Normalise to IncidentReport shape expected by PersonIncidentReporting
+        return {
+          id: d.id,
+          individual_id: raw.individualId ?? raw.individual_id ?? individualId,
+          individual_name: raw.individualName ?? raw.individual_name ?? "",
+          incident_date: raw.incident_date ?? raw.reportedAt?.split?.("T")?.[0] ?? "",
+          incident_time: raw.incident_time ?? "",
+          incident_types: raw.incident_types ?? (raw.type ? [raw.type] : []),
+          description: raw.description ?? "",
+          classification: raw.classification ?? raw.severity ?? "Minor",
+          status: raw.status ?? "Open",
+          current_stage: raw.current_stage ?? 0,
+          person_responsible: raw.person_responsible ?? raw.reportedByName ?? "",
+          staff_on_duty: raw.staff_on_duty ?? "",
+          reported_by_uid: raw.reported_by_uid ?? raw.reportedBy ?? "",
+          reported_by_name: raw.reported_by_name ?? raw.reportedByName ?? "",
+          created_at: raw.createdAt ?? raw.created_at,
+          updated_at: raw.updatedAt ?? raw.updated_at,
+          organizationId: raw.organizationId ?? "",
+          ...raw,
+        } as IncidentReport;
+      }));
+      setLoading(false);
+      setError(null);
+    }, (err) => {
+      // Fall back without ordering
+      console.warn("[incidents] ordered query failed, falling back:", err.message);
+      const fallback = query(
+        collection(db, "incidents"),
+        where("individualId", "==", individualId),
+      );
+      onSnapshot(fallback, (snap) => {
+        setData(snap.docs.map((d) => {
+          const raw = d.data();
+          return {
+            id: d.id,
+            individual_id: raw.individualId ?? individualId,
+            incident_date: raw.incident_date ?? raw.reportedAt?.split?.("T")?.[0] ?? "",
+            incident_types: raw.incident_types ?? (raw.type ? [raw.type] : []),
+            description: raw.description ?? "",
+            classification: raw.classification ?? raw.severity ?? "Minor",
+            status: raw.status ?? "Open",
+            current_stage: raw.current_stage ?? 0,
+            ...raw,
+          } as IncidentReport;
+        }).sort((a, b) => String(b.incident_date).localeCompare(String(a.incident_date))));
+        setLoading(false);
+      });
+    });
+    return unsub;
+  }, [individualId]);
+
+  return { data, loading, error };
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────

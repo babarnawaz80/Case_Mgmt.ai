@@ -14,7 +14,8 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
-const FIREBASE_API_KEY = 'AIzaSyCCDjSN6OIu-VODP7mcqz8IPRk43NRKphE';
+// Use the env var — never hardcode API keys in source files
+const FIREBASE_API_KEY = import.meta.env.VITE_FIREBASE_API_KEY as string;
 
 interface OrgDoc {
   id: string;

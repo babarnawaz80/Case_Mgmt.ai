@@ -71,6 +71,79 @@ export interface Individual {
   photo_url?: string | null;   // uploaded avatar image
   createdAt?: unknown;
   updatedAt?: unknown;
+
+  // Demographics (extended)
+  date_of_birth?: string;          // alias for dob
+  race_ethnicity?: string;
+  primary_language?: string;
+  secondary_language?: string;
+  marital_status?: string;
+  religion?: string;
+  living_situation?: string;
+  communication_notes?: string;
+
+  // Address (split fields)
+  address_street?: string;
+  address_city?: string;
+  address_state?: string;
+  address_zip?: string;
+
+  // Phone
+  phone_home?: string;
+  phone_cell?: string;
+
+  // Dates / Intake
+  admission_date?: string;
+  discharge_date?: string;
+  referral_date?: string;
+  referral_source?: string;
+
+  // Program / Service
+  program_type?: string;
+  waiver_type?: string;
+  service_category?: string;
+  funding_stream?: string;
+  case_number?: string;
+
+  // Clinical
+  primary_diagnosis?: string;
+  secondary_diagnoses?: string;
+  icd10_codes?: string;
+  primary_physician_name?: string;
+  primary_physician_phone?: string;
+  hospital_preference?: string;
+  medical_notes?: string;
+  pcp_status?: string;
+  next_isp_date?: string;
+  last_annual_plan_date?: string;
+
+  // Insurance / Medicaid (extended)
+  ma_status?: string;
+  ma_id?: string;
+  ma_type?: string;
+  ma_effective_date?: string;
+  ma_redetermination_date?: string;
+  secondary_insurance_name?: string;
+  secondary_insurance_id?: string;
+
+  // Legal / Guardian
+  legal_status?: string;
+  guardian_name?: string;
+  guardian_relationship?: string;
+  guardian_phone?: string;
+  guardian_email?: string;
+  poa_name?: string;
+  poa_phone?: string;
+
+  // Emergency Contact
+  emergency_contact_name?: string;
+  emergency_contact_relation?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_phone2?: string;
+  emergency_contact_email?: string;
+
+  // Special instructions (snake_case)
+  special_instructions?: string;
 }
 
 function toIndividual(id: string, data: DocumentData): Individual {
@@ -124,6 +197,79 @@ function toIndividual(id: string, data: DocumentData): Individual {
     photo_url: data.photo_url ?? null,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
+
+    // Demographics (extended)
+    date_of_birth: data.date_of_birth ?? data.dob,
+    race_ethnicity: data.race_ethnicity,
+    primary_language: data.primary_language,
+    secondary_language: data.secondary_language,
+    marital_status: data.marital_status,
+    religion: data.religion,
+    living_situation: data.living_situation,
+    communication_notes: data.communication_notes,
+
+    // Address (split fields)
+    address_street: data.address_street,
+    address_city: data.address_city,
+    address_state: data.address_state,
+    address_zip: data.address_zip,
+
+    // Phone
+    phone_home: data.phone_home,
+    phone_cell: data.phone_cell,
+
+    // Dates / Intake
+    admission_date: data.admission_date ?? data.admittedOn ?? data.admitted_on,
+    discharge_date: data.discharge_date,
+    referral_date: data.referral_date,
+    referral_source: data.referral_source,
+
+    // Program / Service
+    program_type: data.program_type,
+    waiver_type: data.waiver_type,
+    service_category: data.service_category,
+    funding_stream: data.funding_stream,
+    case_number: data.case_number,
+
+    // Clinical
+    primary_diagnosis: data.primary_diagnosis,
+    secondary_diagnoses: data.secondary_diagnoses,
+    icd10_codes: data.icd10_codes,
+    primary_physician_name: data.primary_physician_name,
+    primary_physician_phone: data.primary_physician_phone,
+    hospital_preference: data.hospital_preference,
+    medical_notes: data.medical_notes,
+    pcp_status: data.pcp_status,
+    next_isp_date: data.next_isp_date,
+    last_annual_plan_date: data.last_annual_plan_date,
+
+    // Insurance / Medicaid (extended)
+    ma_status: data.ma_status,
+    ma_id: data.ma_id,
+    ma_type: data.ma_type,
+    ma_effective_date: data.ma_effective_date,
+    ma_redetermination_date: data.ma_redetermination_date,
+    secondary_insurance_name: data.secondary_insurance_name,
+    secondary_insurance_id: data.secondary_insurance_id,
+
+    // Legal / Guardian
+    legal_status: data.legal_status,
+    guardian_name: data.guardian_name,
+    guardian_relationship: data.guardian_relationship,
+    guardian_phone: data.guardian_phone,
+    guardian_email: data.guardian_email,
+    poa_name: data.poa_name,
+    poa_phone: data.poa_phone,
+
+    // Emergency Contact
+    emergency_contact_name: data.emergency_contact_name,
+    emergency_contact_relation: data.emergency_contact_relation,
+    emergency_contact_phone: data.emergency_contact_phone,
+    emergency_contact_phone2: data.emergency_contact_phone2,
+    emergency_contact_email: data.emergency_contact_email,
+
+    // Special instructions (snake_case)
+    special_instructions: data.special_instructions ?? data.specialInstructions,
   };
 }
 

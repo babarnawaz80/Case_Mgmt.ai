@@ -27,7 +27,7 @@ import {
 } from "@/hooks/useIndividuals";
 import { useRiskScore } from "@/contexts/RiskScoreContext";
 import { calculateRiskScore, loadRiskSettings } from "@/lib/riskEngine";
-import { getRiskLabel } from "@/lib/formatDate";
+import { getRiskLabel, formatDate } from "@/lib/formatDate";
 
 
 type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending";
@@ -282,12 +282,15 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
       {/* Identity */}
       <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-tight font-semibold text-[14px] text-icm-text truncate">
+          <button
+            onClick={onOpenProfile}
+            className="font-tight font-semibold text-[14px] text-icm-text truncate hover:text-icm-accent hover:underline transition-colors text-left"
+          >
             {person.last_name}, {person.first_name}
             {person.preferred_name && person.preferred_name !== person.first_name && (
               <span className="font-normal text-icm-text-dim"> ({person.preferred_name})</span>
             )}
-          </h3>
+          </button>
           {(person.alerts?.length ?? 0) > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-red-50 text-red-600 ring-red-200">
               <Sparkles className="w-2.5 h-2.5" />
@@ -305,6 +308,14 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
               <span className="inline-flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 {person.county}
+              </span>
+            </>
+          )}
+          {(person.updatedAt || person.updatedOn) && (
+            <>
+              <span className="text-icm-text-faint hidden sm:inline">·</span>
+              <span className="text-icm-text-faint">
+                Updated {formatDate(person.updatedAt as any ?? person.updatedOn)}
               </span>
             </>
           )}

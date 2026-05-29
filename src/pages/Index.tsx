@@ -32,11 +32,14 @@ import {
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole, type UserRole } from "@/contexts/RoleContext";
+import { useOrgSettings } from "@/contexts/OrgSettingsContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useMessages } from "@/hooks/useMessages";
 import { useFirestoreConversations } from "@/hooks/useFirestoreMessages";
 import { cn } from "@/lib/utils";
 import { useIndividuals } from "@/hooks/useIndividuals";
+import { useTasks } from "@/hooks/useTasks";
+import { useAllProgressNotes } from "@/hooks/useProgressNotes";
 import { demoToast } from "@/lib/demoToast";
 import { auth } from "@/lib/firebase";
 import { InlineIndividualSnapshot } from "@/components/InlineIndividualSnapshot";
@@ -169,6 +172,8 @@ interface ChatTurn {
 
 const Index = () => {
   const { individuals } = useIndividuals();
+  const { tasks, loading: tasksLoading } = useTasks();
+  const { notes, loading: notesLoading } = useAllProgressNotes();
   const [message, setMessage] = useState("");
   const [historyOpen, setHistoryOpen] = useState(true);
   const [chatHistoryItems, setChatHistoryItems] = useState<ChatHistoryItem[]>(loadHistory);
@@ -206,9 +211,13 @@ const Index = () => {
     currentUser?.displayName?.split(" ")[0] ||
     currentUser?.email?.split("@")[0] ||
     "there";
-  const { unreadAlerts, unreadMentions } = useNotifications();
+  const { alerts, unreadAlerts, unreadMentions } = useNotifications();
   const { unreadTotal: unreadMessages } = useMessages();
-  const { totalUnread: fsMessagesUnread } = useFirestoreConversations();
+  const { logoUrl, logoLinkUrl, orgName } = useOrgSettings();
+  const [logoError, setLogoError] = useState(false);
+  // Reset stale error flag whenever the URL changes
+  useEffect(() => { setLogoError(false); }, [logoUrl]);
+  const { conversations: fsConvsIndex, totalUnread: fsMessagesUnread } = useFirestoreConversations();
 
 
   const badgeFor = (item: TopNavItem) => {
@@ -217,7 +226,7 @@ const Index = () => {
       if (OVERDUE_TASK_COUNT > 0) return { count: OVERDUE_TASK_COUNT, tone: "red" as const };
       if (unread > 0) return { count: unread, tone: "accent" as const };
     }
-    const totalMessagesUnread = unreadMessages + fsMessagesUnread;
+    const totalMessagesUnread = fsConvsIndex.length > 0 ? fsMessagesUnread : unreadMessages + fsMessagesUnread;
     if (item.url === "/messages" && totalMessagesUnread > 0) return { count: totalMessagesUnread, tone: "red" as const };
     if (item.url === "/incidents" && OPEN_INCIDENT_COUNT > 0) return { count: OPEN_INCIDENT_COUNT, tone: "red" as const };
     return null;
@@ -228,12 +237,17 @@ const Index = () => {
     accent: "bg-icm-accent text-white",
   };
 
+  // Live computed dashboard stats
+  const pendingTasksCount = tasksLoading ? null : tasks.filter(t => t.status !== "completed").length;
+  const unsignedNotesCount = notesLoading ? null : notes.filter(n => n.status === "draft" || n.status === "pending_signature").length;
+  const criticalAlertsCount = alerts.filter(a => a.severity === "critical" && !a.read && !a.dismissed).length;
+
   const quickStats = useMemo(() => [
     { label: "People Supported", value: individuals.length.toString(), icon: Users, route: "/people" },
-    { label: "Pending Tasks", value: "5", icon: ClipboardList, route: "/my-work" },
-    { label: "Unsigned Notes", value: "3", icon: FileText, route: "/documentation" },
-    { label: "Critical Alerts", value: "2", icon: AlertTriangle, route: "/my-work?view=alerts", highlight: true },
-  ], [individuals.length]);
+    { label: "Pending Tasks", value: pendingTasksCount !== null ? pendingTasksCount.toString() : "—", icon: ClipboardList, route: "/my-work" },
+    { label: "Unsigned Notes", value: unsignedNotesCount !== null ? unsignedNotesCount.toString() : "—", icon: FileText, route: "/documentation" },
+    { label: "Critical Alerts", value: criticalAlertsCount.toString(), icon: AlertTriangle, route: "/my-work?view=alerts", highlight: true },
+  ], [individuals.length, pendingTasksCount, unsignedNotesCount, criticalAlertsCount]);
 
   const individualOptions = ["Select Individual", ...individuals.map((p) => `${p.first_name} ${p.last_name}`)];
 
@@ -594,6 +608,40 @@ const Index = () => {
               />
               <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </NavLink>
+            {/* Org customer logo */}
+            {logoUrl && !logoError && (() => {
+              const isExternal = logoLinkUrl && (logoLinkUrl.startsWith("http://") || logoLinkUrl.startsWith("https://"));
+              const isInternal = logoLinkUrl && logoLinkUrl.startsWith("/");
+              const logoImg = (
+                <img
+                  src={logoUrl}
+                  alt={orgName}
+                  title={orgName}
+                  className="h-6 w-auto max-w-[100px] object-contain shrink-0 opacity-90 hover:opacity-100 transition-opacity"
+                  onError={() => setLogoError(true)}
+                />
+              );
+              return (
+                <>
+                  <span className="w-px h-5 bg-border shrink-0 ml-1" />
+                  {isExternal ? (
+                    <a href={logoLinkUrl!} target="_blank" rel="noopener noreferrer">{logoImg}</a>
+                  ) : isInternal ? (
+                    <NavLink to={logoLinkUrl!}>{logoImg}</NavLink>
+                  ) : (
+                    logoImg
+                  )}
+                </>
+              );
+            })()}
+            {(!logoUrl || logoError) && orgName && orgName !== "CaseManagement.ai" && (
+              <>
+                <span className="w-px h-5 bg-border shrink-0 ml-1" />
+                <span className="text-[11px] font-semibold text-muted-foreground max-w-[120px] truncate shrink-0">
+                  {orgName}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Center: horizontal nav of iCM modules — icon + label pills */}
@@ -648,11 +696,11 @@ const Index = () => {
               transition={{ delay: 0.1 }}
               className="text-center max-w-2xl"
             >
-              <h1 className="font-display text-3xl font-bold text-foreground mb-2">
+              <h1 className="font-manrope text-3xl font-bold text-icm-text mb-2 tracking-[-0.02em]">
                 {greeting}, {firstName}
               </h1>
-              <p className="text-muted-foreground text-lg">
-                Your <span className="text-primary font-medium">AI case manager</span> is ready to assist you
+              <p className="text-muted-foreground text-lg font-geist">
+                Your <span className="text-primary font-medium">AI companion</span> is ready to assist you
               </p>
             </motion.div>
           )}
@@ -1012,66 +1060,22 @@ const Index = () => {
           >
             {thread.length === 0 ? (
               <>
-                {/* Row 1 */}
-                <div className="flex flex-wrap justify-center gap-2">
-                  {suggestedPrompts.slice(0, 2).map((prompt, idx) => {
-                    const i = idx;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => handleSend(prompt.text)}
-                        className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200"
-                      >
-                        <prompt.icon className="w-3.5 h-3.5 text-primary" />
-                        {prompt.text}
-                      </button>
-                    );
-                  })}
+                {/* 4 uniform rows of 2 prompts each */}
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  {suggestedPrompts.slice(0, 8).map((prompt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSend(prompt.text)}
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200 justify-center"
+                    >
+                      <prompt.icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="truncate">{prompt.text}</span>
+                    </button>
+                  ))}
                 </div>
 
-                {/* Row 2 */}
-                <div className="flex flex-wrap justify-center gap-2">
-                  {suggestedPrompts.slice(2, 5).map((prompt, idx) => {
-                    const i = idx + 2;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => handleSend(prompt.text)}
-                        className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200"
-                      >
-                        <prompt.icon className="w-3.5 h-3.5 text-primary" />
-                        {prompt.text}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Row 3 */}
-                <div className="flex flex-wrap justify-center gap-2">
-                  {suggestedPrompts.slice(5, 7).map((prompt, idx) => {
-                    const i = idx + 5;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => handleSend(prompt.text)}
-                        className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200"
-                      >
-                        <prompt.icon className="w-3.5 h-3.5 text-primary" />
-                        {prompt.text}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Row 4 */}
-                <div className="flex flex-wrap justify-center gap-2 items-center">
-                  <button
-                    onClick={() => handleSend(suggestedPrompts[7].text)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200"
-                  >
-                    <User className="w-3.5 h-3.5 text-primary" />
-                    {suggestedPrompts[7].text}
-                  </button>
+                {/* Individual Snapshot — centered below */}
+                <div className="flex justify-center gap-2 items-center w-full">
                   <div className="relative" ref={snapshotRef}>
                     <button
                       onClick={() => setSnapshotPickerOpen((v) => !v)}

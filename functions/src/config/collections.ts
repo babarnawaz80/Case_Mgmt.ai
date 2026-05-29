@@ -21,6 +21,7 @@ export const COLLECTIONS = {
   CREDIT_HISTORY: "credit_history",
   AUDIT_LOG: "audit_log",
   NOTIFICATIONS: "notifications",
+  GEMINI_RATE_LIMITS: "geminiRateLimits",
 } as const;
 
 export const CONFIG_DOCS = {

@@ -9,7 +9,7 @@
 
 import { Request, Response } from "express";
 import * as admin from "firebase-admin";
-import { generateCompletion } from "../services/ai";
+import { generateCompletion, getAiClient } from "../services/ai";
 import { consumeCredits } from "../services/credits";
 import { COLLECTIONS } from "../config/collections";
 
@@ -141,6 +141,114 @@ SAFETY — HIGHEST PRIORITY
 If they mention ANYTHING about being hurt, feeling unsafe, wanting to hurt themselves or others, or a crisis at home — respond with [URGENT] prefix and say:
 "I hear you and I want to make sure you're safe. Please call 988 or 911 right now. I'm also going to flag this for your care team immediately."
 Then log the conversation as urgent.`;
+
+// ── Rule-based fallback responses when AI is unavailable ──────────────────
+// Used when Gemini quota is exceeded or the API is unreachable.
+// Returns contextually appropriate replies based on the user's message.
+function ruleFallback(message: string, name: string): string {
+  const msg = message.toLowerCase().trim();
+
+  // Safety — highest priority
+  if (/\b(hurt|kill|suicide|die|harm|self.harm|end it|end my life|crisis)\b/.test(msg)) {
+    return `[URGENT] ${name}, I hear you and your safety is the most important thing right now. Please call or text 988 right now — they're available 24/7. I'm also flagging this for your care team immediately. You are not alone.`;
+  }
+
+  // Greeting / opening
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening|howdy|sup|yo)\b/.test(msg) ||
+      msg.length < 20 && /\b(how are you|what's up|whats up)\b/.test(msg)) {
+    const opts = [
+      `Hi ${name}! I'm so glad you're here. How are you doing today?`,
+      `Hey ${name}! It's great to hear from you. How are you feeling right now?`,
+      `Hello ${name}! Good to see you. What's on your mind today?`,
+      `Hi ${name}! I'm here for you. How are you doing?`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Positive feeling
+  if (/\b(good|great|well|fine|happy|wonderful|amazing|fantastic|awesome|okay|ok|alright|better|not bad)\b/.test(msg) && msg.length < 60) {
+    const opts = [
+      `That's really great to hear, ${name}! I'm so glad you're doing well. Is there anything on your mind, or anything I can help with today?`,
+      `Wonderful! It makes me really happy to hear that, ${name}. Is there anything you'd like to talk about or any messages I can send for you?`,
+      `That's great, ${name}! Keep that going. Is there anything your case manager should know about, or is there anything I can do for you today?`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Negative / struggling
+  if (/\b(bad|sad|terrible|awful|horrible|not good|not okay|not well|struggling|upset|anxious|worried|depressed|lonely|tired|exhausted|stressed|overwhelmed|scared|afraid|angry|frustrated)\b/.test(msg)) {
+    const opts = [
+      `I hear you, ${name}. I'm really sorry you're having a tough time right now. I'm here with you. Do you want to tell me a little more about what's going on?`,
+      `Thank you for telling me that, ${name}. It sounds like things have been hard. I'm here and I'm listening — what's been going on?`,
+      `I'm really glad you're talking to me, ${name}. I can hear that things aren't easy right now. Do you want to share a little more? I'm here.`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Pain / health symptoms
+  if (/\b(pain|hurt|sick|unwell|headache|stomach|nausea|dizzy|fever|doctor|hospital|nurse|medical)\b/.test(msg)) {
+    return `I'm sorry to hear you're not feeling well, ${name}. Thank you for telling me. Would you like me to send a message to your case manager so they can check in on you or help arrange support?`;
+  }
+
+  // Medication
+  if (/\b(medication|medicine|pill|pills|dose|prescription|pharmacy|refill|ran out|forgot)\b/.test(msg)) {
+    return `Thanks for letting me know, ${name}. I'm not able to share medication details, but I can send a message to your case manager right away so they can follow up with you. Would that help?`;
+  }
+
+  // Case manager / want to talk to someone
+  if (/\b(case manager|coordinator|talk to|speak to|call|reach|contact|message|need help|need someone)\b/.test(msg)) {
+    return `Of course, ${name}. I can send a message to your case manager right now. What would you like me to say to them?`;
+  }
+
+  // Affirmations / yes / confirmations
+  if (/^(yes|yeah|yep|sure|okay|ok|please|go ahead|sounds good|that works|definitely|absolutely)\b/.test(msg) && msg.length < 30) {
+    const opts = [
+      `Great, ${name}! I'll take care of that for you. Is there anything else I can do?`,
+      `Perfect! Consider it done. Is there anything else on your mind?`,
+      `Wonderful! I'll make sure that gets to the right person. Anything else I can help with today?`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Negations / no
+  if (/^(no|nope|not really|nothing|nah|I'm fine|I'm okay)\b/.test(msg) && msg.length < 30) {
+    const opts = [
+      `Okay, ${name}! I'm always here if you need me. Take care of yourself today.`,
+      `No problem at all, ${name}. I'm here whenever you need me. Have a good day!`,
+      `That's totally fine, ${name}. I'm always here if something comes up. Take care!`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Thank you
+  if (/\b(thank|thanks|thank you|appreciate)\b/.test(msg)) {
+    const opts = [
+      `You're so welcome, ${name}! That's what I'm here for. Is there anything else I can help you with?`,
+      `Of course, ${name}! I'm always happy to help. Take care of yourself!`,
+      `Anytime, ${name}! I'm always here for you. Is there anything else on your mind?`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Bye / ending
+  if (/\b(bye|goodbye|see you|talk later|take care|got to go|gotta go|ttyl|later)\b/.test(msg)) {
+    const opts = [
+      `Take care, ${name}! I'll make sure your care team gets a note from our conversation. Have a great day!`,
+      `Goodbye for now, ${name}! Remember I'm always here whenever you need me. Take care of yourself!`,
+      `Talk soon, ${name}! Don't hesitate to come back anytime. Take good care!`,
+    ];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  // Default — acknowledge and invite more
+  const defaults = [
+    `Thank you for sharing that with me, ${name}. I'm here and I'm listening. Can you tell me a little more?`,
+    `I hear you, ${name}. I'm here with you. Is there anything else you'd like to share, or anything I can help you with?`,
+    `Thank you, ${name}. I'm glad you're talking with me today. Is there anything I can do for you, or any message I can pass along to your care team?`,
+    `I appreciate you sharing that, ${name}. I'm here for you. Would you like me to pass anything along to your case manager?`,
+  ];
+  return defaults[Math.floor(Math.random() * defaults.length)];
+}
 
 // ── Build the final system prompt for a session ────────────────────────────
 // Injects individual-specific context (name, case manager, program) and
@@ -357,7 +465,7 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
       return;
     }
 
-    // ── Regular user message — call AI with history ───────────────────────────
+    // ── Regular user message — call AI with history, fall back to rule-based ──
     const result = await generateCompletion(
       systemPrompt,
       message,
@@ -451,8 +559,12 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
   } catch (error: any) {
     console.error("[companion-message] error (first attempt):", error?.message ?? error);
 
+    // Skip retry for known permanent failures (quota/billing) — no point waiting 2.5s
+    const isPermanentFailure = /quota|billing|RESOURCE_EXHAUSTED|INSUFFICIENT_CREDITS|AI_PAUSED|DAILY_LIMIT/i.test(error?.message ?? "");
+
     // Auto-retry once after a short delay — handles Gemini cold-start timeouts
     try {
+      if (isPermanentFailure) throw new Error("permanent failure — skipping retry");
       await new Promise((r) => setTimeout(r, 2500));
       const orgId = (await (async () => {
         const token2 = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
@@ -493,17 +605,31 @@ export async function companionMessage(req: Request, res: Response): Promise<voi
       console.error("[companion-message] retry also failed:", retryErr?.message ?? retryErr);
     }
 
-    // Final fallback — still warm and friendly, never exposes an error to the individual
-    // Attempt one last lightweight name lookup so the greeting uses their name
+    // Final fallback — use rule-based contextual response; never expose an error to the individual
+    // Look up name so the response is personalised
     let fallbackName = "Friend";
+    let fallbackMsg = "";
     try {
       const tkFb = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
       const indFb = await findIndividualByToken(tkFb);
       if (indFb) fallbackName = ((indFb.preferred_name || indFb.first_name) as string) || "Friend";
+      fallbackMsg = (req.body as any)?.message ?? "";
     } catch { /* best-effort */ }
+
+    const isOpenFallback = fallbackMsg === "__OPEN__" || !fallbackMsg;
+    const fallbackGreetings = [
+      `Hi ${fallbackName}! I'm your AI companion. I'm here to chat, check in with you, and help get messages to the right people. What's on your mind today?`,
+      `Hello ${fallbackName}! I'm your AI companion — here to listen and help. How are you doing today?`,
+      `Hey ${fallbackName}! I'm so glad you're here. How are you feeling right now?`,
+    ];
+    const responseText = isOpenFallback
+      ? fallbackGreetings[Math.floor(Math.random() * fallbackGreetings.length)]
+      : ruleFallback(fallbackMsg, fallbackName);
+
+    const isUrgentFallback = responseText.startsWith("[URGENT]");
     res.json({
-      response: `Hi${fallbackName !== "Friend" ? ` ${fallbackName}` : ""}! I'm your AI companion. I'm here to chat and check in with you. How are you doing today?`,
-      urgent: false,
+      response: isUrgentFallback ? responseText.replace(/\[URGENT\]/g, "").trim() : responseText,
+      urgent: isUrgentFallback,
       firstName: fallbackName,
     });
   }
@@ -556,6 +682,29 @@ Do NOT include any personally identifying information beyond first name.`,
         ended_at: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // Auto-create a work-queue task so the case manager sees this check-in
+      const indName = [individual.first_name, individual.last_name].filter(Boolean).join(" ") || "Individual";
+      const sessionDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 1); // due tomorrow
+      const dueMDY = `${dueDate.getMonth() + 1}/${dueDate.getDate()}/${dueDate.getFullYear()}`;
+      await db.collection("tasks").add({
+        title: `Review AI Care Companion session — ${indName}`,
+        description: `AI Care Companion check-in on ${sessionDate}. Summary: ${summaryResult.text}`,
+        individualId: individual.id,
+        individualName: indName,
+        organizationId: orgId,
+        type: "AI Care Companion",
+        priority: "medium",
+        status: "open",
+        source: "companion",
+        sessionId: session_id,
+        dueDate: dueMDY,
+        assignedTo: individual.assigned_case_manager_uid ?? "",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
       await consumeCredits({
         organizationId: orgId,
         userId: "companion_bot",
@@ -580,6 +729,184 @@ Do NOT include any personally identifying information beyond first name.`,
   } catch (error) {
     console.error("[end-session] error:", error);
     res.json({ success: true }); // Never error on session end — it must always succeed
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /care-assistant/:token/agent-config
+// Returns all configuration needed to initialise Deepgram Voice Agent in the
+// browser: the API key, the compiled system prompt (instructions), the per-
+// individual voice model, and the URL of our OpenAI-compatible LLM proxy.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function companionAgentConfig(req: Request, res: Response): Promise<void> {
+  res.set("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  // Strategy 1 — exact companion_token match
+  let individual = await findIndividualByToken(token).catch(() => null);
+
+  // Strategy 2 — decode individual ID from base64 token
+  if (!individual) {
+    try {
+      const raw = token.startsWith("cmp_") ? token.slice(4) : token;
+      const decoded = Buffer.from(raw, "base64").toString("utf8");
+      const underscoreIdx = decoded.lastIndexOf("_");
+      const individualId = underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
+      if (individualId) {
+        const db = admin.firestore();
+        const docSnap = await db.collection(COLLECTIONS.INDIVIDUALS).doc(individualId).get();
+        if (docSnap.exists) individual = { id: docSnap.id, ...docSnap.data() } as Record<string, unknown> & { id: string };
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (!individual) {
+    res.status(403).json({ error: "Invalid companion link." });
+    return;
+  }
+
+  const dgKey = process.env.DEEPGRAM_API_KEY ?? "";
+  if (!dgKey || dgKey === "PASTE_YOUR_KEY_HERE") {
+    res.status(503).json({ error: "Deepgram API key not configured." });
+    return;
+  }
+
+  const db = admin.firestore();
+  const cmSnap = individual.assigned_case_manager
+    ? await db.collection(COLLECTIONS.USERS).doc(individual.assigned_case_manager as string).get().catch(() => null)
+    : null;
+  const cmName = cmSnap?.exists && cmSnap.data()
+    ? `${cmSnap.data()!.firstName} ${cmSnap.data()!.lastName}`
+    : "your case manager";
+
+  const preferredName = ((individual.preferred_name || individual.first_name) as string) || "Friend";
+  const county   = (individual.county   as string) || "";
+  const programName = (individual.program as string) || "";
+  const customPromptData = individual.companion_prompt as { content?: string } | null | undefined;
+  const customInstructions = customPromptData?.content?.trim();
+  const instructions = buildSystemPrompt(preferredName, county, cmName, programName, customInstructions);
+
+  const voice         = (individual.companion_voice as string) || "aura-luna-en";
+  const customLlmUrl  = `https://us-central1-casemanagement-ai.cloudfunctions.net/api/care-assistant/${token}/llm`;
+
+  res.json({ dgKey, voice, instructions, customLlmUrl, firstName: preferredName });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /care-assistant/:token/llm
+// OpenAI-compatible streaming LLM proxy used by Deepgram Voice Agent.
+// Deepgram calls this URL with a standard chat-completions body; we call
+// Gemini and re-emit the response as OpenAI SSE chunks.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function companionLLMProxy(req: Request, res: Response): Promise<void> {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  // Identify individual so we can use the right system prompt
+  let individual: (Record<string, unknown> & { id: string }) | null = null;
+  try {
+    individual = await findIndividualByToken(token);
+    if (!individual) {
+      const raw = token.startsWith("cmp_") ? token.slice(4) : token;
+      const decoded = Buffer.from(raw, "base64").toString("utf8");
+      const underscoreIdx = decoded.lastIndexOf("_");
+      const individualId = underscoreIdx > 0 ? decoded.slice(0, underscoreIdx) : decoded;
+      if (individualId) {
+        const db = admin.firestore();
+        const docSnap = await db.collection(COLLECTIONS.INDIVIDUALS).doc(individualId).get();
+        if (docSnap.exists) individual = { id: docSnap.id, ...docSnap.data() } as Record<string, unknown> & { id: string };
+      }
+    }
+  } catch { /* proceed with default prompt */ }
+
+  // Build system prompt
+  let systemPrompt = DEFAULT_COMPANION_PROMPT;
+  if (individual) {
+    try {
+      const db = admin.firestore();
+      const cmSnap = individual.assigned_case_manager
+        ? await db.collection(COLLECTIONS.USERS).doc(individual.assigned_case_manager as string).get().catch(() => null)
+        : null;
+      const cmName = cmSnap?.exists && cmSnap.data()
+        ? `${cmSnap.data()!.firstName} ${cmSnap.data()!.lastName}`
+        : "your case manager";
+      const preferredName = ((individual.preferred_name || individual.first_name) as string) || "Friend";
+      const county   = (individual.county   as string) || "";
+      const programName = (individual.program as string) || "";
+      const customPromptData = individual.companion_prompt as { content?: string } | null | undefined;
+      const customInstructions = customPromptData?.content?.trim();
+      systemPrompt = buildSystemPrompt(preferredName, county, cmName, programName, customInstructions);
+    } catch { /* use default */ }
+  }
+
+  // Parse incoming OpenAI-format body
+  const body = req.body as {
+    model?: string;
+    messages?: Array<{ role: string; content: string }>;
+    stream?: boolean;
+  };
+  const rawMessages = Array.isArray(body.messages) ? body.messages : [];
+
+  // Extract system message if Deepgram sent one (use it instead of our prompt)
+  const incomingSystem = rawMessages.find((m) => m.role === "system");
+  const effectiveSystem = incomingSystem?.content || systemPrompt;
+  const conversationMsgs = rawMessages.filter((m) => m.role !== "system");
+
+  // Convert to Gemini multi-turn format
+  const geminiContents: Array<{ role: string; parts: Array<{ text: string }> }> =
+    conversationMsgs.length > 0
+      ? conversationMsgs.map((m) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content || " " }],
+        }))
+      : [{ role: "user", parts: [{ text: "Hello" }] }];
+
+  // Stream via Vertex AI SDK — Application Default Credentials (no API key needed)
+  const ai = getAiClient();
+  const respId = `chatcmpl-${Date.now()}`;
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+  });
+
+  try {
+    const stream = await ai.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: geminiContents,
+      config: {
+        systemInstruction: effectiveSystem,
+        maxOutputTokens: 300,
+        temperature: 0.75,
+      },
+    });
+
+    for await (const chunk of stream) {
+      const text: string = chunk.text ?? "";
+      if (text) {
+        const oaiChunk = {
+          id: respId,
+          object: "chat.completion.chunk",
+          choices: [{ delta: { content: text }, index: 0, finish_reason: null }],
+        };
+        res.write(`data: ${JSON.stringify(oaiChunk)}\n\n`);
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch (err: any) {
+    console.error("[llm-proxy] Vertex AI SDK error:", err.message);
+    res.write(`data: {"id":"llm-err","object":"chat.completion.chunk","choices":[{"delta":{"content":"I'm here for you. What's on your mind?"},"index":0}]}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
   }
 }
 

@@ -5,6 +5,7 @@ import {
   CreditCard, Settings, FileText, Pencil, CalendarCheck,
   Phone, AlertTriangle, Folder, ArrowRight,
   Loader2, Sparkles, User, Shield, X,
+  Bell, Building2, Link, Upload, Clock,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ interface CommandItem {
 
 // ─── Static item definitions ─────────────────────────────────────────────────
 
-const NAV_ITEMS: Omit<CommandItem, "action">[] = [
+export const NAV_ITEMS: Omit<CommandItem, "action">[] = [
   { id: "nav-dashboard",  label: "Dashboard",         icon: Home,          category: "Navigation" },
   { id: "nav-my-work",    label: "My Work",            icon: CheckSquare,   category: "Navigation" },
   { id: "nav-people",     label: "People Supported",   icon: Users,         category: "Navigation" },
@@ -42,7 +43,7 @@ const NAV_ITEMS: Omit<CommandItem, "action">[] = [
   { id: "nav-settings",   label: "Settings",           icon: Settings,      category: "Navigation" },
 ];
 
-const ACTION_ITEMS: Omit<CommandItem, "action">[] = [
+export const ACTION_ITEMS: Omit<CommandItem, "action">[] = [
   {
     id: "act-new-progress-note",
     label: "New Progress Note",
@@ -109,7 +110,7 @@ const ACTION_ITEMS: Omit<CommandItem, "action">[] = [
   },
 ];
 
-const NAV_ROUTES: Record<string, string> = {
+export const NAV_ROUTES: Record<string, string> = {
   "nav-dashboard": "/dashboard",
   "nav-my-work":   "/my-work",
   "nav-people":    "/people",
@@ -122,7 +123,7 @@ const NAV_ROUTES: Record<string, string> = {
   "nav-settings":  "/settings",
 };
 
-const ACTION_ROUTES: Record<string, string> = {
+export const ACTION_ROUTES: Record<string, string> = {
   "act-new-progress-note": "/progress-note/new",
   "act-new-contact-note":  "/modules/contact-note",
   "act-new-visit":         "/visit-summary/new",
@@ -130,6 +131,58 @@ const ACTION_ROUTES: Record<string, string> = {
   "act-new-oncall":        "/oncall-log/new",
   "act-compliance":        "/supervisor/compliance",
 };
+
+export const SETTINGS_ITEMS: Omit<CommandItem, "action">[] = [
+  { id: "set-org",           label: "Organization Profile",  sublabel: "Name, address, logo, brand color, NPI",   icon: Building2,  category: "Settings", keywords: ["organization", "org", "address", "logo", "brand", "color", "npi", "license", "phone", "fax", "states", "profile"] },
+  { id: "set-security",      label: "Security & Password",   sublabel: "Password policy, session timeout, MFA",   icon: Shield,     category: "Settings", keywords: ["security", "password", "timeout", "session", "mfa", "2fa", "login", "expiry", "expire"] },
+  { id: "set-users",         label: "Users & Permissions",   sublabel: "Manage team members and roles",           icon: Users,      category: "Settings", keywords: ["users", "staff", "team", "permissions", "roles", "invite", "add user", "members"] },
+  { id: "set-billing",       label: "Billing Configuration", sublabel: "Service codes, rates, payers",            icon: CreditCard, category: "Settings", keywords: ["billing", "rates", "payers", "service codes", "claims", "invoice", "revenue"] },
+  { id: "set-programs",      label: "Programs",              sublabel: "Configure service programs",              icon: Folder,     category: "Settings", keywords: ["programs", "services", "waiver", "idd", "dda"] },
+  { id: "set-ai",            label: "AI Settings",           sublabel: "AI credits, features, models",            icon: Sparkles,   category: "Settings", keywords: ["ai", "credits", "gemini", "intelligence", "automation", "features"] },
+  { id: "set-notifications", label: "Notifications",         sublabel: "Email and in-app notifications",          icon: Bell,       category: "Settings", keywords: ["notifications", "alerts", "email", "reminders"] },
+  { id: "set-integrations",  label: "Integrations",          sublabel: "Third-party connections",                 icon: Link,       category: "Settings", keywords: ["integrations", "api", "connect", "third party", "deepgram", "voice"] },
+  { id: "set-templates",     label: "Document Templates",    sublabel: "Note and form templates",                 icon: FileText,   category: "Settings", keywords: ["templates", "forms", "documents", "progress note", "contact note"] },
+  { id: "set-import",        label: "Import Data",           sublabel: "Import individuals, staff, and data",     icon: Upload,     category: "Settings", keywords: ["import", "upload", "csv", "data", "individuals", "staff"] },
+];
+
+export const SETTINGS_ROUTES: Record<string, string> = {
+  "set-org":           "/settings/organization",
+  "set-security":      "/settings/security",
+  "set-users":         "/settings/users",
+  "set-billing":       "/settings/billing-config",
+  "set-programs":      "/settings/programs",
+  "set-ai":            "/settings/ai",
+  "set-notifications": "/settings/notifications",
+  "set-integrations":  "/settings/integrations",
+  "set-templates":     "/settings/templates",
+  "set-import":        "/settings/import",
+};
+
+// ─── Recent items helpers ─────────────────────────────────────────────────────
+
+const RECENT_KEY = "cp_recent_v1";
+const RECENT_MAX = 5;
+
+function loadRecentIds(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentId(id: string): void {
+  try {
+    const current = loadRecentIds().filter((i) => i !== id);
+    const next = [id, ...current].slice(0, RECENT_MAX);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 // ─── Singleton open/close state ───────────────────────────────────────────────
 
@@ -171,6 +224,7 @@ export function CommandPalette() {
   const [open, setOpenRaw] = useState(paletteOpen);
   const [q, setQ] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const { individuals, loading: loadingPeople } = useIndividuals();
@@ -199,11 +253,12 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Auto-focus input when opened; reset state
+  // Auto-focus input when opened; reset state + load recents
   useEffect(() => {
     if (open) {
       setQ("");
       setSelectedIdx(0);
+      setRecentIds(loadRecentIds());
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -227,6 +282,11 @@ export function CommandPalette() {
       },
     }));
 
+    const settingsItems: CommandItem[] = SETTINGS_ITEMS.map((s) => ({
+      ...s,
+      action: () => navigate(SETTINGS_ROUTES[s.id]),
+    }));
+
     const peopleItems: CommandItem[] = individuals
       .filter((p) => p.enrollment_status === "active")
       .slice(0, 100)
@@ -240,7 +300,7 @@ export function CommandPalette() {
         keywords: [p.first_name, p.last_name, p.county ?? "", p.medicaid_id ?? ""].filter(Boolean),
       }));
 
-    return [...actionItems, ...navItems, ...peopleItems];
+    return [...actionItems, ...navItems, ...settingsItems, ...peopleItems];
   }, [individuals, navigate]);
 
   // Filter by query
@@ -262,41 +322,69 @@ export function CommandPalette() {
       .slice(0, 20);
   }, [allItems, q]);
 
-  // Group results by category (ordered)
+  // Resolve recent ids to full CommandItems (for display when query is empty)
+  const recentItems = useMemo((): CommandItem[] => {
+    if (q.trim()) return [];
+    return recentIds
+      .map((id) => allItems.find((item) => item.id === id))
+      .filter((item): item is CommandItem => item != null);
+  }, [recentIds, allItems, q]);
+
+  // Group results by category (ordered), with Recent prepended when query is empty
   const groups = useMemo(() => {
+    type GroupEntry = { category: string; items: CommandItem[] };
+    const result: GroupEntry[] = [];
+
+    if (recentItems.length > 0) {
+      result.push({ category: "Recent", items: recentItems });
+    }
+
     const order: CommandItem["category"][] = ["Actions", "People", "Navigation", "Settings"];
     const map = new Map<string, CommandItem[]>();
     filtered.forEach((item) => {
       if (!map.has(item.category)) map.set(item.category, []);
       map.get(item.category)!.push(item);
     });
-    return order
+    order
       .filter((cat) => map.has(cat))
-      .map((cat) => ({ category: cat, items: map.get(cat)! }));
-  }, [filtered]);
+      .forEach((cat) => result.push({ category: cat, items: map.get(cat)! }));
 
-  // Flat index map for keyboard selection
-  const itemFlatIdx = useMemo(() => {
+    return result;
+  }, [filtered, recentItems]);
+
+  // Flat index map for keyboard selection (includes all items across groups)
+  const { itemFlatIdx, flatItems } = useMemo(() => {
     let idx = 0;
     const m = new Map<string, number>();
-    groups.forEach((g) => g.items.forEach((item) => { m.set(item.id, idx++); }));
-    return m;
+    const flat: CommandItem[] = [];
+    groups.forEach((g) => g.items.forEach((item) => {
+      m.set(item.id, idx++);
+      flat.push(item);
+    }));
+    return { itemFlatIdx: m, flatItems: flat };
   }, [groups]);
+
+  // Select an item: run its action, save to recents, close
+  function selectItem(item: CommandItem) {
+    saveRecentId(item.id);
+    setRecentIds(loadRecentIds());
+    item.action();
+    closeCommandPalette();
+  }
 
   // Keyboard navigation inside the input
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIdx((i) => Math.min(i + 1, filtered.length - 1));
+      setSelectedIdx((i) => Math.min(i + 1, flatItems.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const item = filtered[selectedIdx];
+      const item = flatItems[selectedIdx];
       if (item) {
-        item.action();
-        closeCommandPalette();
+        selectItem(item);
       }
     }
   }
@@ -316,8 +404,8 @@ export function CommandPalette() {
         aria-label="Command Palette"
       >
         {/* ── Search input ── */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-icm-border">
-          <Search className="w-4 h-4 text-icm-text-dim shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-icm-border bg-icm-panel">
+          <Search className="w-[18px] h-[18px] text-icm-accent shrink-0" />
           <input
             ref={inputRef}
             value={q}
@@ -326,8 +414,8 @@ export function CommandPalette() {
               setSelectedIdx(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search people, actions, pages…"
-            className="flex-1 bg-transparent text-[14px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none"
+            placeholder="Search people, settings, actions, pages…"
+            className="flex-1 bg-transparent text-[15px] font-geist font-medium text-icm-text placeholder:text-icm-text-faint focus:outline-none"
             aria-label="Command palette search"
           />
           {q && (
@@ -345,7 +433,7 @@ export function CommandPalette() {
         </div>
 
         {/* ── Results list ── */}
-        <div ref={listRef} className="max-h-[420px] overflow-y-auto py-2">
+        <div ref={listRef} className="max-h-[420px] overflow-y-auto py-1.5">
           {/* Loading indicator (only when querying people) */}
           {loadingPeople && q && (
             <div className="flex items-center gap-2 px-4 py-3 text-[12px] text-icm-text-dim font-geist">
@@ -355,7 +443,7 @@ export function CommandPalette() {
           )}
 
           {/* Empty state */}
-          {!loadingPeople && filtered.length === 0 && (
+          {!loadingPeople && flatItems.length === 0 && (
             <div className="px-4 py-8 text-center">
               <p className="text-[13px] text-icm-text-dim font-geist">
                 No results for &ldquo;{q}&rdquo;
@@ -369,9 +457,14 @@ export function CommandPalette() {
           {/* Grouped results */}
           {groups.map(({ category, items }) => (
             <div key={category}>
-              <p className="px-4 py-1.5 text-[10px] uppercase tracking-widest font-geist font-semibold text-icm-text-faint select-none">
-                {category}
-              </p>
+              {/* Category header */}
+              <div className="flex items-center gap-2 px-4 pt-3 pb-1 select-none">
+                {category === "Recent" && <Clock className="w-3 h-3 text-icm-text-faint" />}
+                <p className="text-[10px] uppercase tracking-[0.08em] font-geist font-semibold text-icm-text-faint">
+                  {category}
+                </p>
+                <div className="flex-1 h-px bg-icm-border/60" />
+              </div>
               {items.map((item) => {
                 const idx = itemFlatIdx.get(item.id) ?? 0;
                 const isSelected = idx === selectedIdx;
@@ -379,17 +472,15 @@ export function CommandPalette() {
                 const isPerson = item.category === "People";
                 const personId = isPerson ? item.id.replace("person-", "") : null;
                 const person = personId ? individuals.find((p) => p.id === personId) : null;
+                const isSettings = item.category === "Settings";
 
                 return (
                   <button
                     key={item.id}
-                    onClick={() => {
-                      item.action();
-                      closeCommandPalette();
-                    }}
+                    onClick={() => selectItem(item)}
                     onMouseEnter={() => setSelectedIdx(idx)}
                     className={cn(
-                      "w-full text-left flex items-center gap-3 px-4 py-2 transition-colors",
+                      "group w-full text-left flex items-center gap-3 px-4 py-2 transition-colors",
                       isSelected ? "bg-icm-accent-soft" : "hover:bg-icm-bg"
                     )}
                   >
@@ -406,10 +497,12 @@ export function CommandPalette() {
                     ) : (
                       <div
                         className={cn(
-                          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors",
                           isSelected
                             ? "bg-icm-accent/15 text-icm-accent"
-                            : "bg-icm-bg text-icm-text-dim border border-icm-border"
+                            : isSettings
+                              ? "bg-icm-bg/60 text-icm-text-dim"
+                              : "bg-icm-bg text-icm-text-dim border border-icm-border"
                         )}
                       >
                         <Icon className="w-3.5 h-3.5" />
@@ -423,22 +516,29 @@ export function CommandPalette() {
                           "text-[13px] font-geist truncate",
                           isSelected
                             ? "font-semibold text-icm-accent"
-                            : "font-medium text-icm-text"
+                            : "font-semibold text-icm-text"
                         )}
                       >
                         {item.label}
                       </p>
                       {item.sublabel && (
-                        <p className="text-[10.5px] text-icm-text-faint font-geist truncate">
+                        <p className="text-[11px] text-icm-text-dim font-geist truncate">
                           {item.sublabel}
                         </p>
                       )}
                     </div>
 
-                    {/* Arrow indicator on selected */}
-                    {isSelected && (
-                      <ArrowRight className="w-3.5 h-3.5 text-icm-accent shrink-0" />
-                    )}
+                    {/* ↵ hint — visible only on hover/selected */}
+                    <kbd
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-[10px] font-mono border transition-opacity shrink-0",
+                        isSelected
+                          ? "opacity-100 bg-icm-accent/10 border-icm-accent/30 text-icm-accent"
+                          : "opacity-0 group-hover:opacity-60 bg-icm-bg border-icm-border text-icm-text-faint"
+                      )}
+                    >
+                      ↵
+                    </kbd>
                   </button>
                 );
               })}
@@ -447,26 +547,22 @@ export function CommandPalette() {
         </div>
 
         {/* ── Footer: keyboard hints ── */}
-        <div className="px-4 py-2.5 border-t border-icm-border flex items-center gap-4 text-[10.5px] font-geist text-icm-text-faint">
+        <div className="px-4 py-2 border-t border-icm-border flex items-center justify-center gap-3 text-[10px] font-geist text-icm-text-faint">
           <span className="inline-flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-icm-bg border border-icm-border">
-              ↑↓
-            </kbd>
+            <kbd className="px-1 py-0.5 rounded text-[9px] font-mono bg-icm-bg border border-icm-border leading-none">↑↓</kbd>
             navigate
           </span>
+          <span className="text-icm-border select-none">·</span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-icm-bg border border-icm-border">
-              ↵
-            </kbd>
+            <kbd className="px-1 py-0.5 rounded text-[9px] font-mono bg-icm-bg border border-icm-border leading-none">↵</kbd>
             select
           </span>
+          <span className="text-icm-border select-none">·</span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-icm-bg border border-icm-border">
-              ESC
-            </kbd>
+            <kbd className="px-1 py-0.5 rounded text-[9px] font-mono bg-icm-bg border border-icm-border leading-none">esc</kbd>
             close
           </span>
-          <span className="ml-auto inline-flex items-center gap-1">
+          <span className="ml-auto inline-flex items-center gap-1 opacity-60">
             <Sparkles className="w-3 h-3 text-icm-accent" />
             CaseManagement.AI
           </span>

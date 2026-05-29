@@ -1,7 +1,10 @@
 "use strict";
 // AI Abstraction Layer — THE ONLY file that calls AI APIs (Gemini)
 // CaseManagement.AI
-// Uses direct REST calls to Gemini Developer API (v1beta) — bypasses SDK path-prefix issues.
+//
+// Uses @google/genai SDK with Vertex AI backend and Application Default Credentials (ADC).
+// No API keys — the Cloud Functions service account authenticates automatically.
+// GEMINI_API_KEY is NOT used anywhere in this file.
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -36,6 +39,13 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 var __await = (this && this.__await) || function (v) { return this instanceof __await ? (this.v = v, this) : new __await(v); }
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 var __asyncGenerator = (this && this.__asyncGenerator) || function (thisArg, _arguments, generator) {
     if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
     var g = generator.apply(thisArg, _arguments || []), i, q = [];
@@ -49,18 +59,34 @@ var __asyncGenerator = (this && this.__asyncGenerator) || function (thisArg, _ar
     function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getAiClient = getAiClient;
 exports.generateCompletion = generateCompletion;
 exports.streamCompletion = streamCompletion;
 const admin = __importStar(require("firebase-admin"));
+const genai_1 = require("@google/genai");
 const collections_1 = require("../config/collections");
-// Verified available via REST: gemini-2.5-flash works for this API key
+// ─── Singleton Vertex AI client ───────────────────────────────────────────────
+// Created once per warm invocation. ADC auth is handled by the SDK automatically.
+// Exported so companion.ts can share the same instance for multi-turn streaming.
+let _genai = null;
+function getAiClient() {
+    var _a;
+    if (!_genai) {
+        _genai = new genai_1.GoogleGenAI({
+            vertexai: true,
+            project: (_a = process.env.GOOGLE_CLOUD_PROJECT) !== null && _a !== void 0 ? _a : process.env.GCLOUD_PROJECT,
+            location: "us-central1",
+        });
+    }
+    return _genai;
+}
+// ─── Model registry ───────────────────────────────────────────────────────────
 const MODELS = {
     companion: "gemini-2.5-flash", // Care Companion bot
     quality: "gemini-2.5-flash", // Documentation & quality checks
     fast: "gemini-2.5-flash", // Chat, form prefill, scribe
 };
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-// Check org is allowed to use AI before making any call
+// ─── Org access gate ─────────────────────────────────────────────────────────
 async function checkOrgAIAccess(organizationId) {
     try {
         const db = admin.firestore();
@@ -101,121 +127,71 @@ async function checkOrgAIAccess(organizationId) {
         console.error("[AI] checkOrgAIAccess unexpected error — allowing through:", err.message);
     }
 }
-// Direct REST call to Gemini API (v1beta) — bypasses SDK model-path issues
-async function callGeminiRest(apiKey, modelId, systemPrompt, userPrompt, maxTokens, temperature) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
-    const url = `${GEMINI_BASE}/${modelId}:generateContent?key=${apiKey}`;
-    const body = {
-        system_instruction: {
-            parts: [{ text: systemPrompt }],
-        },
-        contents: [
-            { role: "user", parts: [{ text: userPrompt }] },
-        ],
-        generationConfig: {
-            maxOutputTokens: maxTokens,
-            temperature,
-        },
-    };
-    const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
-        const errText = await resp.text().catch(() => "");
-        console.error(`[AI] REST error ${resp.status}:`, errText);
-        throw new Error(`Gemini REST ${resp.status}: ${errText.slice(0, 200)}`);
-    }
-    const data = await resp.json();
-    const text = (_f = (_e = (_d = (_c = (_b = (_a = data.candidates) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.parts) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.text) !== null && _f !== void 0 ? _f : "";
-    const inputTokens = (_h = (_g = data.usageMetadata) === null || _g === void 0 ? void 0 : _g.promptTokenCount) !== null && _h !== void 0 ? _h : 0;
-    const outputTokens = (_k = (_j = data.usageMetadata) === null || _j === void 0 ? void 0 : _j.candidatesTokenCount) !== null && _k !== void 0 ? _k : 0;
-    return { text, inputTokens, outputTokens };
-}
-// Main generation function — called by all feature functions
+// ─── Non-streaming generation ─────────────────────────────────────────────────
 async function generateCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature, options = {}) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     await checkOrgAIAccess(organizationId);
     const modelId = MODELS[tier];
     const maxTokens = (_a = options.maxTokens) !== null && _a !== void 0 ? _a : 4096;
     const temperature = (_b = options.temperature) !== null && _b !== void 0 ? _b : 0.3;
     const fullPrompt = context ? `${context}\n\n${userPrompt}` : userPrompt;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (!geminiApiKey) {
-        console.error("[AI] GEMINI_API_KEY not set");
-        throw new Error("AI_UNAVAILABLE");
-    }
     try {
-        const result = await callGeminiRest(geminiApiKey, modelId, systemPrompt, fullPrompt, maxTokens, temperature);
-        console.log(`[AI] OK — model=${modelId} in=${result.inputTokens} out=${result.outputTokens}`);
-        return result;
+        const ai = getAiClient();
+        const response = await ai.models.generateContent({
+            model: modelId,
+            contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+            config: {
+                systemInstruction: systemPrompt,
+                maxOutputTokens: maxTokens,
+                temperature,
+            },
+        });
+        const text = (_c = response.text) !== null && _c !== void 0 ? _c : "";
+        const inputTokens = (_e = (_d = response.usageMetadata) === null || _d === void 0 ? void 0 : _d.promptTokenCount) !== null && _e !== void 0 ? _e : 0;
+        const outputTokens = (_g = (_f = response.usageMetadata) === null || _f === void 0 ? void 0 : _f.candidatesTokenCount) !== null && _g !== void 0 ? _g : 0;
+        console.log(`[AI] OK — model=${modelId} in=${inputTokens} out=${outputTokens}`);
+        return { text, inputTokens, outputTokens };
     }
     catch (err) {
-        console.error("[AI] Gemini REST failed:", err.message);
+        console.error("[AI] Gemini call failed:", err.message);
         throw new Error("AI_UNAVAILABLE");
     }
 }
-// Streaming version — for Care Companion bot real-time responses
+// ─── Streaming generation ─────────────────────────────────────────────────────
+// Used by the Care Companion bot for real-time token streaming.
 function streamCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature) {
     return __asyncGenerator(this, arguments, function* streamCompletion_1() {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, e_1, _b, _c;
+        var _d;
         yield __await(checkOrgAIAccess(organizationId));
         const modelId = MODELS[tier];
         const fullPrompt = context ? `${context}\n\n${userPrompt}` : userPrompt;
-        const geminiApiKey = process.env.GEMINI_API_KEY;
-        if (!geminiApiKey) {
-            throw new Error("AI_UNAVAILABLE");
-        }
-        // Use streaming REST endpoint
-        const url = `${GEMINI_BASE}/${modelId}:streamGenerateContent?alt=sse&key=${geminiApiKey}`;
-        const body = {
-            system_instruction: { parts: [{ text: systemPrompt }] },
+        const ai = getAiClient();
+        const stream = yield __await(ai.models.generateContentStream({
+            model: modelId,
             contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-            generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
-        };
-        const resp = yield __await(fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+            config: {
+                systemInstruction: systemPrompt,
+                maxOutputTokens: 2048,
+                temperature: 0.7,
+            },
         }));
-        if (!resp.ok || !resp.body) {
-            const errText = yield __await(resp.text().catch(() => ""));
-            console.error(`[AI] Stream REST error ${resp.status}:`, errText);
-            throw new Error("AI_UNAVAILABLE");
-        }
-        // Read SSE stream
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
         try {
-            while (true) {
-                const { done, value } = yield __await(reader.read());
-                if (done)
-                    break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = (_a = lines.pop()) !== null && _a !== void 0 ? _a : "";
-                for (const line of lines) {
-                    if (!line.startsWith("data: "))
-                        continue;
-                    const jsonStr = line.slice(6).trim();
-                    if (jsonStr === "[DONE]")
-                        return yield __await(void 0);
-                    try {
-                        const chunk = JSON.parse(jsonStr);
-                        const text = (_g = (_f = (_e = (_d = (_c = (_b = chunk.candidates) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.content) === null || _d === void 0 ? void 0 : _d.parts) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.text) !== null && _g !== void 0 ? _g : "";
-                        if (text)
-                            yield yield __await(text);
-                    }
-                    catch (_h) {
-                        // skip malformed chunk
-                    }
-                }
+            for (var _e = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield __await(stream_1.next()), _a = stream_1_1.done, !_a; _e = true) {
+                _c = stream_1_1.value;
+                _e = false;
+                const chunk = _c;
+                const text = (_d = chunk.text) !== null && _d !== void 0 ? _d : "";
+                if (text)
+                    yield yield __await(text);
             }
         }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
         finally {
-            reader.releaseLock();
+            try {
+                if (!_e && !_a && (_b = stream_1.return)) yield __await(_b.call(stream_1));
+            }
+            finally { if (e_1) throw e_1.error; }
         }
     });
 }

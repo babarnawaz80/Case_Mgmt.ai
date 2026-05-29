@@ -157,12 +157,14 @@ export async function addTaskComment(
   taskId: string,
   comment: string,
   authorUid: string,
-  authorName: string
+  authorName: string,
+  mentions?: string[]
 ): Promise<void> {
   await addDoc(collection(db, "tasks", taskId, "comments"), {
     body: comment,
     authorUid,
     authorName,
+    ...(mentions && mentions.length > 0 ? { mentions } : {}),
     createdAt: serverTimestamp(),
   });
   // Also update the parent task's updatedAt

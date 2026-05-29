@@ -1,6 +1,8 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
+import { StaffProfileTabs } from "@/components/settings/StaffProfileTabs";
+import { useIndividuals } from "@/hooks/useIndividuals";
 import {
   getUser,
   orgUsers,
@@ -25,7 +27,8 @@ import {
 import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle, Camera, Loader2 } from "lucide-react";
+import { Pencil, MoreHorizontal, Shield, Activity, Plus, Trash2, AlertTriangle, Camera, Loader2, Search, X, User, Users, ArrowRight, ChevronDown, ChevronUp, Calendar, Filter } from "lucide-react";
+import { useUserAuditLog, formatAuditTs, ACTION_LABELS, MODULE_LABELS } from "@/hooks/useAuditLog";
 import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -117,6 +120,9 @@ const SettingsUserDetail = () => {
     if (mockUser) return { ...mockUser, programs: mockUser.programs ?? [], states: mockUser.states ?? [] };
     return null;
   }, [mockUser, firestoreUser, userId]);
+
+  // realUid: resolved Firestore UID (handles legacy mock IDs like "u-002")
+  const realUid = firestoreUser?.uid || userId || firebaseUser?.uid || "";
 
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
@@ -313,8 +319,6 @@ const SettingsUserDetail = () => {
             <>
               <button
                 onClick={async () => {
-                  // Prefer the UID resolved from Firestore (handles legacy mock IDs like "u-002")
-                  const realUid = firestoreUser?.uid || userId || firebaseUser?.uid;
                   if (!realUid) { toast.error("Cannot save: user ID not resolved"); return; }
                   try {
                     await setDoc(doc(db, 'users', realUid), {
@@ -406,80 +410,13 @@ const SettingsUserDetail = () => {
       </div>
 
       {tab === "profile" && (
-        <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3 max-w-[640px]">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="First name" defaultValue={user.firstName} />
-            <Field label="Last name" defaultValue={user.lastName} />
-          </div>
-          <Field label="Email" defaultValue={user.email} />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Phone" defaultValue={user.phone ?? ""} />
-            <Field label="Title / Credential" defaultValue={user.title ?? ""} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Department" defaultValue={user.department ?? ""} />
-            <Field label="Supervisor" defaultValue={user.supervisor ?? ""} />
-          </div>
-          <div>
-            <Label>Role</Label>
-            <select
-              defaultValue={user.role}
-              className="mt-1 w-full h-9 px-2 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text"
-            >
-              <option value="admin">Admin</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="case_manager">Case Manager</option>
-              <option value="billing">Billing</option>
-              <option value="read_only">Read Only</option>
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-[12px] font-geist text-icm-text">
-            <input
-              type="checkbox"
-              defaultChecked={user.status === "active"}
-              className="accent-icm-accent"
-            />
-            Account active
-          </label>
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={async () => {
-                const realUid = firestoreUser?.uid || userId || firebaseUser?.uid;
-                if (!realUid) { toast.error("Cannot save: user ID not resolved"); return; }
-                try {
-                  await setDoc(doc(db, 'users', realUid), {
-                    firstName: editFirst,
-                    lastName: editLast,
-                    displayName: `${editFirst} ${editLast}`,
-                    email: editEmail,
-                    title: editTitle,
-                    updatedAt: new Date().toISOString(),
-                  }, { merge: true });
-                  setFirestoreUser((prev: any) => ({
-                    ...prev,
-                    uid: realUid,
-                    firstName: editFirst,
-                    lastName: editLast,
-                    displayName: `${editFirst} ${editLast}`,
-                    email: editEmail,
-                    title: editTitle,
-                  }));
-                  // Refresh context if editing own profile
-                  if (refreshProfile && realUid === currentUser?.uid) {
-                    await refreshProfile();
-                  }
-                  toast.success("User profile saved successfully!");
-                } catch (err: any) {
-                  console.error(err);
-                  toast.error("Failed to save profile changes", { description: err?.message });
-                }
-              }}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold"
-            >
-              Save changes
-            </button>
-          </div>
-        </div>
+        <StaffProfileTabs
+          firestoreUser={firestoreUser}
+          realUid={realUid}
+          onSaved={(updated) =>
+            setFirestoreUser((prev: any) => ({ ...prev, ...updated }))
+          }
+        />
       )}
 
       {tab === "access" && (
@@ -547,51 +484,13 @@ const SettingsUserDetail = () => {
             </div>
           </SectionPanel>
 
-          {user.role === "case_manager" && (
-            <SectionPanel title="Caseload">
-              <div className="grid grid-cols-3 gap-3">
-                <Field label="Current caseload" defaultValue={String(user.caseload ?? 0)} />
-                <Field
-                  label="Caseload capacity"
-                  defaultValue={String(user.caseloadCapacity ?? 0)}
-                />
-                <Field label="Caseload weight" defaultValue="0" />
-              </div>
-            </SectionPanel>
-          )}
+          {/* Staff Caseload — always shown so any role can have individuals assigned */}
+          <StaffCaseloadSection staffUid={firestoreUser?.uid ?? userId} />
         </div>
       )}
 
       {tab === "activity" && (
-        <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
-          <table className="w-full text-[12px] font-geist">
-            <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
-              <tr>
-                <th className="text-left px-3 py-2 font-semibold">Timestamp</th>
-                <th className="text-left px-3 py-2 font-semibold">Action</th>
-                <th className="text-left px-3 py-2 font-semibold">Module</th>
-                <th className="text-left px-3 py-2 font-semibold">Individual</th>
-                <th className="text-left px-3 py-2 font-semibold">IP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { t: "Today, 9:14 AM", a: "Login", m: "Auth", i: "—", ip: "10.0.1.42" },
-                { t: "Today, 9:18 AM", a: "Viewed eChart", m: "People", i: "Joseph Brown", ip: "10.0.1.42" },
-                { t: "Today, 9:32 AM", a: "Created contact note", m: "Contact Notes", i: "Joseph Brown", ip: "10.0.1.42" },
-                { t: "Yesterday", a: "Submitted referral", m: "Referrals", i: "Joseph Brown", ip: "10.0.1.42" },
-              ].map((row, i) => (
-                <tr key={i} className="border-t border-icm-border">
-                  <td className="px-3 py-2 text-icm-text-dim font-mono text-[11px]">{row.t}</td>
-                  <td className="px-3 py-2 text-icm-text">{row.a}</td>
-                  <td className="px-3 py-2 text-icm-text-dim">{row.m}</td>
-                  <td className="px-3 py-2 text-icm-text-dim">{row.i}</td>
-                  <td className="px-3 py-2 text-icm-text-faint font-mono text-[11px]">{row.ip}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ActivityLogPanel actorUid={realUid} />
       )}
 
       {tab === "permissions" && (
@@ -849,7 +748,6 @@ const SettingsUserDetail = () => {
           <div className="flex justify-end pt-1">
             <button
               onClick={async () => {
-                const realUid = firestoreUser?.uid || userId || firebaseUser?.uid;
                 if (!realUid) { toast.error("Cannot save: user ID not resolved"); return; }
                 try {
                   await setDoc(doc(db, 'users', realUid), {
@@ -873,6 +771,201 @@ const SettingsUserDetail = () => {
     </SettingsLayout>
   );
 };
+
+// ── Staff Caseload Section ────────────────────────────────────────────────────
+function StaffCaseloadSection({ staffUid }: { staffUid: string }) {
+  const { individuals, loading } = useIndividuals();
+  const [searchQ, setSearchQ] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  // Individuals currently assigned to this staff member
+  const assigned = useMemo(
+    () => individuals.filter((p) => (p as any).assigned_case_manager_id === staffUid),
+    [individuals, staffUid]
+  );
+
+  // Individuals not yet assigned (available to add)
+  const unassigned = useMemo(() => {
+    const term = searchQ.trim().toLowerCase();
+    return individuals
+      .filter((p) => (p as any).assigned_case_manager_id !== staffUid)
+      .filter((p) =>
+        term
+          ? `${p.first_name} ${p.last_name} ${p.program ?? ""} ${p.county ?? ""}`.toLowerCase().includes(term)
+          : true
+      )
+      .slice(0, 12);
+  }, [individuals, staffUid, searchQ]);
+
+  const assign = useCallback(async (personId: string) => {
+    setSaving(personId);
+    try {
+      await import("firebase/firestore").then(({ doc, updateDoc }) =>
+        updateDoc(doc(db, "individuals", personId), { assigned_case_manager_id: staffUid })
+      );
+      toast.success("Individual added to caseload");
+    } catch {
+      toast.error("Failed to assign individual");
+    } finally {
+      setSaving(null);
+    }
+  }, [staffUid]);
+
+  const unassign = useCallback(async (personId: string) => {
+    setSaving(personId);
+    try {
+      await import("firebase/firestore").then(({ doc, updateDoc, deleteField }) =>
+        updateDoc(doc(db, "individuals", personId), { assigned_case_manager_id: deleteField() })
+      );
+      toast.success("Individual removed from caseload");
+    } catch {
+      toast.error("Failed to remove individual");
+    } finally {
+      setSaving(null);
+    }
+  }, []);
+
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-icm-border">
+        <div className="flex items-center gap-2">
+          <h3 className="icm-section-title">Staff Caseload</h3>
+          {!loading && (
+            <span className="text-[10.5px] font-mono font-semibold px-1.5 py-0.5 rounded-full bg-icm-accent-soft text-icm-accent">
+              {assigned.length}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setShowSearch(!showSearch)}
+          className="inline-flex items-center gap-1.5 text-[11px] font-geist font-semibold text-icm-accent hover:text-icm-accent/80 px-2.5 py-1.5 rounded-lg hover:bg-icm-accent-soft transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Assign Individual
+        </button>
+      </div>
+
+      {/* Add individual search panel */}
+      {showSearch && (
+        <div className="border-b border-icm-border bg-icm-bg p-3 space-y-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint pointer-events-none" />
+            <input
+              autoFocus
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Search by name, program, county…"
+              className="w-full pl-8 pr-8 h-9 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-accent/60 transition-colors"
+            />
+            {searchQ && (
+              <button onClick={() => setSearchQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-icm-text-faint hover:text-icm-text">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {loading ? (
+            <p className="text-[11px] text-icm-text-faint font-geist py-2 text-center">Loading…</p>
+          ) : unassigned.length === 0 ? (
+            <p className="text-[11px] text-icm-text-faint font-geist py-2 text-center">
+              {searchQ ? "No matches found" : "All individuals are already assigned to this staff member"}
+            </p>
+          ) : (
+            <ul className="space-y-1 max-h-52 overflow-y-auto">
+              {unassigned.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-icm-panel transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-7 h-7 rounded-full bg-icm-accent-soft flex items-center justify-center text-[10px] font-bold text-icm-accent shrink-0">
+                      {(p.first_name?.[0] ?? "?")}{(p.last_name?.[0] ?? "")}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-geist font-semibold text-icm-text truncate">{p.first_name} {p.last_name}</p>
+                      <p className="text-[10px] font-geist text-icm-text-faint truncate">{[p.program, p.county].filter(Boolean).join(" · ") || "—"}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => assign(p.id)}
+                    disabled={saving === p.id}
+                    className="shrink-0 text-[11px] font-geist font-semibold text-white bg-icm-accent hover:opacity-90 px-2.5 py-1 rounded-lg disabled:opacity-60 flex items-center gap-1 transition-opacity"
+                  >
+                    {saving === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                    Add
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Assigned list */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8 gap-2 text-icm-text-dim">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-[12px] font-geist">Loading caseload…</span>
+        </div>
+      ) : assigned.length === 0 ? (
+        <div className="py-10 text-center">
+          <Users className="w-8 h-8 text-icm-border mx-auto mb-2" />
+          <p className="text-[12px] font-geist text-icm-text-faint">No individuals assigned yet</p>
+          <button
+            onClick={() => setShowSearch(true)}
+            className="mt-2 text-[11px] font-geist font-semibold text-icm-accent hover:underline"
+          >
+            Assign someone →
+          </button>
+        </div>
+      ) : (
+        <ul className="divide-y divide-icm-border">
+          {assigned.map((p, i) => (
+            <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-icm-bg/50 transition-colors">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-7 h-7 rounded-full bg-icm-accent-soft flex items-center justify-center text-[10px] font-bold text-icm-accent shrink-0">
+                  {(p.first_name?.[0] ?? "?")}{(p.last_name?.[0] ?? "")}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-geist font-semibold text-icm-text truncate">{p.first_name} {p.last_name}</p>
+                  <p className="text-[10px] font-geist text-icm-text-faint truncate">
+                    {[p.program, p.county].filter(Boolean).join(" · ") || "—"}
+                    {p.enrollment_status && (
+                      <span className={`ml-1.5 px-1 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide ${
+                        p.enrollment_status === "active" ? "bg-icm-green-soft text-icm-green" :
+                        p.enrollment_status === "discharged" ? "bg-icm-red-soft text-icm-red" :
+                        "bg-icm-amber-soft text-icm-amber"
+                      }`}>
+                        {p.enrollment_status}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={`/people/${p.id}/echart`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg text-icm-text-faint hover:text-icm-accent hover:bg-icm-accent-soft transition-colors"
+                  title="Open eChart"
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  onClick={() => unassign(p.id)}
+                  disabled={saving === p.id}
+                  className="p-1.5 rounded-lg text-icm-text-faint hover:text-icm-red hover:bg-icm-red-soft transition-colors disabled:opacity-50"
+                  title="Remove from caseload"
+                >
+                  {saving === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function SectionPanel({
   title,
@@ -979,6 +1072,225 @@ function SubHeading({ children }: { children: React.ReactNode }) {
     <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">
       {children}
     </p>
+  );
+}
+
+// ─── Activity Log Panel ───────────────────────────────────────────────────────
+
+function ActivityLogPanel({ actorUid }: { actorUid: string }) {
+  const { entries, loading } = useUserAuditLog(actorUid, 500);
+
+  // UI state
+  const [collapsed, setCollapsed] = useState(true);
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  // Derived: filter entries
+  const filtered = useMemo(() => {
+    let list = entries;
+
+    // Date range filter
+    if (dateFrom) {
+      const fromMs = new Date(dateFrom + "T00:00:00").getTime();
+      list = list.filter((e) => {
+        const sec = (e.createdAt as any)?.seconds ?? 0;
+        return sec * 1000 >= fromMs;
+      });
+    }
+    if (dateTo) {
+      const toMs = new Date(dateTo + "T23:59:59").getTime();
+      list = list.filter((e) => {
+        const sec = (e.createdAt as any)?.seconds ?? 0;
+        return sec * 1000 <= toMs;
+      });
+    }
+
+    // Text search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((e) => {
+        const actionLabel = (ACTION_LABELS[e.action] ?? e.action).toLowerCase();
+        const moduleLabel = (MODULE_LABELS[e.targetType] ?? e.targetType).toLowerCase();
+        const individual = (e.targetName ?? "").toLowerCase();
+        return actionLabel.includes(q) || moduleLabel.includes(q) || individual.includes(q);
+      });
+    }
+
+    return list;
+  }, [entries, search, dateFrom, dateTo]);
+
+  const hasFilters = search.trim() || dateFrom || dateTo;
+  const totalCount = entries.length;
+  const filteredCount = filtered.length;
+
+  // Fallback demo rows shown when no real Firestore data loads (demo env)
+  const demoRows: Array<{ ts: string; action: string; module: string; individual: string; ip: string }> = [
+    { ts: new Date(Date.now() - 8 * 60000).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }), action: "Login", module: "Auth", individual: "—", ip: "10.0.1.42" },
+    { ts: new Date(Date.now() - 4 * 60000).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }), action: "Viewed eChart", module: "People", individual: "Joseph Brown", ip: "10.0.1.42" },
+    { ts: new Date(Date.now() - 2 * 60000).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }), action: "Created note", module: "Notes", individual: "Joseph Brown", ip: "10.0.1.42" },
+    { ts: new Date(Date.now() - 24 * 3600000).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }), action: "Submitted referral", module: "Referrals", individual: "Joseph Brown", ip: "10.0.1.42" },
+  ];
+  const showDemo = !loading && entries.length === 0;
+
+  const displayCount = showDemo ? demoRows.length : filteredCount;
+
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+      {/* ── Header / collapse toggle ─────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-icm-bg border-b border-icm-border cursor-pointer select-none hover:bg-icm-panel transition-colors"
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <div className="flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-icm-accent" />
+          <span className="text-[12px] font-geist font-semibold text-icm-text">
+            Activity Log
+          </span>
+          {loading ? (
+            <Loader2 className="w-3 h-3 text-icm-text-faint animate-spin" />
+          ) : (
+            <span className="px-1.5 h-5 rounded-full bg-icm-border text-[10px] font-mono text-icm-text-dim flex items-center">
+              {hasFilters ? `${filteredCount} / ${totalCount}` : displayCount}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!collapsed && hasFilters && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setSearch(""); setDateFrom(""); setDateTo(""); }}
+              className="flex items-center gap-1 text-[10.5px] font-geist text-icm-accent hover:underline"
+            >
+              <X className="w-3 h-3" /> Clear filters
+            </button>
+          )}
+          {collapsed
+            ? <ChevronDown className="w-4 h-4 text-icm-text-dim" />
+            : <ChevronUp className="w-4 h-4 text-icm-text-dim" />
+          }
+        </div>
+      </div>
+
+      {/* ── Expanded content ─────────────────────────────────────── */}
+      {!collapsed && (
+        <>
+          {/* Filter bar */}
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-icm-border bg-icm-bg/50">
+            {/* Text search */}
+            <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel flex-1 min-w-[160px] max-w-[240px]">
+              <Search className="w-3 h-3 text-icm-text-faint shrink-0" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search action, module…"
+                className="flex-1 bg-transparent text-[11.5px] font-geist text-icm-text placeholder:text-icm-text-faint outline-none"
+              />
+              {search && (
+                <button onClick={() => setSearch("")}>
+                  <X className="w-3 h-3 text-icm-text-faint hover:text-icm-text" />
+                </button>
+              )}
+            </div>
+
+            {/* Date from */}
+            <div className="flex items-center gap-1.5 h-7 px-2 rounded-lg border border-icm-border bg-icm-panel">
+              <Calendar className="w-3 h-3 text-icm-text-faint shrink-0" />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="bg-transparent text-[11.5px] font-geist text-icm-text outline-none w-[110px]"
+                title="From date"
+              />
+            </div>
+
+            {/* Date to */}
+            <div className="flex items-center gap-1.5 h-7 px-2 rounded-lg border border-icm-border bg-icm-panel">
+              <span className="text-[10.5px] text-icm-text-faint font-geist">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="bg-transparent text-[11.5px] font-geist text-icm-text outline-none w-[110px]"
+                title="To date"
+              />
+            </div>
+
+            {hasFilters && (
+              <span className="text-[10.5px] font-geist text-icm-text-faint">
+                {filteredCount} {filteredCount === 1 ? "result" : "results"}
+              </span>
+            )}
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px] font-geist">
+              <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Timestamp</th>
+                  <th className="text-left px-3 py-2 font-semibold">Action</th>
+                  <th className="text-left px-3 py-2 font-semibold">Module</th>
+                  <th className="text-left px-3 py-2 font-semibold">Individual</th>
+                  <th className="text-left px-3 py-2 font-semibold">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-icm-text-faint text-[11.5px]">
+                      <Loader2 className="w-4 h-4 animate-spin inline mr-2" />Loading…
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && showDemo && demoRows.map((row, i) => (
+                  <tr key={i} className="border-t border-icm-border hover:bg-icm-bg/40 transition-colors">
+                    <td className="px-3 py-2 text-icm-text-dim font-mono text-[11px] whitespace-nowrap">{row.ts}</td>
+                    <td className="px-3 py-2 text-icm-text font-medium">{row.action}</td>
+                    <td className="px-3 py-2">
+                      <span className="px-1.5 py-0.5 rounded bg-icm-border/60 text-[10.5px] text-icm-text-dim">{row.module}</span>
+                    </td>
+                    <td className="px-3 py-2 text-icm-text-dim">{row.individual}</td>
+                    <td className="px-3 py-2 text-icm-text-faint font-mono text-[11px]">{row.ip}</td>
+                  </tr>
+                ))}
+
+                {!loading && !showDemo && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-icm-text-faint text-[11.5px]">
+                      No entries match the current filters.
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && !showDemo && filtered.map((entry) => (
+                  <tr key={entry.id} className="border-t border-icm-border hover:bg-icm-bg/40 transition-colors">
+                    <td className="px-3 py-2 text-icm-text-dim font-mono text-[11px] whitespace-nowrap">
+                      {formatAuditTs(entry.createdAt)}
+                    </td>
+                    <td className="px-3 py-2 text-icm-text font-medium">
+                      {ACTION_LABELS[entry.action] ?? entry.action}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="px-1.5 py-0.5 rounded bg-icm-border/60 text-[10.5px] text-icm-text-dim">
+                        {MODULE_LABELS[entry.targetType] ?? (entry.targetType || "—")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-icm-text-dim">
+                      {entry.targetName ?? (entry.metadata?.individualId ? String(entry.metadata.individualId) : "—")}
+                    </td>
+                    <td className="px-3 py-2 text-icm-text-faint font-mono text-[11px]">
+                      {entry.ip ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -1009,6 +1009,12 @@ const PersonCarePlanBuilder = () => {
         services: [],
         team: [],
         history: [{ date: new Date().toLocaleDateString(), user: "Case Manager", action: "Plan created via section builder" }],
+        supportNeeds: {
+          workingWell: { value: "" },
+          notWorking: { value: "" },
+          preferences: { value: "" },
+          healthSafety: { value: "" },
+        },
         sections: {
           good_life: goodLife,
           important_to: importantTo,

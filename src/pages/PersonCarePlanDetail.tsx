@@ -441,10 +441,10 @@ const PersonCarePlanDetail = () => {
         {/* SECTION 5 — Support Needs */}
         <PlanSection icon={Heart} title="Support Needs & Preferences" complete={4} total={4} open={open.support} onToggle={() => toggle("support")} aiBadge>
           <div className="space-y-4">
-            <SupportField label="What is working well" data={plan.supportNeeds.workingWell} disabled={readOnly} />
-            <SupportField label="What is not working" data={plan.supportNeeds.notWorking} disabled={readOnly} />
-            <SupportField label="Individual's expressed preferences and goals" data={plan.supportNeeds.preferences} disabled={readOnly} />
-            <SupportField label="Health and safety considerations" data={plan.supportNeeds.healthSafety} disabled={readOnly} />
+            <SupportField label="What is working well" data={plan.supportNeeds?.workingWell ?? { value: "" }} disabled={readOnly} />
+            <SupportField label="What is not working" data={plan.supportNeeds?.notWorking ?? { value: "" }} disabled={readOnly} />
+            <SupportField label="Individual's expressed preferences and goals" data={plan.supportNeeds?.preferences ?? { value: "" }} disabled={readOnly} />
+            <SupportField label="Health and safety considerations" data={plan.supportNeeds?.healthSafety ?? { value: "" }} disabled={readOnly} />
           </div>
         </PlanSection>
 

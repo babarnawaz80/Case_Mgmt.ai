@@ -121,7 +121,7 @@ export function OrchestratorSettings() {
         onClick={() => setExpanded((v) => !v)}
       >
         <div>
-          <p className="font-manrope font-bold text-[14px] text-icm-text">Brain Orchestrator</p>
+          <p className="font-manrope font-bold text-[14px] text-icm-text">AI Orchestrator</p>
           <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
             Configure the autonomous AI orchestrator — agent toggles, escalation thresholds, and schedule.
           </p>

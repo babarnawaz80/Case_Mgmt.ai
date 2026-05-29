@@ -66,6 +66,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── Organization Settings subcollection (AI, orchestrator config, etc.) ──
+    match /organizations/{orgId}/settings/{settingId} {
+      allow read: if isAuth() && myOrgId() == orgId;
+      allow write: if isAdmin() && myOrgId() == orgId;
+    }
+
     // ─── Users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
       // Users can read their own doc; supervisors/admins can read all in org

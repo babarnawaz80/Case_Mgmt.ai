@@ -66,7 +66,7 @@ export function SystemStatusHeader({
             </div>
             <div>
               <h1 className="font-manrope text-[22px] font-extrabold text-white leading-tight tracking-[-0.02em]">
-                Brain Orchestrator
+                AI Orchestrator
               </h1>
               <p className="text-[12px] font-geist text-slate-400 mt-0.5">
                 Autonomous AI workflow engine — prepares everything, humans approve everything

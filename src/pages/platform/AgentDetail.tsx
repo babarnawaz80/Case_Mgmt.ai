@@ -260,8 +260,19 @@ export function AgentDetail() {
                   Linked Guidelines Engine
                 </h3>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg border border-icm-border bg-icm-bg hover:border-icm-border-strong cursor-pointer transition-colors"
-                   onClick={() => navigate(`/platform/guidelines-engines/${agent.guidelines_engine_id}`)}>
+              <div
+                className="flex items-center justify-between p-3 rounded-lg border border-icm-border bg-icm-bg hover:border-icm-border-strong cursor-pointer transition-colors"
+                onClick={() => {
+                  const engineId = agent.guidelines_engine_id;
+                  if (!engineId) {
+                    import("sonner").then(({ toast }) =>
+                      toast.error("No guidelines engine linked. Configure one in Agent Settings.")
+                    );
+                    return;
+                  }
+                  navigate(`/agents/guidelines/${engineId}`);
+                }}
+              >
                 <div>
                   <h4 className="text-[13.5px] font-geist font-semibold text-icm-text">{agent.guidelines_engine_name}</h4>
                   <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">Guidelines Version: {agent.guidelines_engine_version}</p>
@@ -295,7 +306,7 @@ export function AgentDetail() {
                   <textarea
                     value={promptInput}
                     onChange={(e) => setPromptInput(e.target.value)}
-                    rows={6}
+                    style={{ minHeight: "320px" }}
                     className="w-full p-3 rounded-xl bg-icm-bg border border-icm-border text-[12.5px] font-geist text-icm-text focus:outline-none focus:border-icm-accent/40 resize-y"
                     placeholder="Instructions guiding how this agent writes generated notes..."
                   />
@@ -317,7 +328,10 @@ export function AgentDetail() {
                   </div>
                 </div>
               ) : (
-                <div className="p-3.5 rounded-xl bg-icm-bg border border-icm-border border-l-[3px] border-l-icm-accent">
+                <div
+                  className="p-3.5 rounded-xl bg-icm-bg border border-icm-border border-l-[3px] border-l-icm-accent overflow-y-auto"
+                  style={{ minHeight: "280px", maxHeight: "480px" }}
+                >
                   <p className="text-[12.5px] font-geist text-icm-text leading-relaxed whitespace-pre-wrap">
                     {agent.master_prompt}
                   </p>

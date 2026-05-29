@@ -86,6 +86,11 @@ export { onNewBillingClaim, onWorkflowTaskDailyCheck } from "./triggers/billing-
 
 // ─── Scheduled Functions ──────────────────────────────────────────────────
 export { dailyAuthRenewalCheck } from "./api/authorizationRenewal";
+export { sendVisitReminders } from "./triggers/visitReminders";
 
 // ─── Brain Orchestrator ───────────────────────────────────────────────────────
 export { scheduledOrchestrator, manualOrchestratorRun } from "./orchestrator/brainOrchestrator";
+
+// ─── PCP Generation ───────────────────────────────────────────────────────────
+export { generatePCP } from "./api/generatePCP";
+export { refinePCP } from "./api/refinePCP";

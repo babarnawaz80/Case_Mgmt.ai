@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { getDocs, query, collection, where, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { updateCarePlan } from "@/hooks/useFirestore";
@@ -42,6 +44,27 @@ const PersonCarePlan = () => {
   const [pcpModalOpen, setPcpModalOpen] = useState(false);
   const [pcpMode, setPcpMode] = useState<PCPMode>("blank");
   const [sharePlan, setSharePlan] = useState<CarePlan | null>(null);
+
+  // PCP Agent state
+  const [pcpAgentId, setPcpAgentId] = useState<string | null>(null);
+  const [pcpAgentPrompt, setPcpAgentPrompt] = useState<string>("");
+  const [pcpEngineName, setPcpEngineName] = useState<string>("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "agents"), where("type", "in", ["pcp_generator", "pcp_alignment"]), where("status", "==", "active"), limit(1))
+        );
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setPcpAgentId(d.id);
+          setPcpAgentPrompt(d.data().master_prompt || "");
+          setPcpEngineName(d.data().guidelines_engine_name || "");
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, []);
 
   const [planType, setPlanType] = useState("Person-Centered Plan (PCP)");
   const [internalDueDate, setInternalDueDate] = useState("2026-08-01");
@@ -209,7 +232,14 @@ const PersonCarePlan = () => {
             </button>
             <button
               id="btn-draft-with-ai"
-              onClick={() => { setPcpMode("ai"); setPcpModalOpen(true); }}
+              onClick={() => {
+                if (!pcpAgentId) {
+                  toast.error("No PCP Agent configured. Ask your admin to set one up under AI Agents.");
+                  return;
+                }
+                setPcpMode("ai");
+                setPcpModalOpen(true);
+              }}
               className="h-10 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-medium hover:opacity-90 inline-flex items-center gap-1.5"
             >
               <Sparkles className="w-3.5 h-3.5" /> Draft with AI
@@ -223,6 +253,11 @@ const PersonCarePlan = () => {
             individualName={individual ? `${individual.first_name} ${individual.last_name}` : ""}
             annualPlanDate="08/31/2026"
             onClose={() => setPcpModalOpen(false)}
+            agentId={pcpAgentId ?? undefined}
+            agentMasterPrompt={pcpAgentPrompt}
+            linkedGuidelinesEngineName={pcpEngineName}
+            individualProgram={individual?.program ?? undefined}
+            individualState={individual?.state ?? undefined}
           />
         )}
       </ICMShell>

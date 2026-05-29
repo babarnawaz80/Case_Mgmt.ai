@@ -11,10 +11,14 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   X, Upload, FileText, ChevronRight, CheckCircle2, Loader2,
-  Sparkles, AlertTriangle, Plus, Trash2, ChevronDown,
+  Sparkles, AlertTriangle, Plus, Trash2, ChevronDown, Edit2,
+  Save, RotateCcw, Brain, ArrowRight,
 } from "lucide-react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, getDocs, query, where, limit, updateDoc, doc } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import { PCPOrbAnimation } from "./PCPOrbAnimation";
 import { extractPcpDataFromPdfs, ExtractedPcpData } from "@/services/pcpAiService";
 
@@ -47,9 +51,15 @@ interface PCPCreationModalProps {
   individualName: string;
   annualPlanDate?: string; // e.g. "08/31/2026"
   onClose: () => void;
+  // Optional: pre-loaded agent data (required for ai mode)
+  agentId?: string;
+  agentMasterPrompt?: string;
+  linkedGuidelinesEngineName?: string;
+  individualProgram?: string;
+  individualState?: string;
 }
 
-type WizardStep = 1 | 2 | 3;
+type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
@@ -142,6 +152,8 @@ function Step1Upload({
   defaultAnnualPlanDate,
   revisionReason,
   onRevisionReasonChange,
+  specialInstructions,
+  onSpecialInstructionsChange,
   onClose,
   onContinue,
 }: {
@@ -157,6 +169,8 @@ function Step1Upload({
   defaultAnnualPlanDate: string;
   revisionReason: string;
   onRevisionReasonChange: (v: string) => void;
+  specialInstructions: string;
+  onSpecialInstructionsChange: (v: string) => void;
   onClose: () => void;
   onContinue: () => void;
 }) {
@@ -353,6 +367,29 @@ function Step1Upload({
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
+      </div>
+
+      {/* Special Instructions */}
+      <div>
+        <label className="block text-[12.5px] font-semibold text-icm-text mb-0.5">
+          Special Instructions for This Plan{" "}
+          <span className="font-normal text-icm-text-dim">(optional)</span>
+        </label>
+        <p className="text-[11.5px] text-icm-text-dim mb-2">
+          Add anything specific you want the AI to focus on, include, or prioritize for this individual's plan.
+        </p>
+        <textarea
+          value={specialInstructions}
+          onChange={(e) => {
+            if (e.target.value.length <= 2000) onSpecialInstructionsChange(e.target.value);
+          }}
+          placeholder="e.g. Joseph wants to explore employment this year. Focus on vocational goals. His mother Linda has concerns about behavioral support..."
+          style={{ minHeight: "120px" }}
+          className="w-full px-3 py-2.5 rounded-lg border border-icm-border bg-white text-[13px] text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-y"
+        />
+        <p className="text-[10.5px] text-icm-text-faint mt-1 text-right">
+          {specialInstructions.length}/2000
+        </p>
       </div>
 
       {/* Skip notice */}
@@ -704,6 +741,668 @@ function Step3Review({
   );
 }
 
+// ─── Step 2 (AI Mode): Animated Processing Feed ──────────────────────────────
+
+interface ProcessingStep {
+  id: string;
+  label: string;
+  status: "waiting" | "processing" | "done";
+}
+
+function Step2AI({
+  individualId,
+  individualName,
+  individualProgram,
+  individualState,
+  files,
+  planType,
+  effectiveDate,
+  annualPlanDate,
+  specialInstructions,
+  agentId,
+  linkedGuidelinesEngineName,
+  onComplete,
+  onError,
+}: {
+  individualId: string;
+  individualName: string;
+  individualProgram?: string;
+  individualState?: string;
+  files: UploadedFile[];
+  planType: string;
+  effectiveDate: string;
+  annualPlanDate: string;
+  specialInstructions: string;
+  agentId?: string;
+  linkedGuidelinesEngineName?: string;
+  onComplete: (plan: Record<string, unknown>, planId: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [steps, setSteps] = useState<ProcessingStep[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const ranRef = useRef(false);
+
+  const initials = individualName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  // Build step list
+  const buildSteps = (c: Record<string, number>): ProcessingStep[] => {
+    const list: ProcessingStep[] = [
+      { id: "load", label: `Loading ${individualName.split(" ")[0]}'s full record…`, status: "waiting" },
+    ];
+    if (files.length > 0) {
+      list.push({ id: "docs", label: `Reading ${files.length} uploaded document${files.length > 1 ? "s" : ""}…`, status: "waiting" });
+    }
+    list.push({ id: "contact", label: `Scanning contact notes (${c.contact ?? "…"} from past 12 months)…`, status: "waiting" });
+    list.push({ id: "visits", label: `Reviewing visit summaries (${c.visits ?? "…"} visits)…`, status: "waiting" });
+    list.push({ id: "ambient", label: `Reading ambient listening sessions (${c.ambient ?? 0} sessions)…`, status: "waiting" });
+    list.push({ id: "monitoring", label: `Reviewing monitoring forms (${c.monitoring ?? "…"} forms)…`, status: "waiting" });
+    list.push({ id: "auth", label: "Checking service authorizations…", status: "waiting" });
+    list.push({ id: "progress", label: "Reading progress notes…", status: "waiting" });
+    list.push({ id: "incidents", label: "Reviewing incident reports…", status: "waiting" });
+    list.push({ id: "assess", label: "Pulling assessment data…", status: "waiting" });
+    list.push({ id: "guidelines", label: `Reviewing ${linkedGuidelinesEngineName || "state guidelines"}…`, status: "waiting" });
+    list.push({ id: "agency", label: "Applying agency instructions…", status: "waiting" });
+    if (specialInstructions.trim()) {
+      list.push({ id: "cm", label: "Applying case manager instructions…", status: "waiting" });
+    }
+    list.push({ id: "evidence", label: "Researching evidence-based practices for this profile…", status: "waiting" });
+    list.push({ id: "build", label: "Building Person-Centered Plan…", status: "waiting" });
+    return list;
+  };
+
+  useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+
+    // Load counts from Firestore in the background
+    const loadCounts = async () => {
+      const newCounts: Record<string, number> = {};
+      try {
+        const [cn, vs, mf, pn, amb] = await Promise.allSettled([
+          getDocs(query(collection(db, "contact_notes"), where("individualId", "==", individualId), limit(100))),
+          getDocs(query(collection(db, "visit_summaries"), where("individualId", "==", individualId), limit(100))),
+          getDocs(query(collection(db, "monitoring_forms"), where("individualId", "==", individualId), limit(100))),
+          getDocs(query(collection(db, "progress_notes"), where("individualId", "==", individualId), limit(100))),
+          getDocs(query(collection(db, "ai_checkins"), where("individualId", "==", individualId), limit(100))),
+        ]);
+        newCounts.contact = cn.status === "fulfilled" ? cn.value.size : 0;
+        newCounts.visits = vs.status === "fulfilled" ? vs.value.size : 0;
+        newCounts.monitoring = mf.status === "fulfilled" ? mf.value.size : 0;
+        newCounts.progress = pn.status === "fulfilled" ? pn.value.size : 0;
+        newCounts.ambient = amb.status === "fulfilled" ? amb.value.size : 0;
+      } catch { /* non-fatal */ }
+      setCounts(newCounts);
+      return newCounts;
+    };
+
+    const countsPromise = loadCounts();
+
+    // Animate steps sequentially
+    const runAnimation = async () => {
+      const c = await countsPromise;
+      const allSteps = buildSteps(c);
+      setSteps(allSteps);
+
+      const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const totalPreBuild = allSteps.length - 1; // all except last "build" step
+
+      for (let i = 0; i < totalPreBuild; i++) {
+        // Start this step
+        setSteps((prev) =>
+          prev.map((s, idx) => idx === i ? { ...s, status: "processing" } : s)
+        );
+        setProgress(Math.floor(((i + 0.5) / allSteps.length) * 88));
+        await delay(i === 0 ? 600 : 700);
+
+        // Complete this step
+        setSteps((prev) =>
+          prev.map((s, idx) => idx === i ? { ...s, status: "done" } : s)
+        );
+        setProgress(Math.floor(((i + 1) / allSteps.length) * 88));
+        await delay(200);
+      }
+
+      // Final step — start it, then call the Cloud Function
+      const lastIdx = allSteps.length - 1;
+      setSteps((prev) =>
+        prev.map((s, idx) => idx === lastIdx ? { ...s, status: "processing" } : s)
+      );
+      setProgress(90);
+
+      try {
+        const fns = getFunctions();
+        const callGenerate = httpsCallable(fns, "generatePCP");
+        const result = await callGenerate({
+          individualId,
+          planType: planType.toLowerCase().replace(" plan", ""),
+          effectiveDate,
+          annualPlanDate,
+          specialInstructions,
+          agentId: agentId || "",
+        }) as any;
+
+        const data = result.data;
+
+        if (!data.success) {
+          onError(data.message || "Generation failed.");
+          return;
+        }
+
+        // Complete last step
+        setSteps((prev) =>
+          prev.map((s, idx) => idx === lastIdx ? { ...s, label: "Plan draft complete.", status: "done" } : s)
+        );
+        setProgress(100);
+
+        await delay(1200);
+        onComplete(data.plan, data.planId);
+      } catch (err: any) {
+        onError(err.message || "Failed to generate plan.");
+      }
+    };
+
+    runAnimation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%)", minHeight: "480px" }}>
+      {/* Grid texture */}
+      <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+      <div className="relative p-6 space-y-5">
+        {/* Individual identity card */}
+        <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white text-[12px] font-bold shrink-0">
+            {initials}
+          </div>
+          <p className="text-[12.5px] font-geist text-slate-300">
+            <span className="font-semibold text-white">{individualName}</span>
+            {individualProgram && <> · {individualProgram}</>}
+            {individualState && <> · {individualState}</>}
+          </p>
+        </div>
+
+        {/* Activity feed */}
+        <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+          {steps.map((s) => (
+            <div key={s.id} className="flex items-center gap-2.5">
+              {s.status === "done" ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : s.status === "processing" ? (
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-white/20 shrink-0" />
+              )}
+              <span className={`text-[12px] font-geist transition-colors ${
+                s.status === "done" ? "text-slate-300" : s.status === "processing" ? "text-white font-semibold" : "text-slate-600"
+              }`}>
+                {s.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div>
+          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 to-violet-400 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-[10.5px] font-geist text-slate-500 mt-2 text-center">
+            This usually takes 20–40 seconds depending on chart size.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 3 (AI Mode): Review Generated Plan ─────────────────────────────────
+
+function EditableSection({ title, content, onSave }: { title: string; content: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(content);
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-icm-bg/60 border-b border-icm-border">
+        <span className="text-[12px] font-semibold text-icm-text">{title}</span>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <button onClick={() => { onSave(draft); setEditing(false); }} className="h-6 px-2 rounded text-[11px] font-geist font-semibold bg-icm-accent text-white inline-flex items-center gap-1">
+              <Save className="w-3 h-3" /> Save
+            </button>
+            <button onClick={() => { setDraft(content); setEditing(false); }} className="h-6 px-2 rounded text-[11px] font-geist text-icm-text-dim border border-icm-border inline-flex items-center gap-1">
+              <RotateCcw className="w-3 h-3" /> Cancel
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} className="h-6 px-2 rounded text-[11px] font-geist text-icm-accent border border-icm-accent/30 inline-flex items-center gap-1 hover:bg-icm-accent-soft">
+            <Edit2 className="w-3 h-3" /> Edit
+          </button>
+        )}
+      </div>
+      <div className="px-4 py-3">
+        {editing ? (
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5}
+            className="w-full text-[12.5px] font-geist text-icm-text border border-icm-border rounded-lg p-2.5 focus:outline-none focus:border-icm-accent/40 resize-y bg-white" />
+        ) : (
+          <p className="text-[12.5px] font-geist text-icm-text leading-relaxed whitespace-pre-wrap">{content}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Step3GeneratedPlan({
+  plan: initialPlan,
+  planId,
+  individualName,
+  onBack,
+  onContinue,
+  onSaveDraft,
+  onPlanUpdate,
+}: {
+  plan: Record<string, unknown>;
+  planId: string;
+  individualName: string;
+  onBack: () => void;
+  onContinue: () => void;
+  onSaveDraft: () => void;
+  onPlanUpdate: (updated: Record<string, unknown>) => void;
+}) {
+  const [plan, setPlan] = useState(initialPlan);
+  const [refineText, setRefineText] = useState("");
+  const [refining, setRefining] = useState(false);
+
+  const pd = (plan.planDetails as any) ?? {};
+  const summary = (plan.individualSummary as any) ?? {};
+  const goals: any[] = Array.isArray(plan.goals) ? plan.goals : [];
+  const services: any[] = Array.isArray(plan.services) ? plan.services : [];
+  const hn = (plan.healthAndSafety as any) ?? {};
+  const sn = (plan.supportNeeds as any) ?? {};
+  const flags: any[] = Array.isArray(plan.complianceFlags) ? plan.complianceFlags : [];
+  const ds = pd.dataSources ?? {};
+  const totalSources = Object.values(ds).reduce((a, b) => (a as number) + (b as number), 0) as number;
+  const confidence = pd.aiConfidence === "high" ? "High" : "Medium";
+
+  function updateSection(field: string, val: string) {
+    const updated = { ...plan, [field]: val };
+    setPlan(updated);
+    onPlanUpdate(updated);
+  }
+
+  async function handleRefine(full: boolean) {
+    if (!refineText.trim()) return;
+    setRefining(true);
+    try {
+      const fns = getFunctions();
+      const call = httpsCallable(fns, "refinePCP");
+      const result = await call({
+        planId,
+        individualId: pd.individualId || "",
+        currentPlan: plan,
+        refinementInstructions: refineText,
+        regenerateFull: full,
+      }) as any;
+      if (result.data.success) {
+        setPlan(result.data.plan);
+        onPlanUpdate(result.data.plan);
+        setRefineText("");
+        toast.success("Plan updated.");
+      } else {
+        toast.error(result.data.message || "Refinement failed.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Refinement failed.");
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div>
+        <h3 className="font-manrope font-bold text-[17px] text-icm-text">Review Your Plan Draft</h3>
+        <p className="text-[12px] text-icm-text-dim mt-0.5">
+          AI generated this plan based on {totalSources} data sources. Review all sections before proceeding.
+        </p>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-geist font-semibold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200">
+            <Sparkles className="w-3 h-3" /> AI confidence: {confidence}
+          </span>
+          <span className="text-[11px] font-geist text-icm-text-faint">· Based on {totalSources} data sources</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Main plan content */}
+        <div className="lg:col-span-2 space-y-3">
+          {/* Individual Summary */}
+          {summary.strengths?.length > 0 && (
+            <EditableSection
+              title="Strengths & Interests"
+              content={[...summary.strengths, ...summary.interests].join("\n• ")}
+              onSave={(v) => updateSection("individualSummary", { ...summary, strengths: v.split("\n• ").filter(Boolean) } as any)}
+            />
+          )}
+
+          {/* Goals */}
+          {goals.length > 0 && (
+            <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+              <div className="px-4 py-2.5 bg-icm-bg/60 border-b border-icm-border">
+                <span className="text-[12px] font-semibold text-icm-text">Goals & Outcomes ({goals.length} goals)</span>
+              </div>
+              <div className="divide-y divide-icm-border">
+                {goals.map((g: any, i: number) => (
+                  <div key={i} className="px-4 py-3 space-y-1">
+                    <p className="text-[13px] font-semibold text-icm-text">{g.title || `Goal ${i + 1}`}</p>
+                    <p className="text-[12px] text-icm-text-dim leading-relaxed">{g.description}</p>
+                    {g.objectives?.length > 0 && (
+                      <ul className="mt-1 space-y-0.5">
+                        {g.objectives.map((obj: any, j: number) => (
+                          <li key={j} className="text-[11.5px] text-icm-text-dim flex items-start gap-1.5">
+                            <span className="text-icm-accent mt-0.5">•</span> {obj.description}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="flex items-center gap-3 mt-1 text-[10.5px] font-mono text-icm-text-faint">
+                      {g.targetDate && <span>Target: {g.targetDate}</span>}
+                      {g.responsibleParty && <span>Responsible: {g.responsibleParty}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Services */}
+          {services.length > 0 && (
+            <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+              <div className="px-4 py-2.5 bg-icm-bg/60 border-b border-icm-border">
+                <span className="text-[12px] font-semibold text-icm-text">Services & Supports ({services.length})</span>
+              </div>
+              <div className="divide-y divide-icm-border">
+                {services.map((s: any, i: number) => (
+                  <div key={i} className="px-4 py-2.5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[12.5px] font-semibold text-icm-text">{s.serviceName}</p>
+                      {s.provider && <p className="text-[11px] text-icm-text-dim">{s.provider} · {s.frequency}</p>}
+                    </div>
+                    {s.authorizationId && <span className="text-[10px] font-mono text-icm-text-faint">{s.authorizationId}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Health & Safety */}
+          {(hn.safetyPlan || hn.riskFactors?.length > 0) && (
+            <EditableSection
+              title="Health & Safety"
+              content={[
+                hn.safetyPlan,
+                hn.riskFactors?.length > 0 ? `Risk factors:\n• ${hn.riskFactors.join("\n• ")}` : null,
+              ].filter(Boolean).join("\n\n")}
+              onSave={(v) => updateSection("healthAndSafety", { ...hn, safetyPlan: v } as any)}
+            />
+          )}
+
+          {/* Support Needs */}
+          {Object.values(sn).some(Boolean) && (
+            <EditableSection
+              title="Support Needs & Preferences"
+              content={Object.entries(sn)
+                .filter(([, v]) => v)
+                .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`)
+                .join("\n")}
+              onSave={(v) => updateSection("supportNeeds", v as any)}
+            />
+          )}
+
+          {/* Compliance Flags */}
+          {flags.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-[12px] font-semibold text-amber-800 mb-2">⚠ {flags.length} Compliance Flag{flags.length > 1 ? "s" : ""}</p>
+              {flags.map((f: any, i: number) => (
+                <p key={i} className="text-[11.5px] text-amber-700 mt-1">
+                  <strong>{f.type === "hard_stop" ? "HARD STOP" : "Warning"}:</strong> {f.description}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Refinement panel */}
+        <div className="space-y-3">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3 sticky top-0">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <p className="text-[13px] font-semibold text-indigo-900">Refine This Plan</p>
+            </div>
+            <textarea
+              value={refineText}
+              onChange={(e) => setRefineText(e.target.value)}
+              rows={4}
+              placeholder="e.g. Add a vocational goal. Make language more person-first. Remove the section about..."
+              className="w-full px-3 py-2 rounded-lg border border-indigo-200 bg-white text-[12.5px] text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:ring-2 focus:ring-indigo-400/40 resize-y"
+            />
+            <button
+              onClick={() => handleRefine(false)}
+              disabled={refining || !refineText.trim()}
+              className="w-full h-9 rounded-lg bg-indigo-600 text-white text-[12px] font-semibold hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+            >
+              {refining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              Apply Changes
+            </button>
+            <button
+              onClick={() => handleRefine(true)}
+              disabled={refining || !refineText.trim()}
+              className="w-full h-8 rounded-lg border border-indigo-200 text-indigo-700 text-[12px] font-medium hover:bg-indigo-100/60 disabled:opacity-50"
+            >
+              Regenerate Full Plan
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-3 border-t border-icm-border">
+        <button onClick={onBack} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">← Back</button>
+        <div className="flex items-center gap-2">
+          <button onClick={onSaveDraft} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">Save as Draft</button>
+          <button onClick={onContinue} className="h-9 px-5 rounded-lg bg-indigo-600 text-white text-[12px] font-semibold hover:bg-indigo-700 inline-flex items-center gap-1.5">
+            Continue <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 4: Finalize Plan Details ────────────────────────────────────────────
+
+function Step4Finalize({
+  individualName,
+  effectiveDate,
+  annualPlanDate,
+  onBack,
+  onSaveDraft,
+  onComplete,
+}: {
+  individualName: string;
+  effectiveDate: string;
+  annualPlanDate: string;
+  onBack: () => void;
+  onSaveDraft: () => void;
+  onComplete: (data: Record<string, string>) => void;
+}) {
+  const [planStatus, setPlanStatus] = useState("In Progress");
+  const [effDate, setEffDate] = useState(effectiveDate);
+  const [dueDate, setDueDate] = useState(annualPlanDate);
+  const [meetingDate, setMeetingDate] = useState("");
+  const [crReceived, setCrReceived] = useState("");
+  const [approvalDate, setApprovalDate] = useState("");
+  const [teamNote, setTeamNote] = useState("");
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="font-manrope font-bold text-[17px] text-icm-text">Finalize Plan Details</h3>
+        <p className="text-[12px] text-icm-text-dim mt-0.5">Review and complete the required fields before saving.</p>
+      </div>
+
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
+        <p className="text-[11px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">Plan Details</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint block mb-1">Plan Status</label>
+            <select value={planStatus} onChange={(e) => setPlanStatus(e.target.value)}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text">
+              <option>In Progress</option>
+              <option>Ready for Review</option>
+              <option>Approved</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint block mb-1">Effective Date</label>
+            <input type="date" value={effDate} onChange={(e) => setEffDate(e.target.value)}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text" />
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint block mb-1">Internal Due Date</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text" />
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint block mb-1">Meeting Date</label>
+            <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text" />
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint block mb-1">CR Received Date</label>
+            <input type="date" value={crReceived} onChange={(e) => setCrReceived(e.target.value)}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text" />
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint block mb-1">Plan Approval Date</label>
+            <input type="date" value={approvalDate} onChange={(e) => setApprovalDate(e.target.value)}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text" />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
+        <p className="text-[11px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">Team & Signatures</p>
+        <textarea value={teamNote} onChange={(e) => setTeamNote(e.target.value)} rows={3}
+          placeholder="Add team members who participated in this plan (names, roles)..."
+          className="w-full px-3 py-2.5 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text placeholder:text-icm-text-faint focus:outline-none resize-y" />
+        <p className="text-[10.5px] font-geist text-icm-text-faint">
+          Signatures will be collected via e-signature after the plan is saved.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-icm-border">
+        <button onClick={onBack} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">← Back</button>
+        <div className="flex items-center gap-2">
+          <button onClick={onSaveDraft} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">Save as Draft</button>
+          <button
+            onClick={() => onComplete({ planStatus, effectiveDate: effDate, internalDueDate: dueDate, meetingDate, crReceivedDate: crReceived, approvalDate, teamNote })}
+            className="h-9 px-5 rounded-lg bg-teal-600 text-white text-[12px] font-semibold hover:bg-teal-700 inline-flex items-center gap-1.5"
+          >
+            Save & Complete <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 5: Complete ─────────────────────────────────────────────────────────
+
+function Step5Complete({
+  individualName,
+  planId,
+  goalsCount,
+  servicesCount,
+  totalSources,
+  onOpenPlan,
+  onReturnToEchart,
+}: {
+  individualName: string;
+  planId: string;
+  goalsCount: number;
+  servicesCount: number;
+  totalSources: number;
+  onOpenPlan: () => void;
+  onReturnToEchart: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center py-6 space-y-5 text-center">
+      <div className="w-16 h-16 rounded-full bg-teal-50 border-2 border-teal-200 flex items-center justify-center animate-[scale-in_0.4s_ease-out]">
+        <CheckCircle2 className="w-8 h-8 text-teal-600" />
+      </div>
+      <div>
+        <h3 className="font-manrope font-extrabold text-[20px] text-icm-text">Plan Draft Saved</h3>
+        <p className="text-[13px] text-icm-text-dim mt-1">
+          {individualName}'s Person-Centered Plan has been saved as a draft.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap justify-center">
+        <span className="px-3 py-1.5 rounded-full bg-icm-green-soft text-icm-green text-[11px] font-semibold ring-1 ring-icm-green/20">
+          {goalsCount} goal{goalsCount !== 1 ? "s" : ""} created
+        </span>
+        <span className="px-3 py-1.5 rounded-full bg-icm-accent-soft text-icm-accent text-[11px] font-semibold ring-1 ring-icm-accent/20">
+          {servicesCount} service{servicesCount !== 1 ? "s" : ""} documented
+        </span>
+        {totalSources > 0 && (
+          <span className="px-3 py-1.5 rounded-full bg-icm-bg text-icm-text-dim text-[11px] font-semibold ring-1 ring-icm-border">
+            {totalSources} data sources reviewed
+          </span>
+        )}
+      </div>
+      <p className="text-[12.5px] font-geist text-icm-text-dim font-semibold">What would you like to do next?</p>
+      <div className="flex flex-col gap-2 w-full max-w-xs">
+        <button onClick={onOpenPlan}
+          className="h-10 rounded-xl bg-indigo-600 text-white text-[13px] font-semibold hover:bg-indigo-700 inline-flex items-center justify-center gap-2">
+          <FileText className="w-4 h-4" /> Open Plan & Review
+        </button>
+        <button onClick={onReturnToEchart}
+          className="h-10 rounded-xl border border-icm-border text-[13px] font-medium text-icm-text-dim hover:bg-icm-bg inline-flex items-center justify-center gap-2">
+          Return to eChart
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Error State ──────────────────────────────────────────────────────────────
+
+function GenerationErrorState({ message, onRetry, onStartBlank }: { message: string; onRetry: () => void; onStartBlank: () => void }) {
+  return (
+    <div className="flex flex-col items-center py-8 space-y-4 text-center">
+      <AlertTriangle className="w-10 h-10 text-red-500" />
+      <div>
+        <p className="text-[14px] font-semibold text-icm-text">Something went wrong generating the plan.</p>
+        <p className="text-[12px] text-icm-text-dim mt-1 max-w-sm">{message}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={onRetry} className="h-9 px-4 rounded-lg bg-indigo-600 text-white text-[12px] font-semibold hover:bg-indigo-700">Try Again</button>
+        <button onClick={onStartBlank} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text-dim hover:bg-icm-bg">Start from Blank</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 
 export function PCPCreationModal({
@@ -712,39 +1411,41 @@ export function PCPCreationModal({
   individualName,
   annualPlanDate = "08/31/2026",
   onClose,
+  agentId,
+  agentMasterPrompt: _agentMasterPrompt,
+  linkedGuidelinesEngineName,
+  individualProgram,
+  individualState,
 }: PCPCreationModalProps) {
   const navigate = useNavigate();
   const [step, setStep] = useState<WizardStep>(1);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [planType, setPlanType] = useState("Annual Plan");
-  const [effectiveDate, setEffectiveDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split("T")[0]);
   const [annualDate, setAnnualDate] = useState("2026-08-31");
   const [revisionReason, setRevisionReason] = useState("");
+  const [specialInstructions, setSpecialInstructions] = useState("");
   const [showOrbAnimation, setShowOrbAnimation] = useState(false);
   const [createdPcpId, setCreatedPcpId] = useState<string | null>(null);
-
   const [extractedData, setExtractedData] = useState<ExtractedPcpData | null>(null);
+  // AI mode state
+  const [generatedPlan, setGeneratedPlan] = useState<Record<string, unknown> | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [step2Key, setStep2Key] = useState(0); // increment to remount Step2AI (retry)
 
-  const title =
-    mode === "blank" ? "Start New Person-Centered Plan" : "Draft PCP with AI";
+  const isAiMode = mode === "ai";
+  const title = isAiMode ? "Draft PCP with AI" : "Start New Person-Centered Plan";
 
   const stepLabel: Record<number, string> = {
     1: "Upload Supporting Documents",
-    2: "Reading Documents",
-    3: "Review What AI Found",
+    2: isAiMode ? "AI Processing" : "Reading Documents",
+    3: isAiMode ? "Review Generated Plan" : "Review What AI Found",
+    4: "Finalize Plan Details",
+    5: "Complete",
   };
 
-  const handleContinueFromStep1 = () => setStep(2);
-
-  const handleStep2Complete = (data: ExtractedPcpData | null) => {
-    setExtractedData(data);
-    setStep(3);
-  };
-
+  // ── Blank mode: handleBuild (unchanged) ──────────────────────────────────────
   const handleBuild = async () => {
-    // Create PCP in Firestore
     try {
       const pcpData = {
         individual_id: individualId,
@@ -753,9 +1454,8 @@ export function PCPCreationModal({
         effective_date: effectiveDate,
         annual_plan_date: annualDate,
         status: "draft",
-        created_by: "kathy-adams",
-        ai_generated: mode === "ai",
-        ai_draft_path: mode === "ai",
+        created_by: "case-manager",
+        ai_generated: false,
         source_documents: files.map((f) => ({ name: f.file.name, label: f.label })),
         revision_reason: planType === "Revised Plan" ? revisionReason : undefined,
         sections: extractedData ? {
@@ -773,47 +1473,56 @@ export function PCPCreationModal({
         compliance_check: { hard_stops: 0, review_items: 2 },
         signatures: [],
       };
-
       const docRef = await addDoc(collection(db, "pcps"), {
         ...pcpData,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
       });
       setCreatedPcpId(docRef.id);
-
-      if (mode === "ai") {
-        // Show orb animation
-        setShowOrbAnimation(true);
-      } else {
-        // Navigate to section builder
-        onClose();
-        navigate(`/people/${individualId}/care-plan/new?pcpId=${docRef.id}&planType=${encodeURIComponent(planType)}&effectiveDate=${effectiveDate}&annualDate=${annualDate}`);
-      }
-    } catch (err) {
-      console.error("[PCP] Failed to create:", err);
-      // Even on error, navigate to builder with a local ID
-      const localId = `pcp-${Date.now()}`;
-      setCreatedPcpId(localId);
-      if (mode === "ai") {
-        setShowOrbAnimation(true);
-      } else {
-        onClose();
-        navigate(`/people/${individualId}/care-plan/new?planType=${encodeURIComponent(planType)}&effectiveDate=${effectiveDate}&annualDate=${annualDate}`);
-      }
+      onClose();
+      navigate(`/people/${individualId}/care-plan/new?pcpId=${docRef.id}&planType=${encodeURIComponent(planType)}&effectiveDate=${effectiveDate}&annualDate=${annualDate}`);
+    } catch {
+      onClose();
+      navigate(`/people/${individualId}/care-plan/new?planType=${encodeURIComponent(planType)}&effectiveDate=${effectiveDate}&annualDate=${annualDate}`);
     }
   };
 
+  // ── AI mode handlers ──────────────────────────────────────────────────────────
+  const handleGenerationComplete = (plan: Record<string, unknown>, planId: string) => {
+    setGeneratedPlan(plan);
+    setCreatedPcpId(planId);
+    setGenerationError(null);
+    setStep(3);
+  };
+
+  const handleGenerationError = (msg: string) => {
+    setGenerationError(msg);
+  };
+
+  const handleSaveDraft = () => {
+    toast.success("Plan draft saved. You can return to it from the PCP module.");
+    onClose();
+  };
+
+  const handleFinalizeComplete = async (data: Record<string, string>) => {
+    if (createdPcpId) {
+      try {
+        await updateDoc(doc(db, "care_plans", createdPcpId), {
+          ...data,
+          status: data.planStatus || "In Progress",
+        });
+      } catch { /* non-fatal */ }
+    }
+    setStep(5);
+  };
+
+  // Orb animation (blank mode)
   const handleOrbComplete = () => {
     onClose();
-    const pcpId = createdPcpId || "pcp-brown-2026-001";
+    const pcpId = createdPcpId || "pcp-draft";
     navigate(`/people/${individualId}/care-plan/${pcpId}?ai=true`);
   };
 
-  const handleOrbLater = () => {
-    onClose();
-  };
-
-  // If showing orb animation, render that instead
   if (showOrbAnimation) {
     return (
       <PCPOrbAnimation
@@ -822,53 +1531,52 @@ export function PCPCreationModal({
         effectiveDate={effectiveDate}
         annualDate={annualDate}
         onComplete={handleOrbComplete}
-        onLater={handleOrbLater}
+        onLater={onClose}
       />
     );
   }
 
+  // Modal width/height adjust on step 3+
+  const isWide = isAiMode && step >= 3;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={step === 2 && isAiMode ? undefined : onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-300 ${isWide ? "max-w-[900px] max-h-[95vh]" : "max-w-2xl max-h-[90vh]"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal header */}
-        <div className="px-6 pt-6 pb-4 border-b border-icm-border">
-          <div className="flex items-start justify-between mb-1">
-            <div>
-              <h2 className="font-manrope font-extrabold text-[18px] text-icm-text">
-                {title}
-                <span className="sr-only">Mode: {mode === "blank" ? "Start blank plan" : "Draft with AI"}</span>
-              </h2>
-              <p className="text-[12px] text-icm-text-dim mt-0.5">
-                Step {step} of 5 — {stepLabel[step]}
-              </p>
+        {/* Modal header — hidden during AI Step 2 (dark mode) */}
+        {!(isAiMode && step === 2) && (
+          <div className="px-6 pt-6 pb-4 border-b border-icm-border">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h2 className="font-manrope font-extrabold text-[18px] text-icm-text">{title}</h2>
+                <p className="text-[12px] text-icm-text-dim mt-0.5">
+                  Step {step} of 5 — {stepLabel[step]}
+                </p>
+              </div>
+              {step !== 2 && (
+                <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-icm-bg text-icm-text-dim mt-0.5">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-icm-bg text-icm-text-dim mt-0.5"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="mt-4">
+              <StepIndicator current={step} />
+            </div>
           </div>
-          <div className="mt-4">
-            <StepIndicator current={step} />
-          </div>
-        </div>
+        )}
 
         {/* Modal body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {/* No docs warning banner (shown throughout if no files) */}
-          {step > 1 && files.length === 0 && (
+        <div className={`flex-1 overflow-y-auto ${isAiMode && step === 2 ? "" : "px-6 py-5"}`}>
+          {/* No docs warning (steps 2+ in blank mode) */}
+          {!isAiMode && step > 1 && files.length === 0 && (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-center gap-2 text-[12px] text-amber-700">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>
-                <strong>No state documents uploaded.</strong> AI suggestions will be based on chart data only.
-              </span>
+              <span><strong>No state documents uploaded.</strong> AI suggestions will be based on chart data only.</span>
             </div>
           )}
 
@@ -886,19 +1594,70 @@ export function PCPCreationModal({
               defaultAnnualPlanDate={annualPlanDate}
               revisionReason={revisionReason}
               onRevisionReasonChange={setRevisionReason}
+              specialInstructions={specialInstructions}
+              onSpecialInstructionsChange={setSpecialInstructions}
               onClose={onClose}
-              onContinue={handleContinueFromStep1}
+              onContinue={() => setStep(2)}
             />
           )}
 
-          {step === 2 && (
+          {/* AI mode Step 2 */}
+          {isAiMode && step === 2 && !generationError && (
+            <Step2AI
+              key={step2Key}
+              individualId={individualId}
+              individualName={individualName}
+              individualProgram={individualProgram}
+              individualState={individualState}
+              files={files}
+              planType={planType}
+              effectiveDate={effectiveDate}
+              annualPlanDate={annualDate}
+              specialInstructions={specialInstructions}
+              agentId={agentId}
+              linkedGuidelinesEngineName={linkedGuidelinesEngineName}
+              onComplete={handleGenerationComplete}
+              onError={handleGenerationError}
+            />
+          )}
+
+          {/* AI mode Step 2 — error state */}
+          {isAiMode && step === 2 && generationError && (
+            <div className="px-6 py-5">
+              <GenerationErrorState
+                message={generationError}
+                onRetry={() => { setGenerationError(null); setStep2Key((k) => k + 1); }}
+                onStartBlank={() => { onClose(); }}
+              />
+            </div>
+          )}
+
+          {/* Blank mode Step 2 */}
+          {!isAiMode && step === 2 && (
             <Step2Reading
               files={files}
               planType={planType}
-              onComplete={handleStep2Complete}
+              onComplete={(data) => { setExtractedData(data); setStep(3); }}
             />
           )}
-          {step === 3 && (
+
+          {/* AI mode Step 3 */}
+          {isAiMode && step === 3 && generatedPlan && (
+            <div className="px-6 py-5">
+              <Step3GeneratedPlan
+                plan={generatedPlan}
+                planId={createdPcpId || ""}
+                individualName={individualName}
+                onBack={() => setStep(1)}
+                onContinue={() => setStep(4)}
+                onSaveDraft={handleSaveDraft}
+                onPlanUpdate={setGeneratedPlan}
+              />
+            </div>
+          )}
+
+          {/* Blank mode Step 3 */}
+          {!isAiMode && step === 3 && (
             <Step3Review
               mode={mode}
               hasFiles={files.length > 0}
@@ -906,6 +1665,33 @@ export function PCPCreationModal({
               onBack={() => setStep(1)}
               onBuild={handleBuild}
             />
+          )}
+
+          {step === 4 && (
+            <div className="px-6 py-5">
+              <Step4Finalize
+                individualName={individualName}
+                effectiveDate={effectiveDate}
+                annualPlanDate={annualDate}
+                onBack={() => setStep(3)}
+                onSaveDraft={handleSaveDraft}
+                onComplete={handleFinalizeComplete}
+              />
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="px-6 py-5">
+              <Step5Complete
+                individualName={individualName}
+                planId={createdPcpId || ""}
+                goalsCount={Array.isArray(generatedPlan?.goals) ? (generatedPlan!.goals as any[]).length : 0}
+                servicesCount={Array.isArray(generatedPlan?.services) ? (generatedPlan!.services as any[]).length : 0}
+                totalSources={Object.values((generatedPlan?.planDetails as any)?.dataSources ?? {}).reduce((a, b) => (a as number) + (b as number), 0) as number}
+                onOpenPlan={() => { onClose(); navigate(`/people/${individualId}/care-plan/${createdPcpId || ""}`); }}
+                onReturnToEchart={() => { onClose(); navigate(`/people/${individualId}/echart`); }}
+              />
+            </div>
           )}
         </div>
       </div>

@@ -11,8 +11,9 @@
 
 import { Request, Response } from "express";
 import * as admin from "firebase-admin";
-import { generateCompletion } from "../services/ai";
+import { generateCompletion, getAiClient } from "../services/ai";
 import { COLLECTIONS } from "../config/collections";
+import { PRODUCT_KNOWLEDGE } from "../config/productKnowledge";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,8 @@ interface GeminiProxyBody {
   systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
+  // Optional: inline file data (e.g. base64 PDF for document reading)
+  inlineData?: { data: string; mimeType: string };
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -128,7 +131,7 @@ export async function geminiProxy(req: Request, res: Response): Promise<void> {
   }
 
   // ── 3. Validate request body ───────────────────────────────────────────────
-  const { prompt, systemPrompt, maxTokens, temperature } = req.body as GeminiProxyBody;
+  const { prompt, systemPrompt, maxTokens, temperature, inlineData } = req.body as GeminiProxyBody;
 
   if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
     res.status(400).json({ error: "prompt is required and must be a non-empty string" });
@@ -179,16 +182,52 @@ export async function geminiProxy(req: Request, res: Response): Promise<void> {
   // ── 5. Call Gemini via the server-side AI abstraction layer ────────────────
   //    generateCompletion uses Vertex AI + ADC — no API key anywhere.
   try {
-    const result = await generateCompletion(
-      systemPrompt?.trim() || "You are a helpful AI assistant for a healthcare case management platform.",
-      prompt.trim(),
-      "",                 // no additional context prefix
-      "fast",            // use the standard fast model (gemini-2.5-flash)
-      organizationId,
-      uid,
-      "gemini_proxy",
-      { maxTokens: resolvedMaxTokens, temperature: resolvedTemperature }
-    );
+    const basePrompt = systemPrompt?.trim()
+      || "You are CaseAI Assistant, a helpful AI for a healthcare case management platform.";
+    const fullSystemPrompt = inlineData
+      ? basePrompt  // Skip PRODUCT_KNOWLEDGE for document reads to save tokens
+      : `${PRODUCT_KNOWLEDGE}\n\n---\n\n${basePrompt}`;
+
+    let result: { text: string; inputTokens: number; outputTokens: number };
+
+    if (inlineData?.data && inlineData?.mimeType) {
+      // ── Inline document path (PDF read) ─────────────────────────────────────
+      // Bypasses generateCompletion to pass the file as an inline data part.
+      const ai = getAiClient();
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: inlineData.mimeType, data: inlineData.data } },
+            { text: prompt.trim() },
+          ],
+        }],
+        config: {
+          systemInstruction: fullSystemPrompt,
+          maxOutputTokens: resolvedMaxTokens,
+          temperature: resolvedTemperature,
+        },
+      });
+      const text = response.text ?? "";
+      result = {
+        text,
+        inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+      };
+    } else {
+      // ── Standard text-only path ──────────────────────────────────────────────
+      result = await generateCompletion(
+        fullSystemPrompt,
+        prompt.trim(),
+        "",
+        "fast",
+        organizationId,
+        uid,
+        "gemini_proxy",
+        { maxTokens: resolvedMaxTokens, temperature: resolvedTemperature }
+      );
+    }
 
     res.status(200).json({
       text: result.text,

@@ -758,9 +758,16 @@ const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const GEMINI_PROXY_URL =
   "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/gemini-proxy";
 
-async function callGeminiProxy(prompt: string, systemPrompt: string): Promise<string> {
+async function callGeminiProxy(
+  prompt: string,
+  systemPrompt: string,
+  inlineData?: { data: string; mimeType: string }
+): Promise<string> {
   const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) throw new Error("Not signed in. Please sign in and try again.");
+
+  const body: Record<string, unknown> = { prompt, systemPrompt, maxTokens: 8192, temperature: 0.4 };
+  if (inlineData) body.inlineData = inlineData;
 
   const res = await fetch(GEMINI_PROXY_URL, {
     method: "POST",
@@ -768,7 +775,7 @@ async function callGeminiProxy(prompt: string, systemPrompt: string): Promise<st
       "Content-Type": "application/json",
       Authorization: `Bearer ${idToken}`,
     },
-    body: JSON.stringify({ prompt, systemPrompt, maxTokens: 8192, temperature: 0.4 }),
+    body: JSON.stringify(body),
   });
 
   if (res.status === 401 || res.status === 403)
@@ -836,7 +843,7 @@ function mockExtractedServices(state: string, program: string): ExtractedService
 }
 
 async function extractRulesFromPdf(
-  _base64Pdf: string,
+  base64Pdf: string,
   name: string,
   state: string,
   program: string,
@@ -849,43 +856,46 @@ async function extractRulesFromPdf(
 
   const systemPrompt =
     "You are a compliance rules extraction AI for a healthcare case management platform. " +
+    "Read the attached PDF document carefully and extract all compliance rules for the specified state waiver program. " +
     "You produce structured service rule sets in strict JSON format. " +
     "Return ONLY valid JSON — no markdown, no backticks, no extra text.";
 
   const prompt = `
-Extract compliance rules for the following state waiver program based on the uploaded guidelines document.
+Read the attached state guideline PDF and extract all compliance rules for this waiver program.
 
 Engine name: ${name || "Not specified"}
 State: ${state || "Not specified"}
 Program / Waiver: ${program || "Not specified"}
 ${instructions ? `Builder instructions: ${instructions}` : ""}
 
+Extract all services and their rules DIRECTLY from the PDF document. Do not make up or hallucinate rules — only use what is explicitly in the document.
+
 Return ONLY a valid JSON array of services — no markdown, no code fences:
 
 [
   {
-    "name": "Service name",
+    "name": "Exact service name from document",
     "category": "Category (Support / Meaningful Day / Medical / Financial / Other)",
     "billingUnit": "15 min | Hourly | Daily | Monthly | Per-episode",
     "hardStops": 3,
     "warnings": 2,
     "rules": [
       {
-        "section": "Section name (Eligibility / Authorization / Documentation / etc.)",
-        "description": "Exact rule text describing the compliance requirement",
+        "section": "Section name from document (Eligibility / Authorization / Documentation / etc.)",
+        "description": "Exact rule text from the document",
         "type": "Hard Stop",
-        "citation": "§ X.X Section Title"
+        "citation": "§ X.X or page/section reference from the document"
       }
     ]
   }
 ]
 
-Generate 3–5 realistic services typical for a ${state || "state"} ${program || "HCBS"} waiver program.
-Each service should have 3–5 rules. Use "Hard Stop" for requirements whose violation blocks billing or triggers audit findings; use "Warning" for documentation and monitoring requirements.
+Extract 3–8 services from the document. Each service should have 3–6 rules. Use "Hard Stop" for requirements whose violation blocks billing or triggers audit findings; use "Warning" for documentation and monitoring requirements.
 Today's date: ${new Date().toISOString().slice(0, 10)}.
 `.trim();
 
-  const rawText = await callGeminiProxy(prompt, systemPrompt);
+  // Pass the PDF as inline data so Gemini actually reads it
+  const rawText = await callGeminiProxy(prompt, systemPrompt, { data: base64Pdf, mimeType: "application/pdf" });
 
   const cleaned = rawText
     .replace(/^```(?:json)?\s*/i, "")
@@ -1683,6 +1693,20 @@ function Step1(props: {
   extracted: ExtractedService[];
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        import("sonner").then(({ toast }) => toast.error("Only PDF files are accepted."));
+        return;
+      }
+      props.onFileSelected(file);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -1804,13 +1828,21 @@ function Step1(props: {
             className="hidden"
           />
           {!props.pdfFile ? (
-            <button
+            <div
               onClick={() => fileInputRef.current?.click()}
-              className="w-full rounded-xl border-2 border-dashed border-icm-border bg-icm-bg hover:border-icm-accent/40 hover:bg-icm-accent-soft/40 transition-all py-10 flex flex-col items-center gap-2"
+              onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+              onDrop={handleDrop}
+              className={`w-full rounded-xl border-2 border-dashed cursor-pointer transition-all py-10 flex flex-col items-center gap-2 ${
+                isDragging
+                  ? "border-icm-accent bg-icm-accent-soft/60 scale-[1.01]"
+                  : "border-icm-border bg-icm-bg hover:border-icm-accent/40 hover:bg-icm-accent-soft/40"
+              }`}
             >
-              <UploadCloud className="w-8 h-8 text-icm-text-faint" />
+              <UploadCloud className={`w-8 h-8 transition-colors ${isDragging ? "text-icm-accent" : "text-icm-text-faint"}`} />
               <p className="text-[13px] text-icm-text font-geist font-medium">
-                Drop state guideline PDF here or click to browse
+                {isDragging ? "Release to upload PDF" : "Drop state guideline PDF here or click to browse"}
               </p>
               <p className="text-[11px] text-icm-text-faint font-geist">
                 Accepted: PDF only · Max size: 50MB
@@ -1818,7 +1850,7 @@ function Step1(props: {
               <div className="mt-2 text-icm-text-dim text-[11.5px] font-geist">
                 or <span className="text-icm-accent hover:underline cursor-pointer font-semibold" onClick={(e) => { e.stopPropagation(); props.onGenerateFallback(); }}>✨ Draft rules with AI Fallback</span>
               </div>
-            </button>
+            </div>
           ) : (
             <div className="space-y-3">
               <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex items-center gap-3">

@@ -388,7 +388,7 @@ const SettingsAI = () => {
             </div>
           </div>
 
-          {/* Brain Orchestrator settings */}
+          {/* AI Orchestrator settings */}
           <OrchestratorSettings />
 
           {/* Coming Soon — Dementia Support */}

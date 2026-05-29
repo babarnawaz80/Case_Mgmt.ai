@@ -1,4 +1,4 @@
-// Brain Orchestrator Frontend Hook
+// AI Orchestrator Frontend Hook
 // Reads orchestrator data from Firestore and provides the trigger function.
 
 import { useState, useEffect, useCallback } from "react";
@@ -296,7 +296,7 @@ export function useOrchestrator() {
   const triggerRun = useCallback(async () => {
     if (!orgId || running) return;
     setRunning(true);
-    setRunProgress("Initializing Brain Orchestrator...");
+    setRunProgress("Initializing AI Orchestrator...");
 
     try {
       const fns = getFunctions(undefined, "us-central1");

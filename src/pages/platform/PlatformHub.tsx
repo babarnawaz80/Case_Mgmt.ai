@@ -40,11 +40,11 @@ const PlatformHub = () => {
           </span>
         </div>
 
-        {/* Brain Orchestrator — full-width hero card */}
+        {/* AI Orchestrator — full-width hero card */}
         <div>
           <PlatformCard
             icon={Brain}
-            title="Brain Orchestrator"
+            title="AI Orchestrator"
             description="Autonomous AI engine that runs nightly to check compliance, generate documentation drafts, flag billing gaps, and escalate overdue items across your entire caseload."
             stat="Runs nightly at 2:00 AM ET · Admin & supervisor access"
             onClick={() => navigate("/platform/orchestrator")}

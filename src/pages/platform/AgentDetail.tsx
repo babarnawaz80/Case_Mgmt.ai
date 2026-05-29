@@ -83,16 +83,26 @@ export function AgentDetail() {
   useEffect(() => {
     if (!agentId) return;
     (async () => {
-      const docData = await getAgentById(agentId);
-      if (docData) {
-        setAgent(docData);
-        setPromptInput(docData.master_prompt);
-        setAutoMonitor(docData.auto_monitor);
-        setPushMode(docData.push_mode);
+      try {
+        const docData = await getAgentById(agentId);
+        if (docData) {
+          setAgent(docData);
+          setPromptInput(docData.master_prompt);
+          setAutoMonitor(docData.auto_monitor);
+          setPushMode(docData.push_mode);
+        }
+        try {
+          const runsData = await getRunsForAgent(agentId);
+          setRuns(runsData);
+        } catch {
+          // Composite index may not exist yet — show agent without run history
+          setRuns([]);
+        }
+      } catch (err) {
+        console.error("[AgentDetail] Failed to load agent:", err);
+      } finally {
+        setLoading(false);
       }
-      const runsData = await getRunsForAgent(agentId);
-      setRuns(runsData);
-      setLoading(false);
     })();
   }, [agentId, isRunModalOpen]);
 

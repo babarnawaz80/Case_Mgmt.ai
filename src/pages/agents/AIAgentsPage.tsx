@@ -108,14 +108,6 @@ function OrchestratorHeroCard() {
             </div>
           </div>
 
-          {/* Powered by */}
-          <button
-            onClick={(e) => { e.stopPropagation(); navigate("/agents/guidelines"); }}
-            className="hidden lg:flex items-center gap-1.5 text-[11px] font-geist text-slate-400 hover:text-slate-200 transition-colors shrink-0"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Guidelines Engines
-          </button>
         </div>
 
         {/* Stats row */}

@@ -494,7 +494,7 @@ const PersonCaseManagement = () => {
               </span>
             </p>
           </div>
-          <button className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0">
+          <button onClick={() => navigate(`/people/${id}/care-plan`)} className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline shrink-0">
             Show AI plan →
           </button>
         </div>

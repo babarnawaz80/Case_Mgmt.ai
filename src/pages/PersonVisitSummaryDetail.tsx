@@ -106,10 +106,11 @@ const PersonVisitSummaryDetail = () => {
         what_is_not_working: form.whatIsNotWorking || form.what_is_not_working || "",
         next_steps: form.nextSteps || form.next_steps || "",
         status,
-        author_uid: "kathy-uid",
-        author_name: "Kathy Martinez",
-        updated_by: "Kathy Martinez",
+        author_uid: userProfile?.uid ?? "",
+        author_name: userProfile?.displayName ?? "",
+        updated_by: userProfile?.displayName ?? "",
         updated_on: new Date().toLocaleDateString(),
+        organizationId: userProfile?.organizationId ?? "",
       };
       if (isNew) {
         const docRef = await addDoc(collection(db, "visit_summaries"), visitData);
@@ -342,7 +343,7 @@ const PersonVisitSummaryDetail = () => {
                 <span className="text-icm-text-dim">Behavioral changes reported by caregiver (04/27/2026, Low-Medium severity). Consider documenting here.</span>
               </p>
             </div>
-            <button className="text-[11.5px] font-geist font-semibold text-icm-amber hover:underline shrink-0">View flag →</button>
+            <button onClick={() => navigate(`/people/${id}/echart`)} className="text-[11.5px] font-geist font-semibold text-icm-amber hover:underline shrink-0">View flag →</button>
           </div>
           <Field label="Immediate Action Needed" aiSource={aiSourceFor("immediateAction")}>
             <textarea disabled={isReadOnly} maxLength={8000} value={form.immediateAction ?? ""} onChange={(e) => update("immediateAction", e.target.value)} className={textareaCls} rows={3} placeholder="Document any immediate health or safety concerns observed during this visit." />

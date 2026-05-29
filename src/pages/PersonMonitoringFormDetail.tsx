@@ -154,15 +154,15 @@ const PersonMonitoringFormDetail = () => {
   // Completion status per section (computed before any early return to keep hook order stable)
   const completion = useMemo(() => {
     if (!form) return { s1: 0, s2: 0, s3: 0, s4: 0, s5: 0, s6: 0, s7: 0, s8: 0, s9: 0, s10: 0 };
-    const s2 = form.s2_circumstances.filter(q => q.answer).length / form.s2_circumstances.length;
-    const s3 = form.s3_satisfaction.filter(q => q.answer).length / form.s3_satisfaction.length;
-    const s4 = form.s4_progress.length > 0 ? form.s4_progress.filter(g => g.notes).length / form.s4_progress.length : 0;
-    const s5 = form.s5_choice.filter(q => q.answer).length / form.s5_choice.length;
-    const s6 = form.s6_health.filter(q => q.answer).length / form.s6_health.length;
-    const s7 = form.s7_emergency.filter(q => q.answer).length / form.s7_emergency.length;
-    const s8 = form.s8_incidents.filter(q => q.answer).length / form.s8_incidents.length;
-    const s9 = form.s9_recommendedActions.length > 0 ? 1 : 0;
-    const s10 = form.s10_contacts.length > 0 ? 1 : 0;
+    const s2Arr = form.s2_circumstances || []; const s2 = s2Arr.length > 0 ? s2Arr.filter((q: any) => q.answer).length / s2Arr.length : 0;
+    const s3Arr = form.s3_satisfaction || []; const s3 = s3Arr.length > 0 ? s3Arr.filter((q: any) => q.answer).length / s3Arr.length : 0;
+    const s4Arr = form.s4_progress || []; const s4 = s4Arr.length > 0 ? s4Arr.filter((g: any) => g.notes).length / s4Arr.length : 0;
+    const s5Arr = form.s5_choice || []; const s5 = s5Arr.length > 0 ? s5Arr.filter((q: any) => q.answer).length / s5Arr.length : 0;
+    const s6Arr = form.s6_health || []; const s6 = s6Arr.length > 0 ? s6Arr.filter((q: any) => q.answer).length / s6Arr.length : 0;
+    const s7Arr = form.s7_emergency || []; const s7 = s7Arr.length > 0 ? s7Arr.filter((q: any) => q.answer).length / s7Arr.length : 0;
+    const s8Arr = form.s8_incidents || []; const s8 = s8Arr.length > 0 ? s8Arr.filter((q: any) => q.answer).length / s8Arr.length : 0;
+    const s9 = (form.s9_recommendedActions || []).length > 0 ? 1 : 0;
+    const s10 = (form.s10_contacts || []).length > 0 ? 1 : 0;
     return { s1: 1, s2, s3, s4, s5, s6, s7, s8, s9, s10 };
   }, [form]);
 
@@ -214,8 +214,9 @@ const PersonMonitoringFormDetail = () => {
         active: form.active || "Active",
         dueDate: form.dueDate || new Date().toISOString().split("T")[0],
         submitted_date: status === "Submitted" ? new Date().toISOString().split("T")[0] : "",
-        updated_by: "Kathy Martinez",
+        updated_by: userProfile?.displayName ?? "",
         updated_on: new Date().toLocaleDateString(),
+        organizationId: userProfile?.organizationId ?? "",
         s2_circumstances: form.s2_circumstances || [],
         s3_satisfaction: form.s3_satisfaction || [],
         s4_progress: form.s4_progress || [],

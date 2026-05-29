@@ -1,4 +1,28 @@
 import React, { lazy, Suspense } from "react";
+
+/**
+ * lazyWithRetry — wraps React.lazy so that when a dynamic import fails
+ * (e.g. "Failed to fetch dynamically imported module" after a fresh deploy),
+ * the page reloads once to pick up the new chunk filenames.
+ * A sessionStorage flag prevents an infinite reload loop.
+ */
+function lazyWithRetry<T extends React.ComponentType<unknown>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    factory().catch((err) => {
+      const key = `chunk-reload:${factory.toString().slice(0, 80)}`;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+        // Return a never-resolving promise — reload will happen
+        return new Promise(() => {}) as never;
+      }
+      throw err;
+    })
+  );
+}
+import { ICMSpinner } from "@/components/icm/ICMSpinner";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,163 +38,165 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { OrgSettingsProvider } from "@/contexts/OrgSettingsContext";
 import { BillingProvider } from "@/contexts/BillingContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SessionTimeoutProvider } from "@/providers/SessionTimeoutProvider";
+import { PasswordExpiryProvider } from "@/providers/PasswordExpiryProvider";
 import { PlatformAdminGuard } from "@/components/superadmin/PlatformAdminGuard";
 
 // ── Lazy page imports (each becomes its own chunk) ──────────────────────────
-const Index = lazy(() => import("./pages/Index"));
-const Login = lazy(() => import("./pages/Login"));
-const SignDocument = lazy(() => import("./pages/SignDocument"));
-const CareAssistant = lazy(() => import("./pages/CareAssistant"));
-const PersonCommunicationsLog = lazy(() => import("./pages/PersonCommunicationsLog"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const PeopleSupported = lazy(() => import("./pages/PeopleSupported"));
-const NewParticipantIntake = lazy(() => import("./pages/NewParticipantIntake"));
-const LifePlanBoard = lazy(() => import("./pages/LifePlanBoard"));
-const LifePlanAgentDetail = lazy(() => import("./pages/LifePlanAgentDetail"));
-const RuleLibraryBuilder = lazy(() => import("./pages/RuleLibraryBuilder"));
-const ComplianceEngineDashboard = lazy(() => import("./pages/ComplianceEngineDashboard"));
-const RuntimeAgentBuilder = lazy(() => import("./pages/RuntimeAgentBuilder"));
-const Layer2AgentBuilder = lazy(() => import("./pages/Layer2AgentBuilder"));
-const EngineHistory = lazy(() => import("./pages/EngineHistory"));
-const AgentDraftRuns = lazy(() => import("./pages/AgentDraftRuns"));
-const AgentMonitoringSettings = lazy(() => import("./pages/AgentMonitoringSettings"));
-const EChart = lazy(() => import("./pages/EChart"));
-const PersonMonitorsBaselines = lazy(() => import("./pages/PersonMonitorsBaselines"));
-const ContactNote = lazy(() => import("./pages/ContactNote"));
-const ContactNoteDetail = lazy(() => import("./pages/ContactNoteDetail"));
-const PersonModule = lazy(() => import("./pages/PersonModule"));
-const PersonCaseManagement = lazy(() => import("./pages/PersonCaseManagement"));
-const PersonCarePlan = lazy(() => import("./pages/PersonCarePlan"));
-const PersonCarePlanDetail = lazy(() => import("./pages/PersonCarePlanDetail"));
-const PersonCarePlanBuilder = lazy(() => import("./pages/PersonCarePlanBuilder"));
-const PersonMonitoringForm = lazy(() => import("./pages/PersonMonitoringForm"));
-const PersonMonitoringFormDetail = lazy(() => import("./pages/PersonMonitoringFormDetail"));
-const PersonVisitSummary = lazy(() => import("./pages/PersonVisitSummary"));
-const PersonVisitSummaryDetail = lazy(() => import("./pages/PersonVisitSummaryDetail"));
-const PersonVisitScheduler = lazy(() => import("./pages/PersonVisitScheduler"));
-const PersonVisitDocument = lazy(() => import("./pages/PersonVisitDocument"));
-const ExceptionsQueue = lazy(() => import("./pages/ExceptionsQueue"));
-const SupervisorDashboard = lazy(() => import("./pages/SupervisorDashboard"));
-const SupervisorReviewNote = lazy(() => import("./pages/SupervisorReviewNote"));
-const SupervisorCompliance = lazy(() => import("./pages/SupervisorCompliance"));
-const PersonEligibilityVerification = lazy(() => import("./pages/PersonEligibilityVerification"));
-const PersonEligibilityVerificationDetail = lazy(() => import("./pages/PersonEligibilityVerificationDetail"));
-const PersonProgressNote = lazy(() => import("./pages/PersonProgressNote"));
-const PersonProgressNoteDetail = lazy(() => import("./pages/PersonProgressNoteDetail"));
-const ProgressNoteNew = lazy(() => import("./pages/ProgressNoteNew"));
-const ProgressNoteLog = lazy(() => import("./pages/ProgressNoteLog"));
-const VisitSummaryNew = lazy(() => import("./pages/VisitSummaryNew"));
-const VisitSummaryLog = lazy(() => import("./pages/VisitSummaryLog"));
-const MonitoringFormLog = lazy(() => import("./pages/MonitoringFormLog"));
-const OnCallLog = lazy(() => import("./pages/OnCallLog"));
-const OnCallLogNew = lazy(() => import("./pages/OnCallLogNew"));
-const PersonWorkflowManager = lazy(() => import("./pages/PersonWorkflowManager"));
-const PersonWorkflowDetail = lazy(() => import("./pages/PersonWorkflowDetail"));
-const WorkflowsGlobal = lazy(() => import("./pages/WorkflowsGlobal"));
-const WorkflowTemplatesAdmin = lazy(() => import("./pages/WorkflowTemplatesAdmin"));
-const PersonIncidentReporting = lazy(() => import("./pages/PersonIncidentReporting"));
-const PersonIncidentReportingDetail = lazy(() => import("./pages/PersonIncidentReportingDetail"));
-const PersonIncidentReportNew = lazy(() => import("./pages/PersonIncidentReportNew"));
-const IncidentsGlobal = lazy(() => import("./pages/IncidentsGlobal"));
-const MyWork = lazy(() => import("./pages/MyWork"));
-const PersonProfile = lazy(() => import("./pages/PersonProfile"));
-const PersonFaceSheet = lazy(() => import("./pages/PersonFaceSheet"));
-const PlatformHub = lazy(() => import("./pages/platform/PlatformHub"));
-const GuidelinesEnginesList = lazy(() => import("./pages/platform/GuidelinesEnginesList"));
-const NewEngineWizard = lazy(() => import("./pages/platform/NewEngineWizard"));
-const EngineDetail = lazy(() => import("./pages/platform/EngineDetail"));
-const RuleLibrary = lazy(() => import("./pages/platform/RuleLibrary"));
-const ComplianceAgentsList = lazy(() => import("./pages/platform/ComplianceAgentsList"));
-const NewAgentWizard = lazy(() => import("./pages/platform/NewAgentWizard"));
-const AgentDetail = lazy(() => import("./pages/platform/AgentDetail"));
-const AssessmentBuilderList = lazy(() => import("./pages/admin/AssessmentBuilderList"));
-const AssessmentBuilderEdit = lazy(() => import("./pages/admin/AssessmentBuilderEdit"));
-const PersonAssessments = lazy(() => import("./pages/PersonAssessments"));
-const PersonAssessmentForm = lazy(() => import("./pages/PersonAssessmentForm"));
-const PersonReferrals = lazy(() => import("./pages/PersonReferrals"));
-const AllReferrals = lazy(() => import("./pages/AllReferrals"));
-const PersonReferralForm = lazy(() => import("./pages/PersonReferralForm"));
-const PersonReferralDetail = lazy(() => import("./pages/PersonReferralDetail"));
-const Documentation = lazy(() => import("./pages/Documentation"));
-const Settings = lazy(() => import("./pages/Settings"));
-const SettingsUsers = lazy(() => import("./pages/settings/SettingsUsers"));
-const SettingsUserDetail = lazy(() => import("./pages/settings/SettingsUserDetail"));
-const SettingsOrganization = lazy(() => import("./pages/settings/SettingsOrganization"));
-const SettingsPrograms = lazy(() => import("./pages/settings/SettingsPrograms"));
-const SettingsAI = lazy(() => import("./pages/settings/SettingsAI"));
-const SettingsIntegrations = lazy(() => import("./pages/settings/SettingsIntegrations"));
-const SettingsSecurity = lazy(() => import("./pages/settings/SettingsSecurity"));
-const SettingsNotifications = lazy(() => import("./pages/settings/SettingsNotifications"));
-const SettingsBillingConfig = lazy(() => import("./pages/settings/SettingsBillingConfig"));
-const SettingsAIUsage = lazy(() => import("./pages/settings/SettingsAIUsage"));
-const SettingsRiskScore = lazy(() => import("./pages/settings/SettingsRiskScore"));
-const BillingCheckoutSimulation = lazy(() => import("./pages/settings/BillingCheckoutSimulation"));
-const BillingPortalSimulation = lazy(() => import("./pages/settings/BillingPortalSimulation"));
-const SettingsImport = lazy(() => import("./pages/settings/SettingsImport"));
-const SettingsTemplates = lazy(() => import("./pages/settings/SettingsTemplates"));
-const SettingsBilling = lazy(() => import("./pages/settings/SettingsBilling"));
-const MyProfile = lazy(() => import("./pages/MyProfile"));
-const AIRoadmap = lazy(() => import("./pages/AIRoadmap"));
-const ProviderDirectory = lazy(() => import("./pages/admin/ProviderDirectory"));
-const AuditLogPage = lazy(() => import("./pages/AuditLogPage"));
-const Reports = lazy(() => import("./pages/Reports"));
-const ReportRunner = lazy(() => import("./pages/ReportRunner"));
-const ReportBuilder = lazy(() => import("./pages/ReportBuilder"));
-const AuditEvidence = lazy(() => import("./pages/AuditEvidence"));
-const PersonDocuments = lazy(() => import("./pages/PersonDocuments"));
-const Documents = lazy(() => import("./pages/Documents"));
-const Leads = lazy(() => import("./pages/Leads"));
-const LeadForm = lazy(() => import("./pages/LeadForm"));
-const LeadDetail = lazy(() => import("./pages/LeadDetail"));
-const Messages = lazy(() => import("./pages/Messages"));
-const VirtualVisit = lazy(() => import("./pages/VirtualVisit"));
-const BillingHub = lazy(() => import("./pages/BillingHub"));
-const PersonCareTeam = lazy(() => import("./pages/PersonCareTeam"));
-const PersonMeetingNotesPage = lazy(() => import("./pages/PersonMeetingNotesPage"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Companion = lazy(() => import("./pages/Companion"));
-const MultiStateConfig = lazy(() => import("./pages/MultiStateConfig"));
-const CommunicationsHub = lazy(() => import("./pages/CommunicationsHub"));
-const AIGovernance = lazy(() => import("./pages/AIGovernance"));
-const PersonAuthorizations = lazy(() => import("./pages/PersonAuthorizations"));
-const PersonAuthorizationNew = lazy(() => import("./pages/PersonAuthorizationNew"));
-const AuthorizationTracker = lazy(() => import("./pages/AuthorizationTracker"));
-const CompanionTranscripts = lazy(() => import("./pages/CompanionTranscripts"));
-const PersonCareTracker = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("care-tracker") })));
-const PersonCommunications = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("communications") })));
-const PersonServices = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("services") })));
-const PersonEmployment = lazy(() => import("./pages/PersonEmployment"));
-const PersonManagedDocuments = lazy(() => import("./pages/PersonManagedDocuments"));
-const PersonOnCall = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("oncall") })));
-const PersonTrainings = lazy(() => import("./pages/PersonTrainings"));
-const PersonServicePlan = lazy(() => import("./pages/PersonServicePlan"));
-const PersonBillingSummary = lazy(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("billing") })));
-const PersonESignature = lazy(() => import("./pages/PersonESignature"));
+const Index = lazyWithRetry(() => import("./pages/Index"));
+const Login = lazyWithRetry(() => import("./pages/Login"));
+const SignDocument = lazyWithRetry(() => import("./pages/SignDocument"));
+const CareAssistant = lazyWithRetry(() => import("./pages/CareAssistant"));
+const PersonCommunicationsLog = lazyWithRetry(() => import("./pages/PersonCommunicationsLog"));
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
+const PeopleSupported = lazyWithRetry(() => import("./pages/PeopleSupported"));
+const NewParticipantIntake = lazyWithRetry(() => import("./pages/NewParticipantIntake"));
+const LifePlanBoard = lazyWithRetry(() => import("./pages/LifePlanBoard"));
+const LifePlanAgentDetail = lazyWithRetry(() => import("./pages/LifePlanAgentDetail"));
+const RuleLibraryBuilder = lazyWithRetry(() => import("./pages/RuleLibraryBuilder"));
+const ComplianceEngineDashboard = lazyWithRetry(() => import("./pages/ComplianceEngineDashboard"));
+const RuntimeAgentBuilder = lazyWithRetry(() => import("./pages/RuntimeAgentBuilder"));
+const Layer2AgentBuilder = lazyWithRetry(() => import("./pages/Layer2AgentBuilder"));
+const EngineHistory = lazyWithRetry(() => import("./pages/EngineHistory"));
+const AgentDraftRuns = lazyWithRetry(() => import("./pages/AgentDraftRuns"));
+const AgentMonitoringSettings = lazyWithRetry(() => import("./pages/AgentMonitoringSettings"));
+const EChart = lazyWithRetry(() => import("./pages/EChart"));
+const PersonMonitorsBaselines = lazyWithRetry(() => import("./pages/PersonMonitorsBaselines"));
+const ContactNote = lazyWithRetry(() => import("./pages/ContactNote"));
+const ContactNoteDetail = lazyWithRetry(() => import("./pages/ContactNoteDetail"));
+const PersonModule = lazyWithRetry(() => import("./pages/PersonModule"));
+const PersonCaseManagement = lazyWithRetry(() => import("./pages/PersonCaseManagement"));
+const PersonCarePlan = lazyWithRetry(() => import("./pages/PersonCarePlan"));
+const PersonCarePlanDetail = lazyWithRetry(() => import("./pages/PersonCarePlanDetail"));
+const PersonCarePlanBuilder = lazyWithRetry(() => import("./pages/PersonCarePlanBuilder"));
+const PersonMonitoringForm = lazyWithRetry(() => import("./pages/PersonMonitoringForm"));
+const PersonMonitoringFormDetail = lazyWithRetry(() => import("./pages/PersonMonitoringFormDetail"));
+const PersonVisitSummary = lazyWithRetry(() => import("./pages/PersonVisitSummary"));
+const PersonVisitSummaryDetail = lazyWithRetry(() => import("./pages/PersonVisitSummaryDetail"));
+const PersonVisitScheduler = lazyWithRetry(() => import("./pages/PersonVisitScheduler"));
+const PersonVisitDocument = lazyWithRetry(() => import("./pages/PersonVisitDocument"));
+const ExceptionsQueue = lazyWithRetry(() => import("./pages/ExceptionsQueue"));
+const SupervisorDashboard = lazyWithRetry(() => import("./pages/SupervisorDashboard"));
+const SupervisorReviewNote = lazyWithRetry(() => import("./pages/SupervisorReviewNote"));
+const SupervisorCompliance = lazyWithRetry(() => import("./pages/SupervisorCompliance"));
+const PersonEligibilityVerification = lazyWithRetry(() => import("./pages/PersonEligibilityVerification"));
+const PersonEligibilityVerificationDetail = lazyWithRetry(() => import("./pages/PersonEligibilityVerificationDetail"));
+const PersonProgressNote = lazyWithRetry(() => import("./pages/PersonProgressNote"));
+const PersonProgressNoteDetail = lazyWithRetry(() => import("./pages/PersonProgressNoteDetail"));
+const ProgressNoteNew = lazyWithRetry(() => import("./pages/ProgressNoteNew"));
+const ProgressNoteLog = lazyWithRetry(() => import("./pages/ProgressNoteLog"));
+const VisitSummaryNew = lazyWithRetry(() => import("./pages/VisitSummaryNew"));
+const VisitSummaryLog = lazyWithRetry(() => import("./pages/VisitSummaryLog"));
+const MonitoringFormLog = lazyWithRetry(() => import("./pages/MonitoringFormLog"));
+const OnCallLog = lazyWithRetry(() => import("./pages/OnCallLog"));
+const OnCallLogNew = lazyWithRetry(() => import("./pages/OnCallLogNew"));
+const PersonWorkflowManager = lazyWithRetry(() => import("./pages/PersonWorkflowManager"));
+const PersonWorkflowDetail = lazyWithRetry(() => import("./pages/PersonWorkflowDetail"));
+const WorkflowsGlobal = lazyWithRetry(() => import("./pages/WorkflowsGlobal"));
+const WorkflowTemplatesAdmin = lazyWithRetry(() => import("./pages/WorkflowTemplatesAdmin"));
+const PersonIncidentReporting = lazyWithRetry(() => import("./pages/PersonIncidentReporting"));
+const PersonIncidentReportingDetail = lazyWithRetry(() => import("./pages/PersonIncidentReportingDetail"));
+const PersonIncidentReportNew = lazyWithRetry(() => import("./pages/PersonIncidentReportNew"));
+const IncidentsGlobal = lazyWithRetry(() => import("./pages/IncidentsGlobal"));
+const MyWork = lazyWithRetry(() => import("./pages/MyWork"));
+const PersonProfile = lazyWithRetry(() => import("./pages/PersonProfile"));
+const PersonFaceSheet = lazyWithRetry(() => import("./pages/PersonFaceSheet"));
+const PlatformHub = lazyWithRetry(() => import("./pages/platform/PlatformHub"));
+const GuidelinesEnginesList = lazyWithRetry(() => import("./pages/platform/GuidelinesEnginesList"));
+const NewEngineWizard = lazyWithRetry(() => import("./pages/platform/NewEngineWizard"));
+const EngineDetail = lazyWithRetry(() => import("./pages/platform/EngineDetail"));
+const RuleLibrary = lazyWithRetry(() => import("./pages/platform/RuleLibrary"));
+const ComplianceAgentsList = lazyWithRetry(() => import("./pages/platform/ComplianceAgentsList"));
+const NewAgentWizard = lazyWithRetry(() => import("./pages/platform/NewAgentWizard"));
+const AgentDetail = lazyWithRetry(() => import("./pages/platform/AgentDetail"));
+const AssessmentBuilderList = lazyWithRetry(() => import("./pages/admin/AssessmentBuilderList"));
+const AssessmentBuilderEdit = lazyWithRetry(() => import("./pages/admin/AssessmentBuilderEdit"));
+const PersonAssessments = lazyWithRetry(() => import("./pages/PersonAssessments"));
+const PersonAssessmentForm = lazyWithRetry(() => import("./pages/PersonAssessmentForm"));
+const PersonReferrals = lazyWithRetry(() => import("./pages/PersonReferrals"));
+const AllReferrals = lazyWithRetry(() => import("./pages/AllReferrals"));
+const PersonReferralForm = lazyWithRetry(() => import("./pages/PersonReferralForm"));
+const PersonReferralDetail = lazyWithRetry(() => import("./pages/PersonReferralDetail"));
+const Documentation = lazyWithRetry(() => import("./pages/Documentation"));
+const Settings = lazyWithRetry(() => import("./pages/Settings"));
+const SettingsUsers = lazyWithRetry(() => import("./pages/settings/SettingsUsers"));
+const SettingsUserDetail = lazyWithRetry(() => import("./pages/settings/SettingsUserDetail"));
+const SettingsOrganization = lazyWithRetry(() => import("./pages/settings/SettingsOrganization"));
+const SettingsPrograms = lazyWithRetry(() => import("./pages/settings/SettingsPrograms"));
+const SettingsAI = lazyWithRetry(() => import("./pages/settings/SettingsAI"));
+const SettingsIntegrations = lazyWithRetry(() => import("./pages/settings/SettingsIntegrations"));
+const SettingsSecurity = lazyWithRetry(() => import("./pages/settings/SettingsSecurity"));
+const SettingsNotifications = lazyWithRetry(() => import("./pages/settings/SettingsNotifications"));
+const SettingsBillingConfig = lazyWithRetry(() => import("./pages/settings/SettingsBillingConfig"));
+const SettingsAIUsage = lazyWithRetry(() => import("./pages/settings/SettingsAIUsage"));
+const SettingsRiskScore = lazyWithRetry(() => import("./pages/settings/SettingsRiskScore"));
+const BillingCheckoutSimulation = lazyWithRetry(() => import("./pages/settings/BillingCheckoutSimulation"));
+const BillingPortalSimulation = lazyWithRetry(() => import("./pages/settings/BillingPortalSimulation"));
+const SettingsImport = lazyWithRetry(() => import("./pages/settings/SettingsImport"));
+const SettingsTemplates = lazyWithRetry(() => import("./pages/settings/SettingsTemplates"));
+const SettingsBilling = lazyWithRetry(() => import("./pages/settings/SettingsBilling"));
+const MyProfile = lazyWithRetry(() => import("./pages/MyProfile"));
+const AIRoadmap = lazyWithRetry(() => import("./pages/AIRoadmap"));
+const ProviderDirectory = lazyWithRetry(() => import("./pages/admin/ProviderDirectory"));
+const AuditLogPage = lazyWithRetry(() => import("./pages/AuditLogPage"));
+const Reports = lazyWithRetry(() => import("./pages/Reports"));
+const ReportRunner = lazyWithRetry(() => import("./pages/ReportRunner"));
+const ReportBuilder = lazyWithRetry(() => import("./pages/ReportBuilder"));
+const AuditEvidence = lazyWithRetry(() => import("./pages/AuditEvidence"));
+const PersonDocuments = lazyWithRetry(() => import("./pages/PersonDocuments"));
+const Documents = lazyWithRetry(() => import("./pages/Documents"));
+const Leads = lazyWithRetry(() => import("./pages/Leads"));
+const LeadForm = lazyWithRetry(() => import("./pages/LeadForm"));
+const LeadDetail = lazyWithRetry(() => import("./pages/LeadDetail"));
+const Messages = lazyWithRetry(() => import("./pages/Messages"));
+const VirtualVisit = lazyWithRetry(() => import("./pages/VirtualVisit"));
+const BillingHub = lazyWithRetry(() => import("./pages/BillingHub"));
+const PersonCareTeam = lazyWithRetry(() => import("./pages/PersonCareTeam"));
+const PersonMeetingNotesPage = lazyWithRetry(() => import("./pages/PersonMeetingNotesPage"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const Companion = lazyWithRetry(() => import("./pages/Companion"));
+const MultiStateConfig = lazyWithRetry(() => import("./pages/MultiStateConfig"));
+const CommunicationsHub = lazyWithRetry(() => import("./pages/CommunicationsHub"));
+const AIGovernance = lazyWithRetry(() => import("./pages/AIGovernance"));
+const PersonAuthorizations = lazyWithRetry(() => import("./pages/PersonAuthorizations"));
+const PersonAuthorizationNew = lazyWithRetry(() => import("./pages/PersonAuthorizationNew"));
+const AuthorizationTracker = lazyWithRetry(() => import("./pages/AuthorizationTracker"));
+const CompanionTranscripts = lazyWithRetry(() => import("./pages/CompanionTranscripts"));
+const PersonCareTracker = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("care-tracker") })));
+const PersonCommunications = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("communications") })));
+const PersonServices = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("services") })));
+const PersonEmployment = lazyWithRetry(() => import("./pages/PersonEmployment"));
+const PersonManagedDocuments = lazyWithRetry(() => import("./pages/PersonManagedDocuments"));
+const PersonOnCall = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("oncall") })));
+const PersonTrainings = lazyWithRetry(() => import("./pages/PersonTrainings"));
+const PersonServicePlan = lazyWithRetry(() => import("./pages/PersonServicePlan"));
+const PersonBillingSummary = lazyWithRetry(() => import("./pages/PersonPlaceholders").then(m => ({ default: m.makePersonPlaceholder("billing") })));
+const PersonESignature = lazyWithRetry(() => import("./pages/PersonESignature"));
 
 // Billing module pages
-const BillingLayout = lazy(() => import("@/components/billing/BillingLayout")) as any;
-const BAgentsDashboard = lazy(() => import("@/pages/billing/AgentsDashboard"));
-const BEngines = lazy(() => import("@/pages/billing/Engines"));
-const BEngineBuilder = lazy(() => import("@/pages/billing/EngineBuilder"));
-const BEngineDetail = lazy(() => import("@/pages/billing/EngineDetail"));
-const BAgentCreate = lazy(() => import("@/pages/billing/AgentCreate"));
-const BAgentDetail = lazy(() => import("@/pages/billing/AgentDetail"));
-const BAgentRun = lazy(() => import("@/pages/billing/AgentRun"));
-const BAgentEdit = lazy(() => import("@/pages/billing/AgentEdit"));
-const BAgentSettings = lazy(() => import("@/pages/billing/AgentSettings"));
-const BIndividualsBillingHealth = lazy(() => import("@/pages/billing/IndividualsBillingHealth"));
-const BIndividualDetail = lazy(() => import("@/pages/billing/IndividualDetail"));
-const BRunsHistory = lazy(() => import("@/pages/billing/RunsHistory"));
-const BClaimsManagement = lazy(() => import("@/pages/billing/ClaimsManagement"));
-const BAuditLog = lazy(() => import("@/pages/billing/AuditLog"));
-const BRevenueCycle = lazy(() => import("@/pages/billing/RevenueCycle"));
-const SuperAdminOrganizations = lazy(() => import("./pages/superadmin/SuperAdminOrganizations"));
-const SuperAdminUsers = lazy(() => import("./pages/superadmin/SuperAdminUsers"));
-const SuperAdminBilling = lazy(() => import("./pages/superadmin/SuperAdminBilling"));
-const SuperAdminAIUsage = lazy(() => import("./pages/superadmin/SuperAdminAIUsage"));
-const SuperAdminSupport = lazy(() => import("./pages/superadmin/SuperAdminSupport"));
-const SuperAdminHealth = lazy(() => import("./pages/superadmin/SuperAdminHealth"));
-const PlatformLogin = lazy(() => import("./pages/PlatformLogin"));
+const BillingLayout = lazyWithRetry(() => import("@/components/billing/BillingLayout")) as any;
+const BAgentsDashboard = lazyWithRetry(() => import("@/pages/billing/AgentsDashboard"));
+const BEngines = lazyWithRetry(() => import("@/pages/billing/Engines"));
+const BEngineBuilder = lazyWithRetry(() => import("@/pages/billing/EngineBuilder"));
+const BEngineDetail = lazyWithRetry(() => import("@/pages/billing/EngineDetail"));
+const BAgentCreate = lazyWithRetry(() => import("@/pages/billing/AgentCreate"));
+const BAgentDetail = lazyWithRetry(() => import("@/pages/billing/AgentDetail"));
+const BAgentRun = lazyWithRetry(() => import("@/pages/billing/AgentRun"));
+const BAgentEdit = lazyWithRetry(() => import("@/pages/billing/AgentEdit"));
+const BAgentSettings = lazyWithRetry(() => import("@/pages/billing/AgentSettings"));
+const BIndividualsBillingHealth = lazyWithRetry(() => import("@/pages/billing/IndividualsBillingHealth"));
+const BIndividualDetail = lazyWithRetry(() => import("@/pages/billing/IndividualDetail"));
+const BRunsHistory = lazyWithRetry(() => import("@/pages/billing/RunsHistory"));
+const BClaimsManagement = lazyWithRetry(() => import("@/pages/billing/ClaimsManagement"));
+const BAuditLog = lazyWithRetry(() => import("@/pages/billing/AuditLog"));
+const BRevenueCycle = lazyWithRetry(() => import("@/pages/billing/RevenueCycle"));
+const SuperAdminOrganizations = lazyWithRetry(() => import("./pages/superadmin/SuperAdminOrganizations"));
+const SuperAdminUsers = lazyWithRetry(() => import("./pages/superadmin/SuperAdminUsers"));
+const SuperAdminBilling = lazyWithRetry(() => import("./pages/superadmin/SuperAdminBilling"));
+const SuperAdminAIUsage = lazyWithRetry(() => import("./pages/superadmin/SuperAdminAIUsage"));
+const SuperAdminSupport = lazyWithRetry(() => import("./pages/superadmin/SuperAdminSupport"));
+const SuperAdminHealth = lazyWithRetry(() => import("./pages/superadmin/SuperAdminHealth"));
+const PlatformLogin = lazyWithRetry(() => import("./pages/PlatformLogin"));
 
 // Static non-page imports (must not be lazy-loaded)
 
@@ -186,7 +212,7 @@ function GlobalRiskDrawer() {
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-64" aria-label="Loading page">
-      <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      <ICMSpinner size={40} />
     </div>
   );
 }
@@ -199,6 +225,8 @@ const App = () => (
       <RiskScoreProvider>
       <OrgSettingsProvider>
       <BillingProvider>
+      <SessionTimeoutProvider>
+      <PasswordExpiryProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -247,6 +275,7 @@ const App = () => (
             <Route path="/people/:id/eligibility-verification" element={<ProtectedRoute><PersonEligibilityVerification /></ProtectedRoute>} />
             <Route path="/people/:id/eligibility-verification/:verificationId" element={<ProtectedRoute><PersonEligibilityVerificationDetail /></ProtectedRoute>} />
             <Route path="/people/:id/progress-note" element={<ProtectedRoute><PersonProgressNote /></ProtectedRoute>} />
+            <Route path="/people/:id/progress-note/new" element={<ProtectedRoute><ProgressNoteNew /></ProtectedRoute>} />
             <Route path="/people/:id/progress-note/:noteId" element={<ProtectedRoute><PersonProgressNoteDetail /></ProtectedRoute>} />
             <Route path="/progress-note" element={<ProtectedRoute><ProgressNoteLog /></ProtectedRoute>} />
             <Route path="/progress-note/new" element={<ProtectedRoute><ProgressNoteNew /></ProtectedRoute>} />
@@ -393,6 +422,8 @@ const App = () => (
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>
+      </PasswordExpiryProvider>
+      </SessionTimeoutProvider>
       </BillingProvider>
       </OrgSettingsProvider>
       </RiskScoreProvider>

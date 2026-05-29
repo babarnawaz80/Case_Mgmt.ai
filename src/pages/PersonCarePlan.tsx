@@ -216,6 +216,15 @@ const PersonCarePlan = () => {
             </button>
           </div>
         </div>
+        {pcpModalOpen && (
+          <PCPCreationModal
+            mode={pcpMode}
+            individualId={id ?? ""}
+            individualName={individual ? `${individual.first_name} ${individual.last_name}` : ""}
+            annualPlanDate="08/31/2026"
+            onClose={() => setPcpModalOpen(false)}
+          />
+        )}
       </ICMShell>
     );
   }

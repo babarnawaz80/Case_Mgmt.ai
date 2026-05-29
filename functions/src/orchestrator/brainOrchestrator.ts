@@ -15,9 +15,11 @@ import {
   IndividualRecord,
   RulePack,
   AgentResult,
+  AgentPrompts,
   ComplianceFinding,
   OrchestratorSettings,
   DEFAULT_ORCHESTRATOR_SETTINGS,
+  DEFAULT_AGENT_PROMPTS,
 } from "./types";
 import { getDefaultRulePack } from "./defaultRulePacks";
 import { runComplianceAgent } from "./agents/complianceAgent";
@@ -134,8 +136,9 @@ async function runOrchestrator(
   let complianceScoresUpdated = 0;
 
   try {
-    // Load orchestrator settings
+    // Load orchestrator settings and custom agent prompts
     const settings = await loadOrchestratorSettings(orgId, db);
+    const customPrompts = await loadAgentPrompts(orgId, db);
 
     // Load all active individuals for this org
     let individualsSnap: admin.firestore.QuerySnapshot;
@@ -197,7 +200,7 @@ async function runOrchestrator(
         let docResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
         if (settings.agents_enabled.documentation && complianceFindings.length > 0) {
           try {
-            docResult = await runDocumentationAgent(individual, complianceFindings, runId, orgId, db);
+            docResult = await runDocumentationAgent(individual, complianceFindings, runId, orgId, db, customPrompts.documentation);
             draftsGenerated += docResult.drafts_count;
           } catch (err) {
             errors.push(`Documentation agent failed for ${individual.id}: ${(err as Error).message}`);
@@ -229,7 +232,7 @@ async function runOrchestrator(
         let renewalResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
         if (settings.agents_enabled.renewal) {
           try {
-            renewalResult = await runRenewalAgent(individual, rulePack, runId, orgId, db);
+            renewalResult = await runRenewalAgent(individual, rulePack, runId, orgId, db, customPrompts.renewal);
             draftsGenerated += renewalResult.drafts_count;
           } catch (err) {
             errors.push(`Renewal agent failed for ${individual.id}: ${(err as Error).message}`);
@@ -506,6 +509,30 @@ function toIndividualRecord(id: string, data: admin.firestore.DocumentData): Ind
     risk_score: data.risk_score,
     county: data.county,
   };
+}
+
+async function loadAgentPrompts(
+  orgId: string,
+  db: admin.firestore.Firestore
+): Promise<typeof DEFAULT_AGENT_PROMPTS> {
+  try {
+    const snap = await db
+      .doc(`organizations/${orgId}/settings/orchestrator_prompts`)
+      .get();
+    if (snap.exists) {
+      const data = snap.data() as Partial<AgentPrompts>;
+      return {
+        compliance: data.compliance || DEFAULT_AGENT_PROMPTS.compliance,
+        documentation: data.documentation || DEFAULT_AGENT_PROMPTS.documentation,
+        billing: data.billing || DEFAULT_AGENT_PROMPTS.billing,
+        escalation: data.escalation || DEFAULT_AGENT_PROMPTS.escalation,
+        renewal: data.renewal || DEFAULT_AGENT_PROMPTS.renewal,
+      };
+    }
+  } catch {
+    // Non-fatal — use defaults
+  }
+  return { ...DEFAULT_AGENT_PROMPTS };
 }
 
 function taskTypeToLabel(taskType: OrchestratorTask["task_type"]): string {

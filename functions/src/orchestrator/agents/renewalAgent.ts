@@ -23,7 +23,8 @@ export async function runRenewalAgent(
   rulePack: RulePack,
   runId: string,
   orgId: string,
-  db: admin.firestore.Firestore
+  db: admin.firestore.Firestore,
+  customPrompt?: string
 ): Promise<AgentResult> {
   const tasks: AgentResult["tasks"] = [];
   const logs: AgentResult["logs"] = [];
@@ -52,7 +53,7 @@ export async function runRenewalAgent(
       });
 
       // Generate AI draft renewal packet (non-blocking — best effort)
-      generateRenewalDraft(individual, runId, orgId, db).catch((err) => {
+      generateRenewalDraft(individual, runId, orgId, db, customPrompt).catch((err) => {
         console.warn(`[RenewalAgent] Draft generation failed for ${individual.id}:`, err.message);
       });
 
@@ -203,7 +204,8 @@ async function generateRenewalDraft(
   individual: IndividualRecord,
   runId: string,
   orgId: string,
-  db: admin.firestore.Firestore
+  db: admin.firestore.Firestore,
+  customPrompt?: string
 ): Promise<void> {
   const indName = `${individual.first_name} ${individual.last_name}`;
   const twelveMonthsAgo = new Date();
@@ -241,11 +243,14 @@ async function generateRenewalDraft(
     progress_notes: progressNotes.status === "fulfilled" ? progressNotes.value.docs.map((d) => d.data()) : [],
   });
 
-  const systemPrompt = `You are an experienced IDD case management specialist.
-Review this individual's 12-month documentation and create a brief renewal summary.
+  const baseFormat = `Review this individual's 12-month documentation and create a brief renewal summary.
 Return a JSON object with: goal_progress_summary (string), recommended_service_changes (string[]), key_highlights (string[]), and draft_goal_updates (string).
 Keep all content concise and evidence-based from the documentation provided.
 Label everything as AI DRAFT — requires CM review before submission.`;
+
+  const systemPrompt = customPrompt
+    ? `${customPrompt}\n\n${baseFormat}`
+    : `You are an experienced IDD case management specialist.\n${baseFormat}`;
 
   const result = await generateCompletion(
     systemPrompt,

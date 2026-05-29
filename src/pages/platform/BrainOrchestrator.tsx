@@ -9,6 +9,7 @@ import { HealthMetricsRow } from "@/components/orchestrator/HealthMetricsRow";
 import { AgentActivityFeed } from "@/components/orchestrator/AgentActivityFeed";
 import { RunHistory } from "@/components/orchestrator/RunHistory";
 import { IndividualComplianceGrid } from "@/components/orchestrator/IndividualComplianceGrid";
+import { PromptStudio } from "@/components/orchestrator/PromptStudio";
 
 const BrainOrchestrator = () => {
   const navigate = useNavigate();
@@ -99,6 +100,12 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
             tasks={tasks}
             loading={individualsLoading}
           />
+        </div>
+
+        {/* Section 5 — Prompt Studio */}
+        <div>
+          <SectionHeading>Prompt Studio — Agent Intelligence</SectionHeading>
+          <PromptStudio />
         </div>
 
         {/* AI Draft disclaimer */}

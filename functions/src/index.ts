@@ -94,3 +94,4 @@ export { scheduledOrchestrator, manualOrchestratorRun } from "./orchestrator/bra
 // ─── PCP Generation ───────────────────────────────────────────────────────────
 export { generatePCP } from "./api/generatePCP";
 export { refinePCP } from "./api/refinePCP";
+export { seedValentinaDemoData } from "./api/seedValentina";

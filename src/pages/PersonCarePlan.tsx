@@ -552,17 +552,14 @@ function PlanTable({
                           <Send className="w-3.5 h-3.5" /> Send
                         </button>
                         <button
-                          onClick={() => {
-                            toast.success(`Opening print dialog for PCP ${displayId}`, { description: "Choose 'Save as PDF' in the print dialog." });
-                            setTimeout(() => window.print(), 400);
-                          }}
+                          onClick={() => window.print()}
                           title="Download / Save as PDF"
                           className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => { toast("Opening print dialog…"); setTimeout(() => window.print(), 200); }}
+                          onClick={() => window.print()}
                           title="Print"
                           className="p-1.5 rounded-md text-icm-text-dim hover:bg-icm-bg hover:text-icm-text"
                         >

@@ -1302,33 +1302,33 @@ const PersonCarePlanBuilder = () => {
     }
 
     if (p.goals?.length) {
+      // Map AI goal shape to builder's Goal interface:
+      // AI uses responsibleParty → builder uses 'responsible'
+      // AI uses progress       → builder uses 'status'
       const mapped: Goal[] = p.goals.map((g: any, i: number) => ({
         id: g.id || `ai-g${i}`,
-        number: i + 1,
-        title: g.title ?? "Goal",
-        description: g.description ?? "",
+        title: g.title ?? `Goal ${i + 1}`,
+        description: [
+          g.description ?? "",
+          g.objectives?.length
+            ? `Objectives: ${(g.objectives as any[]).map((o: any) => o.description).join("; ")}`
+            : "",
+        ].filter(Boolean).join("\n\n"),
         targetDate: g.targetDate ?? "",
-        responsibleParty: g.responsibleParty ?? "Case Manager",
-        progress: "Not Started" as const,
-        aiSuggested: true,
-        objectives: (g.objectives ?? []).map((o: any, j: number) => ({
-          id: `o${i}${j}`,
-          description: o.description ?? "",
-          status: "Not Started" as const,
-          aiSuggested: true,
-        })),
+        responsible: g.responsibleParty ?? g.responsible ?? "Case Manager",
+        status: "New goal",
       }));
       setGoals(mapped);
     }
 
     if (p.healthAndSafety) {
       const h = p.healthAndSafety;
-      const healthText = [
-        h.safetyPlan,
-        h.riskFactors?.length ? `Risk factors: ${h.riskFactors.join("; ")}` : null,
-        h.emergencyContacts?.length ? `Emergency contacts: ${h.emergencyContacts.join(", ")}` : null,
-      ].filter(Boolean).join("\n\n");
-      setEmergencyPlan(healthText);
+      const parts = [];
+      if (h.safetyPlan) parts.push(`SAFETY PLAN:\n${h.safetyPlan}`);
+      if (h.riskFactors?.length) parts.push(`IDENTIFIED RISKS:\n${(h.riskFactors as string[]).map((r, i) => `${i + 1}. ${r}`).join("\n")}`);
+      if (h.emergencyContacts?.length) parts.push(`EMERGENCY CONTACTS:\n${(h.emergencyContacts as string[]).join(", ")}`);
+      if (p.backupPlan?.primaryBackup) parts.push(`BACKUP PLAN:\n${p.backupPlan.primaryBackup}`);
+      if (parts.length) setEmergencyPlan(parts.join("\n\n"));
     }
 
     if (p.services?.length) {

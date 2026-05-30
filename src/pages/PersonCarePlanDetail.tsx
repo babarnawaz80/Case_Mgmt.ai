@@ -257,8 +257,16 @@ const PersonCarePlanDetail = () => {
               </button>
               {printOpen && (
                 <div className="absolute right-0 mt-1 w-56 rounded-lg border border-icm-border bg-white shadow-lg z-10 overflow-hidden">
-                  {["Print care plan (formatted)", "Export as PDF", "Export as Word document", "Copy shareable link"].map((opt) => (
-                    <button key={opt} onClick={() => { setPrintOpen(false); if (opt.startsWith("Print")) window.print(); else if (opt.startsWith("Copy")) { navigator.clipboard?.writeText(window.location.href); toast.success("Shareable link copied"); } else toast.success(opt + " started"); }} className="w-full text-left px-3 py-2 text-[12px] text-icm-text hover:bg-icm-bg">
+                  {["Print care plan (formatted)", "Export as PDF", "Copy shareable link"].map((opt) => (
+                    <button key={opt} onClick={() => {
+                      setPrintOpen(false);
+                      if (opt.startsWith("Print") || opt.startsWith("Export")) {
+                        window.print();
+                      } else if (opt.startsWith("Copy")) {
+                        navigator.clipboard?.writeText(window.location.href);
+                        toast.success("Shareable link copied");
+                      }
+                    }} className="w-full text-left px-3 py-2 text-[12px] text-icm-text hover:bg-icm-bg">
                       {opt}
                     </button>
                   ))}

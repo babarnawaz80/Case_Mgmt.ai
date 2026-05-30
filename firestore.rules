@@ -325,6 +325,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Team Meetings ────────────────────────────────────────────────────────────
+    match /team_meetings/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
     // ─── Audit Log (APPEND-ONLY — immutable forever) ──────────────────────────
     // HIPAA requires audit logs to be tamper-evident. Never allow update/delete.
     match /audit_log/{id} {
@@ -707,6 +716,23 @@ service cloud.firestore {
       // Cloud Functions write these on create; admins/supervisors can also update (resolve)
       allow create: if isAuth();
       allow update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Document Scans (AI scanning results) ────────────────────────────────────
+    match /document_scans/{id} {
+      allow read: if isCaseManager();
+      allow create: if false;   // Cloud Function only
+      allow update: if isCaseManager(); // mark as reviewed
+      allow delete: if isAdmin();
+    }
+
+    // ─── Provider Portal Tokens ───────────────────────────────────────────────────
+    // Public read (validated by token hash in Cloud Function), staff write
+    match /provider_portal_tokens/{id} {
+      allow read: if true;    // token hash validated server-side; no PHI in this doc
+      allow create: if isCaseManager();
+      allow update: if true;  // Cloud Functions update lastAccessedAt, OTP fields, sessions
       allow delete: if isAdmin();
     }
 

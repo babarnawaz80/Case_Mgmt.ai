@@ -45,6 +45,7 @@ function lazyWithRetry<T extends React.ComponentType<unknown>>(
 // ── Lazy page imports (each becomes its own chunk) ──────────────────────────
 const ConsentPortal = lazyWithRetry(() => import("./pages/ConsentPortal"));
 const GuardianPortal = lazyWithRetry(() => import("./pages/GuardianPortal"));
+const ProviderPortal = lazyWithRetry(() => import("./pages/ProviderPortal"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 const SignDocument = lazyWithRetry(() => import("./pages/SignDocument"));
@@ -165,6 +166,9 @@ const VirtualVisit = lazyWithRetry(() => import("./pages/VirtualVisit"));
 const BillingHub = lazyWithRetry(() => import("./pages/BillingHub"));
 const PersonCareTeam = lazyWithRetry(() => import("./pages/PersonCareTeam"));
 const PersonMeetingNotesPage = lazyWithRetry(() => import("./pages/PersonMeetingNotesPage"));
+const TeamMeetings = lazyWithRetry(() => import("./pages/TeamMeetings"));
+const TeamMeetingDetail = lazyWithRetry(() => import("./pages/TeamMeetingDetail"));
+const PersonTeamMeetings = lazyWithRetry(() => import("./pages/PersonTeamMeetings"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const Companion = lazyWithRetry(() => import("./pages/Companion"));
 const MultiStateConfig = lazyWithRetry(() => import("./pages/MultiStateConfig"));
@@ -260,6 +264,8 @@ const App = () => (
             {/* Guardian portal — public, token-validated, mobile consumer experience */}
             <Route path="/guardian-portal/:token/*" element={<GuardianPortal />} />
             <Route path="/guardian-portal/:token" element={<GuardianPortal />} />
+            {/* Provider upload portal — public, OTP-authenticated, for external service providers */}
+            <Route path="/provider-portal/:token" element={<ProviderPortal />} />
             {/* Public intake form — no login required, shared with external providers */}
             <Route path="/intake/:orgToken" element={<IntakeForm />} />
             <Route path="/companion/:token" element={<Companion />} />
@@ -422,6 +428,9 @@ const App = () => (
             {/* Per-person placeholder routes */}
             <Route path="/people/:id/care-tracker" element={<ProtectedRoute><PersonCareTracker /></ProtectedRoute>} />
             <Route path="/people/:id/meeting-notes" element={<ProtectedRoute><PersonMeetingNotesPage /></ProtectedRoute>} />
+            <Route path="/team-meetings" element={<ProtectedRoute><TeamMeetings /></ProtectedRoute>} />
+            <Route path="/team-meetings/:meetingId" element={<ProtectedRoute><TeamMeetingDetail /></ProtectedRoute>} />
+            <Route path="/people/:id/team-meetings" element={<ProtectedRoute><PersonTeamMeetings /></ProtectedRoute>} />
             <Route path="/people/:id/communications" element={<ProtectedRoute><PersonCommunications /></ProtectedRoute>} />
             <Route path="/people/:id/services" element={<ProtectedRoute><PersonServices /></ProtectedRoute>} />
             <Route path="/people/:id/employment" element={<ProtectedRoute><PersonEmployment /></ProtectedRoute>} />

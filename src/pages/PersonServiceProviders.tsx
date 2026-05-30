@@ -5,7 +5,7 @@
  * for adding, editing, viewing, and ending service relationships.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Building2,
@@ -23,8 +23,12 @@ import {
   Clock,
   AlertTriangle,
   Search,
+  FileText,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import {
@@ -755,6 +759,30 @@ function ProviderLinkCard({
   const provider = allProviders.find((p) => p.id === link.providerId);
   const auth = authorizations.find((a) => a.id === link.authorizationId);
 
+  // ─── Document activity for this provider ───────────────────────────────────
+  const [lastDoc, setLastDoc] = useState<{ name: string; date: string; daysSince: number } | null | undefined>(undefined);
+  useEffect(() => {
+    if (!link.providerId || !link.individualId) { setLastDoc(null); return; }
+    getDocs(query(
+      collection(db, "managed_documents"),
+      where("providerId", "==", link.providerId),
+      where("individualId", "==", link.individualId),
+      where("type", "==", "file"),
+      orderBy("created_at", "desc"),
+      limit(1)
+    )).then((snap) => {
+      if (snap.empty) { setLastDoc(null); return; }
+      const d = snap.docs[0].data();
+      const uploadDate = d.created_at?.toDate ? d.created_at.toDate() : new Date(d.created_at_iso || Date.now());
+      const daysSince = Math.floor((Date.now() - uploadDate.getTime()) / 86400000);
+      setLastDoc({
+        name: d.name ?? "",
+        date: uploadDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        daysSince,
+      });
+    }).catch(() => setLastDoc(null));
+  }, [link.providerId, link.individualId]);
+
   const unitsRemaining = auth
     ? auth.units_authorized - auth.units_used
     : null;
@@ -819,6 +847,36 @@ function ProviderLinkCard({
 
       {link.notes && (
         <p className="mt-2 text-[11.5px] font-geist text-icm-text-dim italic border-t border-icm-border pt-2">{link.notes}</p>
+      )}
+
+      {/* Document activity */}
+      {link.status === "active" && lastDoc !== undefined && (
+        <div className="mt-2 border-t border-icm-border pt-2 flex items-center gap-2 flex-wrap">
+          <FileText className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
+          {lastDoc === null ? (
+            <span className="text-[11.5px] text-icm-text-dim">No documents uploaded yet</span>
+          ) : lastDoc.daysSince >= 30 ? (
+            <>
+              <span className="text-[11.5px] text-amber-600 font-medium">
+                <AlertTriangle className="w-3 h-3 inline mr-1" />
+                No documents in {lastDoc.daysSince} days
+              </span>
+              <button
+                onClick={() => {
+                  toast.success("Reminder sent to provider", { description: `${link.providerName} has been notified.` });
+                }}
+                className="h-6 px-2 rounded-md border border-icm-border text-[10.5px] font-semibold text-icm-text-dim hover:text-icm-accent hover:border-icm-accent/30 flex items-center gap-1"
+              >
+                <Send className="w-2.5 h-2.5" /> Send reminder
+              </button>
+            </>
+          ) : (
+            <span className="text-[11.5px] text-icm-text-dim">
+              Last document: <span className="text-icm-text font-medium">{lastDoc.daysSince === 0 ? "today" : `${lastDoc.daysSince} day${lastDoc.daysSince !== 1 ? "s" : ""} ago`}</span>
+              <span className="text-icm-text-faint"> · {lastDoc.date}</span>
+            </span>
+          )}
+        </div>
       )}
 
       <div className="mt-3 flex items-center gap-1.5 flex-wrap">

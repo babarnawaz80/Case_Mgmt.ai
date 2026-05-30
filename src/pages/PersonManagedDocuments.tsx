@@ -6,13 +6,14 @@ import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, Folder, FolderPlus, Upload, FileText, FileImage, FileSpreadsheet,
   File as FileIcon, Search, MoreVertical, Download, Trash2, Pencil, Star, ArrowLeft, Home,
-  Eye, Calendar, User, X, FolderOpen, Archive, Loader2
+  Eye, Calendar, User, X, FolderOpen, Archive, Loader2, Sparkles, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { writeAudit } from "@/lib/auditService";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthorCell } from "@/components/icm/AuthorCell";
+import AIDocumentAlertPanel from "@/components/documents/AIDocumentAlertPanel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Node = {
@@ -158,6 +159,23 @@ export default function PersonManagedDocuments() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [alertPanelDoc, setAlertPanelDoc] = useState<{ id: string; name: string } | null>(null);
+
+  // ─── AI scan stats ─────────────────────────────────────────────────────────
+  const aiStats = useMemo(() => {
+    const files = nodes.filter((n) => n.type === "file");
+    const scanned = files.filter((n) => (n as any).aiScanned === true);
+    const flagged = files.filter((n) => ((n as any).aiAlertCount ?? 0) > 0);
+    const lastScan = files
+      .filter((n) => (n as any).aiScannedAt)
+      .sort((a, b) => {
+        const at = (a as any).aiScannedAt?.seconds ?? 0;
+        const bt = (b as any).aiScannedAt?.seconds ?? 0;
+        return bt - at;
+      })[0];
+    const scanning = files.some((n) => (n as any).scanStatus === "pending" && !(n as any).aiScanned);
+    return { total: files.length, scanned: scanned.length, flagged: flagged.length, lastScan, scanning };
+  }, [nodes]);
 
   const nodes = useMemo(() => {
     return (dbDocs || []).map((d: any) => ({
@@ -461,6 +479,49 @@ export default function PersonManagedDocuments() {
           </div>
         </div>
 
+        {/* AI Document Monitor Banner */}
+        {aiStats.total > 0 && (
+          <div className={`rounded-xl border px-4 py-2.5 flex items-center gap-3 text-[12.5px] font-geist ${
+            aiStats.scanning
+              ? "bg-blue-50/60 border-blue-200 text-blue-700"
+              : aiStats.flagged > 0
+              ? "bg-amber-50/70 border-amber-200 text-amber-800"
+              : "bg-slate-50 border-icm-border text-slate-500"
+          }`}>
+            {aiStats.scanning ? (
+              <Loader2 className="w-4 h-4 shrink-0 animate-spin text-blue-500" />
+            ) : (
+              <Sparkles className={`w-4 h-4 shrink-0 ${aiStats.flagged > 0 ? "text-amber-500" : "text-slate-400"}`} />
+            )}
+            <span className="font-semibold text-[12px]">AI Document Monitor — Active</span>
+            <span className="text-icm-text-faint mx-0.5">·</span>
+            {aiStats.scanning ? (
+              <span>AI scanning new document…</span>
+            ) : aiStats.flagged > 0 ? (
+              <span className="font-medium text-amber-700">{aiStats.flagged} document{aiStats.flagged !== 1 ? "s" : ""} flagged for your attention</span>
+            ) : (
+              <span>All documents reviewed · No issues detected</span>
+            )}
+            {aiStats.lastScan && !aiStats.scanning && (
+              <>
+                <span className="text-icm-text-faint mx-0.5">·</span>
+                <span className="text-[11px]">Last scan: {formatTimeAgo((aiStats.lastScan as any).aiScannedAt)}</span>
+              </>
+            )}
+            {aiStats.flagged > 0 && !aiStats.scanning && (
+              <button
+                onClick={() => {
+                  const flaggedDoc = nodes.filter(n => n.type === "file" && ((n as any).aiAlertCount ?? 0) > 0)[0];
+                  if (flaggedDoc) setAlertPanelDoc({ id: flaggedDoc.id, name: flaggedDoc.name });
+                }}
+                className="ml-auto text-[11.5px] font-semibold text-amber-700 hover:underline whitespace-nowrap"
+              >
+                View alerts →
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -564,6 +625,7 @@ export default function PersonManagedDocuments() {
                   <th className="text-left px-3 py-3 hidden md:table-cell">Owner</th>
                   <th className="text-left px-3 py-3 hidden md:table-cell">Modified</th>
                   <th className="text-left px-3 py-3 hidden sm:table-cell">Size</th>
+                  <th className="text-left px-3 py-3 hidden lg:table-cell">AI</th>
                   <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
@@ -621,6 +683,9 @@ export default function PersonManagedDocuments() {
                       <td className="px-3 py-2.5 hidden sm:table-cell text-[12px] text-slate-600 font-mono">
                         {n.type === "folder" ? "—" : fmtSize(n.size)}
                       </td>
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
+                        {n.type === "folder" ? null : <AIStatusCell node={n} onView={() => setAlertPanelDoc({ id: n.id, name: n.name })} />}
+                      </td>
                       <td className="px-3 py-2.5 text-right relative">
                         <button
                           onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === n.id ? null : n.id); }}
@@ -657,6 +722,20 @@ export default function PersonManagedDocuments() {
           )}
         </div>
       </div>
+
+      {/* AI Document Alert Panel */}
+      {alertPanelDoc && (
+        <AIDocumentAlertPanel
+          documentId={alertPanelDoc.id}
+          documentName={alertPanelDoc.name}
+          individualId={id}
+          onClose={() => setAlertPanelDoc(null)}
+          onMarkReviewed={(docId) => {
+            // Update local node's aiAlertCount to 0 for immediate UI feedback
+            setAlertPanelDoc(null);
+          }}
+        />
+      )}
 
       {/* Preview modal */}
       {previewFile && (
@@ -698,6 +777,58 @@ export default function PersonManagedDocuments() {
         </div>
       )}
     </ICMShell>
+  );
+}
+
+function formatTimeAgo(ts: any): string {
+  if (!ts) return "";
+  const date = ts?.toDate ? ts.toDate() : new Date(ts);
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? "s" : ""} ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH} hour${diffH !== 1 ? "s" : ""} ago`;
+  const diffD = Math.floor(diffH / 24);
+  return `${diffD} day${diffD !== 1 ? "s" : ""} ago`;
+}
+
+function AIStatusCell({ node, onView }: { node: any; onView: () => void }) {
+  const scanStatus = node.scanStatus;
+  const aiScanned = node.aiScanned;
+  const alertCount = node.aiAlertCount ?? 0;
+
+  if (scanStatus === "pending" && !aiScanned) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-orange-500 font-medium">
+        <Loader2 className="w-3 h-3 animate-spin" /> Scanning…
+      </span>
+    );
+  }
+  if (scanStatus === "failed") {
+    return <span className="text-[11px] text-slate-400 italic">Scan failed</span>;
+  }
+  if (!aiScanned) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+        <Sparkles className="w-3 h-3" /> Not scanned
+      </span>
+    );
+  }
+  if (alertCount > 0) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onView(); }}
+        className="inline-flex items-center gap-1 text-[11px] text-amber-600 font-semibold hover:underline"
+      >
+        <AlertTriangle className="w-3 h-3" /> {alertCount} alert{alertCount !== 1 ? "s" : ""} <span className="font-normal">→</span>
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+      <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Reviewed
+    </span>
   );
 }
 

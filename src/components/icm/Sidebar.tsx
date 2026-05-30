@@ -12,6 +12,7 @@ import {
   CreditCard,
   FileCheck,
   CalendarDays,
+  Users2,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ const items: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "People Supported", url: "/people", icon: Users },
   { title: "My Work", url: "/my-work", icon: CheckSquare },
+  { title: "Team Meetings", url: "/team-meetings", icon: Users2 },
   { title: "Schedule", url: "/schedule", icon: CalendarDays },
   { title: "Authorization Tracker", url: "/authorizations", icon: FileCheck },
   { title: "Messages", url: "/messages", icon: MessageSquare },

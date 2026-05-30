@@ -19,6 +19,7 @@ import { seedDemoIfEmpty, seedScheduledVisitsIfEmpty, seedApprovalDemoData } fro
 import { seedAssessmentsIfEmpty } from '../lib/seedAssessments';
 import { seedGuardianPortalIfEmpty } from '../lib/seedGuardianPortal';
 import { seedCarePlanApprovalIfEmpty } from '../lib/seedCarePlanApproval';
+import { seedTeamMeetingsIfEmpty } from '../lib/seedTeamMeetings';
 import { initFCM, setupForegroundMessages } from '../lib/fcm';
 
 interface AuthContextValue {
@@ -115,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             seedAssessmentsIfEmpty(orgId, user.uid).catch(() => {});
             seedGuardianPortalIfEmpty(orgId).catch(() => {});
             seedCarePlanApprovalIfEmpty(orgId, user.uid).catch(() => {});
+            seedTeamMeetingsIfEmpty(orgId, user.uid).catch(() => {});
           }
         } catch (error) {
           // ── IMPORTANT: do NOT call logOut() here ─────────────────────────────

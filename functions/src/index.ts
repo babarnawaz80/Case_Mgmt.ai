@@ -122,3 +122,19 @@ export { createGuardianPortalSession } from "./api/guardianPortal";
 
 // ─── Duplicate Detection ───────────────────────────────────────────────────────
 export { detectDuplicatesScheduled, detectDuplicatesOnCreate, detectDuplicatesOnDemand } from "./api/duplicates";
+
+// ─── Document AI Scanning (Firestore trigger) ──────────────────────────────────
+export { scanDocumentOnCreate } from "./api/scanDocument";
+
+// ─── Provider Portal (callable functions) ─────────────────────────────────────
+export {
+  generateProviderPortalToken,
+  validateProviderToken,
+  sendProviderOTP,
+  verifyProviderOTP,
+  validateProviderSession,
+  getProviderPortalData,
+  providerPortalUpload,
+  revokeProviderPortalToken,
+  getProviderPortalInfo,
+} from "./api/providerPortal";

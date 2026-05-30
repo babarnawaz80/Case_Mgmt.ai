@@ -50,6 +50,7 @@ import {
   MapPin,
   Loader2,
   FileCheck,
+  Users2,
   type LucideIcon,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -83,6 +84,7 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "care-plan",              label: "PCP",                        icon: Heart,          route: "care-plan",              category: "Documentation" },
   { slug: "progress-note",          label: "Progress Note",              icon: Pencil,         route: "progress-note",          category: "Documentation" },
   { slug: "visit-summary",          label: "Visit Summary",              icon: CalendarCheck,  route: "visit-summary",          category: "Documentation" },
+  { slug: "team-meetings",          label: "Team Meetings",              icon: Users2,         route: "team-meetings",          category: "Documentation" },
   { slug: "assessments",            label: "Assessments",                icon: ClipboardCheck, route: "assessments",            category: "Documentation" },
   { slug: "workflow-manager",       label: "Workflow Manager",           icon: LayoutIcon,     route: "workflow-manager",       category: "Documentation" },
 

@@ -17,11 +17,21 @@ import {
   FileText,
   CheckCircle2,
   Clock,
+  Link2,
+  Copy,
+  RefreshCw,
+  ShieldOff,
+  Upload,
+  Plus,
+  ExternalLink,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { cn } from "@/lib/utils";
 import { useProvider, useIndividualProviders, updateProvider, type Provider } from "@/hooks/useProviders";
+import { httpsCallable } from "firebase/functions";
+import { functions as fns } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +132,225 @@ function ArchiveConfirm({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Provider Portal Section ───────────────────────────────────────────────────
+
+function ProviderPortalSection({ provider }: { provider: Provider }) {
+  const { currentUser } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [portalInfo, setPortalInfo] = useState<any>(null);
+  const [generating, setGenerating] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+
+  useEffect(() => {
+    if (!provider?.id) return;
+    setLoading(true);
+    httpsCallable(fns, "getProviderPortalInfo")({ providerId: provider.id })
+      .then((res: any) => { setPortalInfo(res.data); })
+      .catch((err) => { console.error("[ProviderPortal] load error:", err); })
+      .finally(() => setLoading(false));
+  }, [provider.id]);
+
+  async function handleGenerate(sendEmail: boolean) {
+    setGenerating(true);
+    try {
+      const res: any = await httpsCallable(fns, "generateProviderPortalToken")({
+        providerId: provider.id,
+        providerName: provider.name,
+        providerEmail: provider.email ?? provider.contactPersonEmail ?? "",
+        providerPhone: provider.primaryPhone ?? provider.contactPersonPhone ?? null,
+        sendEmail,
+      });
+      setPortalInfo({ hasActiveToken: true, ...res.data });
+      toast.success("Provider portal link generated", {
+        description: sendEmail ? "Link sent to provider email." : "Copy the link to share with the provider.",
+      });
+    } catch (err: any) {
+      toast.error("Failed to generate portal link", { description: err?.message });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleRevoke() {
+    if (!portalInfo?.tokenId) return;
+    setRevoking(true);
+    try {
+      await httpsCallable(fns, "revokeProviderPortalToken")({ tokenId: portalInfo.tokenId });
+      setPortalInfo({ hasActiveToken: false });
+      toast.success("Provider portal access revoked.");
+    } catch (err: any) {
+      toast.error("Failed to revoke access", { description: err?.message });
+    } finally {
+      setRevoking(false);
+      setRevokeOpen(false);
+    }
+  }
+
+  function copyLink() {
+    if (portalInfo?.portalUrl) {
+      navigator.clipboard.writeText(portalInfo.portalUrl).then(() => {
+        toast.success("Portal link copied to clipboard");
+      });
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-5">
+      <h3 className="font-manrope font-bold text-[13px] text-icm-text uppercase tracking-wide mb-4 flex items-center gap-2">
+        <Upload className="w-4 h-4 text-icm-accent" />
+        Provider Document Portal
+      </h3>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-4 text-icm-text-dim">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-[12.5px]">Loading portal info…</span>
+        </div>
+      ) : !portalInfo?.hasActiveToken ? (
+        <div className="space-y-4">
+          <div className="rounded-lg bg-icm-bg border border-icm-border px-4 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+              <Link2 className="w-4 h-4 text-slate-400" />
+            </div>
+            <div>
+              <p className="text-[12.5px] font-medium text-icm-text">No portal link yet</p>
+              <p className="text-[11.5px] text-icm-text-dim">Generate a permanent secure link to allow this provider to upload documents directly.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleGenerate(false)}
+              disabled={generating}
+              className="h-9 px-4 rounded-xl bg-icm-accent text-white text-[12px] font-semibold inline-flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50"
+            >
+              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              Generate Portal Link
+            </button>
+            {(provider.email || provider.contactPersonEmail) && (
+              <button
+                onClick={() => handleGenerate(true)}
+                disabled={generating}
+                className="h-9 px-4 rounded-xl border border-icm-border text-[12px] font-semibold text-icm-text-dim inline-flex items-center gap-1.5 hover:text-icm-text disabled:opacity-50"
+              >
+                <Mail className="w-3.5 h-3.5" /> Generate &amp; Send via Email
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Status row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-icm-green-soft text-icm-green border border-icm-green/20">Active</span>
+            {portalInfo.generatedAt && (
+              <span className="text-[11.5px] text-icm-text-dim">Portal link generated: {new Date(portalInfo.generatedAt?.seconds * 1000).toLocaleDateString()}</span>
+            )}
+          </div>
+
+          {/* Activity */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-icm-text-faint mb-0.5">Last Upload</p>
+              <p className="text-[12.5px] text-icm-text font-medium">
+                {portalInfo.lastDocumentUploadedAt
+                  ? new Date(portalInfo.lastDocumentUploadedAt?.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                  : "Never"}
+              </p>
+            </div>
+            <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-icm-text-faint mb-0.5">Total Documents</p>
+              <p className="text-[12.5px] text-icm-text font-medium tabular-nums">{portalInfo.totalDocumentsUploaded ?? 0}</p>
+            </div>
+          </div>
+
+          {/* Recent uploads */}
+          {portalInfo.recentUploads?.length > 0 && (
+            <div>
+              <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-2">Recent Uploads</p>
+              <div className="space-y-1">
+                {portalInfo.recentUploads.slice(0, 5).map((u: any) => (
+                  <div key={u.id} className="flex items-center gap-2 text-[12px] font-geist">
+                    <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="text-icm-text truncate flex-1">{u.name}</span>
+                    <span className="text-icm-text-dim whitespace-nowrap">{u.created_at_iso ? new Date(u.created_at_iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Portal link */}
+          <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-3">
+            <p className="text-[10.5px] font-geist font-semibold text-icm-text-faint uppercase tracking-wide mb-1.5">Portal Link</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <code className="flex-1 text-[11px] font-mono text-icm-accent break-all">{portalInfo.portalUrl}</code>
+            </div>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <button
+                onClick={copyLink}
+                className="h-7 px-2.5 rounded-lg border border-icm-border text-[11.5px] font-semibold text-icm-text-dim inline-flex items-center gap-1 hover:text-icm-text"
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+              <a
+                href={portalInfo.portalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-7 px-2.5 rounded-lg border border-icm-border text-[11.5px] font-semibold text-icm-text-dim inline-flex items-center gap-1 hover:text-icm-text"
+              >
+                <ExternalLink className="w-3 h-3" /> Open
+              </a>
+              <button
+                onClick={() => handleGenerate(false)}
+                disabled={generating}
+                className="h-7 px-2.5 rounded-lg border border-icm-border text-[11.5px] font-semibold text-icm-text-dim inline-flex items-center gap-1 hover:text-icm-text disabled:opacity-50"
+              >
+                <RefreshCw className="w-3 h-3" /> Regenerate
+              </button>
+              <button
+                onClick={() => setRevokeOpen(true)}
+                className="h-7 px-2.5 rounded-lg border border-red-200 text-[11.5px] font-semibold text-red-600 inline-flex items-center gap-1 hover:bg-red-50"
+              >
+                <ShieldOff className="w-3 h-3" /> Revoke Access
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke confirm modal */}
+      {revokeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-icm-panel border border-icm-border rounded-2xl w-full max-w-sm p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center">
+                <ShieldOff className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="font-manrope font-bold text-[15px] text-icm-text">Revoke Portal Access?</p>
+                <p className="text-[11.5px] font-geist text-icm-text-dim">{provider.name}</p>
+              </div>
+            </div>
+            <p className="text-[12.5px] font-geist text-icm-text-dim mb-5">
+              The provider will immediately lose access to the upload portal. Their existing link will no longer work. You can generate a new link at any time.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={() => setRevokeOpen(false)} className="h-8 px-3 rounded-lg border border-icm-border text-[12px] font-semibold text-icm-text-dim hover:text-icm-text">
+                Cancel
+              </button>
+              <button onClick={handleRevoke} disabled={revoking} className="h-8 px-3 rounded-lg bg-red-600 text-white text-[12px] font-semibold hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-1.5">
+                {revoking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Revoke Access
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -472,6 +701,9 @@ export default function ProviderDetail() {
             </div>
           </Section>
         </div>
+
+        {/* Provider Document Portal */}
+        <ProviderPortalSection provider={provider} />
 
         {/* Internal Notes */}
         <Section title="Internal Notes">

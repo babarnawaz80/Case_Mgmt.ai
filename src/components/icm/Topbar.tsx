@@ -335,7 +335,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
   return (
     <header
-      className="border-b border-icm-border relative flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2"
+      className="border-b border-icm-border grid grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-6 shrink-0"
       style={{
         backgroundColor: "hsl(var(--icm-topbar))",
         paddingTop: "env(safe-area-inset-top)",
@@ -393,7 +393,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
       </div>
 
       {/* Center: horizontal nav (desktop) */}
-      <nav className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-0.5 pointer-events-auto">
+      <nav className="hidden md:flex items-center justify-center gap-0.5">
         {topNavItems.map((item) => {
           if (item.roles && !item.roles.includes(role)) return null;
           const badge = badgeFor(item);
@@ -477,7 +477,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
 
       {/* Right: search + actions */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 justify-end">
         {/* Televisit button — before search */}
         <button
           onClick={() => setTelevisitOpen(true)}

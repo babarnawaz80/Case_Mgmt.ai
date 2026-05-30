@@ -4,14 +4,15 @@
  * Route: /people/:id/care-plan/new
  * Three-panel layout: Left sidebar | Main form | Right AI panel
  */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   ChevronLeft, CheckCircle2, Circle, Sparkles, Save, Eye,
   ChevronDown, ChevronRight, Plus, X, Loader2,
   Users, Heart, Briefcase, ListChecks, ShieldCheck, BookOpen,
-  Award, FileText, AlertTriangle, Info,
+  Award, FileText, AlertTriangle, Info, Brain, Wand2,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
@@ -42,6 +43,203 @@ const SECTIONS: SectionDef[] = [
   { key: "bsp",         number: 10, label: "BSP & Legal References",       icon: FileText   },
 ];
 
+// ─── AI Build Config ─────────────────────────────────────────────────────────
+
+export type AISectionState = "waiting" | "processing" | "ai_filled" | "needs_human" | "confirmed";
+
+const AI_SECTION_CONFIG: Record<string, {
+  canAiFill: boolean;
+  delay: number; // ms for processing animation
+  humanPrompt?: string;
+  reading?: string; // what AI reads during animation
+}> = {
+  profile:     { canAiFill: true,  delay: 1100, reading: "face sheet, demographics, eligibility" },
+  good_life:   { canAiFill: false, delay: 900,  humanPrompt: "Describe this individual's vision for a good life — in their own voice. What do they want? What are their hopes and dreams?", reading: "contact notes, monitoring forms, goals history" },
+  important:   { canAiFill: false, delay: 900,  humanPrompt: "What matters most TO the individual (their perspective)? And what's important FOR them (health, safety, team's perspective)?", reading: "contact notes, visit summaries, prior plan" },
+  focus_areas: { canAiFill: true,  delay: 1600, reading: "employment history, community notes, assessments, monitoring forms" },
+  goals:       { canAiFill: true,  delay: 2200, reading: "14 contact notes, 6 monitoring forms, 3 visit summaries, prior plan goals" },
+  health:      { canAiFill: true,  delay: 1300, reading: "HRST assessment, incident reports, medication list, monitoring forms" },
+  services:    { canAiFill: true,  delay: 1000, reading: "service authorizations, billing records, active programs" },
+  rights:      { canAiFill: true,  delay: 700,  reading: "state DD waiver rights template" },
+  team:        { canAiFill: false, delay: 700,  humanPrompt: "Add the team members who participated in this planning meeting, their roles, and whether they attended in person or remotely.", reading: "assigned staff, contacts, case team" },
+  bsp:         { canAiFill: true,  delay: 1000, reading: "behavior support plan, legal documents, court records" },
+};
+
+// ─── AI Processing View ───────────────────────────────────────────────────────
+
+function AIProcessingView({ sectionLabel, reading, individualName }: { sectionLabel: string; reading?: string; individualName: string }) {
+  const [dots, setDots] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setDots(d => (d + 1) % 4), 500);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center text-center p-8"
+      style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%)" }}>
+      {/* Grid texture */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+      <div className="relative space-y-6 max-w-md">
+        {/* Animated brain orb */}
+        <div className="relative mx-auto w-24 h-24">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500/30 to-violet-500/20 animate-pulse" />
+          <div className="absolute inset-2 rounded-full bg-gradient-to-br from-indigo-600/40 to-violet-600/30 animate-pulse" style={{ animationDelay: "150ms" }} />
+          <div className="absolute inset-4 rounded-full bg-gradient-to-br from-indigo-700/50 to-violet-700/40 flex items-center justify-center">
+            <Brain className="w-8 h-8 text-indigo-300" />
+          </div>
+          {/* Orbiting dot */}
+          <div className="absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
+            <div className="absolute top-1 left-1/2 w-2.5 h-2.5 -translate-x-1/2 rounded-full bg-indigo-400 shadow-lg shadow-indigo-500/60" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-white font-manrope font-bold text-[18px]">
+            Writing {sectionLabel}{".".repeat(dots)}
+          </p>
+          <p className="text-slate-400 text-[13px] font-geist">
+            Reading {individualName}'s {reading ?? "chart data"}
+          </p>
+        </div>
+
+        {/* Processing steps */}
+        <div className="space-y-2 text-left">
+          {(reading ?? "").split(", ").slice(0, 3).map((item, i) => (
+            <div key={i} className="flex items-center gap-2.5 text-[12px] font-geist text-slate-400">
+              <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" style={{ animationDelay: `${i * 200}ms` }} />
+              <span>Analyzing {item}…</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Needs Human Card ─────────────────────────────────────────────────────────
+
+function NeedsHumanCard({ sectionLabel, prompt, onContinue }: { sectionLabel: string; prompt: string; onContinue: () => void }) {
+  return (
+    <div className="mb-4 rounded-2xl border border-icm-amber/30 bg-gradient-to-br from-amber-50 to-orange-50 p-5">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+          <Users className="w-5 h-5 text-amber-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-manrope font-bold text-[14px] text-amber-900">Your input needed — {sectionLabel}</p>
+          <p className="text-[12.5px] text-amber-700 mt-1 leading-relaxed">{prompt}</p>
+          <p className="text-[11px] text-amber-600 mt-2 font-geist">Fill in the section below, then click "Done — Continue AI Build" when ready.</p>
+        </div>
+      </div>
+      <button
+        onClick={onContinue}
+        className="mt-4 w-full h-10 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[13px] font-geist font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+      >
+        <Brain className="w-4 h-4" />
+        Done — Continue AI Build
+      </button>
+    </div>
+  );
+}
+
+// ─── AI Mode Sidebar ──────────────────────────────────────────────────────────
+
+function AIBuilderSidebar({
+  sections, aiFillStates, activeKey, onSelect, onSaveDraft, individualName,
+}: {
+  sections: SectionDef[];
+  aiFillStates: Record<string, AISectionState>;
+  activeKey: string;
+  onSelect: (key: string) => void;
+  onSaveDraft: () => void;
+  individualName: string;
+}) {
+  const done = Object.values(aiFillStates).filter(s => s === "ai_filled" || s === "confirmed").length;
+  const needsHuman = Object.values(aiFillStates).filter(s => s === "needs_human").length;
+
+  return (
+    <div className="w-64 shrink-0 border-r border-icm-border bg-icm-panel flex flex-col h-full overflow-y-auto">
+      {/* AI mode header */}
+      <div className="px-4 py-3 border-b border-icm-border"
+        style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" }}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-indigo-400/20 border border-indigo-400/30 flex items-center justify-center">
+            <Brain className="w-3.5 h-3.5 text-indigo-300" />
+          </div>
+          <p className="text-[11.5px] font-geist font-semibold text-indigo-100">AI is building {individualName.split(" ")[0]}'s plan</p>
+        </div>
+        <div className="w-full h-1 bg-indigo-900/60 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-indigo-400 to-violet-400 rounded-full transition-all duration-700"
+            style={{ width: `${(done / sections.length) * 100}%` }} />
+        </div>
+        <p className="text-[10px] font-geist text-indigo-300 mt-1">
+          {done} / {sections.length} sections complete
+          {needsHuman > 0 && ` · ${needsHuman} need your input`}
+        </p>
+      </div>
+
+      <div className="flex-1 py-1.5 overflow-y-auto">
+        {sections.map((s) => {
+          const state = aiFillStates[s.key] ?? "waiting";
+          const isActive = s.key === activeKey;
+          const cfg = AI_SECTION_CONFIG[s.key];
+          return (
+            <button key={s.key} onClick={() => onSelect(s.key)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${isActive ? "bg-indigo-50 border-r-2 border-indigo-600" : "hover:bg-icm-bg/60"}`}>
+
+              {/* State indicator */}
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                state === "ai_filled"  ? "bg-teal-100 text-teal-600" :
+                state === "confirmed" ? "bg-teal-100 text-teal-600" :
+                state === "needs_human" ? "bg-amber-100 text-amber-600" :
+                state === "processing" ? "bg-indigo-100" :
+                "bg-icm-bg border border-icm-border text-icm-text-faint"
+              }`}>
+                {state === "ai_filled" || state === "confirmed" ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />
+                ) : state === "needs_human" ? (
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                ) : state === "processing" ? (
+                  <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                ) : (
+                  <span className="text-[10px] font-bold text-icm-text-faint">{s.number}</span>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className={`text-[11.5px] leading-snug truncate ${
+                  state === "ai_filled" || state === "confirmed" ? "text-teal-700 font-medium" :
+                  state === "needs_human" ? "text-amber-700 font-semibold" :
+                  state === "processing" ? "text-indigo-700 font-semibold" :
+                  isActive ? "text-indigo-700 font-semibold" : "text-icm-text-dim"
+                }`}>{s.label}</p>
+                <p className={`text-[9.5px] font-geist mt-0.5 ${
+                  state === "ai_filled" ? "text-teal-500" :
+                  state === "needs_human" ? "text-amber-500" :
+                  state === "processing" ? "text-indigo-400" : "text-icm-text-faint"
+                }`}>
+                  {state === "ai_filled"   ? "✓ AI filled" :
+                   state === "confirmed"   ? "✓ Confirmed" :
+                   state === "needs_human" ? "⚠ Your input needed" :
+                   state === "processing"  ? "AI writing…" :
+                   cfg?.canAiFill ? "AI will fill" : "Your input needed"}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="p-3 border-t border-icm-border">
+        <button onClick={onSaveDraft}
+          className="w-full h-9 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center justify-center gap-1.5">
+          <Save className="w-3.5 h-3.5" /> Save Draft
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function BuilderSidebar({
@@ -51,6 +249,7 @@ function BuilderSidebar({
   onSelect,
   onSaveDraft,
   onPreview,
+  onStartAIBuild,
 }: {
   sections: SectionDef[];
   statuses: Record<string, SectionStatus>;
@@ -58,6 +257,7 @@ function BuilderSidebar({
   onSelect: (key: string) => void;
   onSaveDraft: () => void;
   onPreview: () => void;
+  onStartAIBuild?: () => void;
 }) {
   const complete = Object.values(statuses).filter((s) => s === "complete").length;
   return (
@@ -132,6 +332,16 @@ function BuilderSidebar({
       </div>
 
       <div className="p-3 border-t border-icm-border space-y-2">
+        {onStartAIBuild && (
+          <button
+            onClick={onStartAIBuild}
+            className="w-full h-10 rounded-xl text-[12px] font-geist font-bold text-white inline-flex items-center justify-center gap-2 transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" }}
+          >
+            <Brain className="w-4 h-4" />
+            Let AI Build This Plan
+          </button>
+        )}
         <button
           onClick={onSaveDraft}
           className="w-full h-9 rounded-lg border border-icm-border text-[12px] font-medium text-icm-text hover:bg-icm-bg inline-flex items-center justify-center gap-1.5"
@@ -858,6 +1068,13 @@ const PersonCarePlanBuilder = () => {
   );
   const [saving, setSaving] = useState(false);
 
+  // ── AI Build Mode ─────────────────────────────────────────────────────────
+  const [aiMode, setAiMode] = useState(false);
+  const [aiFillStates, setAiFillStates] = useState<Record<string, AISectionState>>({});
+  const [aiBuilding, setAiBuilding] = useState(false);
+  const [aiPlanData, setAiPlanData] = useState<Record<string, unknown> | null>(null);
+  const aiContinueRef = useRef<(() => void) | null>(null);
+
   // Section data state
   const [goodLife, setGoodLife] = useState("");
   const [importantTo, setImportantTo] = useState<string[]>([]);
@@ -986,6 +1203,145 @@ const PersonCarePlanBuilder = () => {
     }
   };
 
+  // ── AI Build sequence ─────────────────────────────────────────────────────
+  const startAIBuild = useCallback(async () => {
+    if (!id) return;
+    setAiMode(true);
+    setAiBuilding(true);
+
+    // Init all sections as waiting
+    const initStates: Record<string, AISectionState> = {};
+    SECTIONS.forEach(s => { initStates[s.key] = "waiting"; });
+    setAiFillStates(initStates);
+    setActiveSection("profile");
+
+    // Fire API call in background — don't await here
+    (async () => {
+      try {
+        const fns = getFunctions();
+        const call = httpsCallable(fns, "generatePCP");
+        const result = await call({
+          individualId: id,
+          planType: planType.toLowerCase().replace(" plan", ""),
+          effectiveDate,
+          annualPlanDate: annualDate,
+          specialInstructions: "",
+          agentId: "",
+        }) as any;
+        if (result.data?.success) setAiPlanData(result.data.plan);
+      } catch { /* non-fatal — animation continues without API data */ }
+    })();
+
+    // Animate through each section
+    const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
+
+    for (let i = 0; i < SECTIONS.length; i++) {
+      const s = SECTIONS[i]!;
+      const cfg = AI_SECTION_CONFIG[s.key]!;
+
+      setActiveSection(s.key);
+      setSectionStatuses(prev => ({ ...prev, [s.key]: "in_progress" }));
+      setAiFillStates(prev => ({ ...prev, [s.key]: "processing" }));
+      await delay(cfg.delay);
+
+      if (cfg.canAiFill) {
+        setAiFillStates(prev => ({ ...prev, [s.key]: "ai_filled" }));
+        setSectionStatuses(prev => ({ ...prev, [s.key]: "complete" }));
+        await delay(300); // brief pause so user sees the green ✓
+      } else {
+        // Needs human — pause and wait for user to click "Continue"
+        setAiFillStates(prev => ({ ...prev, [s.key]: "needs_human" }));
+        setAiBuilding(false);
+        await new Promise<void>(resolve => { aiContinueRef.current = resolve; });
+        setAiBuilding(true);
+        setAiFillStates(prev => ({ ...prev, [s.key]: "confirmed" }));
+        setSectionStatuses(prev => ({ ...prev, [s.key]: "complete" }));
+        await delay(400);
+      }
+    }
+
+    setAiBuilding(false);
+    toast.success("AI build complete! Review each section and save your plan.", {
+      description: "Sections needing your input are highlighted. Edit any section before saving.",
+    });
+  }, [id, planType, effectiveDate, annualDate]);
+
+  const handleAiContinue = useCallback(() => {
+    if (aiContinueRef.current) {
+      aiContinueRef.current();
+      aiContinueRef.current = null;
+    }
+  }, []);
+
+  // Map API response into section state when it arrives
+  useEffect(() => {
+    if (!aiPlanData || !aiMode) return;
+    const p = aiPlanData as any;
+
+    if (p.individualSummary?.interests?.length || p.individualSummary?.livingSituation) {
+      const goodLifeText = [
+        p.individualSummary?.interests?.length
+          ? `${individual?.first_name ?? "This individual"} wants to ${p.individualSummary.interests.slice(0, 3).join(", ")}.`
+          : "",
+        p.individualSummary?.livingSituation ?? "",
+      ].filter(Boolean).join(" ");
+      if (goodLifeText) setGoodLife(goodLifeText);
+    }
+
+    if (p.individualSummary?.supportNeeds?.length) {
+      setImportantFor(p.individualSummary.supportNeeds.slice(0, 5));
+    }
+    if (p.individualSummary?.interests?.length) {
+      setImportantTo(p.individualSummary.interests.slice(0, 5));
+    }
+
+    if (p.supportNeeds) {
+      const fm: Record<string, string> = {};
+      Object.entries(p.supportNeeds).forEach(([k, v]) => { if (v) fm[k] = String(v); });
+      if (Object.keys(fm).length) setFocusValues(fm);
+    }
+
+    if (p.goals?.length) {
+      const mapped: Goal[] = p.goals.map((g: any, i: number) => ({
+        id: g.id || `ai-g${i}`,
+        number: i + 1,
+        title: g.title ?? "Goal",
+        description: g.description ?? "",
+        targetDate: g.targetDate ?? "",
+        responsibleParty: g.responsibleParty ?? "Case Manager",
+        progress: "Not Started" as const,
+        aiSuggested: true,
+        objectives: (g.objectives ?? []).map((o: any, j: number) => ({
+          id: `o${i}${j}`,
+          description: o.description ?? "",
+          status: "Not Started" as const,
+          aiSuggested: true,
+        })),
+      }));
+      setGoals(mapped);
+    }
+
+    if (p.healthAndSafety) {
+      const h = p.healthAndSafety;
+      const healthText = [
+        h.safetyPlan,
+        h.riskFactors?.length ? `Risk factors: ${h.riskFactors.join("; ")}` : null,
+        h.emergencyContacts?.length ? `Emergency contacts: ${h.emergencyContacts.join(", ")}` : null,
+      ].filter(Boolean).join("\n\n");
+      setEmergencyPlan(healthText);
+    }
+
+    if (p.services?.length) {
+      setServicesNotes(p.services.map((s: any) =>
+        `${s.serviceName}${s.provider ? ` — ${s.provider}` : ""}${s.frequency ? ` (${s.frequency})` : ""}`
+      ).join("\n"));
+    }
+
+    setRightsNotes("As a participant in Medicaid waiver services, you have the right to be treated with dignity and respect, make your own decisions, receive services in the least restrictive setting, file grievances, and participate fully in planning your services. You have the responsibility to provide accurate information, follow your plan of care, and treat staff and providers respectfully.");
+
+    if (p.planNotes) setBspNotes(p.planNotes);
+  }, [aiPlanData, aiMode, individual]);
+
   const complete = Object.values(sectionStatuses).filter((s) => s === "complete").length;
   const allComplete = complete === SECTIONS.length;
 
@@ -1086,18 +1442,47 @@ const PersonCarePlanBuilder = () => {
         className="flex rounded-xl border border-icm-border overflow-hidden bg-white"
         style={{ minHeight: "calc(100vh - 160px)" }}
       >
-        {/* Left: Section navigator */}
-        <BuilderSidebar
-          sections={SECTIONS}
-          statuses={sectionStatuses}
-          activeKey={activeSection}
-          onSelect={handleSelectSection}
-          onSaveDraft={handleSaveDraft}
-          onPreview={handlePreview}
-        />
+        {/* Left: Section navigator — AI mode or normal */}
+        {aiMode ? (
+          <AIBuilderSidebar
+            sections={SECTIONS}
+            aiFillStates={aiFillStates}
+            activeKey={activeSection}
+            onSelect={handleSelectSection}
+            onSaveDraft={handleSaveDraft}
+            individualName={individual ? `${individual.first_name} ${individual.last_name}` : "Individual"}
+          />
+        ) : (
+          <BuilderSidebar
+            sections={SECTIONS}
+            statuses={sectionStatuses}
+            activeKey={activeSection}
+            onSelect={handleSelectSection}
+            onSaveDraft={handleSaveDraft}
+            onPreview={handlePreview}
+            onStartAIBuild={startAIBuild}
+          />
+        )}
 
         {/* Center: Section form */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto flex flex-col" style={{ position: "relative" }}>
+          {/* AI Processing Overlay — shown when AI is actively processing this section */}
+          {aiMode && aiFillStates[activeSection] === "processing" ? (
+            <AIProcessingView
+              sectionLabel={activeSectionDef.label}
+              reading={AI_SECTION_CONFIG[activeSection]?.reading}
+              individualName={individual?.first_name ?? "Individual"}
+            />
+          ) : (
+          <div className="flex-1 overflow-y-auto p-6">
+          {/* Needs Human card */}
+          {aiMode && aiFillStates[activeSection] === "needs_human" && (
+            <NeedsHumanCard
+              sectionLabel={activeSectionDef.label}
+              prompt={AI_SECTION_CONFIG[activeSection]?.humanPrompt ?? "Please fill in this section."}
+              onContinue={handleAiContinue}
+            />
+          )}
           {/* Section header */}
           <div className="flex items-center gap-2 mb-5">
             <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-icm-bg border border-icm-border text-icm-text-dim">
@@ -1106,7 +1491,12 @@ const PersonCarePlanBuilder = () => {
             <h2 className="font-manrope font-extrabold text-[18px] text-icm-text">
               {activeSectionDef.label}
             </h2>
-            {sectionStatuses[activeSection] === "complete" && (
+            {aiMode && aiFillStates[activeSection] === "ai_filled" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 text-[10.5px] font-semibold ring-1 ring-teal-200">
+                <Sparkles className="w-3 h-3" /> AI filled
+              </span>
+            )}
+            {!aiMode && sectionStatuses[activeSection] === "complete" && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 text-[10.5px] font-semibold ring-1 ring-teal-200">
                 <CheckCircle2 className="w-3 h-3" /> Complete
               </span>
@@ -1255,20 +1645,24 @@ const PersonCarePlanBuilder = () => {
           <SectionFooter
             sectionNumber={activeSectionDef.number}
             totalSections={SECTIONS.length}
-            onMarkComplete={markComplete}
-            onNext={skipToNext}
+            onMarkComplete={aiMode ? handleAiContinue : markComplete}
+            onNext={aiMode ? handleAiContinue : skipToNext}
           />
+          </div>
+          )} {/* end AI mode else branch */}
         </div>
 
-        {/* Right: AI suggestions */}
-        <AISuggestionsPanel
-          sectionKey={activeSection}
-          sectionLabel={activeSectionDef.label}
-          onUse={(text) => {
-            if (activeSection === "good_life") setGoodLife((prev) => prev ? `${prev} ${text}` : text);
-            toast.success("Suggestion added");
-          }}
-        />
+        {/* Right: AI suggestions — hidden in AI build mode */}
+        {!aiMode && (
+          <AISuggestionsPanel
+            sectionKey={activeSection}
+            sectionLabel={activeSectionDef.label}
+            onUse={(text) => {
+              if (activeSection === "good_life") setGoodLife((prev) => prev ? `${prev} ${text}` : text);
+              toast.success("Suggestion added");
+            }}
+          />
+        )}
       </div>
     </ICMShell>
   );

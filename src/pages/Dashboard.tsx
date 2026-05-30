@@ -1,7 +1,8 @@
-// Dashboard — compact greeting + KPI cards with meters + My Work Queue
-// GreetingBanner (compact) + HeroRow (3 KPI+meter cards + 1 donut) + MyWorkQueue + QuickActions
+// Dashboard — compact greeting + KPI cards with meters + My Work Queue + Today's Schedule
+// GreetingBanner (compact) + HeroRow (3 KPI+meter cards + 1 donut) + MyWorkQueue + TodaySchedule + QuickActions
 
 import { ICMShell } from "@/components/icm/ICMShell";
+import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { Donut } from "@/components/icm/charts";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
@@ -150,17 +151,108 @@ function HeroKpiCard({ kpi }: { kpi: HeroKpi }) {
   );
 }
 
-/* Hero meter card — donut-based */
+/* ============================================================
+   Card 1 — Census: horizontal split bar
+============================================================ */
+function CensusCard({ census, activeCensus }: { census: number; activeCensus: number }) {
+  const inactive = census - activeCensus;
+  const pct = census > 0 ? (activeCensus / census) * 100 : 0;
+  const t = HERO_TONES.blue;
+  return (
+    <NavLink
+      to="/people"
+      className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
+    >
+      <div className="flex items-start justify-between">
+        <div className={`w-10 h-10 rounded-xl ${t.iconBg} flex items-center justify-center`}>
+          <Users className="w-5 h-5 text-icm-accent" />
+        </div>
+      </div>
+      <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">Census</p>
+      <p className="font-manrope text-[40px] font-extrabold leading-none tracking-tight text-icm-text mt-1">
+        {census > 0 ? census : "—"}
+      </p>
+      {/* Horizontal split bar */}
+      <div className="mt-4">
+        <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+          <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="flex items-center gap-4 mt-2">
+          <span className="flex items-center gap-1.5 text-[11px] font-geist text-icm-text-dim">
+            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+            {activeCensus} active
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] font-geist text-icm-text-dim">
+            <span className="w-2 h-2 rounded-full border-2 border-gray-300 shrink-0" />
+            {inactive} inactive / pending
+          </span>
+        </div>
+      </div>
+      <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
+        Open People <ArrowRight className="w-3 h-3" />
+      </span>
+      <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
+    </NavLink>
+  );
+}
+
+/* ============================================================
+   Card 2 — Incidents: two stat chips, no ring
+============================================================ */
+function IncidentsCard({ totalOpen, overdue, closedThisMonth }: {
+  totalOpen: number; overdue: number; closedThisMonth: number;
+}) {
+  const t = HERO_TONES.amber;
+  return (
+    <NavLink
+      to="/incidents"
+      className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
+    >
+      <div className="flex items-start justify-between">
+        <div className={`w-10 h-10 rounded-xl ${t.iconBg} flex items-center justify-center`}>
+          <AlertTriangle className="w-5 h-5 text-icm-amber" />
+        </div>
+      </div>
+      <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">Incidents</p>
+      <p className="font-manrope text-[40px] font-extrabold leading-none tracking-tight text-icm-text mt-1">
+        {totalOpen.toString().padStart(2, "0")}
+      </p>
+      <p className="text-[12px] text-icm-text-dim font-geist mt-0.5">Total open</p>
+      {/* Two stat chips */}
+      <div className="flex gap-2 mt-3">
+        <div className="flex-1 rounded-xl px-2 py-2 bg-red-50 text-center">
+          <p className="font-manrope font-bold text-[22px] text-red-600 leading-none">{overdue}</p>
+          <p className="text-[10.5px] text-red-500 font-geist mt-0.5">overdue</p>
+        </div>
+        <div className="flex-1 rounded-xl px-2 py-2 bg-green-50 text-center">
+          <p className="font-manrope font-bold text-[22px] text-green-600 leading-none">{closedThisMonth}</p>
+          <p className="text-[10.5px] text-green-600 font-geist mt-0.5">closed</p>
+        </div>
+      </div>
+      <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
+        View All <ArrowRight className="w-3 h-3" />
+      </span>
+      <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
+    </NavLink>
+  );
+}
+
+/* ============================================================
+   Card 4 — People Needing Attention: amber donut + two-line sub
+============================================================ */
 interface HeroMeter {
   label: string;
   value: number;
   centerLabel: string;
-  sub: string;
+  subLines: Array<{ color: string; text: string }>;
   icon: LucideIcon;
   to: string;
   cta: string;
-  tone: "rose";
   donutColor: string;
+  bgFrom: string;
+  bgTo: string;
+  ringColor: string;
+  iconColor: string;
 }
 
 function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
@@ -168,11 +260,11 @@ function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
   return (
     <NavLink
       to={kpi.to}
-      className="relative overflow-hidden rounded-2xl ring-1 ring-[hsl(0,80%,80%)]/40 bg-gradient-to-br from-[hsl(0,90%,97%)] to-[hsl(0,80%,93%)] p-5 group hover:shadow-elevated transition-all block"
+      className={`relative overflow-hidden rounded-2xl ring-1 p-5 group hover:shadow-elevated transition-all block bg-gradient-to-br ${kpi.bgFrom} ${kpi.bgTo} ${kpi.ringColor}`}
     >
       <div className="flex items-start justify-between">
         <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-icm-red" />
+          <Icon className={`w-5 h-5 ${kpi.iconColor}`} />
         </div>
       </div>
       <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">
@@ -186,7 +278,14 @@ function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
           </div>
         </div>
         <div>
-          <p className="text-[12px] text-icm-text-dim font-geist">{kpi.sub}</p>
+          <div className="space-y-1">
+            {kpi.subLines.map((line) => (
+              <div key={line.text} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: line.color }} />
+                <span className="text-[12px] text-icm-text-dim font-geist">{line.text}</span>
+              </div>
+            ))}
+          </div>
           <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-2 group-hover:gap-2 transition-all">
             {kpi.cta} <ArrowRight className="w-3 h-3" />
           </span>
@@ -206,69 +305,51 @@ function HeroRow() {
   const attentionCount = highRisk + reviewRisk;
   const incidentSummary = useIncidentSummary();
 
-  const incidentMeterValue =
-    incidentSummary.totalOpen > 0
-      ? Math.round((incidentSummary.overdue / incidentSummary.totalOpen) * 100)
-      : 0;
+  // Card 3 — Billing (unchanged)
+  const billing: HeroKpi = {
+    label: "Billing",
+    value: "98%",
+    sub: "Claims clean rate",
+    icon: CreditCard,
+    to: "/billing",
+    cta: "Billing Hub",
+    tone: "emerald",
+    trend: { value: "+1.4%", positive: true },
+    meter: { value: 98, centerLabel: "98%", color: "hsl(var(--icm-green))" },
+  };
 
-  const kpis: HeroKpi[] = [
-    {
-      label: "Census",
-      value: census > 0 ? census.toString() : "—",
-      sub: `${activeCensus} active · ${census - activeCensus} inactive/pending`,
-      icon: Users,
-      to: "/people",
-      cta: "Open People",
-      tone: "blue",
-    },
-    {
-      label: "Incidents",
-      value: incidentSummary.totalOpen.toString().padStart(2, "0"),
-      sub: `${incidentSummary.overdue} overdue · ${incidentSummary.closedThisMonth} closed`,
-      icon: AlertTriangle,
-      to: "/incidents",
-      cta: "View All",
-      tone: "amber",
-      meter: {
-        value: incidentMeterValue,
-        centerLabel: `${incidentSummary.overdue}/${incidentSummary.totalOpen}`,
-        color: "hsl(var(--icm-amber))",
-      },
-    },
-    {
-      label: "Billing",
-      value: "98%",
-      sub: "Claims clean rate",
-      icon: CreditCard,
-      to: "/billing",
-      cta: "Billing Hub",
-      tone: "emerald",
-      trend: { value: "+1.4%", positive: true },
-      meter: {
-        value: 98,
-        centerLabel: "98%",
-        color: "hsl(var(--icm-green))",
-      },
-    },
-  ];
-
+  // Card 4 — People Needing Attention: amber, two-line breakdown
   const attention: HeroMeter = {
     label: "People Needing Attention",
     value: census > 0 ? (attentionCount / census) * 100 : 0,
     centerLabel: `${attentionCount}/${census}`,
-    sub: `${highRisk} high compliance risk · ${reviewRisk} need review`,
+    subLines: [
+      { color: "#f59e0b", text: `${highRisk} compliance risk` },
+      { color: "#3b82f6", text: `${reviewRisk} need review` },
+    ],
     icon: AlertTriangle,
     to: "/people",
     cta: "View Watchlist",
-    tone: "rose",
-    donutColor: "hsl(var(--icm-red))",
+    donutColor: "#f59e0b",
+    bgFrom: "from-[hsl(38,100%,97%)]",
+    bgTo:   "to-[hsl(38,90%,93%)]",
+    ringColor: "ring-[hsl(38,80%,80%)]/40",
+    iconColor: "text-icm-amber",
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-      {kpis.map((k) => (
-        <HeroKpiCard key={k.label} kpi={k} />
-      ))}
+      {/* Card 1 — Census: horizontal split bar */}
+      <CensusCard census={census} activeCensus={activeCensus} />
+      {/* Card 2 — Incidents: two stat chips, no ring */}
+      <IncidentsCard
+        totalOpen={incidentSummary.totalOpen}
+        overdue={incidentSummary.overdue}
+        closedThisMonth={incidentSummary.closedThisMonth}
+      />
+      {/* Card 3 — Billing: unchanged */}
+      <HeroKpiCard kpi={billing} />
+      {/* Card 4 — People Needing Attention: amber ring */}
       <HeroMeterCard kpi={attention} />
     </div>
   );
@@ -798,7 +879,11 @@ const Dashboard = () => {
       <div className="space-y-5">
         <GreetingBanner name={firstName} />
         <HeroRow />
-        <MyWorkQueue />
+        {/* ── My Work + Today's Schedule — side-by-side ─────────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+          <MyWorkQueue />
+          <TodaySchedule compact />
+        </div>
         <QuickActions />
       </div>
     </ICMShell>

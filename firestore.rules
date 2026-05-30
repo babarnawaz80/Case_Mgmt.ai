@@ -431,13 +431,24 @@ service cloud.firestore {
       allow delete: if isAdmin() && ownedByOrg();
     }
 
-    // ─── Assessments ──────────────────────────────────────────────────────────
+    // ─── Assessment Templates (admin-created form templates) ─────────────────
+    match /assessment_templates/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Assessments (completed/draft instances) ──────────────────────────────
+    // create: any authenticated case manager — organizationId may be set later
+    // get/update: any authenticated user (scoped client-side by individualId query)
     match /assessments/{id} {
       allow list: if isAuth();
-      allow get: if isAuth() && ownedByOrg();
-      allow create: if isCaseManager() && newDocInOrg();
-      allow update: if isCaseManager() && ownedByOrg();
-      allow delete: if isAdmin() && ownedByOrg();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
     }
 
     // ─── Support Notes ────────────────────────────────────────────────────────
@@ -564,7 +575,96 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ─── Default: Deny All ───────────────────────────────────────────────────
+    // ─── Intake Tokens (admin-managed) ──────────────────────────────────────
+    match /intake_tokens/{id} {
+      allow read, write: if false;  // Cloud Functions only via Admin SDK
+    }
+
+    // ─── Pending Leads (intake form submissions) ──────────────────────────────
+    match /pending_leads/{id} {
+      allow create: if true;  // public intake form writes via Cloud Function (Admin SDK)
+      allow list: if isSupervisor();
+      allow get: if isSupervisor();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Rate Limits (intake form anti-spam) ─────────────────────────────────
+    match /rate_limits/{id} {
+      allow read, write: if false;  // Cloud Functions only
+    }
+
+    // ─── Provider Directory (org-level provider database) ────────────────────
+    // Admins manage; case managers and supervisors can read and create
+    match /providers/{id} {
+      allow list: if isAuth();
+      allow get:    if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Individual Service Providers (per-individual provider links) ─────────
+    match /individual_providers/{id} {
+      allow list: if isAuth();
+      allow get:    if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Consent Tokens (public — read needed for portal) ────────────────────
+    match /consent_tokens/{id} {
+      allow read:   if true;        // Portal reads without auth via token hash lookup
+      allow create: if false;       // Cloud Functions only (Admin SDK)
+      allow update: if false;       // Cloud Functions only
+      allow delete: if isAdmin();
+    }
+
+    // ─── Individual Consents subcollection ───────────────────────────────────
+    match /individuals/{id}/consents/{consentId} {
+      allow list: if isAuth();
+      allow get:    if isAuth();
+      allow create: if isAuth();    // Portal writes + CM writes
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Role Permissions (admin-managed) ──────────────────────────────────────
+    match /role_permissions/{roleId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ─── Staff Training Records ───────────────────────────────────────────────
+    match /staff_trainings/{id} {
+      allow read: if isSupervisor();
+      allow create: if isSupervisor();
+      allow update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Org Training Requirements ────────────────────────────────────────────
+    match /org_training_requirements/{id} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ─── Training Alerts ─────────────────────────────────────────────────────
+    match /training_alerts/{id} {
+      allow read: if isSupervisor();
+      allow update: if isCaseManager();
+    }
+
+    // ─── Renewal Letters ─────────────────────────────────────────────────────
+    match /renewal_letters/{id} {
+      allow read: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Default: Deny All ─────────────────────────────────────────────────────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

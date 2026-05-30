@@ -123,6 +123,7 @@ const Documentation = lazyWithRetry(() => import("./pages/Documentation"));
 const Settings = lazyWithRetry(() => import("./pages/Settings"));
 const SettingsUsers = lazyWithRetry(() => import("./pages/settings/SettingsUsers"));
 const SettingsUserDetail = lazyWithRetry(() => import("./pages/settings/SettingsUserDetail"));
+const RoleEditor = lazyWithRetry(() => import("./pages/settings/RoleEditor"));
 const SettingsOrganization = lazyWithRetry(() => import("./pages/settings/SettingsOrganization"));
 const SettingsPrograms = lazyWithRetry(() => import("./pages/settings/SettingsPrograms"));
 const SettingsAI = lazyWithRetry(() => import("./pages/settings/SettingsAI"));
@@ -131,6 +132,7 @@ const SettingsSecurity = lazyWithRetry(() => import("./pages/settings/SettingsSe
 const SettingsNotifications = lazyWithRetry(() => import("./pages/settings/SettingsNotifications"));
 const SettingsBillingConfig = lazyWithRetry(() => import("./pages/settings/SettingsBillingConfig"));
 const SettingsAIUsage = lazyWithRetry(() => import("./pages/settings/SettingsAIUsage"));
+const SettingsTrainingCompliance = lazyWithRetry(() => import("./pages/settings/SettingsTrainingCompliance"));
 const SettingsRiskScore = lazyWithRetry(() => import("./pages/settings/SettingsRiskScore"));
 const BillingCheckoutSimulation = lazyWithRetry(() => import("./pages/settings/BillingCheckoutSimulation"));
 const BillingPortalSimulation = lazyWithRetry(() => import("./pages/settings/BillingPortalSimulation"));
@@ -359,6 +361,7 @@ const App = () => (
             {/* ── ADMIN-ONLY ROUTES ─────────────────────────────────────── */}
             <Route path="/settings" element={<ProtectedRoute requireRole="admin"><Settings /></ProtectedRoute>} />
             <Route path="/settings/users" element={<ProtectedRoute requireRole="admin"><SettingsUsers /></ProtectedRoute>} />
+            <Route path="/settings/users/roles/:roleId" element={<ProtectedRoute requireRole="admin"><RoleEditor /></ProtectedRoute>} />
             <Route path="/settings/users/:userId" element={<ProtectedRoute requireRole="admin"><SettingsUserDetail /></ProtectedRoute>} />
             <Route path="/settings/roles" element={<ProtectedRoute requireRole="admin"><SettingsUsers /></ProtectedRoute>} />
             <Route path="/settings/organization" element={<ProtectedRoute requireRole="admin"><SettingsOrganization /></ProtectedRoute>} />
@@ -370,6 +373,7 @@ const App = () => (
             <Route path="/settings/notifications" element={<ProtectedRoute requireRole="admin"><SettingsNotifications /></ProtectedRoute>} />
             <Route path="/settings/billing-config" element={<ProtectedRoute requireRole="admin"><SettingsBillingConfig /></ProtectedRoute>} />
             <Route path="/settings/ai-usage" element={<ProtectedRoute requireRole="admin"><SettingsAIUsage /></ProtectedRoute>} />
+            <Route path="/settings/training-compliance" element={<ProtectedRoute requireRole="admin"><SettingsTrainingCompliance /></ProtectedRoute>} />
             <Route path="/settings/billing/checkout-simulation" element={<ProtectedRoute requireRole="admin"><BillingCheckoutSimulation /></ProtectedRoute>} />
             <Route path="/settings/billing/portal-simulation" element={<ProtectedRoute requireRole="admin"><BillingPortalSimulation /></ProtectedRoute>} />
             <Route path="/settings/import" element={<ProtectedRoute requireRole="admin"><SettingsImport /></ProtectedRoute>} />

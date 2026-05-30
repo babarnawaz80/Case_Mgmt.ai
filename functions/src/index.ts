@@ -78,11 +78,20 @@ app.post("/api/agents/pcp-renewal/run", runPcpRenewalAgent);
 import { deepgramToken } from "./api/ambient";
 app.post("/api/ambient/deepgram-token", deepgramToken);
 
+// ─── Intake Form API ──────────────────────────────────────────────────────
+import { intakeRoutes } from "./api/intakeFunctions";
+app.use("/api/intake", intakeRoutes);
+
+// ─── Assessment API ────────────────────────────────────────────────────────
+import { assessmentRoutes } from "./api/assessmentFunctions";
+app.use("/api/assessments", assessmentRoutes);
+
 // ─── Export the Express app as a single Gen 2 Cloud Function ──────────────
 export const api = onRequest({ cors: true }, app);
 
 // ─── Firestore Triggers ───────────────────────────────────────────────────
 export { onNewBillingClaim, onWorkflowTaskDailyCheck } from "./triggers/billing-claims";
+export { onAssessmentLeadTransfer } from "./triggers/assessmentTransfer";
 
 // ─── Scheduled Functions ──────────────────────────────────────────────────
 export { dailyAuthRenewalCheck } from "./api/authorizationRenewal";
@@ -106,3 +115,4 @@ export {
   submitConsentSignature,
   cleanupExpiredConsents,
 } from "./api/consent";
+export { checkTrainingExpirations, seedTrainingData } from "./api/trainingAlerts";

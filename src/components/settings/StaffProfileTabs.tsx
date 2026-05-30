@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AlertTriangle, X, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { TrainingRecordsSection } from "./TrainingRecordsSection";
 
 /* ─── Constants ────────────────────────────────────────────── */
 
@@ -1034,6 +1035,8 @@ export function StaffProfileTabs({
               placeholder="Add certification…"
               className="col-span-2"
             />
+            {/* Full training records section */}
+            {realUid && <TrainingRecordsSection userId={realUid} />}
           </div>
         )}
 

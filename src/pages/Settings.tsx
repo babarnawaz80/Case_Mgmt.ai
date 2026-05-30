@@ -17,6 +17,9 @@ import {
   Zap,
   ArrowRight,
   Settings as SettingsIcon,
+  Link as LinkIcon,
+  MapPin,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 import { userCounts, programs, integrations, operatingStates } from "@/data/settings";
@@ -88,10 +91,17 @@ const Settings = () => {
     },
     {
       icon: LayoutTemplate,
-      title: "Templates",
+      title: "Assessment Builder",
       description: "Case management, workflow, assessment, and document templates.",
       to: "/admin/assessment-builder",
       tone: "teal",
+    },
+    {
+      icon: MapPin,
+      title: "Provider Directory",
+      description: "Manage community providers, service agencies, and contracted partners.",
+      to: "/admin/provider-directory",
+      tone: "green",
     },
     {
       icon: Shield,
@@ -121,6 +131,13 @@ const Settings = () => {
       to: "/settings/ai-usage",
       tone: "teal",
       badge: { label: "12,400 credits remaining", tone: "amber" },
+    },
+    {
+      icon: GraduationCap,
+      title: "Training Compliance",
+      description: "Track staff training and certification status across your organization.",
+      to: "/settings/training-compliance",
+      tone: "purple",
     },
   ];
 

@@ -3,9 +3,11 @@ import {
   Home, Users, CheckSquare, MessageSquare,
   BarChart3, CreditCard, Settings, User, Clock, LogOut,
   Pencil, FileText, CalendarCheck, AlertTriangle, Phone,
-  Shield, Bell, Building2, Folder, ArrowRight, X,
+  Shield, Bell, Building2, Folder, ArrowRight, X, Video,
   type LucideIcon,
 } from "lucide-react";
+import { useState as useTopbarState } from "react";
+import { TelevisitModal } from "@/components/televisit/TelevisitModal";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useIndividuals } from "@/hooks/useIndividuals";
 import {
@@ -295,6 +297,7 @@ function InlineSearch() {
 export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const navigate = useNavigate();
   const { isAdmin, role } = useRole();
+  const [televisitOpen, setTelevisitOpen] = useTopbarState(false);
   const { toggle: toggleAI, open: aiOpen } = useAIPanel();
   const { unreadAlerts, unreadMentions } = useNotifications();
   const { unreadCount: fsUnread } = useFirestoreNotifications();
@@ -332,7 +335,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
   return (
     <header
-      className="border-b border-icm-border flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2"
+      className="border-b border-icm-border relative flex items-center justify-between px-3 sm:px-6 shrink-0 gap-2"
       style={{
         backgroundColor: "hsl(var(--icm-topbar))",
         paddingTop: "env(safe-area-inset-top)",
@@ -390,7 +393,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
       </div>
 
       {/* Center: horizontal nav (desktop) */}
-      <nav className="hidden md:flex flex-1 items-center justify-center gap-0.5 overflow-x-auto min-w-0">
+      <nav className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-0.5 pointer-events-auto">
         {topNavItems.map((item) => {
           if (item.roles && !item.roles.includes(role)) return null;
           const badge = badgeFor(item);
@@ -475,6 +478,16 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
       {/* Right: search + actions */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Televisit button — before search */}
+        <button
+          onClick={() => setTelevisitOpen(true)}
+          title="Start a Televisit"
+          className="hidden sm:flex h-9 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-[12px] font-geist font-semibold items-center gap-1.5 transition-colors shadow-sm shrink-0"
+        >
+          <Video className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">Televisit</span>
+        </button>
+
         <InlineSearch />
 
         {/* Mobile-only search icon — opens command palette */}
@@ -525,6 +538,12 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
         <UserMenu />
       </div>
+
+      {/* Televisit modal — mounted at root level so it overlays everything */}
+      <TelevisitModal
+        open={televisitOpen}
+        onClose={() => setTelevisitOpen(false)}
+      />
     </header>
   );
 }

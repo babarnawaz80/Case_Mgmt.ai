@@ -618,6 +618,16 @@ const Index = () => {
             >
               {historyOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
             </button>
+            {thread.length > 0 && (
+              <button
+                onClick={() => { setThread([]); setMessage(""); setActiveIndividualId(null); setSelectedIndividualId(null); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-border/50"
+                title="New chat"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New chat
+              </button>
+            )}
             <NavLink to="/home" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title="Go to Chat Home">
               <img
                 src={brandLogo}
@@ -706,7 +716,8 @@ const Index = () => {
 
 
         {/* Chat Content */}
-        <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-10">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-8" id="chat-scroll-area">
           {thread.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -750,7 +761,7 @@ const Index = () => {
 
           {/* Conversation thread */}
           {thread.length > 0 && (
-            <div className="w-full max-w-2xl mt-2 mb-6">
+            <div className="w-full max-w-2xl mt-4 mb-2">
               {/* Context bar — active person chip */}
               <div className="flex items-center justify-end mb-3">
                 {activeIndividualId && (() => {
@@ -816,52 +827,56 @@ const Index = () => {
                     const numColors = ["bg-blue-500", "bg-violet-500", "bg-amber-500", "bg-emerald-500", "bg-rose-500"];
 
                     return (
-                      <div key={idx} className="flex justify-start">
-                        <div className="max-w-[90%] w-full">
-                          <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                            <div className="px-5 pt-4 pb-3 space-y-3">
-                              {segments.map((seg, si) => {
-                                if (seg.type === "text") return (
-                                  <p key={si} className="text-sm text-foreground leading-relaxed">{renderInline(seg.content)}</p>
+                      <div key={idx} className="flex justify-start items-start gap-3 max-w-[85%]">
+                        {/* AI Avatar */}
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                          <Sparkles className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        {/* Bubble */}
+                        <div className="flex-1 min-w-0">
+                          <div className="rounded-2xl rounded-tl-sm bg-muted/70 px-4 py-3 space-y-2.5">
+                            {segments.map((seg, si) => {
+                              if (seg.type === "text") return (
+                                <p key={si} className="text-sm text-foreground leading-relaxed">{renderInline(seg.content)}</p>
+                              );
+                              if (seg.type === "bullet") {
+                                return (
+                                  <div key={si} className="grid grid-cols-1 gap-1.5">
+                                    {seg.content.split("|||").map((item, ii) => (
+                                      <div key={ii} className="flex items-start gap-2 py-1">
+                                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                        <span className="text-sm text-foreground leading-snug">{renderInline(item)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 );
-                                if (seg.type === "bullet") {
-                                  return (
-                                    <div key={si} className="grid grid-cols-1 gap-1.5">
-                                      {seg.content.split("|||").map((item, ii) => (
-                                        <div key={ii} className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-muted/50 border border-border/60">
-                                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                                          <span className="text-sm text-foreground leading-snug">{renderInline(item)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                }
-                                if (seg.type === "numbered") {
-                                  return (
-                                    <div key={si} className="grid grid-cols-1 gap-1.5">
-                                      {seg.content.split("|||").map((item, ii) => (
-                                        <div key={ii} className={`flex items-start gap-3 px-3 py-2.5 rounded-xl border ${cardColors[ii % cardColors.length]}`}>
-                                          <span className={`mt-0.5 min-w-[22px] h-[22px] rounded-full ${numColors[ii % numColors.length]} text-white text-[11px] font-bold flex items-center justify-center shrink-0`}>{ii + 1}</span>
-                                          <span className="text-sm text-foreground leading-snug">{renderInline(item)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })}
-                            </div>
-                            {turn.cta && (
-                              <div className="px-5 pb-4">
-                                <button
-                                  onClick={() => navigate(turn.cta!.href)}
-                                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                                >
-                                  {turn.cta.label} <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
+                              }
+                              if (seg.type === "numbered") {
+                                return (
+                                  <div key={si} className="grid grid-cols-1 gap-1.5">
+                                    {seg.content.split("|||").map((item, ii) => (
+                                      <div key={ii} className={`flex items-start gap-2.5 px-3 py-2 rounded-xl border ${cardColors[ii % cardColors.length]}`}>
+                                        <span className={`mt-0.5 min-w-[22px] h-[22px] rounded-full ${numColors[ii % numColors.length]} text-white text-[11px] font-bold flex items-center justify-center shrink-0`}>{ii + 1}</span>
+                                        <span className="text-sm text-foreground leading-snug">{renderInline(item)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })}
                           </div>
+                          {/* CTA button outside bubble */}
+                          {turn.cta && (
+                            <div className="mt-2 ml-1">
+                              <button
+                                onClick={() => navigate(turn.cta!.href)}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                              >
+                                {turn.cta.label} <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -878,8 +893,11 @@ const Index = () => {
                 })}
 
                 {aiLoading && (
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl border border-border bg-card px-5 py-4 flex items-center gap-1.5 shadow-sm">
+                  <div className="flex justify-start items-start gap-3">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div className="rounded-2xl rounded-tl-sm bg-muted/70 px-4 py-3 flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
                       <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
                       <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -896,12 +914,71 @@ const Index = () => {
 
 
 
+          {/* Suggested Prompts + Snapshot — inside scroll area, empty state only */}
+          {thread.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="flex flex-col items-center gap-2.5 mt-6 w-full max-w-2xl pb-4"
+            >
+              <div className="grid grid-cols-2 gap-2 w-full">
+                {suggestedPrompts.slice(0, 8).map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSend(prompt.text)}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200 justify-center"
+                  >
+                    <prompt.icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="truncate">{prompt.text}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-center gap-2 items-center w-full">
+                <div className="relative" ref={snapshotRef}>
+                  <button
+                    onClick={() => setSnapshotPickerOpen((v) => !v)}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Individual Snapshot
+                  </button>
+                  {snapshotPickerOpen && (
+                    <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
+                      <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">Pick an individual</p>
+                        <input autoFocus value={snapshotQuery} onChange={(e) => setSnapshotQuery(e.target.value)} placeholder="Search…"
+                          className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400" />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {individuals.filter((p) => `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`.toLowerCase().includes(snapshotQuery.trim().toLowerCase())).map((p) => (
+                          <button key={p.id} onClick={() => openSnapshotFor(p.id)} className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors">
+                            <PersonAvatar person={p as any} size={28} shape="circle" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{p.first_name} {p.last_name}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{p.county} · {p.enrollment_status}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          </div>{/* closes inner scroll area */}
+
+          {/* Sticky input area — input only, compact */}
+          <div className="shrink-0 border-t border-border/60 bg-background/95 backdrop-blur-sm px-6 py-3 flex flex-col items-center">
+
           {/* Chat Input */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="w-full max-w-2xl mt-2"
+            transition={{ delay: 0.2 }}
+            className="w-full max-w-2xl"
           >
             <div className="glass rounded-2xl p-4">
               <textarea
@@ -1069,138 +1146,8 @@ const Index = () => {
             </div>
           </motion.div>
 
-          {/* Suggested Prompts — only on empty state. Snapshot button always available. */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="flex flex-col items-center gap-2.5 mt-6 w-full max-w-2xl"
-          >
-            {thread.length === 0 ? (
-              <>
-                {/* 4 uniform rows of 2 prompts each */}
-                <div className="grid grid-cols-2 gap-2 w-full">
-                  {suggestedPrompts.slice(0, 8).map((prompt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSend(prompt.text)}
-                      className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200 justify-center"
-                    >
-                      <prompt.icon className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <span className="truncate">{prompt.text}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Individual Snapshot — centered below */}
-                <div className="flex justify-center gap-2 items-center w-full">
-                  <div className="relative" ref={snapshotRef}>
-                    <button
-                      onClick={() => setSnapshotPickerOpen((v) => !v)}
-                      className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Individual Snapshot
-                    </button>
-                    {snapshotPickerOpen && (
-                      <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
-                        <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">
-                            Pick an individual
-                          </p>
-                          <input
-                            autoFocus
-                            value={snapshotQuery}
-                            onChange={(e) => setSnapshotQuery(e.target.value)}
-                            placeholder="Search…"
-                            className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400"
-                          />
-                        </div>
-                        <div className="max-h-64 overflow-y-auto">
-                          {individuals
-                            .filter((p) =>
-                              `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`
-                                .toLowerCase()
-                                .includes(snapshotQuery.trim().toLowerCase())
-                            )
-                            .map((p) => (
-                              <button
-                                key={p.id}
-                                onClick={() => openSnapshotFor(p.id)}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
-                              >
-                                <PersonAvatar person={p as any} size={28} shape="circle" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-foreground truncate">
-                                    {p.first_name} {p.last_name}
-                                  </p>
-                                  <p className="text-[11px] text-muted-foreground truncate">
-                                    {p.county} · {p.enrollment_status}
-                                  </p>
-                                </div>
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="relative" ref={snapshotRef}>
-                <button
-                  onClick={() => setSnapshotPickerOpen((v) => !v)}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Individual Snapshot
-                </button>
-                {snapshotPickerOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
-                    <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">
-                        Pick an individual
-                      </p>
-                      <input
-                        autoFocus
-                        value={snapshotQuery}
-                        onChange={(e) => setSnapshotQuery(e.target.value)}
-                        placeholder="Search…"
-                        className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400"
-                      />
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {individuals
-                        .filter((p) =>
-                          `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`
-                            .toLowerCase()
-                            .includes(snapshotQuery.trim().toLowerCase())
-                        )
-                        .map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => openSnapshotFor(p.id)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
-                          >
-                            <PersonAvatar person={p as any} size={28} shape="circle" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {p.first_name} {p.last_name}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground truncate">
-                                {p.county} · {p.enrollment_status}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-          </motion.div>
-        </div>
+          </div>{/* closes sticky input area */}
+        </div>{/* closes flex-1 min-h-0 flex flex-col */}
       </div>
     </div>
     </>

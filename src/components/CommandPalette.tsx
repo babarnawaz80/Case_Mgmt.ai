@@ -32,16 +32,17 @@ interface CommandItem {
 // ─── Static item definitions ─────────────────────────────────────────────────
 
 export const NAV_ITEMS: Omit<CommandItem, "action">[] = [
-  { id: "nav-dashboard",  label: "Dashboard",         icon: Home,          category: "Navigation" },
-  { id: "nav-my-work",    label: "My Work",            icon: CheckSquare,   category: "Navigation" },
-  { id: "nav-people",     label: "People Supported",   icon: Users,         category: "Navigation" },
-  { id: "nav-messages",   label: "Messages",           icon: MessageSquare, category: "Navigation" },
-  { id: "nav-reports",    label: "Reports",            icon: BarChart3,     category: "Navigation" },
-  { id: "nav-billing",    label: "Billing Hub",        icon: CreditCard,    category: "Navigation" },
-  { id: "nav-incidents",  label: "Incidents",          icon: AlertTriangle, category: "Navigation" },
-  { id: "nav-documents",  label: "Documents",          icon: Folder,        category: "Navigation" },
-  { id: "nav-referrals",  label: "All Referrals",      icon: Phone,         category: "Navigation" },
-  { id: "nav-settings",   label: "Settings",           icon: Settings,      category: "Navigation" },
+  { id: "nav-dashboard",     label: "Dashboard",         icon: Home,          category: "Navigation" },
+  { id: "nav-my-work",       label: "My Work",            icon: CheckSquare,   category: "Navigation" },
+  { id: "nav-people",        label: "People Supported",   icon: Users,         category: "Navigation" },
+  { id: "nav-messages",      label: "Messages",           icon: MessageSquare, category: "Navigation" },
+  { id: "nav-reports",       label: "Reports",            icon: BarChart3,     category: "Navigation" },
+  { id: "nav-billing",       label: "Billing Hub",        icon: CreditCard,    category: "Navigation" },
+  { id: "nav-incidents",     label: "Incidents",          icon: AlertTriangle, category: "Navigation" },
+  { id: "nav-documents",     label: "Documents",          icon: Folder,        category: "Navigation" },
+  { id: "nav-referrals",     label: "All Referrals",      icon: Phone,         category: "Navigation" },
+  { id: "nav-team-meetings", label: "Team Meetings",      icon: Users,         category: "Navigation", keywords: ["team meeting", "meetings", "schedule meeting", "pcp review", "quarterly review", "meeting minutes", "transcribe", "publish minutes"] } as any,
+  { id: "nav-settings",      label: "Settings",           icon: Settings,      category: "Navigation" },
 ];
 
 export const ACTION_ITEMS: Omit<CommandItem, "action">[] = [
@@ -112,16 +113,17 @@ export const ACTION_ITEMS: Omit<CommandItem, "action">[] = [
 ];
 
 export const NAV_ROUTES: Record<string, string> = {
-  "nav-dashboard": "/dashboard",
-  "nav-my-work":   "/my-work",
-  "nav-people":    "/people",
-  "nav-messages":  "/messages",
-  "nav-reports":   "/reports",
-  "nav-billing":   "/billing",
-  "nav-incidents": "/incidents",
-  "nav-documents": "/documents",
-  "nav-referrals": "/referrals",
-  "nav-settings":  "/settings",
+  "nav-dashboard":     "/dashboard",
+  "nav-my-work":       "/my-work",
+  "nav-people":        "/people",
+  "nav-messages":      "/messages",
+  "nav-reports":       "/reports",
+  "nav-billing":       "/billing",
+  "nav-incidents":     "/incidents",
+  "nav-documents":     "/documents",
+  "nav-referrals":     "/referrals",
+  "nav-team-meetings": "/team-meetings",
+  "nav-settings":      "/settings",
 };
 
 export const ACTION_ROUTES: Record<string, string> = {
@@ -488,6 +490,13 @@ export const SECTION_ITEMS: Omit<CommandItem, "action">[] = [
     icon: User, category: "Sections",
     keywords: ["intake", "new participant", "enroll", "new individual", "add person", "new client", "new admission", "registration", "intake form", "onboarding"],
   },
+  {
+    id: "sec-team-meetings",
+    label: "Team Meetings",
+    sublabel: "Schedule, transcribe, and publish meeting minutes",
+    icon: Users, category: "Sections",
+    keywords: ["team meeting", "meeting", "meetings", "schedule meeting", "new meeting", "pcp review", "annual pcp", "quarterly review", "transition planning", "crisis meeting", "meeting minutes", "transcribe", "publish minutes", "agenda", "action items", "attendees", "zoom meeting", "in-person meeting"],
+  },
 ];
 
 export const SECTION_ROUTES: Record<string, string> = {
@@ -540,6 +549,7 @@ export const SECTION_ROUTES: Record<string, string> = {
   "sec-import":              "/settings/import",
   "sec-reports-overview":    "/reports",
   "sec-new-participant":     "/people/new",
+  "sec-team-meetings":       "/team-meetings",
 };
 
 // ─── Recent items helpers ─────────────────────────────────────────────────────

@@ -6,7 +6,17 @@
 
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { generateCompletion } from "../services/ai";
+import { getAiClient } from "../services/ai";
+
+async function callAIDirect(systemPrompt: string, userPrompt: string, maxTokens = 8000, temperature = 0.2): Promise<string> {
+  const ai = getAiClient();
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    config: { systemInstruction: systemPrompt, maxOutputTokens: maxTokens, temperature },
+  });
+  return response.text ?? "";
+}
 
 interface RefinePCPRequest {
   planId: string;
@@ -41,13 +51,13 @@ export const refinePCP = onCall(
     try {
       // Load individual for context
       let indName = "Individual";
-      let orgId = "unknown";
+      
       try {
         const indSnap = await db.collection("individuals").doc(individualId).get();
         if (indSnap.exists) {
           const data = indSnap.data()!;
           indName = `${data.first_name || ""} ${data.last_name || ""}`.trim() || indName;
-          orgId = data.organizationId || "unknown";
+          
         }
       } catch { /* non-fatal */ }
 
@@ -66,17 +76,7 @@ export const refinePCP = onCall(
 
       let rawText: string;
       try {
-        const result = await generateCompletion(
-          systemPrompt,
-          userPrompt,
-          "",
-          "quality",
-          orgId,
-          uid,
-          "refine_pcp",
-          { maxTokens: 8000, temperature: 0.2 }
-        );
-        rawText = result.text;
+        rawText = await callAIDirect(systemPrompt, userPrompt, 8000, 0.2);
       } catch (err: any) {
         return { success: false, error: "GENERATION_FAILED", message: err.message || "Gemini call failed." };
       }

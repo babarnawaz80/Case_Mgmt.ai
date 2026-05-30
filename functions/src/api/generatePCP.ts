@@ -7,7 +7,31 @@
 
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { generateCompletion } from "../services/ai";
+import { getAiClient } from "../services/ai";
+
+// Direct AI call that bypasses org-level AI_PAUSED / credit checks.
+// generatePCP is an admin-level server function — it should never be blocked
+// by org feature flags or credit balances.
+async function callAIDirect(
+  systemPrompt: string,
+  contextBlock: string,
+  userPrompt: string,
+  maxTokens = 8000,
+  temperature = 0.25
+): Promise<string> {
+  const ai = getAiClient();
+  const fullPrompt = contextBlock ? `${contextBlock}\n\n${userPrompt}` : userPrompt;
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+    config: {
+      systemInstruction: systemPrompt,
+      maxOutputTokens: maxTokens,
+      temperature,
+    },
+  });
+  return response.text ?? "";
+}
 
 interface GeneratePCPRequest {
   individualId: string;
@@ -275,17 +299,7 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
 
       let rawText: string;
       try {
-        const result = await generateCompletion(
-          systemPrompt,
-          userPrompt,
-          contextBlock,
-          "quality",
-          individual.organizationId as string || "unknown",
-          uid,
-          "generate_pcp",
-          { maxTokens: 8000, temperature: 0.25 }
-        );
-        rawText = result.text;
+        rawText = await callAIDirect(systemPrompt, contextBlock, userPrompt, 8000, 0.25);
       } catch (err: any) {
         return { success: false, error: "GENERATION_FAILED", message: err.message || "Gemini call failed." };
       }

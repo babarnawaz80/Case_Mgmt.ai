@@ -1,59 +1,67 @@
 // PlatformLogin — Private login page for the SaaS platform owner (superadmin)
-// Not linked from anywhere in the customer app.
-// URL: /platform-login  (share this internally only)
+// URL: /platform-login  (share this internally only — not linked from customer app)
+//
+// Standalone — does NOT use AuthContext to avoid session-race issues.
+// Signs in directly with Firebase SDK, checks role in Firestore, then hard-redirects.
 
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Loader2, Lock, Shield } from 'lucide-react';
-import { signIn } from '@/lib/auth';
-import { useAuth } from '@/contexts/AuthContext';
+import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import app from '@/lib/firebase';
+
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
 export default function PlatformLogin() {
-  const navigate = useNavigate();
-  const { isAuthenticated, isLoading, isPlatformAdmin } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  // If already authenticated as platform admin → go straight to dashboard
-  // Wait for profile to load (isLoading from AuthContext) before checking role
-  useEffect(() => {
-    if (isLoading) return; // profile still loading — wait
-    if (isAuthenticated) {
-      if (isPlatformAdmin) {
-        navigate('/super-admin', { replace: true });
-      } else {
-        // Signed in but not a platform admin — show error and sign them out
-        setError('This login is for platform administrators only. Use the main login for your organization.');
-        setLoading(false);
-      }
-    }
-  }, [isAuthenticated, isLoading, isPlatformAdmin, navigate]);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
     try {
-      await signIn(email, password);
-      // AuthContext onAuthStateChanged will fire → useEffect above redirects
-      // Don't call setLoading(false) here — component will unmount on redirect
-      // But set a safety timeout in case something stalls
-      setTimeout(() => setLoading(false), 8000);
+      // Sign out any existing session first
+      try { await signOut(auth); } catch { /* ignore */ }
+
+      // Sign in with the provided credentials
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const uid  = cred.user.uid;
+
+      // Check Firestore directly — no AuthContext involved
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      const role = userDoc.exists() ? userDoc.data()?.role : null;
+
+      if (role !== 'platform_admin') {
+        // Wrong role — sign out immediately and show clear error
+        await signOut(auth);
+        setError(
+          `This account does not have platform admin access (role: ${role ?? 'none'}). ` +
+          `Contact your system administrator.`
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Role confirmed — hard redirect so AuthContext reloads cleanly
+      window.location.replace('/super-admin/organizations');
+
     } catch (err: any) {
-      setError(err.message ?? 'Sign in failed. Check your credentials.');
+      const msg: string = err.message ?? '';
+      if (msg.includes('wrong-password') || msg.includes('user-not-found') || msg.includes('invalid-credential')) {
+        setError('Incorrect email or password. Please try again.');
+      } else if (msg.includes('too-many-requests')) {
+        setError('Too many failed attempts. Please wait a few minutes and try again.');
+      } else {
+        setError(msg || 'Sign in failed. Check your credentials.');
+      }
       setLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0d0d1a]">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0d0d1a] relative overflow-hidden">
@@ -86,13 +94,13 @@ export default function PlatformLogin() {
               </label>
               <input
                 type="email"
-                id="platform-email"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="superadmin@casemanagement.ai"
-                autoComplete="email"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-white placeholder:text-slate-600 text-[14px] outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                placeholder="admin@casemanagement.ai"
+                autoComplete="username"
+                disabled={loading}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-white placeholder:text-slate-600 text-[14px] outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/20 transition-all disabled:opacity-50"
               />
             </div>
 
@@ -102,18 +110,18 @@ export default function PlatformLogin() {
               </label>
               <input
                 type="password"
-                id="platform-password"
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••••••"
                 autoComplete="current-password"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-white placeholder:text-slate-600 text-[14px] outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                disabled={loading}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-white placeholder:text-slate-600 text-[14px] outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/20 transition-all disabled:opacity-50"
               />
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-red-400 text-[13px]">
+              <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-red-400 text-[13px] leading-snug">
                 {error}
               </div>
             )}
@@ -121,12 +129,12 @@ export default function PlatformLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-xl bg-gradient-to-r from-teal-500 to-indigo-500 text-white font-semibold text-[14.5px] shadow-lg shadow-teal-500/25 hover:shadow-xl hover:shadow-teal-500/35 transition-all disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
+              className="w-full h-12 rounded-xl bg-gradient-to-r from-teal-500 to-indigo-500 text-white font-semibold text-[14.5px] shadow-lg shadow-teal-500/25 hover:shadow-xl hover:shadow-teal-500/35 transition-all disabled:opacity-60 mt-2 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Authenticating…
+                  Signing in…
                 </>
               ) : (
                 'Access Platform Admin'

@@ -41,6 +41,7 @@ export default function SuperAdminBilling() {
   const [rows, setRows] = useState<OrgBilling[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [filterOrg, setFilterOrg] = useState<string>('all');
 
   useEffect(() => {
     async function load() {
@@ -67,7 +68,8 @@ export default function SuperAdminBilling() {
     load();
   }, []);
 
-  const sorted = [...rows].sort((a, b) =>
+  const displayed = filterOrg === 'all' ? rows : rows.filter(r => r.id === filterOrg);
+  const sorted = [...displayed].sort((a, b) =>
     sortDir === 'desc' ? b.amountPaid - a.amountPaid : a.amountPaid - b.amountPaid
   );
 
@@ -80,9 +82,21 @@ export default function SuperAdminBilling() {
   return (
     <SuperAdminLayout title="Billing">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-white font-manrope font-bold text-[22px]">Billing Overview</h2>
-          <p className="text-slate-400 font-geist text-[13px] mt-0.5">Platform-wide revenue and credit consumption</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-white font-manrope font-bold text-[22px]">Billing Overview</h2>
+            <p className="text-slate-400 font-geist text-[13px] mt-0.5">Platform-wide revenue and credit consumption</p>
+          </div>
+          {/* Org filter */}
+          <select
+            value={filterOrg}
+            onChange={e => setFilterOrg(e.target.value)}
+            className="px-3 py-2 rounded-lg text-[13px] font-geist text-white outline-none"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}
+          >
+            <option value="all">All Organizations</option>
+            {rows.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
         </div>
 
         {/* Summary Cards */}

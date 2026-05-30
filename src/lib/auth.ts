@@ -156,6 +156,10 @@ export async function bootstrapUserProfile(user: User): Promise<UserProfile> {
     writeData.role = 'admin';
     writeData.createdAt = serverTimestamp();
   }
+  // NEVER overwrite platform_admin — it is set manually and must be preserved
+  if (existingRole === 'platform_admin') {
+    writeData.role = 'platform_admin';
+  }
   await setDoc(doc(db, 'users', user.uid), writeData, { merge: true });
 
   console.log('[auth] Bootstrapped user profile for:', user.uid, 'role:', role);

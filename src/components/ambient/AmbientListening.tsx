@@ -34,6 +34,8 @@ import ReviewApplyModal from "./ReviewApplyModal";
 interface AmbientListeningProps {
   individualName: string;
   onBack: () => void;
+  /** Called when the session ends — passes formatted transcript text for processing */
+  onTranscriptComplete?: (transcriptText: string) => void;
 }
 
 interface TranscriptEntry {
@@ -271,7 +273,7 @@ const draftTemplates: Record<SessionType, { title: string; module: string; field
 
 type Screen = "consent" | "recording" | "processed";
 
-const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => {
+const AmbientListening = ({ individualName, onBack, onTranscriptComplete }: AmbientListeningProps) => {
   const [screen, setScreen] = useState<Screen>("consent");
   const [consentChecked, setConsentChecked] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -340,6 +342,19 @@ const AmbientListening = ({ individualName, onBack }: AmbientListeningProps) => 
     setVisibleEntries(mockTranscript.length);
     setScreen("processed");
     setActiveTab("entities");
+    // Build formatted transcript text and notify parent (e.g., Team Meeting)
+    if (onTranscriptComplete) {
+      const ROLE_LABEL: Record<string, string> = {
+        case_manager: "Case Manager",
+        individual: "Individual",
+        guardian: "Guardian",
+        provider: "Provider",
+      };
+      const text = mockTranscript
+        .map(e => `[${e.time}] ${e.name} (${ROLE_LABEL[e.role] ?? e.role}): ${e.text}`)
+        .join("\n");
+      onTranscriptComplete(text);
+    }
   };
 
   const handleSelectSessionType = (type: SessionType) => {

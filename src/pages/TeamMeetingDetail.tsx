@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -30,6 +30,8 @@ import {
 } from "@/hooks/useTeamMeetings";
 import { collection, onSnapshot, query, where, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+const AmbientListening = lazy(() => import("@/components/ambient/AmbientListening"));
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
@@ -244,6 +246,7 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
   const [consent, setConsent] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [showAmbient, setShowAmbient] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLInputElement>(null);
 
@@ -325,6 +328,29 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
   }
 
   return (
+    <>
+    {/* Ambient session full-screen overlay — mounts over entire screen */}
+    {showAmbient && (
+      <div className="fixed inset-0 z-50 bg-white overflow-auto">
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-full gap-2 text-icm-text-dim">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span className="text-[13px]">Loading ambient session…</span>
+          </div>
+        }>
+          <AmbientListening
+            individualName={meeting.individualName}
+            onBack={() => setShowAmbient(false)}
+            onTranscriptComplete={(text) => {
+              setShowAmbient(false);
+              // Auto-process the transcript — feeds directly into AI extraction
+              processTranscript(text, "ambient_recording");
+            }}
+          />
+        </Suspense>
+      </div>
+    )}
+
     <div className="space-y-4">
       {/* Consent checkbox */}
       <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
@@ -350,7 +376,7 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
 
       <div className="grid grid-cols-2 gap-3">
         {/* Ambient */}
-        <div className={`rounded-xl border p-4 ${!consent ? "opacity-50" : "hover:border-icm-accent/40 cursor-pointer"} border-icm-border bg-icm-panel`}>
+        <div className={`rounded-xl border p-4 ${!consent ? "opacity-50" : "hover:border-icm-accent/40"} border-icm-border bg-icm-panel`}>
           <div className="flex items-center gap-2 mb-1.5">
             <Mic className="w-4 h-4 text-icm-accent" />
             <span className="text-[12.5px] font-medium text-icm-text">Ambient Recording</span>
@@ -358,7 +384,7 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
           <p className="text-[11.5px] text-icm-text-dim mb-3">Start a live ambient session with real-time transcription.</p>
           <button
             disabled={!consent}
-            onClick={() => toast.info("Ambient recording requires the Companion app to be active during the meeting.")}
+            onClick={() => setShowAmbient(true)}
             className="text-[11.5px] px-3 py-1.5 rounded-md bg-icm-accent text-white hover:bg-icm-accent/90 disabled:opacity-40"
           >
             Open Ambient Session
@@ -457,6 +483,7 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
         </div>
       )}
     </div>
+    </>
   );
 }
 

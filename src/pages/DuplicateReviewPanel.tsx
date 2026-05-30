@@ -818,7 +818,7 @@ export default function DuplicateReviewPanel() {
   const [searchParams] = useSearchParams();
   const { userProfile, isSupervisor } = useAuth();
 
-  const { pairs, loading: pairsLoading } = usePendingDuplicatePairs();
+  const { data: pairs, loading: pairsLoading } = usePendingDuplicatePairs(userProfile?.organizationId);
   const { individuals } = useIndividuals();
 
   const userId = userProfile?.uid ?? "";

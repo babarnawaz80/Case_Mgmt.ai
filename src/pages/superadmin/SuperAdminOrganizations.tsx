@@ -1,6 +1,7 @@
 // Super Admin — Organizations Page
 // Lists all organizations, create new org + admin user, suspend/reactivate/delete
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   collection, getDocs, doc, updateDoc,
   setDoc, serverTimestamp, query, orderBy,
@@ -22,7 +23,10 @@ interface OrgDoc {
   name: string;
   state?: string;
   status?: string;
+  plan?: string;
   totalUsers?: number;
+  activeUserCount?: number;
+  userLimit?: number;
   creditBalance?: number;
   monthlyAISpend?: number;
   createdAt?: any;
@@ -129,6 +133,7 @@ function InputField({
 }
 
 export default function SuperAdminOrganizations() {
+  const navigate = useNavigate();
   const [orgs, setOrgs] = useState<OrgDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -301,28 +306,45 @@ export default function SuperAdminOrganizations() {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b" style={{ borderColor: 'rgba(99,102,241,0.15)' }}>
-                    {['Name', 'Plan', 'Credit Balance', 'Status', 'Created', 'Actions'].map(h => (
+                    {['Name', 'Plan', 'Credit Balance', 'Users', 'Seat Limit', 'Status', 'Created', 'Actions'].map(h => (
                       <th key={h} className="text-left py-3 px-3 text-slate-400 font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={6} className="text-center py-8 text-slate-500">No organizations found</td></tr>
+                    <tr><td colSpan={8} className="text-center py-8 text-slate-500">No organizations found</td></tr>
                   )}
                   {filtered.map(org => (
-                    <tr key={org.id} className="border-b hover:bg-white/[0.02] transition-colors"
-                        style={{ borderColor: 'rgba(99,102,241,0.08)' }}>
+                    <tr key={org.id} className="border-b hover:bg-white/[0.02] transition-colors cursor-pointer"
+                        style={{ borderColor: 'rgba(99,102,241,0.08)' }}
+                        onClick={() => navigate(`/super-admin/organizations/${org.id}`)}>
                       <td className="py-3 px-3 text-white font-medium">{org.name}</td>
-                      <td className="py-3 px-3 text-slate-300">{org.plan ?? 'Enterprise'}</td>
-                      <td className="py-3 px-3 text-teal-400 font-mono">{(org.credit_balance ?? org.creditBalance ?? 0).toLocaleString()}</td>
+                      <td className="py-3 px-3 text-slate-300">{(org as any).plan ?? 'Enterprise'}</td>
+                      <td className="py-3 px-3 text-teal-400 font-mono">{((org as any).credit_balance ?? org.creditBalance ?? 0).toLocaleString()}</td>
+                      {/* Users column */}
+                      <td className="py-3 px-3 text-slate-200 font-mono text-[13px]">
+                        {org.totalUsers ?? 0}
+                      </td>
+                      {/* Seat limit column */}
+                      <td className="py-3 px-3">
+                        {org.userLimit ? (
+                          <span className={`text-[12px] font-mono font-semibold ${
+                            (org.totalUsers ?? 0) >= org.userLimit ? 'text-red-400' : 'text-slate-300'
+                          }`}>
+                            {org.totalUsers ?? 0}/{org.userLimit}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600 text-[12px]">∞</span>
+                        )}
+                      </td>
                       <td className="py-3 px-3"><StatusBadge status={org.status} /></td>
                       <td className="py-3 px-3 text-slate-500 text-[11px]">
-                        {org.createdAt?.toDate?.()?.toLocaleDateString() ?? org.createdAt_iso ?? '—'}
+                        {org.createdAt?.toDate?.()?.toLocaleDateString() ?? (org as any).createdAt_iso ?? '—'}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setViewOrg(org)} title="View Details"
+                          <button onClick={() => navigate(`/super-admin/organizations/${org.id}`)} title="View Details"
                             className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-all">
                             <Eye className="w-3.5 h-3.5" />
                           </button>

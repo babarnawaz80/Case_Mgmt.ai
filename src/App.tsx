@@ -208,6 +208,7 @@ const BClaimsManagement = lazyWithRetry(() => import("@/pages/billing/ClaimsMana
 const BAuditLog = lazyWithRetry(() => import("@/pages/billing/AuditLog"));
 const BRevenueCycle = lazyWithRetry(() => import("@/pages/billing/RevenueCycle"));
 const SuperAdminOrganizations = lazyWithRetry(() => import("./pages/superadmin/SuperAdminOrganizations"));
+const SuperAdminOrgDetail = lazyWithRetry(() => import("./pages/superadmin/SuperAdminOrgDetail"));
 const SuperAdminUsers = lazyWithRetry(() => import("./pages/superadmin/SuperAdminUsers"));
 const SuperAdminBilling = lazyWithRetry(() => import("./pages/superadmin/SuperAdminBilling"));
 const SuperAdminAIUsage = lazyWithRetry(() => import("./pages/superadmin/SuperAdminAIUsage"));
@@ -456,6 +457,7 @@ const App = () => (
             {/* ── SUPER ADMIN — platform_admin role only ─────────────── */}
             <Route path="/super-admin" element={<PlatformAdminGuard><Navigate to="/super-admin/organizations" replace /></PlatformAdminGuard>} />
             <Route path="/super-admin/organizations" element={<PlatformAdminGuard><SuperAdminOrganizations /></PlatformAdminGuard>} />
+            <Route path="/super-admin/organizations/:orgId" element={<PlatformAdminGuard><SuperAdminOrgDetail /></PlatformAdminGuard>} />
             <Route path="/super-admin/users" element={<PlatformAdminGuard><SuperAdminUsers /></PlatformAdminGuard>} />
             <Route path="/super-admin/billing" element={<PlatformAdminGuard><SuperAdminBilling /></PlatformAdminGuard>} />
             <Route path="/super-admin/ai-usage" element={<PlatformAdminGuard><SuperAdminAIUsage /></PlatformAdminGuard>} />

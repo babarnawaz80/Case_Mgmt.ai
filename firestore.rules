@@ -26,12 +26,16 @@ service cloud.firestore {
       return userDoc().role;
     }
 
+    function isPlatformAdmin() {
+      return isAuth() && myRole() == 'platform_admin';
+    }
+
     function isAdmin() {
-      return isAuth() && myRole() == 'admin';
+      return isAuth() && (myRole() == 'admin' || isPlatformAdmin());
     }
 
     function isSupervisor() {
-      return isAuth() && myRole() in ['supervisor', 'admin'];
+      return isAuth() && myRole() in ['supervisor', 'admin', 'platform_admin'];
     }
 
     function isCaseManager() {
@@ -62,8 +66,9 @@ service cloud.firestore {
       allow read: if isAuth();
       // Admin can update; any auth user can CREATE their own org (bootstrap/demo seed)
       allow create: if isAuth() && request.resource.data.id == orgId;
-      allow update: if isAdmin() && myOrgId() == orgId;
-      allow delete: if false;
+      // Platform admin can update any org; org admin can update their own
+      allow update: if isPlatformAdmin() || (isAdmin() && myOrgId() == orgId);
+      allow delete: if isPlatformAdmin();
     }
 
     // ─── Organization Settings subcollection (AI, orchestrator config, etc.) ──
@@ -734,6 +739,13 @@ service cloud.firestore {
       allow create: if isCaseManager();
       allow update: if true;  // Cloud Functions update lastAccessedAt, OTP fields, sessions
       allow delete: if isAdmin();
+    }
+
+    // ─── Platform Admin — read ALL collections across ALL orgs ───────────────────
+    // Platform admins need cross-org visibility for customer support.
+    // Write is still restricted per-collection above.
+    match /{document=**} {
+      allow read: if isPlatformAdmin();
     }
 
     // ─── Default: Deny All ─────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   where,
   onSnapshot,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   addDoc,
@@ -82,6 +83,7 @@ const SettingsUsers = () => {
 
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userLimit, setUserLimit] = useState<number | null>(null);
   const [tab, setTab] = useState<"users" | "roles">("users");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | RoleKey>("all");
@@ -109,6 +111,17 @@ const SettingsUsers = () => {
     if (openMenuId) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openMenuId]);
+
+  // Load user limit from org document
+  useEffect(() => {
+    if (!orgId) return;
+    getDoc(doc(db, "organizations", orgId)).then((snap) => {
+      if (snap.exists()) {
+        const limit = snap.data()?.userLimit;
+        setUserLimit(typeof limit === "number" ? limit : null);
+      }
+    }).catch(() => {});
+  }, [orgId]);
 
   // Live Firestore subscription
   useEffect(() => {
@@ -419,13 +432,19 @@ const SettingsUsers = () => {
                 <Upload className="w-3.5 h-3.5" />
                 Import users
               </button>
-              <button
-                onClick={() => setShowInvite(true)}
-                className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Add User
-              </button>
+              {userLimit !== null && users.filter(u => u.status === "active").length >= userLimit ? (
+                <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-icm-red/30 bg-icm-red-soft text-icm-red text-[12px] font-geist font-semibold">
+                  <span>Seat limit reached ({userLimit}/{userLimit})</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowInvite(true)}
+                  className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Add User {userLimit !== null ? `(${users.filter(u => u.status === "active").length}/${userLimit})` : ""}
+                </button>
+              )}
             </div>
           </div>
 

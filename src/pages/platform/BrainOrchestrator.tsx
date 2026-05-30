@@ -10,6 +10,9 @@ import { AgentActivityFeed } from "@/components/orchestrator/AgentActivityFeed";
 import { RunHistory } from "@/components/orchestrator/RunHistory";
 import { IndividualComplianceGrid } from "@/components/orchestrator/IndividualComplianceGrid";
 import { PromptStudio } from "@/components/orchestrator/PromptStudio";
+import { ForwardComplianceCalendar } from "@/components/orchestrator/ForwardComplianceCalendar";
+import { OrchestratorRecommendations } from "@/components/orchestrator/OrchestratorRecommendations";
+import { useMemo } from "react";
 
 const BrainOrchestrator = () => {
   const navigate = useNavigate();
@@ -77,22 +80,32 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
           />
         </div>
 
-        {/* Section 3 — Agent Activity Feed + Run History */}
+        {/* Section 3 — Forward Compliance Calendar */}
+        <ForwardComplianceCalendar
+          individuals={individuals}
+          loading={individualsLoading}
+        />
+
+        {/* Section 4 — AI Recommendations (derived from calendar data) */}
+        <OrchestratorRecommendationsWrapper
+          individuals={individuals}
+          draftsCount={draftsReadyCount}
+        />
+
+        {/* Section 5 — Agent Activity Feed + Run History */}
         <div>
           <SectionHeading>Agent Activity</SectionHeading>
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Activity feed: 60% */}
             <div className="lg:col-span-3" style={{ minHeight: 400 }}>
               <AgentActivityFeed logs={logs} loading={logsLoading} />
             </div>
-            {/* Run history: 40% */}
             <div className="lg:col-span-2">
               <RunHistory runs={runs} loading={runsLoading} />
             </div>
           </div>
         </div>
 
-        {/* Section 4 — Individual Compliance Grid */}
+        {/* Section 6 — Individual Compliance Grid */}
         <div>
           <SectionHeading>Individual Compliance Grid</SectionHeading>
           <IndividualComplianceGrid
@@ -102,7 +115,7 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
           />
         </div>
 
-        {/* Section 5 — Prompt Studio */}
+        {/* Section 7 — Prompt Studio */}
         <div>
           <SectionHeading>Prompt Studio — Agent Intelligence</SectionHeading>
           <PromptStudio />
@@ -123,6 +136,38 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
       </div>
     </ICMShell>
   );
+}
+
+function OrchestratorRecommendationsWrapper({
+  individuals,
+  draftsCount,
+}: {
+  individuals: ReturnType<typeof useIndividuals>["individuals"];
+  draftsCount: number;
+}) {
+  // Build deadlines from individuals for recommendations
+  const deadlines = useMemo(() => {
+    const today = new Date();
+    const ninetyDays = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const items: import("@/components/orchestrator/ForwardComplianceCalendar").Deadline[] = [];
+    for (const ind of individuals) {
+      if (ind.enrollment_status !== "active") continue;
+      const name = `${ind.last_name}, ${ind.first_name}`;
+      const cm = ind.assigned_case_manager_name ?? "—";
+      const push = (type: import("@/components/orchestrator/ForwardComplianceCalendar").DeadlineType, dueDate: Date) => {
+        const days = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (dueDate > ninetyDays && days >= 0) return;
+        const status: "overdue" | "at_risk" | "on_track" = days < 0 ? "overdue" : days <= 30 ? "at_risk" : "on_track";
+        items.push({ id: `${ind.id}-${type}`, type, individualId: ind.id, individualName: name, caseManager: cm, dueDate, daysUntil: days, status });
+      };
+      if (ind.pcp_due_date ?? ind.isp_due_date) push("PCP Renewal", new Date((ind.pcp_due_date ?? ind.isp_due_date)!));
+      if (ind.ma_redetermination_date) push("MA Renewal", new Date(ind.ma_redetermination_date));
+      if (ind.last_visit_date) push("Quarterly Visit Due", new Date(new Date(ind.last_visit_date).getTime() + 90 * 24 * 60 * 60 * 1000));
+    }
+    return items;
+  }, [individuals]);
+
+  return <OrchestratorRecommendations deadlines={deadlines} draftsCount={draftsCount} />;
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {

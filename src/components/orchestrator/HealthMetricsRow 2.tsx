@@ -24,41 +24,24 @@ export function HealthMetricsRow({
   individuals,
   individualsLoading,
 }: HealthMetricsRowProps) {
-  const active = individuals.filter((i) => i.enrollment_status === "active");
-  const activeCount = active.length;
+  const activeCount = individuals.filter((i) => i.enrollment_status === "active").length;
 
-  const today = new Date();
-  const thirtyDays = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const ninetyDaysAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-
-  // Calculate at-risk from actual date fields (not just compliance_score)
-  const atRiskCount = active.filter((i) => {
-    const pcpDate = i.pcp_due_date ?? i.isp_due_date;
-    if (pcpDate && new Date(pcpDate) < thirtyDays) return true;
-    if (i.last_visit_date && new Date(i.last_visit_date) < ninetyDaysAgo) return true;
-    if (i.ma_redetermination_date && new Date(i.ma_redetermination_date) < thirtyDays) return true;
-    return false;
-  }).length;
-
-  // Use stored compliance_score if available, otherwise calculate from date fields
-  const scored = active.filter((i) => typeof i.compliance_score === "number");
+  // Compute org average compliance from individuals that have compliance_score
+  const scored = individuals.filter((i) => typeof i.compliance_score === "number");
   const avgScore =
     scored.length > 0
       ? Math.round(scored.reduce((s, i) => s + (i.compliance_score ?? 0), 0) / scored.length)
-      : activeCount > 0
-      ? Math.round(((activeCount - atRiskCount) / activeCount) * 100)
       : null;
 
-  // Compliance distribution — use stored scores if available, else estimate from date fields
-  const scoredTiers = active.filter((i) => typeof i.compliance_score === "number");
-  const tiers = scoredTiers.length > 0 ? {
-    green: scoredTiers.filter((i) => complianceTier(i.compliance_score) === "green").length,
-    amber: scoredTiers.filter((i) => complianceTier(i.compliance_score) === "amber").length,
-    red: scoredTiers.filter((i) => complianceTier(i.compliance_score) === "red").length,
-  } : {
-    green: activeCount - atRiskCount,
-    amber: Math.floor(atRiskCount * 0.6),
-    red: Math.ceil(atRiskCount * 0.4),
+  const atRiskCount = individuals.filter(
+    (i) => typeof i.compliance_score === "number" && i.compliance_score < 80
+  ).length;
+
+  // Compliance distribution
+  const tiers = {
+    green: individuals.filter((i) => complianceTier(i.compliance_score) === "green" && typeof i.compliance_score === "number").length,
+    amber: individuals.filter((i) => complianceTier(i.compliance_score) === "amber").length,
+    red: individuals.filter((i) => complianceTier(i.compliance_score) === "red").length,
   };
   const total = tiers.green + tiers.amber + tiers.red;
 
@@ -72,7 +55,7 @@ export function HealthMetricsRow({
         <MetricCard
           label="Org compliance score"
           value={avgScore !== null ? `${avgScore}%` : "—"}
-          sub={avgScore !== null ? (scoreTone === "green" ? "On track" : scoreTone === "amber" ? "Needs attention" : "At risk") : activeCount > 0 ? "Calculating…" : "No active individuals"}
+          sub={avgScore !== null ? scoreTone === "green" ? "On track" : scoreTone === "amber" ? "Needs attention" : "At risk" : "No data yet"}
           tone={scoreTone}
           loading={individualsLoading}
         />

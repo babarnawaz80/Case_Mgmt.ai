@@ -100,15 +100,40 @@ export function RunHistory({ runs, loading }: RunHistoryProps) {
 
               {/* Expanded detail */}
               {expanded === run.id && (
-                <div className="px-3 pb-3 pt-1 border-t border-icm-border space-y-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    <RunStat label="Duration" value={formatDuration(run.started_at, run.completed_at)} />
-                    <RunStat label="Individuals" value={String(run.individuals_processed)} />
-                    <RunStat label="Tasks created" value={String(run.tasks_created)} />
-                    <RunStat label="AI drafts" value={String(run.drafts_generated)} />
-                    <RunStat label="Escalations" value={String(run.escalations_triggered)} />
-                    <RunStat label="Scores updated" value={String(run.compliance_scores_updated)} />
+                <div className="px-3 pb-3 pt-2 border-t border-icm-border space-y-3 bg-icm-bg/40">
+                  {/* What was checked */}
+                  <div>
+                    <p className="text-[10px] font-geist font-bold uppercase tracking-wider text-icm-text-dim mb-1.5">What the orchestrator checked</p>
+                    <div className="space-y-0.5">
+                      {[
+                        `Scanned ${run.individuals_processed} active individual${run.individuals_processed !== 1 ? "s" : ""}`,
+                        "Checked PCP/ISP compliance dates",
+                        "Checked Medicaid renewal dates",
+                        "Checked service authorizations",
+                        "Checked monitoring form schedules",
+                        "Checked visit frequency requirements",
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-[11px] font-geist text-icm-text-dim">
+                          <Clock className="w-3 h-3 text-icm-green shrink-0" />
+                          {item}
+                        </div>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* What was found */}
+                  <div className="border-t border-icm-border pt-2">
+                    <p className="text-[10px] font-geist font-bold uppercase tracking-wider text-icm-text-dim mb-1.5">What it found</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <RunStat label="Individuals" value={String(run.individuals_processed)} />
+                      <RunStat label="Tasks created" value={String(run.tasks_created)} />
+                      <RunStat label="AI drafts" value={String(run.drafts_generated)} />
+                      <RunStat label="Escalations" value={String(run.escalations_triggered)} />
+                      <RunStat label="Scores updated" value={String(run.compliance_scores_updated)} />
+                      <RunStat label="Duration" value={formatDuration(run.started_at, run.completed_at)} />
+                    </div>
+                  </div>
+
                   {run.summary && (
                     <p className="text-[11px] font-geist text-icm-text-dim leading-relaxed border-t border-icm-border pt-2">
                       {run.summary}
@@ -120,9 +145,7 @@ export function RunHistory({ runs, loading }: RunHistoryProps) {
                         {run.errors.length} error{run.errors.length > 1 ? "s" : ""}
                       </p>
                       {run.errors.slice(0, 3).map((e, i) => (
-                        <p key={i} className="text-[10.5px] font-mono text-icm-red/80">
-                          {e}
-                        </p>
+                        <p key={i} className="text-[10.5px] font-mono text-icm-red/80">{e}</p>
                       ))}
                     </div>
                   )}

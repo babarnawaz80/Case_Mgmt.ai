@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, Download, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowUpDown, Download, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, Circle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Individual } from "@/hooks/useIndividuals";
 import { type OrchestratorTask } from "@/hooks/useOrchestrator";
@@ -42,6 +42,25 @@ function daysUntil(dateStr?: string): number | null {
   return Math.floor((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function calcComplianceStatus(ind: Individual): "compliant" | "at_risk" | "non_compliant" {
+  const today = new Date();
+  const thirtyDays = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const pcpDate = ind.pcp_due_date ?? ind.isp_due_date;
+  if (pcpDate && new Date(pcpDate) < today) return "non_compliant";
+  if (pcpDate && new Date(pcpDate) < thirtyDays) return "at_risk";
+  if (ind.ma_redetermination_date) {
+    const ma = new Date(ind.ma_redetermination_date);
+    if (ma < today) return "non_compliant";
+    if (ma < thirtyDays) return "at_risk";
+  }
+  if (ind.last_visit_date) {
+    const daysSinceVisit = (today.getTime() - new Date(ind.last_visit_date).getTime()) / (1000*60*60*24);
+    if (daysSinceVisit > 90) return "non_compliant";
+    if (daysSinceVisit > 75) return "at_risk";
+  }
+  return "compliant";
+}
+
 export function IndividualComplianceGrid({
   individuals,
   tasks,
@@ -53,6 +72,7 @@ export function IndividualComplianceGrid({
   const [search, setSearch] = useState("");
   const [cmFilter, setCmFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState<"all" | "green" | "amber" | "red">("all");
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Build task counts per individual
   const taskCounts = useMemo(() => {
@@ -253,96 +273,119 @@ export function IndividualComplianceGrid({
                 const daysPcp = daysUntil(pcpDue);
                 const openTasks = taskCounts[ind.id] ?? 0;
                 const aiDrafts = draftCounts[ind.id] ?? 0;
-                const hasCritical =
-                  typeof ind.compliance_score === "number" && ind.compliance_score < 70;
+                const complianceStatus = calcComplianceStatus(ind);
+                const isExpanded = expandedRow === ind.id;
 
                 return (
-                  <tr
-                    key={ind.id}
-                    className="border-b border-icm-border hover:bg-icm-panel/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/people/${ind.id}/echart`)}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {hasCritical && (
-                          <AlertTriangle className="w-3.5 h-3.5 text-icm-red shrink-0" />
+                  <>
+                    <tr
+                      key={ind.id}
+                      className="border-b border-icm-border hover:bg-icm-panel/50 transition-colors cursor-pointer"
+                      onClick={() => setExpandedRow(isExpanded ? null : ind.id)}
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          {complianceStatus === "non_compliant" && <AlertTriangle className="w-3.5 h-3.5 text-icm-red shrink-0" />}
+                          <span className="text-[12px] font-geist font-semibold text-icm-text hover:text-icm-accent transition-colors">
+                            {ind.first_name} {ind.last_name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-[11.5px] font-geist text-icm-text-dim">{ind.assigned_case_manager_name ?? "—"}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-[11px] font-mono text-icm-text-faint">{ind.program ?? ind.program_type ?? "—"}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {typeof ind.compliance_score === "number" ? (
+                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-geist font-bold", tierBg(ind.compliance_score))}>
+                            {ind.compliance_score}%
+                          </span>
+                        ) : (
+                          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-geist font-bold",
+                            complianceStatus === "compliant" ? "bg-icm-green-soft text-icm-green" :
+                            complianceStatus === "at_risk" ? "bg-icm-amber-soft text-icm-amber" :
+                            "bg-icm-red-soft text-icm-red"
+                          )}>
+                            {complianceStatus === "compliant" ? <><CheckCircle2 className="w-3 h-3" /> On track</> :
+                             complianceStatus === "at_risk" ? <><Circle className="w-3 h-3" /> At risk</> :
+                             <><XCircle className="w-3 h-3" /> Non-compliant</>}
+                          </span>
                         )}
-                        <span className="text-[12px] font-geist font-semibold text-icm-text hover:text-icm-accent transition-colors">
-                          {ind.first_name} {ind.last_name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-[11.5px] font-geist text-icm-text-dim">
-                        {ind.assigned_case_manager_name ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-[11px] font-mono text-icm-text-faint">
-                        {ind.program ?? ind.program_type ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {typeof ind.compliance_score === "number" ? (
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-geist font-bold",
-                            tierBg(ind.compliance_score)
-                          )}
-                        >
-                          {ind.compliance_score}%
-                        </span>
-                      ) : (
-                        <span className="text-[11px] font-geist text-icm-text-faint">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {daysLastVisit !== null ? (
-                        <span
-                          className={cn(
-                            "text-[11.5px] font-geist",
-                            daysLastVisit > 90 ? "text-icm-red font-semibold" : daysLastVisit > 60 ? "text-icm-amber" : "text-icm-text-dim"
-                          )}
-                        >
-                          {daysLastVisit}d ago
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-icm-text-faint">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {daysPcp !== null ? (
-                        <span
-                          className={cn(
-                            "text-[11.5px] font-geist",
-                            daysPcp < 0 ? "text-icm-red font-semibold" : daysPcp <= 30 ? "text-icm-amber font-semibold" : "text-icm-text-dim"
-                          )}
-                        >
-                          {daysPcp < 0 ? `${Math.abs(daysPcp)}d overdue` : `${daysPcp}d`}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-icm-text-faint">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {openTasks > 0 ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-icm-accent-soft text-icm-accent text-[10.5px] font-geist font-bold">
-                          {openTasks}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-icm-text-faint">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {aiDrafts > 0 ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-icm-green-soft text-icm-green text-[10.5px] font-geist font-bold">
-                          {aiDrafts}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-icm-text-faint">—</span>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {daysLastVisit !== null ? (
+                          <span className={cn("text-[11.5px] font-geist", daysLastVisit > 90 ? "text-icm-red font-semibold" : daysLastVisit > 60 ? "text-icm-amber" : "text-icm-text-dim")}>
+                            {daysLastVisit}d ago
+                          </span>
+                        ) : <span className="text-[11px] text-icm-text-faint">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {daysPcp !== null ? (
+                          <span className={cn("text-[11.5px] font-geist", daysPcp < 0 ? "text-icm-red font-semibold" : daysPcp <= 30 ? "text-icm-amber font-semibold" : "text-icm-text-dim")}>
+                            {daysPcp < 0 ? `${Math.abs(daysPcp)}d overdue` : `${daysPcp}d`}
+                          </span>
+                        ) : <span className="text-[11px] text-icm-text-faint">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {openTasks > 0 ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-icm-accent-soft text-icm-accent text-[10.5px] font-geist font-bold">{openTasks}</span>
+                        ) : <span className="text-[11px] text-icm-text-faint">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {aiDrafts > 0 ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-icm-green-soft text-icm-green text-[10.5px] font-geist font-bold">{aiDrafts}</span>
+                        ) : <span className="text-[11px] text-icm-text-faint">—</span>}
+                      </td>
+                    </tr>
+
+                    {/* Expanded row */}
+                    {isExpanded && (
+                      <tr key={`${ind.id}-expanded`} className="bg-icm-bg/60 border-b border-icm-border">
+                        <td colSpan={8} className="px-4 py-3">
+                          <div className="flex items-start gap-8 flex-wrap">
+                            <div className="min-w-[180px]">
+                              <p className="text-[10px] font-geist font-bold uppercase tracking-wider text-icm-text-dim mb-1.5">Pending Tasks ({openTasks})</p>
+                              {openTasks === 0 ? (
+                                <p className="text-[11px] font-geist text-icm-text-faint">No open tasks</p>
+                              ) : (
+                                <div className="space-y-1">
+                                  {daysPcp !== null && daysPcp < 0 && (
+                                    <div className="flex items-center gap-1.5 text-[11px] font-geist text-icm-text">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-icm-red shrink-0" />
+                                      PCP renewal ({Math.abs(daysPcp)}d overdue)
+                                    </div>
+                                  )}
+                                  {daysLastVisit !== null && daysLastVisit > 90 && (
+                                    <div className="flex items-center gap-1.5 text-[11px] font-geist text-icm-text">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-icm-amber shrink-0" />
+                                      Quarterly visit overdue ({daysLastVisit}d)
+                                    </div>
+                                  )}
+                                  {openTasks > 0 && <p className="text-[10.5px] text-icm-text-faint">{openTasks} total open task{openTasks > 1 ? "s" : ""}</p>}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-[160px]">
+                              <p className="text-[10px] font-geist font-bold uppercase tracking-wider text-icm-text-dim mb-1.5">AI Drafts Ready ({aiDrafts})</p>
+                              {aiDrafts === 0 ? (
+                                <p className="text-[11px] font-geist text-icm-text-faint">No drafts pending</p>
+                              ) : (
+                                <p className="text-[11px] font-geist text-icm-green">{aiDrafts} draft{aiDrafts > 1 ? "s" : ""} awaiting CM review</p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => navigate(`/people/${ind.id}/echart`)}
+                              className="ml-auto text-[11.5px] font-geist font-semibold text-icm-accent hover:underline self-center"
+                            >
+                              Open eChart →
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 );
               })}
             </tbody>

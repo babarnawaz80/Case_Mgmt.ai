@@ -175,6 +175,52 @@ export const generatePCP = onCall(
       const incidents = incidentsResult.status === "fulfilled" ? incidentsResult.value : [];
       const authorizationDocs = authorizationsResult.status === "fulfilled" ? (authorizationsResult.value as any).docs || [] : [];
       const assessmentDocs = assessmentsResult.status === "fulfilled" ? (assessmentsResult.value as any).docs || [] : [];
+
+      // ── Extract structured assessment data ────────────────────────────────────
+      const sortedAssessments = [...assessmentDocs].sort((a: any, b: any) => {
+        const aDate = (a.data().completedAt?.toDate?.() || new Date(a.data().date || 0)).getTime();
+        const bDate = (b.data().completedAt?.toDate?.() || new Date(b.data().date || 0)).getTime();
+        return bDate - aDate; // most recent first
+      });
+
+      const structuredAssessments = sortedAssessments.slice(0, 3).map((d: any) => {
+        const a = d.data();
+        const responses = a.responses || {};
+        const entries = Object.entries(responses) as [string, any][];
+        return {
+          templateName: a.templateName || a.assessmentType || a.type || "Assessment",
+          completedAt: a.completedAt?.toDate?.()?.toLocaleDateString?.() || a.date || "—",
+          score: a.totalScore || a.score || null,
+          maxScore: a.maxScore || null,
+          keyFindings: a.keyFindings || a.summary || "",
+          independenceLevels: entries
+            .filter(([, r]) => r?.questionType === "independence_level" || r?.questionLabel?.toLowerCase().includes("independence") || r?.questionLabel?.toLowerCase().includes("adl"))
+            .map(([, r]) => `${r.questionLabel || "Activity"}: Level ${r.value || "—"}`),
+          goalAreas: entries
+            .filter(([, r]) => r?.questionLabel?.toLowerCase().includes("goal") || r?.questionType === "goal_area")
+            .map(([, r]) => `${r.questionLabel}: ${r.value || "—"}`),
+          supportNeeds: entries
+            .filter(([, r]) => r?.questionLabel?.toLowerCase().includes("support") || r?.questionType === "support_need")
+            .map(([, r]) => `${r.questionLabel}: ${r.value}`),
+          recommendedServices: entries
+            .filter(([, r]) => r?.questionLabel?.toLowerCase().includes("recommend") || r?.questionLabel?.toLowerCase().includes("service"))
+            .map(([, r]) => `${r.questionLabel}: ${r.value}`),
+          riskScore: entries.find(([, r]) => r?.questionLabel?.toLowerCase().includes("risk") && typeof r?.value === "number")?.[1]?.value ?? null,
+        };
+      });
+
+      // Check assessment freshness for warnings
+      const latestAssessmentDate = sortedAssessments.length > 0
+        ? (sortedAssessments[0].data().completedAt?.toDate?.() || new Date(sortedAssessments[0].data().date || 0))
+        : null;
+      const assessmentAgeMonths = latestAssessmentDate
+        ? Math.floor((Date.now() - latestAssessmentDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+        : null;
+      const assessmentWarning = assessmentDocs.length === 0
+        ? "NO_ASSESSMENT"
+        : assessmentAgeMonths !== null && assessmentAgeMonths > 13
+        ? "OUTDATED_ASSESSMENT"
+        : null;
       const priorPlanDocs = priorPlansResult.status === "fulfilled" ? (priorPlansResult.value as any).docs || [] : [];
 
       // Load guidelines engine if linked
@@ -264,8 +310,25 @@ ${summarizeDocs(incidents, ["date", "incidentType", "classification", "status", 
 SERVICE AUTHORIZATIONS (${authorizationDocs.length}):
 ${summarizeDocs(authorizationDocs, ["serviceName", "serviceType", "authorizedUnits", "unitsUsed", "expirationDate", "status"], 200)}
 
-ASSESSMENTS (${assessmentDocs.length}):
-${summarizeDocs(assessmentDocs, ["assessmentType", "date", "score", "keyFindings", "summary"], 200)}
+COMPLETED ASSESSMENTS (${assessmentDocs.length} total, most recent first):
+${structuredAssessments.length === 0 ? "No completed assessments on file." : structuredAssessments.map(a => `
+Assessment: ${a.templateName}
+Completed: ${a.completedAt}${a.score !== null ? ` | Score: ${a.score}${a.maxScore ? `/${a.maxScore}` : ""}` : ""}
+Key Findings: ${a.keyFindings || "See responses"}
+Independence/ADL Levels: ${a.independenceLevels.length ? a.independenceLevels.join("; ") : "Not assessed"}
+Support Needs Identified: ${a.supportNeeds.length ? a.supportNeeds.join("; ") : "Not specified"}
+Recommended Services: ${a.recommendedServices.length ? a.recommendedServices.join("; ") : "Not specified"}
+Goal Areas: ${a.goalAreas.length ? a.goalAreas.join("; ") : "Not specified"}
+Risk Score: ${a.riskScore !== null ? a.riskScore : "Not scored"}
+`).join("---")}
+
+ASSESSMENT → PCP MAPPING INSTRUCTIONS:
+- Independence Level scores → map directly to "Support Needs" section
+  Levels 1-3 = high support need; Levels 4-5 = moderate support; Levels 6-8 = minimal/no support
+- Goal Areas from assessment → seed ISP Goals section (each goal area = proposed PCP goal)
+- Recommended Services → populate Services section alongside authorizations
+- Risk Score → Health & Safety: 0-2=Low, 3-5=Moderate, 6+=High risk (flag for attention)
+- Always cite assessment source: "Based on ${structuredAssessments[0]?.templateName || "assessment"} (${structuredAssessments[0]?.completedAt || "—"})"
 
 ${priorPlanDocs.length > 0 ? `PRIOR PLAN HISTORY (most recent):
 ${JSON.stringify((priorPlanDocs[0] as any).data().goals || [], null, 2).slice(0, 1000)}` : "PRIOR PLAN: No prior plans on file."}
@@ -432,6 +495,21 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
           dataSources,
         });
 
+        const warnings: Array<{ type: string; severity: string; message: string }> = [];
+        if (assessmentWarning === "NO_ASSESSMENT") {
+          warnings.push({
+            type: "no_assessment",
+            severity: "warning",
+            message: "No completed assessments found. PCP generated from contact notes and monitoring forms only. Complete an Initial Assessment to improve accuracy.",
+          });
+        } else if (assessmentWarning === "OUTDATED_ASSESSMENT") {
+          warnings.push({
+            type: "outdated_assessment",
+            severity: "info",
+            message: `Most recent assessment was completed ${assessmentAgeMonths} months ago. Consider completing a new assessment before finalizing this PCP renewal.`,
+          });
+        }
+
         return {
           success: true,
           planId: docRef.id,
@@ -439,6 +517,8 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
           plan: { ...parsedPlan, guidelinesEngineName: engineName },
           engineName,
           dataSources,
+          assessmentWarning,
+          warnings,
         };
       } catch (err: any) {
         return { success: false, error: "SAVE_FAILED", message: err.message || "Failed to save plan to Firestore." };

@@ -14,7 +14,9 @@ export type DeadlineType =
   | "Quarterly Visit Due"
   | "Monitoring Form"
   | "Service Auth Expiring"
-  | "Assessment Due";
+  | "Assessment Due"
+  | "Annual Reassessment Due"
+  | "Initial Assessment Due";
 
 export interface Deadline {
   id: string;
@@ -50,6 +52,14 @@ export function buildDeadlines(individuals: Individual[]): Deadline[] {
     if (ind.pcp_due_date ?? ind.isp_due_date) push("PCP Renewal", new Date((ind.pcp_due_date ?? ind.isp_due_date)!));
     if (ind.ma_redetermination_date) push("MA Renewal", new Date(ind.ma_redetermination_date));
     if (ind.last_visit_date) push("Quarterly Visit Due", new Date(new Date(ind.last_visit_date).getTime() + 90 * 24 * 60 * 60 * 1000));
+    // Assessment deadline from last_assessment_date (annual cycle) or next_assessment_date
+    const lastAssess = (ind as any).last_assessment_date;
+    const nextAssess = (ind as any).next_assessment_date;
+    if (nextAssess) {
+      push("Annual Reassessment Due", new Date(nextAssess));
+    } else if (lastAssess) {
+      push("Annual Reassessment Due", new Date(new Date(lastAssess).getTime() + 365 * 24 * 60 * 60 * 1000));
+    }
   }
 
   return items.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
@@ -63,7 +73,9 @@ const TYPE_CONFIG: Record<DeadlineType, { icon: React.ComponentType<{className?:
   "Quarterly Visit Due":   { icon: Activity,    color: "text-icm-green",   border: "border-l-icm-green" },
   "Monitoring Form":       { icon: FileText,    color: "text-teal-600",    border: "border-l-teal-500" },
   "Service Auth Expiring": { icon: RefreshCw,   color: "text-orange-600",  border: "border-l-orange-500" },
-  "Assessment Due":        { icon: Calendar,    color: "text-yellow-600",  border: "border-l-yellow-500" },
+  "Assessment Due":              { icon: Calendar,    color: "text-yellow-600",  border: "border-l-yellow-500" },
+  "Annual Reassessment Due":     { icon: Calendar,    color: "text-yellow-600",  border: "border-l-yellow-500" },
+  "Initial Assessment Due":      { icon: Calendar,    color: "text-red-600",     border: "border-l-red-500" },
 };
 
 // ─── Deadline Card ─────────────────────────────────────────────────────────────

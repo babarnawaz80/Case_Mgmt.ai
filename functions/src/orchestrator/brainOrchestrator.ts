@@ -28,6 +28,7 @@ import { runBillingAgent } from "./agents/billingAgent";
 import { runEscalationAgent } from "./agents/escalationAgent";
 import { runRenewalAgent } from "./agents/renewalAgent";
 import { runAuthorizationAgent } from "./agents/authorizationAgent";
+import { runAssessmentAgent } from "./agents/assessmentAgent";
 import { clearEngineCache } from "./utilities/getGuidelinesEngine";
 
 const ORCHESTRATOR_TASKS = "orchestrator_tasks";
@@ -254,6 +255,16 @@ async function runOrchestrator(
           }
         }
 
+        // ── Agent 7: Assessment Compliance ────────────────────────────────────
+        let assessmentResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
+        if ((settings.agents_enabled as any).assessment !== false) {
+          try {
+            assessmentResult = await runAssessmentAgent(individual, runId, orgId, db);
+          } catch (err) {
+            errors.push(`Assessment agent failed for ${individual.id}: ${(err as Error).message}`);
+          }
+        }
+
         // ── Collect all tasks from all agents ─────────────────────────────────
         const allTasks = [
           ...complianceResult.tasks,
@@ -262,6 +273,7 @@ async function runOrchestrator(
           ...escalationResult.tasks,
           ...renewalResult.tasks,
           ...authResult.tasks,
+          ...assessmentResult.tasks,
         ];
 
         const allLogs = [
@@ -271,6 +283,7 @@ async function runOrchestrator(
           ...escalationResult.logs,
           ...renewalResult.logs,
           ...authResult.logs,
+          ...assessmentResult.logs,
         ];
 
         // ── Write tasks to both orchestrator_tasks and tasks (My Work) ─────────

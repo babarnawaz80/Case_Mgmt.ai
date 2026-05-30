@@ -14,6 +14,7 @@ import { PromptStudio } from "@/components/orchestrator/PromptStudio";
 import { ForwardComplianceCalendar, buildDeadlines, type Deadline } from "@/components/orchestrator/ForwardComplianceCalendar";
 import { OrchestratorRecommendations } from "@/components/orchestrator/OrchestratorRecommendations";
 import { AuthorizationHealthSection } from "@/components/orchestrator/AuthorizationHealthSection";
+import { AssessmentComplianceSection } from "@/components/orchestrator/AssessmentComplianceSection";
 import { StateComplianceBreakdown } from "@/components/orchestrator/StateComplianceBreakdown";
 import { cn } from "@/lib/utils";
 
@@ -184,6 +185,7 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
                 <div className="space-y-5">
                   <StateComplianceBreakdown individuals={individuals} selectedState={selectedState} />
                   <AuthorizationHealthSection individuals={filteredIndividuals} />
+                  <AssessmentComplianceSection individuals={filteredIndividuals} />
                   <IndividualComplianceGrid
                     individuals={filteredIndividuals}
                     tasks={tasks}

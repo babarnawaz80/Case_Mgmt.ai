@@ -32,6 +32,27 @@ const DEFAULT_PROMPTS = {
 
   renewal: `You are a DD waiver service renewal specialist. Generate renewal packets that anticipate state review committee requirements. Include: justification for continued services, evidence of progress toward current plan goals, changes in support needs, updated risk documentation, and identification of any missing items that could cause renewal denial. Use person-first language throughout. Base all content on the individual's documentation record. Flag any gaps explicitly. Label all output as AI DRAFT — Requires CM Review before submission.`,
 
+  assessment: `You are the Assessment Compliance Agent for a DD waiver case management organization.
+
+Your role is to monitor assessment completion requirements for all individuals.
+
+CHECK ORDER:
+1. Initial assessments never completed — CRITICAL if past enrollment window
+2. Recurring assessments overdue by >30 days — CRITICAL
+3. Assessments due within 14 days — WARNING
+4. Assessments due within 30 days — INFO
+5. Assessment score changed >10 points from prior — flag for PCP review
+
+PRIORITY RULES:
+- Never-completed initial assessments block PCP generation accuracy
+- Outdated assessments (>13 months) should trigger PCP review
+- Always link findings to the specific template and program requirement
+- When both a PCP renewal AND assessment are due, surface both separately
+
+MESSAGING:
+- Include individual name, template name, days overdue/until due
+- For score changes: include old score, new score, and what changed`,
+
   authorization: `You are the Authorization Agent for a DD waiver case management organization. Monitor all service authorizations and ensure no authorization expires without a renewal being initiated.
 
 EXPIRATION THRESHOLDS: 90 days = log informational · 60 days = planning task · 30 days = high-priority task + notify CM · 14 days = critical task + notify CM and supervisor · 7 days or less = escalate immediately + notify supervisor and director.
@@ -111,6 +132,15 @@ const AGENT_CONFIG: Record<AgentKey, {
     bg: "bg-orange-50",
     border: "border-l-orange-500",
     description: "Monitors service authorization expiration dates and unit utilization pace. Controls thresholds, escalation rules, and how renewal tasks are phrased.",
+    usesAI: true,
+  },
+  assessment: {
+    label: "Assessment Compliance Agent",
+    icon: FileText,
+    color: "text-yellow-600",
+    bg: "bg-yellow-50",
+    border: "border-l-yellow-500",
+    description: "Monitors assessment completion schedules. Tracks initial assessment windows, annual/quarterly due dates, and assessment-to-PCP prerequisite requirements.",
     usesAI: true,
   },
 };
@@ -244,7 +274,7 @@ export function PromptStudio() {
 
   const [prompts, setPrompts] = useState<typeof DEFAULT_PROMPTS>({ ...DEFAULT_PROMPTS });
   const [metas, setMetas] = useState<Record<AgentKey, PromptMeta>>({
-    compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {}, authorization: {},
+    compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {}, authorization: {}, assessment: {},
   });
   const [loading, setLoading] = useState(true);
 
@@ -261,10 +291,11 @@ export function PromptStudio() {
             escalation: data.escalation || DEFAULT_PROMPTS.escalation,
             renewal: data.renewal || DEFAULT_PROMPTS.renewal,
             authorization: data.authorization || DEFAULT_PROMPTS.authorization,
+            assessment: data.assessment || DEFAULT_PROMPTS.assessment,
           });
           // Load per-agent metadata if stored
           const metaObj: Record<AgentKey, PromptMeta> = {
-            compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {}, authorization: {},
+            compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {}, authorization: {}, assessment: {},
           };
           for (const key of Object.keys(metaObj) as AgentKey[]) {
             if (data[`${key}_updated_at`]) {

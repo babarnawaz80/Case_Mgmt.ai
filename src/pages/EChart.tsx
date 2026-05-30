@@ -83,6 +83,7 @@ const ALL_TILES: ModuleTile[] = [
   { slug: "care-plan",              label: "PCP",                        icon: Heart,          route: "care-plan",              category: "Documentation" },
   { slug: "progress-note",          label: "Progress Note",              icon: Pencil,         route: "progress-note",          category: "Documentation" },
   { slug: "visit-summary",          label: "Visit Summary",              icon: CalendarCheck,  route: "visit-summary",          category: "Documentation" },
+  { slug: "assessments",            label: "Assessments",                icon: ClipboardCheck, route: "assessments",            category: "Documentation" },
   { slug: "workflow-manager",       label: "Workflow Manager",           icon: LayoutIcon,     route: "workflow-manager",       category: "Documentation" },
 
   // Care (green)
@@ -405,6 +406,14 @@ const EChart = () => {
                     individualId={individual.id}
                     onOpen={() => navigate(`/people/${individual.id}/${t.route}`)}
                   />
+                ) : t.slug === "assessments" ? (
+                  <AssessmentsTileCard
+                    key={t.slug}
+                    tile={t}
+                    individualId={individual.id}
+                    count={liveCounts[t.slug] !== undefined ? liveCounts[t.slug] : t.count}
+                    onOpen={() => navigate(destination)}
+                  />
                 ) : (
                   <ModuleTileCard
                     key={t.slug}
@@ -555,6 +564,57 @@ function FilterPill({
     >
       <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white/80" : meta.dot}`} />
       {label}
+    </button>
+  );
+}
+
+function AssessmentsTileCard({
+  tile, individualId, count, onOpen,
+}: { tile: ModuleTile; individualId: string; count?: number; onOpen: () => void }) {
+  const [status, setStatus] = useState<"loading" | "current" | "due_soon" | "overdue" | "none">("loading");
+  const [daysLabel, setDaysLabel] = useState<string>("");
+
+  useEffect(() => {
+    if (!individualId) { setStatus("none"); return; }
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "assessments"),
+            where("individualId", "==", individualId),
+            where("status", "==", "completed"),
+            orderBy("completedAt", "desc"),
+            limit(1))
+        );
+        if (snap.empty) { setStatus("none"); return; }
+        const lastDate = snap.docs[0].data().completedAt?.toDate?.() || new Date();
+        const nextDue = new Date(lastDate.getTime() + 365 * 24 * 60 * 60 * 1000);
+        const days = Math.floor((nextDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        if (days < 0) { setStatus("overdue"); setDaysLabel(`${Math.abs(days)}d overdue`); }
+        else if (days <= 30) { setStatus("due_soon"); setDaysLabel(`Due in ${days}d`); }
+        else { setStatus("current"); }
+      } catch { setStatus("current"); }
+    })();
+  }, [individualId]);
+
+  const Icon = tile.icon;
+  const statusChip = status === "overdue"
+    ? <span className="text-[9.5px] font-geist font-bold text-icm-red">● {daysLabel}</span>
+    : status === "due_soon"
+    ? <span className="text-[9.5px] font-geist font-bold text-icm-amber">⚠ {daysLabel}</span>
+    : status === "none"
+    ? <span className="text-[9.5px] font-geist text-icm-text-faint">No assessments</span>
+    : status === "current"
+    ? <span className="text-[9.5px] font-geist text-icm-green">● All current</span>
+    : null;
+
+  return (
+    <button onClick={onOpen} className="rounded-2xl border border-icm-border bg-icm-panel p-3.5 flex flex-col items-start gap-2 hover:border-icm-border-strong hover:shadow-elevated transition-all group text-left">
+      <Icon className="w-5 h-5 text-icm-text-dim group-hover:text-icm-accent transition-colors" />
+      <div>
+        <p className="text-[13px] font-manrope font-bold text-icm-text leading-tight">{tile.label}</p>
+        <p className="text-[10.5px] font-geist text-icm-text-faint mt-0.5">{count ?? 0} completed</p>
+        {statusChip && <div className="mt-1">{statusChip}</div>}
+      </div>
     </button>
   );
 }

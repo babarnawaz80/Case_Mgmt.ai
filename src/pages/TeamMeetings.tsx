@@ -392,8 +392,9 @@ function ScheduleMeetingModal({
         meetingDate: Timestamp.fromDate(parsedDate),
         startTime: startTime || "09:00",
         location,
-        locationDetail: locationDetail.trim() || undefined,
-        agenda: agenda.trim() || undefined,
+        // Use null instead of undefined — Firestore rejects undefined field values
+        locationDetail: locationDetail.trim() || null,
+        agenda: agenda.trim() || null,
         attendees: attendees.filter(a => a.name.trim()),
         status: "scheduled",
         consentAcknowledged: false,

@@ -72,8 +72,12 @@ export function useTeamMeetings(individualId?: string) {
 }
 
 export async function createTeamMeeting(data: Omit<TeamMeeting, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  // Strip undefined values — Firestore rejects them with "Unsupported field value: undefined"
+  const clean = Object.fromEntries(
+    Object.entries(data).filter(([, v]) => v !== undefined)
+  );
   const ref = await addDoc(collection(db, "team_meetings"), {
-    ...data,
+    ...clean,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

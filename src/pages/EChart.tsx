@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { getDocs, query, collection, where, orderBy, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { DischargedBanner } from "@/components/icm/DischargedBanner";
 import { demoToast } from "@/lib/demoToast";
@@ -150,6 +152,34 @@ const EChart = () => {
   const { individual, loading } = useIndividual(id);
   const { role } = useRole();
   const [showPreVisit, setShowPreVisit] = useState(false);
+
+  // ── Orchestrator engine indicator ──────────────────────────────────────────
+  const [orchEngine, setOrchEngine] = useState<{
+    engineName: string | null; engineId: string | null; configured: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!individual?.state && !individual?.address_state) return;
+    const state = individual.state || (individual as any).address_state;
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "guidelines_engines"),
+            where("state", "==", state),
+            where("status", "==", "published"),
+            orderBy("effectiveDate", "desc"),
+            limit(1)
+          )
+        );
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setOrchEngine({ engineName: d.data().name, engineId: d.id, configured: true });
+        } else {
+          setOrchEngine({ engineName: null, engineId: null, configured: false });
+        }
+      } catch { setOrchEngine({ engineName: null, engineId: null, configured: false }); }
+    })();
+  }, [individual?.state, (individual as any)?.address_state]);
   const [filter, setFilter] = useState<"All" | Category>("All");
   const liveCounts = useEChartCounts(id);
   const liveStats = useEChartStats(id);
@@ -257,6 +287,25 @@ const EChart = () => {
                     <StatusChip tone="green" label={individual.enrollment_status} />
                     <StatusChip tone="accent" label="eChart" />
                   </div>
+                  {/* Orchestrator engine chip */}
+                  {orchEngine !== null && (
+                    <button
+                      onClick={() => orchEngine.configured && orchEngine.engineId
+                        ? navigate(`/agents/guidelines/${orchEngine.engineId}`)
+                        : navigate("/agents/guidelines/new")}
+                      title={orchEngine.configured ? "Click to view guidelines engine" : "No guidelines engine — click to add one"}
+                      className={cn(
+                        "mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10.5px] font-geist font-medium border transition-colors",
+                        orchEngine.configured
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                          : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                      )}
+                    >
+                      {orchEngine.configured
+                        ? <><span className="text-[9px]">✦</span> AI Orchestrator: {orchEngine.engineName}</>
+                        : <><span>⚠</span> AI Orchestrator: No engine for {individual.state || (individual as any).address_state || "this state"}</>}
+                    </button>
+                  )}
                 </div>
               </div>
 

@@ -14,6 +14,7 @@ import { PromptStudio } from "@/components/orchestrator/PromptStudio";
 import { ForwardComplianceCalendar, buildDeadlines } from "@/components/orchestrator/ForwardComplianceCalendar";
 import { OrchestratorRecommendations } from "@/components/orchestrator/OrchestratorRecommendations";
 import { AuthorizationHealthSection } from "@/components/orchestrator/AuthorizationHealthSection";
+import { StateComplianceBreakdown } from "@/components/orchestrator/StateComplianceBreakdown";
 import { cn } from "@/lib/utils";
 import { type Deadline } from "@/components/orchestrator/ForwardComplianceCalendar";
 
@@ -77,6 +78,24 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
 
   // Track which tabs have been mounted (for lazy loading)
   const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(new Set(["overview"]));
+  const [selectedState, setSelectedState] = useState("all");
+
+  // Derive available states from individuals
+  const availableStates = useMemo(() => {
+    const states = new Set<string>();
+    individuals.forEach(ind => {
+      const s = ind.state || (ind as any).address_state;
+      if (s) states.add(s);
+    });
+    return [...states].sort();
+  }, [individuals]);
+
+  // Filter individuals by selected state
+  const filteredIndividuals = useMemo(() =>
+    selectedState === "all" ? individuals : individuals.filter(ind => {
+      const s = ind.state || (ind as any).address_state;
+      return s === selectedState;
+    }), [individuals, selectedState]);
 
   function handleTabChange(tab: TabId) {
     setMountedTabs(prev => new Set([...prev, tab]));
@@ -123,6 +142,29 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
           loading={runsLoading}
         />
 
+        {/* State filter — only shown when multiple states present */}
+        {availableStates.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11.5px] font-geist text-icm-text-dim">Filter by state:</span>
+            <select
+              value={selectedState}
+              onChange={e => setSelectedState(e.target.value)}
+              className="h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12px] font-geist text-icm-text"
+            >
+              <option value="all">All States ({individuals.length} individuals)</option>
+              {availableStates.map(s => (
+                <option key={s} value={s}>{s} ({individuals.filter(i => (i.state || (i as any).address_state) === s).length})</option>
+              ))}
+            </select>
+            {selectedState !== "all" && (
+              <button onClick={() => setSelectedState("all")}
+                className="text-[11px] font-geist text-icm-text-dim hover:text-icm-text">
+                Clear ×
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Always-visible stat cards */}
         <HealthMetricsRow
           tasks={tasks}
@@ -141,9 +183,10 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
             <div className={activeTab === "overview" ? "p-5" : "hidden"}>
               {mountedTabs.has("overview") && (
                 <div className="space-y-5">
-                  <AuthorizationHealthSection individuals={individuals} />
+                  <StateComplianceBreakdown individuals={individuals} selectedState={selectedState} />
+                  <AuthorizationHealthSection individuals={filteredIndividuals} />
                   <IndividualComplianceGrid
-                    individuals={individuals}
+                    individuals={filteredIndividuals}
                     tasks={tasks}
                     loading={individualsLoading}
                   />
@@ -155,7 +198,7 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
             <div className={activeTab === "calendar" ? "p-5" : "hidden"}>
               {mountedTabs.has("calendar") && (
                 <ForwardComplianceCalendar
-                  individuals={individuals}
+                  individuals={filteredIndividuals}
                   loading={individualsLoading}
                 />
               )}

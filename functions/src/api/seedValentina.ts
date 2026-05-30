@@ -305,6 +305,61 @@ export const seedValentinaDemoData = onCall(
       createdAt: admin.firestore.Timestamp.fromDate(new Date("2026-04-27")),
     });
 
+    // ── Seed Indiana DDA guidelines engine if not present ────────────────────
+    const existingIndiana = await db.collection("guidelines_engines")
+      .where("state", "==", "Indiana")
+      .where("status", "==", "published")
+      .limit(1)
+      .get();
+
+    if (existingIndiana.empty) {
+      const orgSnap = await db.collection("individuals").doc(valentinaId).get();
+      const orgId = orgSnap.data()?.organizationId || null;
+
+      await db.collection("guidelines_engines").add({
+        name: "Indiana DDA — HCBS Waiver v1.0",
+        state: "Indiana",
+        program: "HCBS Waiver",
+        status: "published",
+        version: "v1.0",
+        effectiveDate: "2024-01-01",
+        organizationId: orgId,
+        serviceCount: 6,
+        hardStopCount: 8,
+        warningCount: 12,
+        createdBy: "system-seed",
+        publishedAt: admin.firestore.FieldValue.serverTimestamp(),
+        visit_frequency_months: 3,
+        monitoring_form_frequency_months: 3,
+        contact_frequency_months: 1,
+        annual_pcp_required: true,
+        pcp_renewal_cycle_days: 365,
+        medicaid_redetermination_cycle_days: 365,
+        assessment_frequency_months: 12,
+        supervisor_review_required: true,
+        billing_authorization_required: true,
+        description: "Indiana Division of Disability and Rehabilitative Services — Home and Community Based Services (HCBS) waiver compliance rules for case management agencies.",
+        extracted_rules: {
+          required_sections: [
+            { name: "Targeted Case Management", billing_unit: "15 min", hard_stops: ["Annual PCP required", "Prior authorization required"], warnings: ["Monthly contact required"] },
+            { name: "Community Habilitation", billing_unit: "15 min", hard_stops: ["Daily service notes required"], warnings: ["Monthly progress summary required"] },
+            { name: "Supported Employment", billing_unit: "15 min", hard_stops: ["Employment goal required in PCP"], warnings: ["Annual vocational assessment required"] },
+          ],
+        },
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log("[seedValentina] Indiana DDA engine created");
+    }
+
+    // Update Valentina's state to Indiana
+    await db.collection("individuals").doc(valentinaId).update({
+      state: "Indiana",
+      address_state: "Indiana",
+      program: "HCBS Waiver",
+      waiver_type: "DD Waiver",
+    });
+
     // ── Verify counts ─────────────────────────────────────────────────────────
     const subCollRef = (col: string) =>
       db.collection("individuals").doc(valentinaId!).collection(col);

@@ -35,7 +35,7 @@ import { useIndividual, updateIndividual, initials, riskAvatarClass, riskScoreCl
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { demoToast } from "@/lib/demoToast";
-import { collection, addDoc, serverTimestamp, onSnapshot, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, onSnapshot, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
@@ -1238,7 +1238,47 @@ function CourtTab({ profile, person }: { profile: ProfileData; person: Individua
 function ProgramTab({ profile }: { profile: ProfileData }) {
   const { id: individualId } = useParams<{ id: string }>();
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+
+  const [orchEngine, setOrchEngine] = useState<{
+    engineName: string | null; engineId: string | null; configured: boolean;
+  } | null>(null);
+  const [lastEvaluatedAt, setLastEvaluatedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    const state = profile.state || (profile as any).address_state;
+    if (!state) return;
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "guidelines_engines"),
+            where("state", "==", state), where("status", "==", "published"),
+            orderBy("effectiveDate", "desc"), limit(1)
+          )
+        );
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setOrchEngine({ engineName: d.data().name, engineId: d.id, configured: true });
+        } else {
+          setOrchEngine({ engineName: null, engineId: null, configured: false });
+        }
+        // Load last evaluated
+        if (individualId && userProfile?.organizationId) {
+          const actSnap = await getDocs(
+            query(collection(db, "orchestrator_logs"),
+              where("individual_id", "==", individualId),
+              orderBy("timestamp", "desc"), limit(1)
+            )
+          ).catch(() => null);
+          if (actSnap && !actSnap.empty) {
+            const ts = (actSnap.docs[0].data().timestamp as any)?.toDate?.();
+            if (ts) setLastEvaluatedAt(ts.toLocaleString());
+          }
+        }
+      } catch { setOrchEngine({ engineName: null, engineId: null, configured: false }); }
+    })();
+  }, [profile.state, (profile as any).address_state, individualId, userProfile?.organizationId]);
 
   // Live enrollments from Firestore subcollection
   const [fsEnrollments, setFsEnrollments] = useState<Array<{
@@ -1258,8 +1298,69 @@ function ProgramTab({ profile }: { profile: ProfileData }) {
   // Merge Firestore enrollments with static seed data (Firestore wins if any exist)
   const displayEnrollments = fsEnrollments.length > 0 ? fsEnrollments : profile.enrollments;
 
+  const indState = profile.state || (profile as any).address_state;
+
   return (
     <div className="space-y-4">
+      {/* Orchestrator Engine Status */}
+      {orchEngine !== null && (
+        <div className="rounded-xl border overflow-hidden"
+          style={{ borderColor: orchEngine.configured ? "#ddd6fe" : "#fcd34d" }}>
+          <div className="flex items-center justify-between px-4 py-2 border-b"
+            style={{ backgroundColor: orchEngine.configured ? "#f5f3ff" : "#fffbeb", borderColor: orchEngine.configured ? "#ddd6fe" : "#fcd34d" }}>
+            <span className="text-[10px] font-geist font-bold uppercase tracking-wider"
+              style={{ color: orchEngine.configured ? "#5b21b6" : "#92400e" }}>
+              AI ORCHESTRATOR ENGINE
+            </span>
+            {orchEngine.configured && orchEngine.engineId && (
+              <button onClick={() => navigate(`/agents/guidelines/${orchEngine.engineId}`)}
+                className="text-[11px] font-geist font-semibold text-indigo-600 hover:underline">
+                View engine →
+              </button>
+            )}
+          </div>
+          <div className="px-4 py-3" style={{ backgroundColor: orchEngine.configured ? "#f5f3ff" : "#fffbeb" }}>
+            {orchEngine.configured ? (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <span style={{ color: "#7c3aed", fontSize: "14px" }}>✦</span>
+                  <span className="font-geist font-semibold text-[14px]" style={{ color: "#1e1b4b" }}>{orchEngine.engineName}</span>
+                  <span className="text-[10px] font-geist font-bold text-white px-1.5 py-0.5 rounded" style={{ background: "#7c3aed" }}>ACTIVE</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {["PCP compliance checks", "Authorization monitoring", "Documentation drafting", "Billing gap detection"].map(item => (
+                    <div key={item} className="flex items-center gap-1.5">
+                      <span className="font-bold" style={{ color: "#7c3aed" }}>✓</span>
+                      <span className="text-[12px] font-geist" style={{ color: "#4c1d95" }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                {lastEvaluatedAt && (
+                  <p className="text-[11px] font-geist" style={{ color: "#6d28d9" }}>
+                    Last evaluated: {lastEvaluatedAt}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 font-geist font-semibold text-[13px]" style={{ color: "#92400e" }}>
+                  <span>⚠</span>
+                  <span>No guidelines engine configured for <strong>{indState || "this state"}</strong></span>
+                </div>
+                <p className="text-[12px] font-geist leading-relaxed" style={{ color: "#78350f" }}>
+                  AI compliance checks, PCP generation, and authorization monitoring are inactive for this individual.
+                  Ask your administrator to add a guidelines engine for {indState || "this state"} in AI Agents → Guidelines Engines.
+                </p>
+                <button onClick={() => navigate("/agents/guidelines/new")}
+                  className="text-[12px] font-geist font-semibold hover:underline" style={{ color: "#7c3aed" }}>
+                  + Add {indState || "state"} guidelines engine →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <Section title="Current Programs">
         <DataTable
           columns={["Program", "Service Category", "Start", "Status", "Case Manager"]}

@@ -8,6 +8,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { getAiClient } from "../services/ai";
+import { getGuidelinesEngineForIndividual } from "../orchestrator/utilities/getGuidelinesEngine";
 
 // Direct AI call that bypasses org-level AI_PAUSED / credit checks.
 // generatePCP is an admin-level server function — it should never be blocked
@@ -186,7 +187,22 @@ export const generatePCP = onCall(
         } catch { /* non-fatal */ }
       }
 
-      const engineName = (engineData.name as string) || (agent.guidelines_engine_name as string) || "State DD Waiver Guidelines";
+      // Dynamic engine selection: agent's linked engine → fallback to individual's state+program
+      let dynamicEngineName = (engineData.name as string) || (agent.guidelines_engine_name as string) || null;
+      let dynamicEngineId = engineId || null;
+
+      if (!dynamicEngineName) {
+        const orgId = individual.organizationId as string || "unknown";
+        const indState = individual.state as string || individual.address_state as string || "";
+        const indProgram = individual.program as string || individual.program_type as string || "";
+        const foundEngine = await getGuidelinesEngineForIndividual(orgId, indState, indProgram, db);
+        if (foundEngine) {
+          dynamicEngineName = foundEngine.name;
+          dynamicEngineId = foundEngine.id;
+        }
+      }
+
+      const engineName = dynamicEngineName || "State DD Waiver Guidelines";
       const masterPrompt = (agent.master_prompt as string) || "";
 
       // ── Step B: Build the prompt ──────────────────────────────────────────────
@@ -395,7 +411,7 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
           humanReadableId,
           versionNote,
           agentId: agentId || null,
-          guidelinesEngineId: engineId || null,
+          guidelinesEngineId: dynamicEngineId || null,
           guidelinesEngineName: engineName,
           specialInstructions: specialInstructions || null,
           effective_date: effectiveDate,

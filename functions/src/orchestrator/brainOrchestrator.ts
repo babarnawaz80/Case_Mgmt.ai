@@ -28,6 +28,7 @@ import { runBillingAgent } from "./agents/billingAgent";
 import { runEscalationAgent } from "./agents/escalationAgent";
 import { runRenewalAgent } from "./agents/renewalAgent";
 import { runAuthorizationAgent } from "./agents/authorizationAgent";
+import { clearEngineCache } from "./utilities/getGuidelinesEngine";
 
 const ORCHESTRATOR_TASKS = "orchestrator_tasks";
 const ORCHESTRATOR_RUNS = "orchestrator_runs";
@@ -137,6 +138,9 @@ async function runOrchestrator(
   let complianceScoresUpdated = 0;
 
   try {
+    // Clear engine cache for this run (cache persists per warm instance, clear for fresh run)
+    clearEngineCache();
+
     // Load orchestrator settings and custom agent prompts
     const settings = await loadOrchestratorSettings(orgId, db);
     const customPrompts = await loadAgentPrompts(orgId, db);

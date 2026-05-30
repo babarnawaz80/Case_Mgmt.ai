@@ -35,7 +35,7 @@ import { useIndividual, updateIndividual, initials, riskAvatarClass, riskScoreCl
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
 import { demoToast } from "@/lib/demoToast";
-import { collection, addDoc, serverTimestamp, onSnapshot, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, serverTimestamp, onSnapshot, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
@@ -314,13 +314,6 @@ const PersonProfile = () => {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => setTabAndUrl("program")}
-                  className="h-9 px-3 rounded-xl text-[12px] font-geist font-medium flex items-center gap-1.5 border border-icm-border bg-icm-panel text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong"
-                >
-                  Manage Programs
-                  <Settings2 className="w-3 h-3 opacity-70" />
-                </button>
               </div>
             </div>
 
@@ -1312,8 +1305,181 @@ function ProgramTab({ profile, person }: { profile: ProfileData; person: Individ
 
   const indState = profile.state || (profile as any).address_state;
 
+  // ── Program assignment state ─────────────────────────────────────────────
+  const [programModalOpen, setProgramModalOpen] = useState(false);
+  const [availablePrograms, setAvailablePrograms] = useState<Array<{
+    id: string; name: string; state: string; payer: string; code: string; active: boolean;
+  }>>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(false);
+  const [assigningProgram, setAssigningProgram] = useState(false);
+  const [programSearch, setProgramSearch] = useState("");
+
+  // Current program data (denormalized on individual doc)
+  const currentProgram = (person as any).programName ?? (person as any).program ?? null;
+  const currentProgramId = (person as any).programId ?? null;
+  const currentProgramState = (person as any).state ?? (person as any).address_state ?? null;
+  const currentProgramPayer = (person as any).payer ?? null;
+  const currentProgramCode = (person as any).programCode ?? null;
+
+  const openProgramModal = async () => {
+    setProgramModalOpen(true);
+    setLoadingPrograms(true);
+    setProgramSearch("");
+    try {
+      if (!userProfile?.organizationId) return;
+      const snap = await getDocs(
+        query(
+          collection(db, "programs"),
+          where("organizationId", "==", userProfile.organizationId)
+        )
+      );
+      setAvailablePrograms(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as any))
+          .filter((p: any) => p.active !== false)
+      );
+    } catch {
+      toast.error("Could not load programs.");
+    } finally {
+      setLoadingPrograms(false);
+    }
+  };
+
+  const assignProgram = async (prog: { id: string; name: string; state: string; payer: string; code: string }) => {
+    if (!individualId) return;
+    setAssigningProgram(true);
+    try {
+      await updateDoc(doc(db, "individuals", individualId), {
+        programId:   prog.id,
+        programName: prog.name,
+        programCode: prog.code,
+        program:     prog.name,
+        state:       prog.state,
+        payer:       prog.payer,
+        updatedAt:   serverTimestamp(),
+      });
+      toast.success(`Program updated to ${prog.name} (${prog.state})`);
+      setProgramModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update program.");
+    } finally {
+      setAssigningProgram(false);
+    }
+  };
+
+  const filteredPrograms = programSearch
+    ? availablePrograms.filter((p) =>
+        `${p.name} ${p.state} ${p.payer}`.toLowerCase().includes(programSearch.toLowerCase())
+      )
+    : availablePrograms;
+
   return (
     <div className="space-y-4">
+
+      {/* ── Current Program ─────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-icm-border bg-icm-bg">
+          <p className="text-[10.5px] font-geist font-bold uppercase tracking-wider text-icm-text-dim">
+            Current Program
+          </p>
+          <button
+            onClick={openProgramModal}
+            className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-geist font-semibold text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
+          >
+            {currentProgram ? "Change Program" : "+ Assign Program"}
+          </button>
+        </div>
+        {currentProgram ? (
+          <div className="p-4">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <ProgramDetailRow label="Program" value={currentProgram} />
+              <ProgramDetailRow label="State" value={currentProgramState} />
+              <ProgramDetailRow label="Payer" value={currentProgramPayer} />
+              <ProgramDetailRow label="Code" value={currentProgramCode} />
+            </dl>
+          </div>
+        ) : (
+          <div className="p-5 text-center">
+            <p className="text-[13px] text-icm-text-dim font-geist">No program assigned yet.</p>
+            <button
+              onClick={openProgramModal}
+              className="mt-2 h-8 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
+            >
+              + Assign Program
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Assign Program Modal ─────────────────────────────────────────────── */}
+      {programModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setProgramModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-[520px] rounded-2xl bg-icm-panel border border-icm-border shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-icm-border">
+              <div>
+                <h2 className="font-manrope font-bold text-[15px] text-icm-text">Assign Program</h2>
+                <p className="text-[11.5px] text-icm-text-dim font-geist">
+                  Select the program for {person.first_name} {person.last_name}
+                </p>
+              </div>
+              <button onClick={() => setProgramModalOpen(false)} className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center">
+                ✕
+              </button>
+            </div>
+            <div className="p-3 border-b border-icm-border">
+              <input
+                value={programSearch}
+                onChange={(e) => setProgramSearch(e.target.value)}
+                placeholder="Search programs…"
+                className="w-full h-9 px-3 rounded-xl border border-icm-border bg-white text-[12.5px] font-geist focus:outline-none focus:border-icm-border-strong"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-[360px] overflow-y-auto">
+              {loadingPrograms ? (
+                <div className="py-8 flex items-center justify-center gap-2 text-icm-text-dim">
+                  <div className="w-4 h-4 border-2 border-icm-accent border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[12px] font-geist">Loading programs…</span>
+                </div>
+              ) : filteredPrograms.length === 0 ? (
+                <p className="text-center text-[12px] text-icm-text-dim py-8">No active programs found.</p>
+              ) : (
+                <div className="p-2 space-y-1.5">
+                  {filteredPrograms.map((prog) => (
+                    <div
+                      key={prog.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-icm-border p-3 hover:border-icm-border-strong hover:bg-icm-bg transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-manrope font-bold text-[13.5px] text-icm-text">{prog.name}</p>
+                        <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">
+                          {[prog.state, prog.payer, prog.code ? `Code: ${prog.code}` : null]
+                            .filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <button
+                        disabled={assigningProgram}
+                        onClick={() => assignProgram(prog)}
+                        className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold shrink-0 hover:opacity-90 disabled:opacity-50"
+                      >
+                        Select
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Orchestrator Engine Status */}
       {orchEngine !== null && (
         <div className="rounded-xl border overflow-hidden"
@@ -1885,6 +2051,20 @@ function ModalField({ label, children }: { label: string; children: React.ReactN
 
 
 // =============================================================
+// ─── ProgramDetailRow helper (used in ProgramTab) ────────────────────────────
+function ProgramDetailRow({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <dt className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+        {label}
+      </dt>
+      <dd className="text-[13px] font-geist text-icm-text mt-0.5">
+        {value || <span className="text-icm-text-faint">—</span>}
+      </dd>
+    </div>
+  );
+}
+
 // TAB 6 — Contacts
 // =============================================================
 function ContactsTab({ profile, person }: { profile: ProfileData; person: Individual }) {

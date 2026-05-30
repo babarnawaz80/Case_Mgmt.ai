@@ -175,7 +175,7 @@ const Index = () => {
   const { tasks, loading: tasksLoading } = useTasks();
   const { notes, loading: notesLoading } = useAllProgressNotes();
   const [message, setMessage] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [chatHistoryItems, setChatHistoryItems] = useState<ChatHistoryItem[]>(loadHistory);
   const [hoveredHistoryId, setHoveredHistoryId] = useState<string | null>(null);
   const [selectedIndividualId, setSelectedIndividualId] = useState<string | null>(null);
@@ -482,6 +482,14 @@ const Index = () => {
     {scribeOverlay}
     
     <div className="flex h-screen w-full bg-background">
+      {/* Mobile backdrop — tap outside to close sidebar */}
+      {historyOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={() => setHistoryOpen(false)}
+        />
+      )}
+
       {/* Collapsible Chat History Sidebar */}
       <AnimatePresence initial={false}>
         {historyOpen && (
@@ -489,8 +497,12 @@ const Index = () => {
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="border-r border-border flex flex-col shrink-0 overflow-hidden bg-card"
+            transition={{ duration: 0.22, ease: "easeInOut" }}
+            className="
+              fixed md:static inset-y-0 left-0 z-40
+              border-r border-border flex flex-col shrink-0 overflow-hidden bg-card
+              shadow-2xl md:shadow-none
+            "
           >
             {/* Sidebar header */}
             <div className="px-4 pt-5 pb-3 border-b border-border shrink-0">
@@ -592,8 +604,14 @@ const Index = () => {
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="h-16 flex items-center justify-between px-6 border-b border-border glass shrink-0">
-          <div className="flex items-center gap-3">
+        <header
+          className="flex items-center px-6 border-b border-border glass shrink-0"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            minHeight: "calc(4rem + env(safe-area-inset-top))",
+          }}
+        >
+          <div className="flex-1 flex items-center gap-3">
             <button
               onClick={() => setHistoryOpen(!historyOpen)}
               className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -680,7 +698,7 @@ const Index = () => {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex-1 flex items-center gap-3 justify-end">
             <UserMenu />
           </div>
         </header>

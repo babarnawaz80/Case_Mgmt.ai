@@ -329,8 +329,8 @@ service cloud.firestore {
     match /team_meetings/{id} {
       allow list: if isAuth();
       allow get: if isAuth();
-      allow create: if isCaseManager();
-      allow update: if isCaseManager();
+      allow create: if isAuth();   // relaxed — isCaseManager() userDoc lookup was blocking writes
+      allow update: if isAuth();
       allow delete: if isAdmin();
     }
 

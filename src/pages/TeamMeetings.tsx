@@ -373,6 +373,15 @@ function ScheduleMeetingModal({
   async function handleSave() {
     if (!selectedInd) { toast.error("Select an individual."); return; }
     if (!date) { toast.error("Date is required."); return; }
+    if (!userProfile?.organizationId) { toast.error("User profile not loaded. Try refreshing."); return; }
+
+    // Validate date parsing before hitting Firestore
+    const parsedDate = new Date(`${date}T${startTime || "09:00"}:00`);
+    if (isNaN(parsedDate.getTime())) {
+      toast.error("Invalid date or time format.");
+      return;
+    }
+
     setSaving(true);
     try {
       const id = await createTeamMeeting({
@@ -380,8 +389,8 @@ function ScheduleMeetingModal({
         individualId: selectedInd.id,
         individualName: `${selectedInd.first_name} ${selectedInd.last_name}`,
         meetingType,
-        meetingDate: Timestamp.fromDate(new Date(`${date}T${startTime}:00`)),
-        startTime,
+        meetingDate: Timestamp.fromDate(parsedDate),
+        startTime: startTime || "09:00",
         location,
         locationDetail: locationDetail.trim() || undefined,
         agenda: agenda.trim() || undefined,
@@ -392,9 +401,15 @@ function ScheduleMeetingModal({
       } as any);
       toast.success("Meeting scheduled");
       onCreated(id);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to schedule meeting");
+    } catch (err: any) {
+      console.error("[createTeamMeeting]", err);
+      // Show a more useful error to help diagnose
+      const msg = err?.message ?? String(err);
+      if (msg.includes("permission") || msg.includes("PERMISSION_DENIED")) {
+        toast.error("Permission denied — contact your administrator.");
+      } else {
+        toast.error(`Failed to schedule meeting: ${msg.slice(0, 80)}`);
+      }
     } finally {
       setSaving(false);
     }

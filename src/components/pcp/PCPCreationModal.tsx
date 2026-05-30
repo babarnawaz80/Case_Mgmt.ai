@@ -630,12 +630,14 @@ function Step3Review({
   mode,
   hasFiles,
   extractedData,
+  individualName,
   onBack,
   onBuild,
 }: {
   mode: PCPMode;
   hasFiles: boolean;
   extractedData: ExtractedPcpData | null;
+  individualName?: string;
   onBack: () => void;
   onBuild: () => void;
 }) {
@@ -685,16 +687,46 @@ function Step3Review({
       {/* Card 2 — From chart */}
       <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
         <div className="px-4 py-2.5 border-b border-icm-border bg-icm-bg/60">
-          <span className="text-[11.5px] font-semibold text-icm-text">Pulled from Joe's chart</span>
+          <span className="text-[11.5px] font-semibold text-icm-text">
+            Pulled from {individualName ? `${individualName.split(" ")[0]}'s` : "the individual's"} chart
+          </span>
         </div>
         <div className="px-4 py-1">
-          <CollapsibleRow label="Goals & Outcomes" summary="3 active goals" />
-          <CollapsibleRow label="Services" summary="2 active authorizations" />
-          <CollapsibleRow label="Contacts / Team" summary="4 contacts on file" />
-          <CollapsibleRow label="Monitoring History" summary="6 forms, last: Jan 2026" />
-          <CollapsibleRow label="Risk Score" summary="70 — High (3 active risk factors)" />
-          <CollapsibleRow label="MA Status" summary="Active — renewal due May 2026" />
-          <CollapsibleRow label="Incidents" summary="2 open (1 Critical)" />
+          <CollapsibleRow
+            label="Goals & Outcomes"
+            summary="3 active goals"
+            detail="Explore part-time employment · Increase community participation · Improve medication management adherence. Each goal will be reviewed and updated in the plan sections below."
+          />
+          <CollapsibleRow
+            label="Services"
+            summary="2 active authorizations"
+            detail="Day Habilitation (T2021) — Carroll Community Services · Targeted Case Management — Carroll County CM. These services will be pre-filled into Section 7 of the plan."
+          />
+          <CollapsibleRow
+            label="Contacts / Team"
+            summary="4 contacts on file"
+            detail="Kathy Adams (CCS/CM) · Linda Brown (Guardian/Family) · Dr. R. Patel (Primary Care Provider) · Carroll Community Services (Day Hab Provider). These contacts will appear in the Team & Signatures section."
+          />
+          <CollapsibleRow
+            label="Monitoring History"
+            summary="6 forms, last: Jan 2026"
+            detail="6 quarterly monitoring forms on file. Most recent: January 2026 — flagged behavioral changes at home and progress on Day Hab attendance goals. This history informs health & safety and goal sections."
+          />
+          <CollapsibleRow
+            label="Risk Score"
+            summary="70 — High (3 active risk factors)"
+            detail="HRST Score: 3.2 — Health Care Level 3. Active risk factors: fall risk during transfers, medication interaction risk (3 active prescriptions), elopement risk in unfamiliar environments. These will populate the Health & Safety section."
+          />
+          <CollapsibleRow
+            label="MA Status"
+            summary="Active — renewal due May 2026"
+            detail="Medicaid Active. MA redetermination due May 2026. Waiver enrollment: Community Integration and Habilitation (CIH). This eligibility status is reflected in the Individual Profile section."
+          />
+          <CollapsibleRow
+            label="Incidents"
+            summary="2 open (1 Critical)"
+            detail="1 Critical incident: behavioral escalation (reported 03/2026, under review). 1 Low-Medium: behavioral changes at home reported by guardian (02/2026). Incident history informs the Health & Safety risk section."
+          />
         </div>
       </div>
 
@@ -1795,6 +1827,7 @@ export function PCPCreationModal({
               mode={mode}
               hasFiles={files.length > 0}
               extractedData={extractedData}
+              individualName={individualName}
               onBack={() => setStep(1)}
               onBuild={handleBuild}
             />

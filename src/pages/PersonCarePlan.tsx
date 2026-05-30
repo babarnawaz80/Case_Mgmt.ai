@@ -23,6 +23,8 @@ import {
   Lock,
   MoreHorizontal,
   Loader2,
+  Smartphone,
+  Phone,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { AuthorCell } from "@/components/icm/AuthorCell";
@@ -710,6 +712,8 @@ function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personN
   const [requirePasscode, setRequirePasscode] = useState(true);
   const [notifyOnOpen, setNotifyOnOpen] = useState(true);
   const [sending, setSending] = useState(false);
+  const [passcodeDelivery, setPasscodeDelivery] = useState<"sms" | "email" | "both">("sms");
+  const [providerPhone, setProviderPhone] = useState("");
   const [message, setMessage] = useState(
     `Hello,\n\nPlease find the secure link to view the Person-Centered Plan (PCP) for ${personName}. This link is HIPAA-compliant, encrypted, and expires automatically. A separate passcode is required to open it.\n\nThank you.`
   );
@@ -729,6 +733,9 @@ function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personN
 
   const sendIt = async () => {
     if (!providerEmail) { toast.error("Provider email is required"); return; }
+    if (requirePasscode && (passcodeDelivery === "sms" || passcodeDelivery === "both") && !providerPhone.trim()) {
+      toast.error("Phone number is required for SMS passcode delivery"); return;
+    }
     setSending(true);
     try {
       const expiresAt = new Date();
@@ -742,7 +749,9 @@ function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personN
         recipientEmail: providerEmail,
         recipientName: providerName,
         recipientOrg: providerOrg,
+        recipientPhone: providerPhone || null,
         passcode, // stored for verification; in production, store a hash
+        passcodeDelivery: requirePasscode ? passcodeDelivery : "none",
         expiresAt,
         expiresInDays: parseInt(expiresIn),
         requirePasscode,
@@ -762,7 +771,12 @@ function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personN
       });
 
       setStep("sent");
-      toast.success(`Secure link created${providerEmail ? ` — share it with ${providerEmail}` : ""}`);
+      const deliveryNote = requirePasscode
+        ? passcodeDelivery === "sms" ? ` · Passcode will be sent via SMS to ${providerPhone}`
+        : passcodeDelivery === "both" ? ` · Passcode sent via SMS + email`
+        : ` · Passcode delivered via email`
+        : "";
+      toast.success(`Secure link created${deliveryNote}`);
     } catch (err) {
       console.error(err);
       toast.error("Failed to create secure link — check connection.");
@@ -819,6 +833,72 @@ function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personN
               <span>Require 6-digit passcode</span>
               <input type="checkbox" checked={requirePasscode} onChange={(e) => setRequirePasscode(e.target.checked)} />
             </label>
+
+            {/* Passcode delivery method — shown when passcode is required */}
+            {requirePasscode && (
+              <div className="rounded-lg border border-icm-border bg-icm-bg p-3 space-y-2.5 mt-1">
+                <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wide text-icm-text-faint">
+                  Send passcode to recipient via
+                </p>
+
+                {/* Delivery options */}
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { id: "sms",   label: "Text message (SMS)", icon: Smartphone },
+                    { id: "email", label: "Email",               icon: Mail },
+                    { id: "both",  label: "Both",                icon: Phone },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setPasscodeDelivery(opt.id as "sms" | "email" | "both")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-geist font-medium transition-colors ${
+                        passcodeDelivery === opt.id
+                          ? "border-teal-600 bg-teal-50 text-teal-700"
+                          : "border-icm-border bg-white text-icm-text-dim hover:border-icm-border-strong"
+                      }`}
+                    >
+                      <opt.icon className="w-3.5 h-3.5" />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Phone number input — shown for SMS or Both */}
+                {(passcodeDelivery === "sms" || passcodeDelivery === "both") && (
+                  <div>
+                    <label className="block text-[10.5px] font-geist font-semibold uppercase tracking-wide text-icm-text-faint mb-1">
+                      Recipient's cell phone number
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center h-9 px-3 rounded-l-lg border border-r-0 border-icm-border bg-icm-bg text-[12px] text-icm-text-dim shrink-0">
+                        <Smartphone className="w-3.5 h-3.5 mr-1.5" /> +1
+                      </div>
+                      <input
+                        type="tel"
+                        value={providerPhone}
+                        onChange={(e) => setProviderPhone(e.target.value.replace(/[^\d\s\-().+]/g, ""))}
+                        placeholder="(555) 867-5309"
+                        className="flex-1 h-9 px-3 rounded-r-lg border border-icm-border bg-white text-[13px] text-icm-text focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                    <p className="text-[10.5px] font-geist text-icm-text-faint mt-1">
+                      The 6-digit passcode will be texted to this number. Share the link separately.
+                    </p>
+                  </div>
+                )}
+
+                {/* Email delivery note */}
+                {passcodeDelivery === "email" && (
+                  <p className="text-[11px] font-geist text-icm-text-dim flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-icm-accent shrink-0" />
+                    Passcode will be included in the email to <strong>{providerEmail || "the provider"}</strong>.
+                    Share the link separately for best security.
+                  </p>
+                )}
+              </div>
+            )}
+
             <label className="flex items-center justify-between gap-3 text-[12px] text-icm-text">
               <span>Notify me when opened</span>
               <input type="checkbox" checked={notifyOnOpen} onChange={(e) => setNotifyOnOpen(e.target.checked)} />
@@ -851,13 +931,29 @@ function SharePlanModal({ plan, personName, onClose }: { plan: CarePlan; personN
               </button>
             </div>
             {requirePasscode && (
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-icm-border">
-                <span className="text-[11.5px] text-icm-text-dim">Passcode (share separately)</span>
+              <div className="space-y-2 pt-1 border-t border-icm-border">
+                {/* Passcode delivery status */}
                 <div className="flex items-center gap-2">
-                  <code className="font-mono font-bold text-[13px] text-icm-text tracking-widest">{passcode}</code>
-                  <button onClick={() => { navigator.clipboard.writeText(passcode); toast.success("Passcode copied"); }} className="p-1 rounded hover:bg-white" title="Copy passcode">
-                    <Copy className="w-3 h-3 text-icm-text-dim" />
-                  </button>
+                  {(passcodeDelivery === "sms" || passcodeDelivery === "both") && providerPhone ? (
+                    <span className="text-[11px] font-geist text-icm-green flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5" />
+                      Passcode will be texted to {providerPhone}
+                    </span>
+                  ) : passcodeDelivery === "email" ? (
+                    <span className="text-[11px] font-geist text-icm-accent flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5" />
+                      Passcode included in email to {providerEmail}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11.5px] text-icm-text-dim">Passcode — copy and send separately</span>
+                  <div className="flex items-center gap-2">
+                    <code className="font-mono font-bold text-[14px] text-icm-text tracking-[0.2em]">{passcode}</code>
+                    <button onClick={() => { navigator.clipboard.writeText(passcode); toast.success("Passcode copied"); }} className="p-1 rounded hover:bg-white" title="Copy passcode">
+                      <Copy className="w-3 h-3 text-icm-text-dim" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

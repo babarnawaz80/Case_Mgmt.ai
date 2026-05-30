@@ -1051,22 +1051,23 @@ export function useServiceAuthorizations(individualId: string | undefined) {
 /** Org-wide: all auths for a case manager's caseload */
 export function useAllAuthorizations(
   organizationId: string | undefined,
-  caseManagerId: string | undefined
+  _caseManagerId: string | undefined  // kept for API compatibility but no longer used as a filter
 ) {
   const [data, setData] = useState<ServiceAuthorization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!organizationId || !caseManagerId) {
+    if (!organizationId) {
       setLoading(false);
       return;
     }
     setLoading(true);
+    // Query all org authorizations — the assigned_case_manager_id filter was
+    // too restrictive (most auths lack that field) and caused 0 results.
     const q = query(
       collection(db, "service_authorizations"),
       where("organizationId", "==", organizationId),
-      where("assigned_case_manager_id", "==", caseManagerId),
       orderBy("end_date", "asc")
     );
     const unsub = onSnapshot(
@@ -1190,4 +1191,93 @@ export async function updatePCP(id: string, data: Partial<PCPRecord>) {
     ...data,
     updated_at: serverTimestamp(),
   });
+}
+
+// ─── Consents (subcollection: individuals/{id}/consents) ─────────────────────
+
+export type ConsentType =
+  | "General Consent"
+  | "Release of Information"
+  | "Guardian Consent for Plan Documents"
+  | "Photo/Video Consent"
+  | "Communication Consent";
+
+export type ConsentStatus = "Active" | "Expired" | "Revoked";
+
+export interface ConsentRecord {
+  id: string;
+  individual_id: string;
+  consent_type: ConsentType;
+  given_by_name: string;
+  relationship: string;
+  date_obtained: string;        // YYYY-MM-DD
+  expiration_date?: string;     // YYYY-MM-DD — empty = no expiry
+  status: ConsentStatus;
+  document_url?: string;
+  notes?: string;
+  revoked_date?: string;
+  revoked_by?: string;
+  created_by_uid?: string;
+  created_by_name?: string;
+  created_at?: unknown;
+  updated_at?: unknown;
+}
+
+/** Compute status from dates — call before saving or displaying */
+export function computeConsentStatus(
+  record: Pick<ConsentRecord, "expiration_date" | "status" | "revoked_date">
+): ConsentStatus {
+  if (record.status === "Revoked" || record.revoked_date) return "Revoked";
+  if (record.expiration_date) {
+    const exp = new Date(record.expiration_date);
+    exp.setHours(23, 59, 59);
+    if (exp < new Date()) return "Expired";
+  }
+  return "Active";
+}
+
+export function useConsents(individualId: string | undefined) {
+  const [data, setData] = useState<ConsentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!individualId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "individuals", individualId, "consents"),
+      orderBy("date_obtained", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setData(snap.docs.map((d) => {
+        const raw = { id: d.id, ...d.data() } as ConsentRecord;
+        // Auto-refresh computed status on read
+        return { ...raw, status: computeConsentStatus(raw) };
+      }));
+      setLoading(false);
+    }, () => { setLoading(false); });
+    return () => unsub();
+  }, [individualId]);
+
+  return { data, loading };
+}
+
+export async function addConsent(
+  individualId: string,
+  data: Omit<ConsentRecord, "id" | "created_at" | "updated_at">
+) {
+  return addDoc(collection(db, "individuals", individualId, "consents"), {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function updateConsent(
+  individualId: string,
+  consentId: string,
+  data: Partial<ConsentRecord>
+) {
+  return updateDoc(
+    doc(db, "individuals", individualId, "consents", consentId),
+    { ...data, updated_at: serverTimestamp() }
+  );
 }

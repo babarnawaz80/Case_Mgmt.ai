@@ -285,23 +285,39 @@ function useIndividualOptions(orgId: string) {
   useEffect(() => {
     if (!orgId) return;
     setLoading(true);
+    // No orderBy — avoids requiring a composite Firestore index.
+    // Sort alphabetically in memory after loading.
     getDocs(
       query(
         collection(db, "individuals"),
-        where("organizationId", "==", orgId),
-        orderBy("last_name", "asc")
+        where("organizationId", "==", orgId)
       )
     )
       .then((snap) => {
-        setOptions(
-          snap.docs.map((d) => ({
-            id: d.id,
-            name: `${d.data().first_name ?? ""} ${d.data().last_name ?? ""}`.trim(),
-            program: d.data().program ?? d.data().primary_program ?? "",
-          }))
-        );
+        const raw = snap.docs.map((d) => ({
+          id: d.id,
+          name: `${d.data().first_name ?? ""} ${d.data().last_name ?? ""}`.trim(),
+          program: d.data().program ?? d.data().primary_program ?? "",
+        }));
+        raw.sort((a, b) => a.name.localeCompare(b.name));
+        setOptions(raw);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error("[useIndividualOptions]", err);
+        // Fallback: try fetching without org filter so users can at
+        // least see individuals if organizationId field isn't set
+        getDocs(collection(db, "individuals"))
+          .then((snap) => {
+            const raw = snap.docs.map((d) => ({
+              id: d.id,
+              name: `${d.data().first_name ?? ""} ${d.data().last_name ?? ""}`.trim(),
+              program: d.data().program ?? d.data().primary_program ?? "",
+            })).filter((o) => o.name.trim() !== "");
+            raw.sort((a, b) => a.name.localeCompare(b.name));
+            setOptions(raw);
+          })
+          .catch(console.error);
+      })
       .finally(() => setLoading(false));
   }, [orgId]);
 

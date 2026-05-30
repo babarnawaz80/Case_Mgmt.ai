@@ -411,3 +411,196 @@ textarea:focus-visible {
 .scrollbar-none::-webkit-scrollbar {
   display: none; /* Chrome, Safari */
 }
+
+/* ============================================================
+ * PCP Print Document — Professional formatted output
+ * ============================================================ */
+
+/* Hide print document in normal app view */
+.pcp-print-document {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 8.5in;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media print {
+  /* Hide ALL app chrome — only print the PCP document */
+  body > * {
+    display: none !important;
+  }
+  .pcp-print-document {
+    display: block !important;
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    visibility: visible !important;
+    width: 100% !important;
+  }
+
+  @page {
+    size: letter portrait;
+    margin: 0.85in 1in 1in 1in;
+  }
+
+  .pcp-print-document {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 10pt;
+    line-height: 1.5;
+    color: #000;
+    background: #fff;
+  }
+
+  /* Header */
+  .print-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12pt;
+    margin-bottom: 8pt;
+  }
+  .print-header-left { flex: 1; }
+  .print-header-center { flex: 2; text-align: center; }
+  .print-header-right { flex: 1; text-align: right; }
+
+  .print-rule {
+    border: none;
+    border-top: 3px solid #000;
+    margin: 8pt 0;
+  }
+
+  /* HIPAA box */
+  .print-hipaa-box {
+    border: 1px solid #333;
+    text-align: center;
+    padding: 5pt 8pt;
+    font-size: 8.5pt;
+    margin-bottom: 12pt;
+    color: #333;
+  }
+
+  /* Section header */
+  .print-section-header {
+    border-top: 2px solid #000;
+    border-bottom: 1px solid #000;
+    font-weight: bold;
+    font-size: 11pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3pt 0;
+    margin-top: 14pt;
+    margin-bottom: 8pt;
+  }
+
+  /* Tables */
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10pt;
+    font-size: 10pt;
+  }
+  .print-table td,
+  .print-table th {
+    border: 1px solid #333;
+    padding: 4pt 7pt;
+    vertical-align: top;
+  }
+  .print-th {
+    font-weight: bold;
+    background-color: #e8e8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    text-align: left;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .print-label {
+    font-weight: bold;
+    background-color: #f5f5f5 !important;
+    width: 35%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Goal blocks */
+  .print-goal-block {
+    border: 1px solid #333;
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
+  }
+  .print-goal-header {
+    background-color: #eeeeee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 5pt 8pt;
+    font-weight: bold;
+    font-size: 11pt;
+    border-bottom: 1px solid #333;
+  }
+  .print-goal-body {
+    padding: 8pt;
+  }
+
+  /* Bordered box (text areas) */
+  .print-bordered-box {
+    border: 1px solid #333;
+    padding: 8pt;
+    min-height: 40pt;
+    margin-bottom: 8pt;
+    white-space: pre-line;
+    font-size: 10pt;
+    line-height: 1.5;
+  }
+
+  /* Page break */
+  .print-page-break {
+    page-break-before: always;
+    padding-top: 0;
+  }
+  .print-no-break {
+    page-break-inside: avoid;
+  }
+
+  /* Signature blocks */
+  .print-sig-block {
+    border: 1px solid #ccc;
+    padding: 10pt;
+    margin-bottom: 14pt;
+    page-break-inside: avoid;
+  }
+  .print-sig-line {
+    border-bottom: 1px solid #333;
+    margin-top: 24pt;
+    margin-bottom: 2pt;
+  }
+
+  /* Footer */
+  .print-footer {
+    position: fixed;
+    bottom: 0.4in;
+    left: 0;
+    right: 0;
+    border-top: 1px solid #ccc;
+    padding-top: 4pt;
+    font-size: 7.5pt;
+    color: #555;
+    font-family: 'Georgia', serif;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Hide app UI chrome in print */
+  button,
+  nav,
+  .sidebar,
+  .plan-left-nav,
+  .action-bar,
+  [data-testid="toast"],
+  .ai-badge,
+  .ai-drafted-badge,
+  .no-print {
+    display: none !important;
+  }
+}

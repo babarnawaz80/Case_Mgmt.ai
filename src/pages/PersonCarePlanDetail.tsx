@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
   CheckCircle2, Clock, Mail, FileText, Users, Heart, ListChecks, Briefcase, History,
   AlertCircle, Compass, Star, Link2, ShieldCheck, GitBranch, Eye, ExternalLink,
-  Loader2,
+  Loader2, Download,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
@@ -13,9 +13,11 @@ import { type CarePlan, type PlanGoal } from "@/data/carePlans";
 import { useCarePlans, updateCarePlan, usePCP, useConsents } from "@/hooks/useFirestore";
 import { AttestationSection, EMPTY_ATTESTATION, type AttestationValue } from "@/components/icm/AttestationSection";
 import { writeAudit } from "@/lib/auditService";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { PCPDocumentViewer } from "@/components/pcp/PCPDocumentViewer";
+import { PCPPrintDocument } from "@/components/pcp/PCPPrintDocument";
 import { MOCK_PCP_BROWN_2026 } from "@/data/pcpMockData";
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
@@ -68,6 +70,17 @@ const PersonCarePlanDetail = () => {
   // Guardian consent flag
   const [guardianConsentRequired, setGuardianConsentRequired] = useState(false);
   const [planAttestation, setPlanAttestation] = useState<AttestationValue>(EMPTY_ATTESTATION);
+  const [organization, setOrganization] = useState<Record<string, unknown> | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Load organization for print logo
+  useEffect(() => {
+    const orgId = userProfile?.organizationId;
+    if (!orgId) return;
+    getDoc(doc(db, "organizations", orgId))
+      .then(snap => { if (snap.exists()) setOrganization(snap.data() as Record<string, unknown>); })
+      .catch(() => {});
+  }, [userProfile?.organizationId]);
   const { data: consents } = useConsents(id);
   const hasActiveConsent = consents.some(
     (c) => c.status === "Active" && c.consent_type === "Guardian Consent for Plan Documents"
@@ -256,20 +269,69 @@ const PersonCarePlanDetail = () => {
                 <Printer className="w-3.5 h-3.5" /> Print / Export
               </button>
               {printOpen && (
-                <div className="absolute right-0 mt-1 w-56 rounded-lg border border-icm-border bg-white shadow-lg z-10 overflow-hidden">
-                  {["Print care plan (formatted)", "Export as PDF", "Copy shareable link"].map((opt) => (
-                    <button key={opt} onClick={() => {
-                      setPrintOpen(false);
-                      if (opt.startsWith("Print") || opt.startsWith("Export")) {
-                        window.print();
-                      } else if (opt.startsWith("Copy")) {
-                        navigator.clipboard?.writeText(window.location.href);
-                        toast.success("Shareable link copied");
+                <div className="absolute right-0 mt-1 w-60 rounded-lg border border-icm-border bg-white shadow-lg z-10 overflow-hidden">
+                  <button onClick={() => { setPrintOpen(false); window.print(); }}
+                    className="w-full text-left px-3 py-2.5 text-[12px] text-icm-text hover:bg-icm-bg flex items-center gap-2">
+                    <Printer className="w-3.5 h-3.5 text-icm-text-dim" /> Print care plan (formatted)
+                  </button>
+                  <button disabled={exporting} onClick={async () => {
+                    setPrintOpen(false);
+                    const element = document.getElementById("pcp-print-root");
+                    if (!element || !plan) return;
+                    setExporting(true);
+                    try {
+                      // Temporarily reveal for capture
+                      element.style.position = "static";
+                      element.style.left = "0";
+                      element.style.visibility = "visible";
+                      element.style.width = "8.5in";
+                      const { default: jsPDF } = await import("jspdf");
+                      const html2canvas = (await import("html2canvas")).default;
+                      const canvas = await html2canvas(element, { scale: 1.5, useCORS: true, backgroundColor: "#ffffff", logging: false });
+                      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+                      const pdf = new jsPDF({ orientation: "portrait", unit: "in", format: "letter" });
+                      const pW = 8.5 - 2; // content width with 1in margins
+                      const pH = (canvas.height / canvas.width) * pW;
+                      const pageH = 11 - 1.85; // content height
+                      let y = 0;
+                      let page = 0;
+                      while (y < pH) {
+                        if (page > 0) pdf.addPage("letter", "portrait");
+                        const sliceH = Math.min(pageH, pH - y);
+                        const srcY = (y / pH) * canvas.height;
+                        const srcH = (sliceH / pH) * canvas.height;
+                        const tmp = document.createElement("canvas");
+                        tmp.width = canvas.width; tmp.height = Math.round(srcH);
+                        const ctx = tmp.getContext("2d")!;
+                        ctx.drawImage(canvas, 0, Math.round(srcY), canvas.width, Math.round(srcH), 0, 0, canvas.width, Math.round(srcH));
+                        pdf.addImage(tmp.toDataURL("image/jpeg", 0.92), "JPEG", 1, 0.85, pW, sliceH);
+                        y += pageH; page++;
                       }
-                    }} className="w-full text-left px-3 py-2 text-[12px] text-icm-text hover:bg-icm-bg">
-                      {opt}
-                    </button>
-                  ))}
+                      const lastName = individual?.last_name || "Individual";
+                      const firstName = individual?.first_name || "";
+                      const hId = (plan as any).humanReadableId || "PCP";
+                      pdf.save(`${hId}-${lastName}-${firstName}.pdf`);
+                    } catch (e) {
+                      console.error(e);
+                      toast.error("PDF export failed. Use Print → Save as PDF instead.");
+                    } finally {
+                      element.style.position = "absolute";
+                      element.style.left = "-9999px";
+                      element.style.visibility = "hidden";
+                      setExporting(false);
+                    }
+                  }} className="w-full text-left px-3 py-2.5 text-[12px] text-icm-text hover:bg-icm-bg flex items-center gap-2 disabled:opacity-50">
+                    {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-icm-text-dim" /> : <Download className="w-3.5 h-3.5 text-icm-text-dim" />}
+                    {exporting ? "Generating PDF…" : "Export as PDF"}
+                  </button>
+                  <button onClick={() => {
+                    setPrintOpen(false);
+                    navigator.clipboard?.writeText(window.location.href);
+                    toast.success("Shareable link copied");
+                  }} className="w-full text-left px-3 py-2.5 text-[12px] text-icm-text hover:bg-icm-bg flex items-center gap-2">
+                    <Link2 className="w-3.5 h-3.5 text-icm-text-dim" /> Copy shareable link
+                  </button>
+                  {[].map(() => null) /* placeholder to preserve JSX structure */}
                 </div>
               )}
             </div>
@@ -777,6 +839,15 @@ const PersonCarePlanDetail = () => {
           readOnly={readOnly}
         />
       </div>
+
+      {/* Hidden print document — revealed only for window.print() and PDF export */}
+      {plan && individual && (
+        <PCPPrintDocument
+          plan={plan as Record<string, unknown>}
+          individual={individual}
+          organization={organization as any}
+        />
+      )}
     </ICMShell>
   );
 };

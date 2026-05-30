@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Sparkles,
@@ -41,7 +41,11 @@ import { toast } from "sonner";
 
 import { getProfile, tabCompleteness, overallCompleteness, type TabKey, type ProfileData, LIVING_SITUATION_OPTIONS } from "@/data/profiles";
 import { useServiceAuthorizations, useConsents, addConsent, updateConsent, computeConsentStatus, type ConsentRecord, type ConsentType } from "@/hooks/useFirestore";
-import { lazy, Suspense } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { calculateRiskScore } from "@/lib/riskEngine";
+import { getRiskLabel } from "@/lib/formatDate";
+
+const PersonServiceProviders = lazy(() => import("./PersonServiceProviders"));
 const PersonConsentsTab = lazy(() => import("./PersonConsentsTab"));
 function ConsentsTabWrapper({ individualId, individual }: { individualId: string; individual: any }) {
   return (
@@ -50,9 +54,6 @@ function ConsentsTabWrapper({ individualId, individual }: { individualId: string
     </Suspense>
   );
 }
-import { useAuth } from "@/contexts/AuthContext";
-import { calculateRiskScore } from "@/lib/riskEngine";
-import { getRiskLabel } from "@/lib/formatDate";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "Basic Info" },
@@ -410,7 +411,7 @@ const PersonProfile = () => {
         {tab === "medical" && <MedicalInfoTab profile={profile} person={person} />}
         {tab === "monitors" && <MonitorsTab profile={profile} person={person} />}
         {tab === "court" && <CourtTab profile={profile} person={person} />}
-        {tab === "program" && <ProgramTab profile={profile} />}
+        {tab === "program" && <ProgramTab profile={profile} person={person} />}
         {tab === "contacts" && <ContactsTab profile={profile} person={person} />}
         {tab === "documents" && <DocumentsTab profile={profile} />}
         {tab === "consents" && <ConsentsTabWrapper individualId={person.id} individual={person} />}
@@ -1246,7 +1247,7 @@ function CourtTab({ profile, person }: { profile: ProfileData; person: Individua
 
 // TAB 5 — Program
 // =============================================================
-function ProgramTab({ profile }: { profile: ProfileData }) {
+function ProgramTab({ profile, person }: { profile: ProfileData; person: Individual }) {
   const { id: individualId } = useParams<{ id: string }>();
   const { userProfile } = useAuth();
   const navigate = useNavigate();
@@ -1403,6 +1404,13 @@ function ProgramTab({ profile }: { profile: ProfileData }) {
           </div>
         ))}
       </Section>
+
+      {/* Service Providers — live from individual_providers collection */}
+      {individualId && (
+        <Suspense fallback={null}>
+          <PersonServiceProviders individualId={individualId} individual={person as any} />
+        </Suspense>
+      )}
 
       <FundingStreamsSection profile={profile} />
 

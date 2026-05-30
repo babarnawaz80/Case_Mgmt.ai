@@ -59,16 +59,15 @@ interface PCPCreationModalProps {
   individualState?: string;
 }
 
-type WizardStep = 1 | 2 | 3 | 4 | 5;
+type WizardStep = 1 | 2 | 3 | 4;
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
 const STEPS = [
   { key: 1, label: "Upload" },
-  { key: 2, label: "Reading" },
+  { key: 2, label: "Processing" },
   { key: 3, label: "Review" },
-  { key: 4, label: "Build" },
-  { key: 5, label: "Complete" },
+  { key: 4, label: "Complete" },
 ];
 
 function StepIndicator({ current }: { current: number }) {
@@ -1392,6 +1391,134 @@ function Step5Complete({
   );
 }
 
+// ─── Step 3 (AI Mode): Review Summary ────────────────────────────────────────
+
+function Step3AIReview({
+  plan,
+  planId,
+  individualName,
+  individualId,
+  onOpenPlan,
+}: {
+  plan: Record<string, unknown>;
+  planId: string;
+  individualName: string;
+  individualId: string;
+  onOpenPlan: () => void;
+}) {
+  const pd = (plan.planDetails as any) ?? {};
+  const ds = pd.dataSources ?? {};
+  const goals: any[] = Array.isArray(plan.goals) ? plan.goals : [];
+  const services: any[] = Array.isArray(plan.services) ? plan.services : [];
+  const flags: any[] = Array.isArray(plan.complianceFlags) ? plan.complianceFlags : [];
+  const totalSources = Object.values(ds).reduce((a: number, b) => a + Number(b), 0);
+  const engineName = (plan as any).guidelinesEngineName || pd.guidelinesEngineName || "";
+
+  const chips = [
+    { label: "Goals created", value: goals.length, color: "bg-icm-accent-soft text-icm-accent ring-icm-accent/20" },
+    { label: "Services identified", value: services.length, color: "bg-icm-green-soft text-icm-green ring-icm-green/20" },
+    { label: "Data sources reviewed", value: totalSources, color: "bg-icm-bg text-icm-text-dim ring-icm-border" },
+  ];
+
+  const dataSummary = [
+    ds.contactNotes   > 0 && `${ds.contactNotes} contact notes`,
+    ds.visitSummaries > 0 && `${ds.visitSummaries} visit summaries`,
+    ds.monitoringForms > 0 && `${ds.monitoringForms} monitoring forms`,
+    ds.progressNotes  > 0 && `${ds.progressNotes} progress notes`,
+    ds.incidents      > 0 && `${ds.incidents} incident reports`,
+    ds.authorizations > 0 && `${ds.authorizations} service authorizations`,
+    ds.assessments    > 0 && `${ds.assessments} assessments`,
+    ds.uploadedDocuments > 0 && `${ds.uploadedDocuments} uploaded documents`,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className="space-y-5">
+      {/* Success header */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center shrink-0">
+          <CheckCircle2 className="w-6 h-6 text-teal-600" />
+        </div>
+        <div>
+          <h3 className="font-manrope font-bold text-[17px] text-icm-text">
+            {individualName.split(" ")[0]}'s plan is ready
+          </h3>
+          <p className="text-[12.5px] text-icm-text-dim mt-0.5">
+            AI reviewed {totalSources} data sources and built a complete draft.{engineName ? ` Applied ${engineName} guidelines.` : ""}
+          </p>
+        </div>
+      </div>
+
+      {/* Summary chips */}
+      <div className="flex flex-wrap gap-2">
+        {chips.map(c => (
+          <div key={c.label} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl ring-1 ${c.color}`}>
+            <span className="text-[10px] uppercase tracking-wide font-geist font-semibold opacity-80">{c.label}</span>
+            <span className="font-mono font-bold text-[16px]">{c.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Data reviewed */}
+      {dataSummary.length > 0 && (
+        <div className="rounded-xl border border-icm-border bg-icm-bg p-4">
+          <p className="text-[11px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">Data reviewed from {individualName.split(" ")[0]}'s chart</p>
+          <div className="flex flex-wrap gap-1.5">
+            {dataSummary.map(s => (
+              <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-icm-panel border border-icm-border text-[11px] font-geist text-icm-text-dim">
+                <CheckCircle2 className="w-3 h-3 text-teal-500" /> {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Goals preview */}
+      {goals.length > 0 && (
+        <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+          <p className="text-[11px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">{goals.length} goals drafted</p>
+          <ul className="space-y-1.5">
+            {goals.map((g: any, i: number) => (
+              <li key={i} className="flex items-start gap-2 text-[12.5px]">
+                <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-icm-accent-soft text-icm-accent shrink-0 mt-0.5">G{i + 1}</span>
+                <span className="text-icm-text">{g.title}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Compliance flags */}
+      {flags.length > 0 && (
+        <div className="rounded-xl border border-icm-amber/30 bg-amber-50 p-4">
+          <p className="text-[11px] font-geist font-semibold uppercase tracking-wider text-amber-700 mb-2">{flags.length} compliance item{flags.length > 1 ? "s" : ""} to review</p>
+          {flags.slice(0, 3).map((f: any, i: number) => (
+            <p key={i} className="text-[12px] text-amber-700">
+              <strong>{f.type === "hard_stop" ? "HARD STOP" : "Warning"}:</strong> {f.description}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <div className="text-[11.5px] text-icm-text-dim font-geist bg-icm-bg rounded-lg px-3 py-2 border border-icm-border">
+        <Sparkles className="w-3.5 h-3.5 inline text-icm-accent mr-1.5" />
+        All AI-generated content is labeled "AI drafted" — review and edit each section before finalizing.
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-icm-border">
+        <p className="text-[11px] text-icm-text-faint font-geist">Plan ID: {planId.slice(0, 8)}</p>
+        <button
+          onClick={onOpenPlan}
+          className="h-10 px-5 rounded-xl bg-icm-text text-icm-panel text-[13px] font-geist font-bold hover:opacity-90 inline-flex items-center gap-2 transition-opacity"
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          Open Complete Plan →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Error State ──────────────────────────────────────────────────────────────
 
 function GenerationErrorState({ message, onRetry, onStartBlank }: { message: string; onRetry: () => void; onStartBlank: () => void }) {
@@ -1446,9 +1573,8 @@ export function PCPCreationModal({
   const stepLabel: Record<number, string> = {
     1: "Upload Supporting Documents",
     2: isAiMode ? "AI Processing" : "Reading Documents",
-    3: isAiMode ? "Review Generated Plan" : "Review What AI Found",
-    4: "Finalize Plan Details",
-    5: "Complete",
+    3: "Review",
+    4: "Complete",
   };
 
   // ── Blank mode: handleBuild (unchanged) ──────────────────────────────────────
@@ -1543,8 +1669,7 @@ export function PCPCreationModal({
     );
   }
 
-  // Modal width/height adjust on step 3+
-  const isWide = isAiMode && step >= 3;
+  const isWide = false; // Keep modal standard size throughout
 
   return (
     <div
@@ -1562,7 +1687,7 @@ export function PCPCreationModal({
               <div>
                 <h2 className="font-manrope font-extrabold text-[18px] text-icm-text">{title}</h2>
                 <p className="text-[12px] text-icm-text-dim mt-0.5">
-                  Step {step} of 5 — {stepLabel[step]}
+                  Step {step} of 4 — {stepLabel[step]}
                 </p>
               </div>
               {step !== 2 && (
@@ -1648,17 +1773,18 @@ export function PCPCreationModal({
             />
           )}
 
-          {/* AI mode Step 3 */}
+          {/* AI mode Step 3 — Review Summary */}
           {isAiMode && step === 3 && generatedPlan && (
             <div className="px-6 py-5">
-              <Step3GeneratedPlan
+              <Step3AIReview
                 plan={generatedPlan}
                 planId={createdPcpId || ""}
                 individualName={individualName}
-                onBack={() => setStep(1)}
-                onContinue={() => setStep(4)}
-                onSaveDraft={handleSaveDraft}
-                onPlanUpdate={setGeneratedPlan}
+                individualId={individualId}
+                onOpenPlan={() => {
+                  onClose();
+                  navigate(`/people/${individualId}/care-plan/${createdPcpId || ""}`);
+                }}
               />
             </div>
           )}
@@ -1672,33 +1798,6 @@ export function PCPCreationModal({
               onBack={() => setStep(1)}
               onBuild={handleBuild}
             />
-          )}
-
-          {step === 4 && (
-            <div className="px-6 py-5">
-              <Step4Finalize
-                individualName={individualName}
-                effectiveDate={effectiveDate}
-                annualPlanDate={annualDate}
-                onBack={() => setStep(3)}
-                onSaveDraft={handleSaveDraft}
-                onComplete={handleFinalizeComplete}
-              />
-            </div>
-          )}
-
-          {step === 5 && (
-            <div className="px-6 py-5">
-              <Step5Complete
-                individualName={individualName}
-                planId={createdPcpId || ""}
-                goalsCount={Array.isArray(generatedPlan?.goals) ? (generatedPlan!.goals as any[]).length : 0}
-                servicesCount={Array.isArray(generatedPlan?.services) ? (generatedPlan!.services as any[]).length : 0}
-                totalSources={Object.values((generatedPlan?.planDetails as any)?.dataSources ?? {}).reduce((a, b) => (a as number) + (b as number), 0) as number}
-                onOpenPlan={() => { onClose(); navigate(`/people/${individualId}/care-plan/${createdPcpId || ""}`); }}
-                onReturnToEchart={() => { onClose(); navigate(`/people/${individualId}/echart`); }}
-              />
-            </div>
           )}
         </div>
       </div>

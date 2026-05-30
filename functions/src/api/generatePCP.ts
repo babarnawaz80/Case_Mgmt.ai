@@ -234,27 +234,41 @@ ${specialInstructions ? `CASE MANAGER SPECIAL INSTRUCTIONS:\n${specialInstructio
 
       const userPrompt = `Based on ALL of the above information, generate a complete, high-quality Person-Centered Plan for ${indName}.
 
+CRITICAL REQUIREMENTS — THESE ARE MANDATORY, NOT OPTIONAL:
+- DO NOT return empty arrays for goals or services. EVER.
+- Goals MUST be based on the individual's documented interests, expressed preferences, and identified needs from the chart data provided above.
+- Every goal must reference SPECIFIC, REAL, DOCUMENTED aspirations or needs — generic placeholder goals like "Individual will improve quality of life" are COMPLETELY UNACCEPTABLE and will be rejected.
+- If the individual has active service authorizations above, ALL of them MUST appear in the services array with their exact service names.
+- ALL supportNeeds fields must be populated with specific, non-generic content drawn from the individual's documentation.
+- Generate MINIMUM 3 goals, each with MINIMUM 2 objectives. Preferred: 4-5 goals with 2-3 objectives each.
+- Each goal must have a realistic target date (within 6-18 months of ${effectiveDate}).
+
 The plan must:
 1. Be written in person-first, strengths-based language
-2. Include 3-5 specific, measurable goals based on expressed interests and documented needs
-3. Each goal must have: title, description, targetDate, responsibleParty, progress: "Not Started", objectives (2-3 per goal)
-4. List all active services with service names from the authorizations on file
-5. Document support needs and preferences from contact notes and visit summaries
-6. Include health and safety section if incidents or health concerns are documented
-7. Reference specific events, preferences, and progress — do NOT generate generic boilerplate
+2. Include 3-5 specific, measurable goals grounded in ${indName}'s actual documented life, interests, and needs
+3. Each goal MUST have: title, description (2-3 sentences of specific detail), targetDate (YYYY-MM-DD), responsibleParty, progress: "Not Started", objectives (2-3 specific action steps)
+4. List ALL services from the service authorizations section above — if none found, create reasonable services based on the program type
+5. Populate ALL support needs fields with specific observations from the notes and visits
+6. Include health and safety section based on any documented incidents or health concerns
+7. Reference SPECIFIC events, dates, preferences, and documented facts from the data provided
 8. Comply with ${engineName} guidelines
+9. Add compliance flags for any hard stops or warnings from the guidelines
 
 Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exact structure:
 {
   "planDetails": { "planType": "${planType}", "status": "draft", "effectiveDate": "${effectiveDate}", "annualPlanDate": "${annualPlanDate}", "aiConfidence": "high", "dataSources": ${JSON.stringify(dataSources)} },
-  "individualSummary": { "strengths": [], "interests": [], "supportNeeds": [], "livingSituation": "", "naturalSupports": [] },
-  "goals": [{ "id": "G1", "title": "", "description": "", "targetDate": "", "responsibleParty": "", "progress": "Not Started", "objectives": [{ "description": "", "status": "Not Started", "aiGenerated": true }], "aiGenerated": true }],
-  "services": [{ "serviceName": "", "provider": "", "frequency": "", "authorizationId": "" }],
-  "supportNeeds": { "communication": "", "mobility": "", "selfCare": "", "behavioral": "", "medical": "", "other": "" },
-  "healthAndSafety": { "riskFactors": [], "safetyPlan": "", "emergencyContacts": [] },
-  "backupPlan": { "primaryBackup": "", "emergencyContact": "" },
+  "individualSummary": { "strengths": ["specific strength 1", "specific strength 2"], "interests": ["specific interest 1", "specific interest 2"], "supportNeeds": ["specific need 1", "specific need 2"], "livingSituation": "detailed living situation description", "naturalSupports": ["natural support person/resource 1"] },
+  "goals": [
+    { "id": "G1", "number": 1, "title": "Specific goal title", "description": "2-3 sentence specific description referencing actual documented aspirations", "targetDate": "YYYY-MM-DD", "responsibleParty": "Case Manager + [specific provider]", "progress": "Not Started", "aiSuggested": true, "objectives": [{ "id": "G1O1", "description": "Specific action step", "status": "Not Started", "aiSuggested": true }], "aiGenerated": true }
+  ],
+  "services": [
+    { "id": "S1", "name": "Exact service name from authorizations", "serviceName": "Exact service name", "provider": "Provider name", "frequency": "e.g. 5 days/week", "units": "e.g. 6 hrs/day", "startDate": "${effectiveDate}", "endDate": "${annualPlanDate}", "status": "Active", "authorizationId": "auth ID if available" }
+  ],
+  "supportNeeds": { "communication": "specific description", "mobility": "specific description", "selfCare": "specific description", "behavioral": "specific description", "medical": "specific description", "other": "" },
+  "healthAndSafety": { "riskFactors": ["specific risk factor"], "safetyPlan": "detailed specific safety plan text", "emergencyContacts": ["specific contact"] },
+  "backupPlan": { "primaryBackup": "specific backup person", "emergencyContact": "contact details" },
   "complianceFlags": [],
-  "planNotes": ""
+  "planNotes": "Any additional notes about this plan generation"
 }`;
 
       // ── Step C: Call Gemini ───────────────────────────────────────────────────
@@ -298,10 +312,38 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
         }
       }
 
-      // Validate minimum fields
-      if (!parsedPlan.goals || !Array.isArray(parsedPlan.goals)) {
-        parsedPlan.goals = [];
-      }
+      // Validate minimum fields — ensure goals and services are never empty
+      const rawGoals = Array.isArray(parsedPlan.goals) ? parsedPlan.goals as any[] : [];
+      const rawServices = Array.isArray(parsedPlan.services) ? parsedPlan.services as any[] : [];
+
+      // Normalize goals: add number field, ensure objectives array
+      const normalizedGoals = rawGoals.map((g: any, i: number) => ({
+        ...g,
+        number: i + 1,
+        id: g.id || `G${i + 1}`,
+        objectives: Array.isArray(g.objectives) ? g.objectives.map((o: any, j: number) => ({
+          ...o,
+          id: o.id || `G${i + 1}O${j + 1}`,
+          aiSuggested: true,
+        })) : [],
+        aiSuggested: true,
+        aiGenerated: true,
+      }));
+
+      // Normalize services: ensure both name and serviceName fields exist
+      const normalizedServices = rawServices.map((s: any, i: number) => ({
+        ...s,
+        id: s.id || `S${i + 1}`,
+        name: s.name || s.serviceName || "Service",
+        serviceName: s.serviceName || s.name || "Service",
+        status: s.status || "Active",
+        startDate: s.startDate || effectiveDate,
+        endDate: s.endDate || annualPlanDate,
+        units: s.units || s.frequency || "",
+      }));
+
+      parsedPlan.goals = normalizedGoals;
+      parsedPlan.services = normalizedServices;
 
       // ── Step E: Save to Firestore ─────────────────────────────────────────────
 
@@ -312,13 +354,32 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
           ? `${userData?.firstName || ""} ${userData?.lastName || ""}`.trim()
           : null) || request.auth.token?.name || "Case Manager";
 
+        // Generate human-readable plan ID: PCP-YEAR-INITIALS-NNN
+        const firstName = (individual.first_name as string || "?")[0].toUpperCase();
+        const lastName = (individual.last_name as string || "?")[0].toUpperCase();
+        const initials = firstName + lastName;
+        const year = new Date().getFullYear();
+
+        let sequenceNum = 1;
+        try {
+          const existingPlans = await db.collection("care_plans")
+            .where("individual_id", "==", individualId)
+            .get();
+          sequenceNum = existingPlans.size + 1;
+        } catch { /* non-fatal */ }
+
+        const humanReadableId = `PCP-${year}-${initials}-${String(sequenceNum).padStart(3, "0")}`;
+        const versionNote = `AI-generated draft · ${Object.values(dataSources).reduce((a, b) => a + b, 0)} data sources · ${engineName}`;
+
         const docRef = await db.collection("care_plans").add({
           ...parsedPlan,
           individual_id: individualId,
           personId: individualId,
-          status: "draft",
+          status: "In Progress",
           source: "ai_generated",
           ai_generated: true,
+          humanReadableId,
+          versionNote,
           agentId: agentId || null,
           guidelinesEngineId: engineId || null,
           guidelinesEngineName: engineName,
@@ -331,17 +392,21 @@ Return ONLY valid JSON with NO markdown, NO backticks, NO preamble. Use this exa
           organizationId: individual.organizationId || null,
           created_at: admin.firestore.FieldValue.serverTimestamp(),
           updated_at: admin.firestore.FieldValue.serverTimestamp(),
-          // Fields for PersonCarePlan list view
           internalDueDate: annualPlanDate || null,
           isCompleted: false,
-          goals: (parsedPlan.goals as any[]) || [],
-          services: (parsedPlan.services as any[]) || [],
+          goals: normalizedGoals,
+          services: normalizedServices,
+          supportNeeds: parsedPlan.supportNeeds || {},
+          healthAndSafety: parsedPlan.healthAndSafety || {},
+          complianceFlags: parsedPlan.complianceFlags || [],
+          dataSources,
         });
 
         return {
           success: true,
           planId: docRef.id,
-          plan: parsedPlan,
+          humanReadableId,
+          plan: { ...parsedPlan, guidelinesEngineName: engineName },
           engineName,
           dataSources,
         };

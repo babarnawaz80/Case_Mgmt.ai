@@ -180,10 +180,40 @@ const PersonCarePlanDetail = () => {
           Care Plan Board
         </button>
 
+        {/* Compliance flags banner */}
+        {(plan as any).complianceFlags?.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <p className="text-[12.5px] font-geist font-semibold text-amber-900">
+                {(plan as any).complianceFlags.length} Compliance Item{(plan as any).complianceFlags.length > 1 ? "s" : ""} Need Attention
+              </p>
+              {(plan as any).guidelinesEngineId && (
+                <button
+                  onClick={() => navigate(`/agents/guidelines/${(plan as any).guidelinesEngineId}`)}
+                  className="ml-auto text-[11px] font-geist text-amber-700 hover:underline"
+                >
+                  View guidelines →
+                </button>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {((plan as any).complianceFlags as any[]).map((f: any, i: number) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${f.type === "hard_stop" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                    {f.type === "hard_stop" ? "HARD STOP" : "WARNING"}
+                  </span>
+                  <p className="text-[12px] font-geist text-amber-800">{f.description || f.rule}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Plan header */}
         <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex items-center gap-3 flex-wrap">
           <div className="font-mono text-[13px] font-bold text-icm-text px-2.5 py-1 rounded-md bg-icm-bg border border-icm-border">
-            #{plan.id}
+            {(plan as any).humanReadableId || `#${plan.id.slice(0, 8)}`}
           </div>
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-geist font-semibold ring-1 ${statusToneClass}`}>
             {plan.status}
@@ -403,15 +433,15 @@ const PersonCarePlanDetail = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-icm-border">
-                  {(plan.services ?? []).map((s) => (
-                    <tr key={s.id}>
-                      <td className="px-3 py-2 text-icm-text font-medium">{s.name}</td>
-                      <td className="px-3 py-2 text-icm-text-dim">{s.provider}</td>
-                      <td className="px-3 py-2 font-mono text-icm-text-dim">{s.startDate}</td>
-                      <td className="px-3 py-2 font-mono text-icm-text-dim">{s.endDate}</td>
-                      <td className="px-3 py-2 text-icm-text-dim">{s.units}</td>
+                  {(plan.services ?? []).map((s: any) => (
+                    <tr key={s.id || s.serviceName}>
+                      <td className="px-3 py-2 text-icm-text font-medium">{s.name ?? s.serviceName ?? "Service"}</td>
+                      <td className="px-3 py-2 text-icm-text-dim">{s.provider ?? "—"}</td>
+                      <td className="px-3 py-2 font-mono text-icm-text-dim">{s.startDate ?? "—"}</td>
+                      <td className="px-3 py-2 font-mono text-icm-text-dim">{s.endDate ?? "—"}</td>
+                      <td className="px-3 py-2 text-icm-text-dim">{s.units ?? s.frequency ?? "—"}</td>
                       <td className="px-3 py-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">{s.status}</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">{s.status ?? "Active"}</span>
                       </td>
                       <td className="px-3 py-2 text-right">
                         {!readOnly && <button onClick={() => toast(`Remove ${s.name}?`, { action: { label: "Remove", onClick: () => toast.success(`${s.name} removed from plan`) } })} className="text-icm-text-faint hover:text-icm-red"><Trash2 className="w-3.5 h-3.5" /></button>}
@@ -441,10 +471,10 @@ const PersonCarePlanDetail = () => {
         {/* SECTION 5 — Support Needs */}
         <PlanSection icon={Heart} title="Support Needs & Preferences" complete={4} total={4} open={open.support} onToggle={() => toggle("support")} aiBadge>
           <div className="space-y-4">
-            <SupportField label="What is working well" data={plan.supportNeeds?.workingWell ?? { value: "" }} disabled={readOnly} />
-            <SupportField label="What is not working" data={plan.supportNeeds?.notWorking ?? { value: "" }} disabled={readOnly} />
-            <SupportField label="Individual's expressed preferences and goals" data={plan.supportNeeds?.preferences ?? { value: "" }} disabled={readOnly} />
-            <SupportField label="Health and safety considerations" data={plan.supportNeeds?.healthSafety ?? { value: "" }} disabled={readOnly} />
+            <SupportField label="What is working well" data={plan.supportNeeds?.workingWell ?? { value: (plan as any).supportNeeds?.communication ?? "" }} disabled={readOnly} />
+            <SupportField label="What is not working / Support needs" data={plan.supportNeeds?.notWorking ?? { value: [(plan as any).supportNeeds?.behavioral, (plan as any).supportNeeds?.medical].filter(Boolean).join("\n") ?? "" }} disabled={readOnly} />
+            <SupportField label="Individual's expressed preferences and goals" data={plan.supportNeeds?.preferences ?? { value: (plan as any).supportNeeds?.other ?? "" }} disabled={readOnly} />
+            <SupportField label="Health and safety considerations" data={plan.supportNeeds?.healthSafety ?? { value: (plan as any).healthAndSafety?.safetyPlan ?? "" }} disabled={readOnly} />
           </div>
         </PlanSection>
 
@@ -661,22 +691,20 @@ const PersonCarePlanDetail = () => {
               <span className="text-[10px] text-icm-text-faint">Immutable — edits create a new version</span>
             </div>
             <ol className="space-y-1.5">
-              {[
-                { v: "v3.0", date: "04/15/2026", who: "Kathy Adams, CM", note: "Current draft — incorporates 04/12 HRA findings" },
-                { v: "v2.1", date: "08/30/2025", who: "Kathy Adams, CM", note: "Annual renewal, approved" },
-                { v: "v2.0", date: "08/15/2024", who: "Marcus Lee, CM", note: "Annual renewal, approved" },
-                { v: "v1.0", date: "08/01/2023", who: "Marcus Lee, CM", note: "Initial plan" },
-              ].map((vv, i) => (
-                <li key={vv.v} className="flex items-center gap-3 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border">
-                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${i === 0 ? "bg-icm-amber-soft text-icm-amber" : "bg-icm-bg text-icm-text-dim border border-icm-border"}`}>
-                    {vv.v}
-                  </span>
-                  <span className="text-[11px] font-mono text-icm-text-faint w-20 shrink-0">{vv.date}</span>
-                  <span className="text-[11.5px] text-icm-text-dim w-32 shrink-0 truncate">{vv.who}</span>
-                  <span className="text-[11.5px] text-icm-text truncate flex-1">{vv.note}</span>
-                  <button onClick={() => toast(`Plan ${vv.v}`, { description: `Opened read-only snapshot from ${vv.date}` })} className="text-[11px] text-icm-accent hover:underline shrink-0">View</button>
-                </li>
-              ))}
+              {/* Current plan (this document) */}
+              <li className="flex items-center gap-3 px-2.5 py-1.5 rounded-md bg-icm-bg border border-icm-border">
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-icm-amber-soft text-icm-amber">v1.0</span>
+                <span className="text-[11px] font-mono text-icm-text-faint w-20 shrink-0">
+                  {(plan as any).created_at?.toDate?.()?.toLocaleDateString?.() ?? new Date().toLocaleDateString()}
+                </span>
+                <span className="text-[11.5px] text-icm-text-dim w-32 shrink-0 truncate">
+                  {(plan as any).created_by_name ?? "Case Manager"}
+                </span>
+                <span className="text-[11.5px] text-icm-text truncate flex-1">
+                  {(plan as any).versionNote ?? ((plan as any).ai_generated ? "AI-generated draft" : "Plan created")}
+                </span>
+                <span className="text-[11px] text-icm-text-faint shrink-0">Current</span>
+              </li>
             </ol>
           </div>
         </PlanSection>

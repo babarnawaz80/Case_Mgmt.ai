@@ -727,7 +727,15 @@ const Index = () => {
 
         {/* Chat Content */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-8" id="chat-scroll-area">
+          {/* Empty state: justify-end pushes content to bottom so it sits flush above the input,
+              creating the ChatGPT/Gemini effect of greeting+input as one centered block.
+              Active state: top-anchored scrolling for messages. */}
+          <div
+            className={`flex-1 overflow-y-auto flex flex-col items-center px-6 ${
+              thread.length === 0 ? "justify-end pb-2" : "py-8 justify-start"
+            }`}
+            id="chat-scroll-area"
+          >
           {thread.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -930,7 +938,7 @@ const Index = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="flex flex-col items-center gap-2.5 mt-6 w-full max-w-2xl pb-4"
+              className="flex flex-col items-center gap-2.5 mt-4 w-full max-w-2xl pb-2"
             >
               <div className="grid grid-cols-2 gap-2 w-full">
                 {suggestedPrompts.slice(0, 8).map((prompt, i) => (
@@ -980,8 +988,12 @@ const Index = () => {
 
           </div>{/* closes inner scroll area */}
 
-          {/* Sticky input area — input only, compact */}
-          <div className="shrink-0 border-t border-border/60 bg-background/95 backdrop-blur-sm px-6 py-3 flex flex-col items-center">
+          {/* Sticky input — no border/bg in empty state so it blends with scroll content above */}
+          <div className={`shrink-0 px-6 py-3 flex flex-col items-center ${
+            thread.length > 0
+              ? "border-t border-border/60 bg-background/95 backdrop-blur-sm"
+              : "bg-transparent"
+          }`}>
 
           {/* Chat Input */}
           <motion.div

@@ -80,6 +80,16 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
   const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(new Set(["overview"]));
   const [selectedState, setSelectedState] = useState("all");
 
+  // MUST be declared before any useMemo that references `individuals` or `tasks`
+  // to avoid "Cannot access before initialization" TDZ errors in the minified bundle.
+  const { individuals, loading: individualsLoading } = useIndividuals();
+  const {
+    runs, logs, tasks,
+    runsLoading, logsLoading, running, runProgress,
+    lastRun, nextRunDate, openTasksCount, draftsReadyCount,
+    triggerRun,
+  } = useOrchestrator();
+
   // Derive available states from individuals
   const availableStates = useMemo(() => {
     const states = new Set<string>();
@@ -101,15 +111,6 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
     setMountedTabs(prev => new Set([...prev, tab]));
     setSearchParams({ tab }, { replace: true });
   }
-
-  const {
-    runs, logs, tasks,
-    runsLoading, logsLoading, running, runProgress,
-    lastRun, nextRunDate, openTasksCount, draftsReadyCount,
-    triggerRun,
-  } = useOrchestrator();
-
-  const { individuals, loading: individualsLoading } = useIndividuals();
 
   // Build deadlines for recommendations badge count
   const deadlines: Deadline[] = useMemo(() => buildDeadlines(individuals), [individuals]);

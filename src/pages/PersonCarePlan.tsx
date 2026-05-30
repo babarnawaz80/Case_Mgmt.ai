@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { getDocs, query, collection, where, limit } from "firebase/firestore";
+import { getDocs, query, collection, where, limit, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -568,7 +568,19 @@ function PlanTable({
                       </>
                     )}
                     <button
-                      onClick={() => toast(`Delete plan ${displayId}?`, { action: { label: "Delete", onClick: () => toast.success(`Plan ${displayId} deleted`) } })}
+                      onClick={() => toast(`Delete plan ${displayId}?`, {
+                        action: {
+                          label: "Delete",
+                          onClick: async () => {
+                            try {
+                              await deleteDoc(doc(db, "care_plans", p.id));
+                              toast.success(`Plan ${displayId} deleted`);
+                            } catch {
+                              toast.error("Failed to delete plan — check connection.");
+                            }
+                          }
+                        }
+                      })}
                       className="text-icm-text-faint hover:text-icm-red p-1.5 rounded-md"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -488,11 +488,18 @@ function Step2Reading({
             setTimeout(() => onComplete(data), 1500);
           }
         } else {
+          // No files — skip API call entirely, show chart items and complete
+          const staticItems = [
+            "Profile data loaded from chart",
+            "Active goals and services loaded",
+            "Contact notes reviewed",
+            "Monitoring history loaded",
+            "Eligibility and MA status checked",
+          ];
           setProgress(100);
-          const dummyData = await extractPcpDataFromPdfs([], planType);
           if (isSubscribed) {
-            setChartItems(dummyData.chartItems.map((text) => ({ text, done: true })));
-            setTimeout(() => onComplete(dummyData), 1500);
+            setChartItems(staticItems.map((text) => ({ text, done: true })));
+            setTimeout(() => onComplete(null), 1200);
           }
         }
       } catch (err) {

@@ -335,7 +335,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
 
   return (
     <header
-      className="border-b border-icm-border grid grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-6 shrink-0"
+      className="border-b border-icm-border flex items-center px-3 sm:px-6 shrink-0"
       style={{
         backgroundColor: "hsl(var(--icm-topbar))",
         paddingTop: "env(safe-area-inset-top)",
@@ -343,7 +343,7 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
       }}
     >
       {/* Left: CaseManagement.ai brand + org logo side-by-side */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+      <div className="flex-1 flex items-center gap-2 sm:gap-3 min-w-0">
         <NavLink to="/home" className="flex items-center gap-2 shrink-0" title="Home">
           <img
             src={brandLogo}
@@ -428,56 +428,54 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         })}
       </nav>
 
-      {/* Mobile spacer + nav dropdown */}
-      <div className="flex-1 md:hidden" />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            className="md:hidden h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors"
-            aria-label="Open navigation"
-          >
-            <Menu className="w-[18px] h-[18px]" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56 bg-icm-panel z-50">
-          <DropdownMenuLabel>Navigation</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {topNavItems.map((item) => {
-            if (item.roles && !item.roles.includes(role)) return null;
-            const badge = badgeFor(item);
-            const Icon = item.icon;
-            return (
-              <DropdownMenuItem key={item.title} onClick={() => navigate(item.url)} className="cursor-pointer">
-                <Icon className="w-4 h-4 mr-2" />
-                <span className="flex-1">{item.title}</span>
-                {badge && (
-                  <span className={cn("min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-mono font-bold flex items-center justify-center", badgeTone[badge.tone])}>
-                    {badge.count}
-                  </span>
-                )}
-              </DropdownMenuItem>
-            );
-          })}
-          {isAdmin && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/agents")} className="cursor-pointer">
-                <Bot className="w-4 h-4 mr-2" />
-                AI Agent
-              </DropdownMenuItem>
-            </>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => demoToast("Help & documentation")} className="cursor-pointer">
-            <HelpCircle className="w-4 h-4 mr-2" />
-            Help
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Right: mobile hamburger + search + actions */}
+      <div className="flex-1 flex items-center gap-1 sm:gap-2 justify-end">
+        {/* Mobile nav hamburger */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="md:hidden h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors"
+              aria-label="Open navigation"
+            >
+              <Menu className="w-[18px] h-[18px]" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 bg-icm-panel z-50">
+            <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {topNavItems.map((item) => {
+              if (item.roles && !item.roles.includes(role)) return null;
+              const badge = badgeFor(item);
+              const Icon = item.icon;
+              return (
+                <DropdownMenuItem key={item.title} onClick={() => navigate(item.url)} className="cursor-pointer">
+                  <Icon className="w-4 h-4 mr-2" />
+                  <span className="flex-1">{item.title}</span>
+                  {badge && (
+                    <span className={cn("min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-mono font-bold flex items-center justify-center", badgeTone[badge.tone])}>
+                      {badge.count}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/agents")} className="cursor-pointer">
+                  <Bot className="w-4 h-4 mr-2" />
+                  AI Agent
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => demoToast("Help & documentation")} className="cursor-pointer">
+              <HelpCircle className="w-4 h-4 mr-2" />
+              Help
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-
-      {/* Right: search + actions */}
-      <div className="flex items-center gap-1 sm:gap-2 justify-end">
         {/* Televisit button — before search */}
         <button
           onClick={() => setTelevisitOpen(true)}

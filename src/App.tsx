@@ -1,4 +1,23 @@
 import React, { lazy, Suspense } from "react";
+import { ICMSpinner } from "@/components/icm/ICMSpinner";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { RoleProvider } from "@/contexts/RoleContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import SmartNoteAttacher from "@/components/SmartNoteAttacher";
+import { CommandPalette } from "@/components/CommandPalette";
+import { RiskScoreProvider, useRiskScore } from "@/contexts/RiskScoreContext";
+import { RiskScoreDrawer } from "@/components/icm/RiskScoreDrawer";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { OrgSettingsProvider } from "@/contexts/OrgSettingsContext";
+import { BillingProvider } from "@/contexts/BillingContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SessionTimeoutProvider } from "@/providers/SessionTimeoutProvider";
+import { PasswordExpiryProvider } from "@/providers/PasswordExpiryProvider";
+import { PlatformAdminGuard } from "@/components/superadmin/PlatformAdminGuard";
 
 /**
  * lazyWithRetry — wraps React.lazy so that when a dynamic import fails
@@ -22,27 +41,9 @@ function lazyWithRetry<T extends React.ComponentType<unknown>>(
     })
   );
 }
-import { ICMSpinner } from "@/components/icm/ICMSpinner";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { RoleProvider } from "@/contexts/RoleContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import SmartNoteAttacher from "@/components/SmartNoteAttacher";
-import { CommandPalette } from "@/components/CommandPalette";
-import { RiskScoreProvider, useRiskScore } from "@/contexts/RiskScoreContext";
-import { RiskScoreDrawer } from "@/components/icm/RiskScoreDrawer";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { OrgSettingsProvider } from "@/contexts/OrgSettingsContext";
-import { BillingProvider } from "@/contexts/BillingContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { SessionTimeoutProvider } from "@/providers/SessionTimeoutProvider";
-import { PasswordExpiryProvider } from "@/providers/PasswordExpiryProvider";
-import { PlatformAdminGuard } from "@/components/superadmin/PlatformAdminGuard";
 
 // ── Lazy page imports (each becomes its own chunk) ──────────────────────────
+const ConsentPortal = lazyWithRetry(() => import("./pages/ConsentPortal"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 const SignDocument = lazyWithRetry(() => import("./pages/SignDocument"));
@@ -139,6 +140,8 @@ const SettingsBilling = lazyWithRetry(() => import("./pages/settings/SettingsBil
 const MyProfile = lazyWithRetry(() => import("./pages/MyProfile"));
 const AIRoadmap = lazyWithRetry(() => import("./pages/AIRoadmap"));
 const ProviderDirectory = lazyWithRetry(() => import("./pages/admin/ProviderDirectory"));
+const ProviderDetail = lazyWithRetry(() => import("./pages/admin/ProviderDetail"));
+const ProviderForm = lazyWithRetry(() => import("./pages/admin/ProviderForm"));
 const AuditLogPage = lazyWithRetry(() => import("./pages/AuditLogPage"));
 const Reports = lazyWithRetry(() => import("./pages/Reports"));
 const ReportRunner = lazyWithRetry(() => import("./pages/ReportRunner"));
@@ -149,6 +152,9 @@ const Documents = lazyWithRetry(() => import("./pages/Documents"));
 const Leads = lazyWithRetry(() => import("./pages/Leads"));
 const LeadForm = lazyWithRetry(() => import("./pages/LeadForm"));
 const LeadDetail = lazyWithRetry(() => import("./pages/LeadDetail"));
+const IntakeForm = lazyWithRetry(() => import("./pages/IntakeForm"));
+const IntakeForms = lazyWithRetry(() => import("./pages/admin/IntakeForms"));
+const PendingLeadDetail = lazyWithRetry(() => import("./pages/PendingLeadDetail"));
 const Messages = lazyWithRetry(() => import("./pages/Messages"));
 const SchedulePage = lazyWithRetry(() => import("./pages/SchedulePage"));
 const VirtualVisit = lazyWithRetry(() => import("./pages/VirtualVisit"));
@@ -244,6 +250,10 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/platform-login" element={<PlatformLogin />} />
             <Route path="/sign/:token" element={<SignDocument />} />
+            {/* Public consent portal — no login required, opened from SMS link */}
+            <Route path="/consent/:token" element={<ConsentPortal />} />
+            {/* Public intake form — no login required, shared with external providers */}
+            <Route path="/intake/:orgToken" element={<IntakeForm />} />
             <Route path="/companion/:token" element={<Companion />} />
             <Route path="/shared/:token" element={<PlanShareViewer />} />
             <Route path="/care-assistant/:linkToken" element={<CareAssistant />} />
@@ -331,8 +341,10 @@ const App = () => (
             <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
             <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
             <Route path="/leads/new" element={<ProtectedRoute><LeadForm /></ProtectedRoute>} />
+            <Route path="/leads/pending/:id" element={<ProtectedRoute><PendingLeadDetail /></ProtectedRoute>} />
             <Route path="/leads/:id" element={<ProtectedRoute><LeadDetail /></ProtectedRoute>} />
             <Route path="/leads/:id/edit" element={<ProtectedRoute><LeadForm /></ProtectedRoute>} />
+            <Route path="/leads/:leadId/assessments/new" element={<ProtectedRoute><PersonAssessmentForm /></ProtectedRoute>} />
             <Route path="/documentation" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
             <Route path="/documentation/contact-notes" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
             <Route path="/documentation/progress-notes" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
@@ -363,8 +375,12 @@ const App = () => (
             <Route path="/settings/import" element={<ProtectedRoute requireRole="admin"><SettingsImport /></ProtectedRoute>} />
             <Route path="/settings/templates" element={<ProtectedRoute requireRole="admin"><SettingsTemplates /></ProtectedRoute>} />
             <Route path="/settings/billing" element={<ProtectedRoute requireRole="admin"><SettingsBilling /></ProtectedRoute>} />
+            <Route path="/leads/intake-links" element={<ProtectedRoute><IntakeForms /></ProtectedRoute>} />
             <Route path="/ai-roadmap" element={<ProtectedRoute><AIRoadmap /></ProtectedRoute>} />
             <Route path="/admin/provider-directory" element={<ProtectedRoute requireRole="admin"><ProviderDirectory /></ProtectedRoute>} />
+            <Route path="/admin/provider-directory/new" element={<ProtectedRoute requireRole="admin"><ProviderForm /></ProtectedRoute>} />
+            <Route path="/admin/provider-directory/:providerId" element={<ProtectedRoute requireRole="admin"><ProviderDetail /></ProtectedRoute>} />
+            <Route path="/admin/provider-directory/:providerId/edit" element={<ProtectedRoute requireRole="admin"><ProviderForm /></ProtectedRoute>} />
             <Route path="/admin/audit-log" element={<ProtectedRoute requireRole="admin"><AuditLogPage /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/reports/builder" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />

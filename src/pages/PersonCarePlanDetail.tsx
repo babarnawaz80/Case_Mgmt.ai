@@ -16,6 +16,7 @@ import { writeAudit } from "@/lib/auditService";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgSettings } from "@/contexts/OrgSettingsContext";
 import { PCPDocumentViewer } from "@/components/pcp/PCPDocumentViewer";
 import { PCPPrintDocument } from "@/components/pcp/PCPPrintDocument";
 import { MOCK_PCP_BROWN_2026 } from "@/data/pcpMockData";
@@ -70,17 +71,10 @@ const PersonCarePlanDetail = () => {
   // Guardian consent flag
   const [guardianConsentRequired, setGuardianConsentRequired] = useState(false);
   const [planAttestation, setPlanAttestation] = useState<AttestationValue>(EMPTY_ATTESTATION);
-  const [organization, setOrganization] = useState<Record<string, unknown> | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  // Load organization for print logo
-  useEffect(() => {
-    const orgId = userProfile?.organizationId;
-    if (!orgId) return;
-    getDoc(doc(db, "organizations", orgId))
-      .then(snap => { if (snap.exists()) setOrganization(snap.data() as Record<string, unknown>); })
-      .catch(() => {});
-  }, [userProfile?.organizationId]);
+  // Use OrgSettingsContext — already loaded, has logoUrl and orgName
+  const { logoUrl: orgLogoUrl, orgName } = useOrgSettings();
   const { data: consents } = useConsents(id);
   const hasActiveConsent = consents.some(
     (c) => c.status === "Active" && c.consent_type === "Guardian Consent for Plan Documents"
@@ -845,7 +839,7 @@ const PersonCarePlanDetail = () => {
         <PCPPrintDocument
           plan={plan as Record<string, unknown>}
           individual={individual}
-          organization={organization as any}
+          organization={{ logoUrl: orgLogoUrl, name: orgName }}
         />
       )}
     </ICMShell>

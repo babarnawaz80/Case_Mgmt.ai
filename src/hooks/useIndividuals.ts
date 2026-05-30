@@ -145,6 +145,63 @@ export interface Individual {
 
   // Special instructions (snake_case)
   special_instructions?: string;
+
+  // Demographics (extended — additional fields)
+  pronouns?: string;
+  communication_needs?: string;
+
+  // Identification (extended)
+  medicare_id?: string;
+  state_id?: string;
+  admitted_on?: string;
+
+  // Phone (extended)
+  phone_secondary?: string;
+  preferred_contact?: string;
+
+  // HRST / Monitoring
+  hrst_score?: string;
+  hrst_scored_on?: string;
+  hrst_next_due?: string;
+  hrst_assessed_by?: string;
+  hrst_source?: string;
+
+  // Level of Care
+  loc_current?: string;
+  loc_effective_date?: string;
+  loc_expiration_date?: string;
+  loc_issued_by?: string;
+
+  // Behavioral / Health baselines
+  behavioral_monitoring_notes?: string;
+  health_monitoring_notes?: string;
+
+  // Court / Legal (extended)
+  court_involvement?: boolean;
+  guardianship_type?: string;
+  guardian_address?: string;
+  guardianship_effective_date?: string;
+  on_probation?: boolean;
+  probation_officer_name?: string;
+  probation_officer_phone?: string;
+  probation_end_date?: string;
+  probation_conditions?: string;
+
+  // Admin / Assignment (extended)
+  secondary_case_manager?: string;
+  supervisor?: string;
+  program_coordinator?: string;
+  caseload_weight?: string;
+  complexity?: string;
+
+  // Intake / Discharge (extended)
+  admission_type?: string;
+  previous_agency?: string;
+  discharge_reason?: string;
+
+  // Compliance / Quality
+  last_chart_review?: string;
+  next_chart_review_due?: string;
 }
 
 function toIndividual(id: string, data: DocumentData): Individual {
@@ -271,6 +328,63 @@ function toIndividual(id: string, data: DocumentData): Individual {
 
     // Special instructions (snake_case)
     special_instructions: data.special_instructions ?? data.specialInstructions,
+
+    // Demographics (extended — additional fields)
+    pronouns: data.pronouns,
+    communication_needs: data.communication_needs,
+
+    // Identification (extended)
+    medicare_id: data.medicare_id,
+    state_id: data.state_id,
+    admitted_on: data.admitted_on ?? data.admittedOn,
+
+    // Phone (extended)
+    phone_secondary: data.phone_secondary,
+    preferred_contact: data.preferred_contact,
+
+    // HRST / Monitoring
+    hrst_score: data.hrst_score,
+    hrst_scored_on: data.hrst_scored_on,
+    hrst_next_due: data.hrst_next_due,
+    hrst_assessed_by: data.hrst_assessed_by,
+    hrst_source: data.hrst_source,
+
+    // Level of Care
+    loc_current: data.loc_current,
+    loc_effective_date: data.loc_effective_date,
+    loc_expiration_date: data.loc_expiration_date,
+    loc_issued_by: data.loc_issued_by,
+
+    // Behavioral / Health baselines
+    behavioral_monitoring_notes: data.behavioral_monitoring_notes,
+    health_monitoring_notes: data.health_monitoring_notes,
+
+    // Court / Legal (extended)
+    court_involvement: data.court_involvement,
+    guardianship_type: data.guardianship_type,
+    guardian_address: data.guardian_address,
+    guardianship_effective_date: data.guardianship_effective_date,
+    on_probation: data.on_probation,
+    probation_officer_name: data.probation_officer_name,
+    probation_officer_phone: data.probation_officer_phone,
+    probation_end_date: data.probation_end_date,
+    probation_conditions: data.probation_conditions,
+
+    // Admin / Assignment (extended)
+    secondary_case_manager: data.secondary_case_manager,
+    supervisor: data.supervisor,
+    program_coordinator: data.program_coordinator,
+    caseload_weight: data.caseload_weight?.toString(),
+    complexity: data.complexity,
+
+    // Intake / Discharge (extended)
+    admission_type: data.admission_type,
+    previous_agency: data.previous_agency,
+    discharge_reason: data.discharge_reason,
+
+    // Compliance / Quality
+    last_chart_review: data.last_chart_review,
+    next_chart_review_due: data.next_chart_review_due,
   };
 }
 

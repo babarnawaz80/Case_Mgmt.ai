@@ -41,6 +41,15 @@ import { toast } from "sonner";
 
 import { getProfile, tabCompleteness, overallCompleteness, type TabKey, type ProfileData, LIVING_SITUATION_OPTIONS } from "@/data/profiles";
 import { useServiceAuthorizations, useConsents, addConsent, updateConsent, computeConsentStatus, type ConsentRecord, type ConsentType } from "@/hooks/useFirestore";
+import { lazy, Suspense } from "react";
+const PersonConsentsTab = lazy(() => import("./PersonConsentsTab"));
+function ConsentsTabWrapper({ individualId, individual }: { individualId: string; individual: any }) {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-[12px] text-icm-text-dim">Loading consents…</div>}>
+      <PersonConsentsTab individualId={individualId} individual={individual} />
+    </Suspense>
+  );
+}
 import { useAuth } from "@/contexts/AuthContext";
 import { calculateRiskScore } from "@/lib/riskEngine";
 import { getRiskLabel } from "@/lib/formatDate";
@@ -53,6 +62,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "program", label: "Program" },
   { key: "contacts", label: "Contacts" },
   { key: "documents", label: "Documents" },
+  { key: "consents", label: "Consents" },
   { key: "administrative", label: "Administrative" },
 ];
 
@@ -65,6 +75,12 @@ const PersonProfile = () => {
 
   const initialTab = (params.get("tab") as TabKey) ?? "basic";
   const [tab, setTab] = useState<TabKey>(initialTab);
+
+  // Consent pending indicator for the tab dot
+  const { data: profileConsents } = useConsents(id);
+  const hasPendingConsents = profileConsents.some(
+    (c) => c.status === "pending_signature" || (c.status as string) === "sent"
+  );
   const [showSsn, setShowSsn] = useState(false);
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [echartOpen, setEchartOpen] = useState(false);
@@ -374,6 +390,12 @@ const PersonProfile = () => {
                         className="w-1.5 h-1.5 rounded-full bg-icm-amber"
                       />
                     )}
+                    {t.key === "consents" && hasPendingConsents && (
+                      <span
+                        title="Consent signature pending"
+                        className="w-1.5 h-1.5 rounded-full bg-orange-500"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -386,11 +408,12 @@ const PersonProfile = () => {
             <BasicInfoTab person={person} profile={profile} showSsn={showSsn} setShowSsn={setShowSsn} personId={person.id} />
         )}
         {tab === "medical" && <MedicalInfoTab profile={profile} person={person} />}
-        {tab === "monitors" && <MonitorsTab profile={profile} />}
-        {tab === "court" && <CourtTab profile={profile} />}
+        {tab === "monitors" && <MonitorsTab profile={profile} person={person} />}
+        {tab === "court" && <CourtTab profile={profile} person={person} />}
         {tab === "program" && <ProgramTab profile={profile} />}
         {tab === "contacts" && <ContactsTab profile={profile} person={person} />}
         {tab === "documents" && <DocumentsTab profile={profile} />}
+        {tab === "consents" && <ConsentsTabWrapper individualId={person.id} individual={person} />}
         {tab === "administrative" && <AdminTab profile={profile} person={person} />}
 
         {/* Per-tab completeness footer */}
@@ -529,6 +552,14 @@ function BasicInfoTab({
           preferred_name: data.preferred_name ?? "",
           ...(data.dob && { dob: data.dob }),
           ...(data.gender && { gender: data.gender }),
+          pronouns: String(data.pronouns ?? ""),
+          marital_status: String(data.marital_status ?? ""),
+          religion: String(data.religion ?? ""),
+          communication_notes: String(data.communication_notes ?? ""),
+          primary_language: String(data.primary_language ?? ""),
+          secondary_language: String(data.secondary_language ?? ""),
+          communication_needs: String(data.communication_needs ?? ""),
+          race_ethnicity: String(data.race_ethnicity ?? ""),
         });
       }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
@@ -538,11 +569,11 @@ function BasicInfoTab({
           <EditableField label="Preferred Name / Also Known As" name="preferred_name" defaultValue={profile.preferredName ?? person.preferred_name ?? ""} />
           <EditableField label="Date of Birth" name="dob" defaultValue={person.dob ?? ""} required hint={`Age: ${calcAge(person.dob)}y`} />
           <EditableSelect label="Gender" name="gender" defaultValue={person.gender === "M" ? "Male" : person.gender ?? "Female"} options={GENDER_OPTIONS} />
-          <EditableField label="Pronouns" name="pronouns" defaultValue={profile.pronouns ?? ""} />
-          <EditableSelect label="Primary Language" name="primary_language" defaultValue={profile.primaryLanguage} options={LANGUAGE_OPTIONS} required />
-          <EditableSelect label="Secondary Language" name="secondary_language" defaultValue={profile.secondaryLanguage ?? ""} options={["—", ...LANGUAGE_OPTIONS]} />
+          <EditableField label="Pronouns" name="pronouns" defaultValue={person.pronouns ?? profile.pronouns ?? ""} />
+          <EditableSelect label="Primary Language" name="primary_language" defaultValue={person.primary_language ?? profile.primaryLanguage} options={LANGUAGE_OPTIONS} required />
+          <EditableSelect label="Secondary Language" name="secondary_language" defaultValue={person.secondary_language ?? profile.secondaryLanguage ?? ""} options={["—", ...LANGUAGE_OPTIONS]} />
           <div className="md:col-span-2">
-            <EditableField label="Communication Needs" name="communication_needs" defaultValue={profile.communicationNeeds ?? ""} multiline />
+            <EditableField label="Communication Needs" name="communication_needs" defaultValue={person.communication_needs ?? profile.communicationNeeds ?? ""} multiline />
           </div>
           <EditableField label="Marital Status" name="marital_status" defaultValue={person.marital_status ?? ""} />
           <EditableField label="Religion" name="religion" defaultValue={person.religion ?? ""} />
@@ -550,18 +581,7 @@ function BasicInfoTab({
             <EditableField label="Communication Notes" name="communication_notes" defaultValue={person.communication_notes ?? ""} multiline />
           </div>
           <div className="md:col-span-2">
-            <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">Race / Ethnicity</label>
-            <div className="flex flex-wrap gap-1.5">
-              {RACE_OPTIONS.map((opt) => {
-                const selected = (profile.raceEthnicity ?? []).includes(opt);
-                return (
-                  <span key={opt} className={cn(
-                    "px-2 py-0.5 rounded-full text-[11px] font-geist border cursor-default",
-                    selected ? "bg-icm-accent-soft text-icm-accent border-icm-accent/30" : "border-icm-border text-icm-text-dim"
-                  )}>{opt}</span>
-                );
-              })}
-            </div>
+            <EditableSelect label="Race / Ethnicity" name="race_ethnicity" defaultValue={person.race_ethnicity ?? (profile.raceEthnicity ?? [])[0] ?? ""} options={["", ...RACE_OPTIONS]} />
           </div>
         </div>
       </Section>
@@ -615,6 +635,10 @@ function BasicInfoTab({
         await updateIndividual(personId, {
           ...(data.medicaid_id && { medicaid_id: data.medicaid_id }),
           ...(data.ltss_id !== undefined && { ltss_id: data.ltss_id }),
+          medicare_id: String(data.medicare_id ?? ""),
+          state_id: String(data.state_id ?? ""),
+          admitted_on: String(data.admitted_on ?? ""),
+          referral_source: String(data.referral_source ?? ""),
         });
       }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
@@ -647,6 +671,10 @@ function BasicInfoTab({
         await updateIndividual(personId, {
           ...(data.primary_phone && { phone: data.primary_phone }),
           ...(data.email && { email: data.email }),
+          phone_secondary: String(data.secondary_phone ?? ""),
+          phone_home: String(data.phone_home ?? ""),
+          phone_cell: String(data.phone_cell ?? ""),
+          preferred_contact: String(data.preferred_contact ?? ""),
         });
       }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
@@ -754,21 +782,28 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
         />
       </Section>
 
-      <Section title="Health Screenings">
+      <Section title="Health Screenings" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          hrst_score: String(data.hrst_score ?? ""),
+          hrst_scored_on: String(data.hrst_scored_on ?? ""),
+          hrst_source: String(data.hrst_source ?? ""),
+        });
+      }}>
         <div className="rounded-lg border border-icm-border bg-icm-bg p-3 space-y-2">
           <div className="flex items-end gap-3 flex-wrap">
             <Field label="HRST / Risk Screening Score">
               <input
-                defaultValue={profile.hrstScore ?? ""}
+                name="hrst_score"
+                defaultValue={person.hrst_score ?? profile.hrstScore?.toString() ?? ""}
                 className="modal-input w-24"
                 placeholder="—"
               />
             </Field>
             <Field label="Score date">
-              <input defaultValue={profile.hrstScoredOn ?? ""} className="modal-input w-32" />
+              <input name="hrst_scored_on" defaultValue={person.hrst_scored_on ?? profile.hrstScoredOn ?? ""} className="modal-input w-32" />
             </Field>
             <Field label="Source">
-              <select className="modal-input w-44" defaultValue={profile.hrstSource ?? "Manual entry"}>
+              <select name="hrst_source" className="modal-input w-44" defaultValue={person.hrst_source ?? profile.hrstSource ?? "Manual entry"}>
                 <option>Manual entry</option>
                 <option>From Intellectability</option>
                 <option>From HRST</option>
@@ -827,7 +862,14 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
         />
       </Section>
 
-      <Section title="Clinical Summary">
+      <Section title="Clinical Summary" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          primary_diagnosis: String(data.primary_diagnosis ?? ""),
+          secondary_diagnoses: String(data.secondary_diagnoses ?? ""),
+          icd10_codes: String(data.icd10_codes ?? ""),
+          medical_notes: String(data.medical_notes ?? ""),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <div className="md:col-span-2">
             <EditableField label="Primary Diagnosis" name="primary_diagnosis" defaultValue={person.primary_diagnosis ?? ""} />
@@ -844,7 +886,13 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
         </div>
       </Section>
 
-      <Section title="Primary Physician">
+      <Section title="Primary Physician" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          primary_physician_name: String(data.primary_physician_name ?? ""),
+          primary_physician_phone: String(data.primary_physician_phone ?? ""),
+          hospital_preference: String(data.hospital_preference ?? ""),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <EditableField label="Physician Name" name="primary_physician_name" defaultValue={person.primary_physician_name ?? ""} />
           <EditableField label="Physician Phone" name="primary_physician_phone" defaultValue={person.primary_physician_phone ?? ""} />
@@ -852,7 +900,15 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
         </div>
       </Section>
 
-      <Section title="Medicaid (MA) Details">
+      <Section title="Medicaid (MA) Details" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          ma_status: String(data.ma_status ?? ""),
+          ma_id: String(data.ma_id ?? ""),
+          ma_type: String(data.ma_type ?? ""),
+          ma_effective_date: String(data.ma_effective_date ?? ""),
+          ma_redetermination_date: String(data.ma_redetermination_date ?? ""),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <EditableField label="MA Status" name="ma_status" defaultValue={person.ma_status ?? ""} />
           <EditableField label="MA ID" name="ma_id" defaultValue={person.ma_id ?? ""} />
@@ -862,7 +918,12 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
         </div>
       </Section>
 
-      <Section title="Secondary Insurance">
+      <Section title="Secondary Insurance" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          secondary_insurance_name: String(data.secondary_insurance_name ?? ""),
+          secondary_insurance_id: String(data.secondary_insurance_id ?? ""),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <EditableField label="Secondary Insurance Name" name="secondary_insurance_name" defaultValue={person.secondary_insurance_name ?? ""} />
           <EditableField label="Secondary Insurance ID" name="secondary_insurance_id" defaultValue={person.secondary_insurance_id ?? ""} />
@@ -878,24 +939,37 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
 // =============================================================
 const OTHER_INSTRUMENT_INIT = { name: "", score: "", date: "", nextDue: "" };
 
-function MonitorsTab({ profile }: { profile: ProfileData }) {
+function MonitorsTab({ profile, person }: { profile: ProfileData; person: Individual }) {
   const [instruments, setInstruments] = useState([OTHER_INSTRUMENT_INIT]);
 
   return (
     <div className="space-y-4">
-      <Section title="Standardized Scores">
+      <Section title="Standardized Scores" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          hrst_score: String(data.hrst_score ?? ""),
+          hrst_scored_on: String(data.hrst_scored_on ?? ""),
+          hrst_next_due: String(data.hrst_next_due ?? ""),
+          hrst_assessed_by: String(data.hrst_assessed_by ?? ""),
+          hrst_source: String(data.hrst_source ?? ""),
+          loc_current: String(data.loc_current ?? ""),
+          loc_effective_date: String(data.loc_effective_date ?? ""),
+          loc_expiration_date: String(data.loc_expiration_date ?? ""),
+          loc_issued_by: String(data.loc_issued_by ?? ""),
+        });
+      }}>
         <div className="space-y-4">
           {/* HRST */}
           <div>
             <p className="text-[11px] font-mono uppercase tracking-wider text-icm-text-faint mb-2">HRST Score</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <EditableField label="Score (1–6)" defaultValue={profile.hrstScore?.toString() ?? ""} />
-              <EditableField label="Date of Last Assessment" defaultValue={profile.hrstScoredOn ?? ""} />
-              <EditableField label="Next Due Date" defaultValue="" />
-              <EditableField label="Assessed By" defaultValue="" />
+              <EditableField label="Score (1–6)" name="hrst_score" defaultValue={person.hrst_score?.toString() ?? profile.hrstScore?.toString() ?? ""} />
+              <EditableField label="Date of Last Assessment" name="hrst_scored_on" defaultValue={person.hrst_scored_on ?? profile.hrstScoredOn ?? ""} />
+              <EditableField label="Next Due Date" name="hrst_next_due" defaultValue={person.hrst_next_due ?? ""} />
+              <EditableField label="Assessed By" name="hrst_assessed_by" defaultValue={person.hrst_assessed_by ?? ""} />
               <EditableSelect
                 label="Source"
-                defaultValue={profile.hrstSource ?? "Manual entry"}
+                name="hrst_source"
+                defaultValue={person.hrst_source ?? profile.hrstSource ?? "Manual entry"}
                 options={["Intellectability", "Manual entry", "Uploaded"]}
               />
             </div>
@@ -911,10 +985,10 @@ function MonitorsTab({ profile }: { profile: ProfileData }) {
           <div className="pt-3 border-t border-icm-border">
             <p className="text-[11px] font-mono uppercase tracking-wider text-icm-text-faint mb-2">Level of Care (LOC)</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <EditableField label="Current LOC" defaultValue="" />
-              <EditableField label="Effective Date" defaultValue="" />
-              <EditableField label="Expiration / Renewal Date" defaultValue="" />
-              <EditableField label="Issued By" defaultValue="" />
+              <EditableField label="Current LOC" name="loc_current" defaultValue={person.loc_current ?? ""} />
+              <EditableField label="Effective Date" name="loc_effective_date" defaultValue={person.loc_effective_date ?? ""} />
+              <EditableField label="Expiration / Renewal Date" name="loc_expiration_date" defaultValue={person.loc_expiration_date ?? ""} />
+              <EditableField label="Issued By" name="loc_issued_by" defaultValue={person.loc_issued_by ?? ""} />
             </div>
           </div>
 
@@ -944,15 +1018,24 @@ function MonitorsTab({ profile }: { profile: ProfileData }) {
         </div>
       </Section>
 
-      <Section title="Behavioral Baselines">
+      <Section title="Behavioral Baselines" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          behavioral_monitoring_notes: String(data.behavioral_monitoring_notes ?? ""),
+        });
+      }}>
         <EditableField
           label="Behavioral baselines, triggers, de-escalation strategies, and support protocols"
-          defaultValue={profile.behavioralMonitoringNotes ?? ""}
+          name="behavioral_monitoring_notes"
+          defaultValue={person.behavioral_monitoring_notes ?? profile.behavioralMonitoringNotes ?? ""}
           multiline
         />
       </Section>
 
-      <Section title="Health Baselines">
+      <Section title="Health Baselines" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          health_monitoring_notes: String(data.health_monitoring_notes ?? ""),
+        });
+      }}>
         <div className="mb-3">
           <DataTable
             columns={["Measurement", "Baseline", "Normal Range", "Last Measured", "Measured By"]}
@@ -968,7 +1051,8 @@ function MonitorsTab({ profile }: { profile: ProfileData }) {
         </div>
         <EditableField
           label="Additional health baseline notes"
-          defaultValue={profile.healthMonitoringNotes ?? ""}
+          name="health_monitoring_notes"
+          defaultValue={person.health_monitoring_notes ?? profile.healthMonitoringNotes ?? ""}
           multiline
         />
       </Section>
@@ -992,12 +1076,12 @@ const GUARDIAN_REL_OPTIONS = ["Parent", "Sibling", "Spouse", "Other family", "Pr
 const CASE_TYPE_OPTIONS = ["Criminal", "Civil", "Family", "Probate", "Other"];
 const CASE_STATUS_OPTIONS = ["Active", "Closed", "Pending"];
 
-function CourtTab({ profile }: { profile: ProfileData }) {
+function CourtTab({ profile, person }: { profile: ProfileData; person: Individual }) {
   const [hasCourtInvolvement, setHasCourtInvolvement] = useState(
-    !!(profile.court || profile.legalStatus || profile.forensicInvolvement)
+    !!(profile.court || profile.legalStatus || profile.forensicInvolvement || person.court_involvement)
   );
-  const [hasProbation, setHasProbation] = useState(false);
-  const [legalStatus, setLegalStatus] = useState(profile.legalStatus ?? "");
+  const [hasProbation, setHasProbation] = useState(!!person.on_probation);
+  const [legalStatus, setLegalStatus] = useState(person.legal_status ?? profile.legalStatus ?? "");
   const isGuardianship = legalStatus.includes("Guardianship") || legalStatus === "Power of Attorney";
 
   return (
@@ -1029,11 +1113,24 @@ function CourtTab({ profile }: { profile: ProfileData }) {
         </div>
       ) : (
         <>
-          <Section title="Legal Status">
+          <Section title="Legal Status" onSave={async (data) => {
+            await updateIndividual(person.id, {
+              legal_status: String(data.legal_status ?? legalStatus),
+              guardianship_type: String(data.guardianship_type ?? ""),
+              guardian_name: String(data.guardian_name ?? ""),
+              guardian_relationship: String(data.guardian_relationship ?? ""),
+              guardian_phone: String(data.guardian_phone ?? ""),
+              guardian_email: String(data.guardian_email ?? ""),
+              guardian_address: String(data.guardian_address ?? ""),
+              guardianship_effective_date: String(data.guardianship_effective_date ?? ""),
+              court_involvement: hasCourtInvolvement,
+            });
+          }}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="md:col-span-2">
                 <label className="text-[10.5px] uppercase tracking-wider text-icm-text-faint font-geist block mb-1">Legal Status</label>
                 <select
+                  name="legal_status"
                   className="modal-input max-w-xs"
                   value={legalStatus}
                   onChange={(e) => setLegalStatus(e.target.value)}
@@ -1044,14 +1141,14 @@ function CourtTab({ profile }: { profile: ProfileData }) {
               </div>
               {isGuardianship && (
                 <>
-                  <EditableField label="Guardian / POA Name" defaultValue={profile.guardianName ?? ""} required />
-                  <EditableSelect label="Guardian / POA Relationship" defaultValue={profile.guardianRelationship ?? ""} options={GUARDIAN_REL_OPTIONS} />
-                  <EditableField label="Guardian / POA Phone" defaultValue={profile.guardianPhone ?? ""} required />
-                  <EditableField label="Guardian / POA Email" defaultValue="" />
+                  <EditableField label="Guardian / POA Name" name="guardian_name" defaultValue={person.guardian_name ?? profile.guardianName ?? ""} required />
+                  <EditableSelect label="Guardian / POA Relationship" name="guardian_relationship" defaultValue={person.guardian_relationship ?? profile.guardianRelationship ?? ""} options={GUARDIAN_REL_OPTIONS} />
+                  <EditableField label="Guardian / POA Phone" name="guardian_phone" defaultValue={person.guardian_phone ?? profile.guardianPhone ?? ""} required />
+                  <EditableField label="Guardian / POA Email" name="guardian_email" defaultValue={person.guardian_email ?? ""} />
                   <div className="md:col-span-2">
-                    <EditableField label="Guardian / POA Address" defaultValue={profile.guardianAddress ?? ""} />
+                    <EditableField label="Guardian / POA Address" name="guardian_address" defaultValue={person.guardian_address ?? profile.guardianAddress ?? ""} />
                   </div>
-                  <EditableField label="Effective Date of Guardianship / POA" defaultValue="" />
+                  <EditableField label="Effective Date of Guardianship / POA" name="guardianship_effective_date" defaultValue={person.guardianship_effective_date ?? ""} />
                 </>
               )}
             </div>
@@ -1073,7 +1170,15 @@ function CourtTab({ profile }: { profile: ProfileData }) {
             />
           </Section>
 
-          <Section title="Probation / Parole">
+          <Section title="Probation / Parole" onSave={async (data) => {
+            await updateIndividual(person.id, {
+              on_probation: hasProbation,
+              probation_officer_name: String(data.probation_officer_name ?? ""),
+              probation_officer_phone: String(data.probation_officer_phone ?? ""),
+              probation_end_date: String(data.probation_end_date ?? ""),
+              probation_conditions: String(data.probation_conditions ?? ""),
+            });
+          }}>
             <div className="flex items-center gap-3 mb-3">
               <button
                 type="button"
@@ -1092,11 +1197,11 @@ function CourtTab({ profile }: { profile: ProfileData }) {
             </div>
             {hasProbation && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <EditableField label="Officer Name" defaultValue="" />
-                <EditableField label="Officer Phone" defaultValue="" />
-                <EditableField label="Supervision End Date" defaultValue="" />
+                <EditableField label="Officer Name" name="probation_officer_name" defaultValue={person.probation_officer_name ?? ""} />
+                <EditableField label="Officer Phone" name="probation_officer_phone" defaultValue={person.probation_officer_phone ?? ""} />
+                <EditableField label="Supervision End Date" name="probation_end_date" defaultValue={person.probation_end_date ?? ""} />
                 <div className="md:col-span-2">
-                  <EditableField label="Conditions" defaultValue="" multiline />
+                  <EditableField label="Conditions" name="probation_conditions" defaultValue={person.probation_conditions ?? ""} multiline />
                 </div>
               </div>
             )}
@@ -1698,7 +1803,15 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
         </div>
       </Section>
 
-      <Section title="Emergency Contact (Primary)">
+      <Section title="Emergency Contact (Primary)" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          emergency_contact_name: String(data.emergency_contact_name ?? ""),
+          emergency_contact_relation: String(data.emergency_contact_relation ?? ""),
+          emergency_contact_phone: String(data.emergency_contact_phone ?? ""),
+          emergency_contact_phone2: String(data.emergency_contact_phone2 ?? ""),
+          emergency_contact_email: String(data.emergency_contact_email ?? ""),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <EditableField label="Name" name="emergency_contact_name" defaultValue={person.emergency_contact_name ?? ""} />
           <EditableField label="Relationship" name="emergency_contact_relation" defaultValue={person.emergency_contact_relation ?? ""} />
@@ -1708,7 +1821,16 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
         </div>
       </Section>
 
-      <Section title="Guardian / POA">
+      <Section title="Guardian / POA" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          guardian_name: String(data.guardian_name ?? ""),
+          guardian_relationship: String(data.guardian_relationship ?? ""),
+          guardian_phone: String(data.guardian_phone ?? ""),
+          guardian_email: String(data.guardian_email ?? ""),
+          poa_name: String(data.poa_name ?? ""),
+          poa_phone: String(data.poa_phone ?? ""),
+        });
+      }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           <EditableField label="Guardian Name" name="guardian_name" defaultValue={person.guardian_name ?? ""} />
           <EditableField label="Guardian Relationship" name="guardian_relationship" defaultValue={person.guardian_relationship ?? ""} />
@@ -1816,7 +1938,6 @@ function DocumentsTab({ profile }: { profile: ProfileData }) {
         <div className="rounded-lg border border-icm-border bg-icm-panel p-3 mb-3 flex flex-wrap items-center gap-2">
           <select className="modal-input w-44">
             <option>All types</option>
-            <option>Consent Forms</option>
             <option>DNR</option>
             <option>Guardianship Papers</option>
             <option>Insurance Cards</option>
@@ -1836,7 +1957,7 @@ function DocumentsTab({ profile }: { profile: ProfileData }) {
             <FileText className="w-8 h-8 text-icm-text-faint mx-auto mb-2" />
             <p className="text-[13px] font-semibold text-icm-text">No documents uploaded</p>
             <p className="text-[11.5px] text-icm-text-dim mt-1">
-              Upload intake paperwork, insurance cards, and consent forms here.
+              Upload intake paperwork, insurance cards, and medical records here.
             </p>
           </div>
         ) : (
@@ -1908,74 +2029,104 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
 
   return (
     <div className="space-y-4">
-      <Section title="Case Assignment">
-        <KvGrid
-          rows={[
-            ["Assigned Case Manager", profile.caseManager, true],
-            ["Secondary Case Manager", profile.secondaryCaseManager ?? "—"],
-            ["Supervisor", profile.supervisor ?? "—"],
-            ["Program Coordinator", profile.programCoordinator ?? "—"],
-          ]}
-        />
+      <Section title="Case Assignment" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          assigned_case_manager: String(data.assigned_case_manager ?? ""),
+          secondary_case_manager: String(data.secondary_case_manager ?? ""),
+          supervisor: String(data.supervisor ?? ""),
+          program_coordinator: String(data.program_coordinator ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Assigned Case Manager" name="assigned_case_manager" defaultValue={person.assigned_case_manager ?? profile.caseManager ?? ""} required />
+          <EditableField label="Secondary Case Manager" name="secondary_case_manager" defaultValue={person.secondary_case_manager ?? profile.secondaryCaseManager ?? ""} />
+          <EditableField label="Supervisor" name="supervisor" defaultValue={person.supervisor ?? profile.supervisor ?? ""} />
+          <EditableField label="Program Coordinator" name="program_coordinator" defaultValue={person.program_coordinator ?? profile.programCoordinator ?? ""} />
+        </div>
         <p className="text-[11px] text-icm-text-faint mt-2 font-geist">
           Assignment changes are managed in Admin Settings.
         </p>
       </Section>
 
-      <Section title="Caseload Weighting">
-        <KvGrid
-          rows={[
-            ["Caseload weight", profile.caseloadWeight?.toString() ?? "—"],
-            ["Complexity level", profile.complexity ?? "Standard"],
-          ]}
-        />
+      <Section title="Caseload Weighting" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          caseload_weight: String(data.caseload_weight ?? ""),
+          complexity: String(data.complexity ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Caseload Weight" name="caseload_weight" defaultValue={person.caseload_weight?.toString() ?? profile.caseloadWeight?.toString() ?? ""} />
+          <EditableField label="Complexity Level" name="complexity" defaultValue={person.complexity ?? profile.complexity ?? "Standard"} />
+        </div>
       </Section>
 
-      <Section title="Intake & Discharge">
-        <KvGrid
-          rows={[
-            ["Referral date", person.referral_date ?? profile.referralDate ?? "—"],
-            ["Referral source", person.referral_source ?? "—"],
-            ["Admission date", person.admission_date ?? person.admittedOn ?? "—"],
-            ["Admission type", profile.admissionType ?? "—"],
-            ["Previous agency", profile.previousAgency ?? "—"],
-            ["Discharge date", person.discharge_date ?? profile.dischargeDate ?? (dischargeDone ? dischargeDate : "—")],
-            ["Discharge reason", profile.dischargeReason ?? (dischargeDone ? dischargeReason : "—")],
-          ]}
-        />
+      <Section title="Intake & Discharge" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          referral_date: String(data.referral_date ?? ""),
+          referral_source: String(data.referral_source ?? ""),
+          admission_date: String(data.admission_date ?? ""),
+          admission_type: String(data.admission_type ?? ""),
+          previous_agency: String(data.previous_agency ?? ""),
+          discharge_date: String(data.discharge_date ?? ""),
+          discharge_reason: String(data.discharge_reason ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Referral Date" name="referral_date" defaultValue={person.referral_date ?? (profile as any).referralDate ?? ""} />
+          <EditableField label="Referral Source" name="referral_source" defaultValue={person.referral_source ?? ""} />
+          <EditableField label="Admission Date" name="admission_date" defaultValue={person.admission_date ?? person.admittedOn ?? ""} />
+          <EditableField label="Admission Type" name="admission_type" defaultValue={person.admission_type ?? (profile as any).admissionType ?? ""} />
+          <EditableField label="Previous Agency" name="previous_agency" defaultValue={person.previous_agency ?? (profile as any).previousAgency ?? ""} />
+          <EditableField label="Discharge Date" name="discharge_date" defaultValue={person.discharge_date ?? (profile as any).dischargeDate ?? (dischargeDone ? dischargeDate : "")} />
+          <EditableField label="Discharge Reason" name="discharge_reason" defaultValue={(profile as any).dischargeReason ?? (dischargeDone ? dischargeReason : "")} />
+        </div>
       </Section>
 
-      <Section title="Program & Service">
-        <KvGrid
-          rows={[
-            ["Program type", person.program_type ?? "—"],
-            ["Waiver type", person.waiver_type ?? "—"],
-            ["Service category", person.service_category ?? "—"],
-            ["Funding stream", person.funding_stream ?? "—"],
-            ["Case number", person.case_number ?? "—"],
-          ]}
-        />
+      <Section title="Program & Service" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          program_type: String(data.program_type ?? ""),
+          waiver_type: String(data.waiver_type ?? ""),
+          service_category: String(data.service_category ?? ""),
+          funding_stream: String(data.funding_stream ?? ""),
+          case_number: String(data.case_number ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Program Type" name="program_type" defaultValue={person.program_type ?? ""} />
+          <EditableField label="Waiver Type" name="waiver_type" defaultValue={person.waiver_type ?? ""} />
+          <EditableField label="Service Category" name="service_category" defaultValue={person.service_category ?? ""} />
+          <EditableField label="Funding Stream" name="funding_stream" defaultValue={person.funding_stream ?? ""} />
+          <EditableField label="Case Number" name="case_number" defaultValue={person.case_number ?? ""} />
+        </div>
       </Section>
 
-      <Section title="Legal & Care Planning">
-        <KvGrid
-          rows={[
-            ["Legal status", person.legal_status ?? "—"],
-            ["PCP status", person.pcp_status ?? "—"],
-            ["Next ISP date", person.next_isp_date ?? "—"],
-            ["Last annual plan date", person.last_annual_plan_date ?? "—"],
-          ]}
-        />
+      <Section title="Legal & Care Planning" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          legal_status: String(data.legal_status_admin ?? ""),
+          pcp_status: String(data.pcp_status ?? ""),
+          next_isp_date: String(data.next_isp_date ?? ""),
+          last_annual_plan_date: String(data.last_annual_plan_date ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Legal Status" name="legal_status_admin" defaultValue={person.legal_status ?? ""} />
+          <EditableField label="PCP Status" name="pcp_status" defaultValue={person.pcp_status ?? ""} />
+          <EditableField label="Next ISP Date" name="next_isp_date" defaultValue={person.next_isp_date ?? ""} />
+          <EditableField label="Last Annual Plan Date" name="last_annual_plan_date" defaultValue={person.last_annual_plan_date ?? ""} />
+        </div>
       </Section>
 
-      <Section title="Compliance & Quality">
-        <KvGrid
-          rows={[
-            ["Last chart review", profile.lastChartReview ?? "—"],
-            ["Next chart review due", profile.nextChartReviewDue ?? "—"],
-          ]}
-        />
-        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+      <Section title="Compliance & Quality" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          last_chart_review: String(data.last_chart_review ?? ""),
+          next_chart_review_due: String(data.next_chart_review_due ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 mb-3">
+          <EditableField label="Last Chart Review" name="last_chart_review" defaultValue={person.last_chart_review ?? (profile as any).lastChartReview ?? ""} />
+          <EditableField label="Next Chart Review Due" name="next_chart_review_due" defaultValue={person.next_chart_review_due ?? (profile as any).nextChartReviewDue ?? ""} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <ComplianceChip label="PCP" status="Out of compliance" tone="red" />
           <ComplianceChip label="Monitoring" status="Due in 7 days" tone="amber" />
           <ComplianceChip label="MA" status="Active" tone="green" />
@@ -2014,30 +2165,6 @@ function AdminTab({ profile, person }: { profile: ProfileData; person: Individua
           ]}
         />
       </Section>
-
-      {/* Consent Records */}
-      <ConsentSection individualId={person.id} />
-
-      {/* Discharge Management — only visible if not already discharged */}
-      {person.status !== "Discharged" && !dischargeDone && (
-        <div className="rounded-xl border border-icm-red/30 bg-icm-red-soft p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[13px] font-semibold text-icm-red font-manrope">Discharge Management</p>
-              <p className="text-[11.5px] text-icm-text-dim mt-0.5">
-                Initiating discharge will close all active tasks, terminate active workflows, and flag this record as inactive.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowDischargeModal(true)}
-              className="h-9 px-3 rounded-xl border border-icm-red text-[12px] font-semibold text-icm-red hover:bg-icm-red/10 flex items-center gap-1.5"
-            >
-              Initiate Discharge
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Discharge confirmation modal */}
       {showDischargeModal && (

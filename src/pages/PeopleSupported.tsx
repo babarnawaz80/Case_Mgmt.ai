@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -28,6 +28,9 @@ import {
 import { useRiskScore } from "@/contexts/RiskScoreContext";
 import { calculateRiskScore, loadRiskSettings } from "@/lib/riskEngine";
 import { getRiskLabel, formatDate } from "@/lib/formatDate";
+import { collection, query as firestoreQuery, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending";
@@ -35,13 +38,50 @@ type RiskFilter = "All" | "High" | "Review" | "Standard";
 
 const PeopleSupported = () => {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const { individuals, loading, error } = useIndividuals();
   const { openDrawer } = useRiskScore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("All");
   const [risk, setRisk] = useState<RiskFilter>("All");
   const [county, setCounty] = useState("All");
+  const [selectedState, setSelectedState] = useState("All");
   const [showImport, setShowImport] = useState(false);
+
+  // ── Dynamic state list from org's programs config ──────────────────────────
+  // Also builds a map of programName → state so the filter can match
+  // an individual's .program field (not their home address state).
+  const [programStates, setProgramStates] = useState<string[]>([]);
+  const [programToState, setProgramToState] = useState<Record<string, string>>({});
+  const [statesLoading, setStatesLoading] = useState(true);
+
+  useEffect(() => {
+    const orgId = userProfile?.organizationId;
+    if (!orgId) { setStatesLoading(false); return; }
+    getDocs(
+      firestoreQuery(collection(db, "programs"), where("organizationId", "==", orgId))
+    )
+      .then((snap) => {
+        const stateSet = new Set<string>();
+        const nameToState: Record<string, string> = {};
+        snap.docs.forEach((d) => {
+          const prog = d.data();
+          const state = (prog.state as string | undefined)?.trim();
+          const name  = (prog.name  as string | undefined)?.trim();
+          if (state) {
+            stateSet.add(state);
+            // Map both the exact name and the program code to its state
+            if (name) nameToState[name.toLowerCase()] = state;
+            const code = (prog.code as string | undefined)?.trim();
+            if (code) nameToState[code.toLowerCase()] = state;
+          }
+        });
+        setProgramStates([...stateSet].sort());
+        setProgramToState(nameToState);
+      })
+      .catch(() => {/* non-fatal — show only "All" */})
+      .finally(() => setStatesLoading(false));
+  }, [userProfile?.organizationId]);
 
   // Compute scores once per render (uses localStorage settings)
   const riskSettings = useMemo(() => loadRiskSettings(), []);
@@ -75,18 +115,31 @@ const PeopleSupported = () => {
           ? statusLabel(p.enrollment_status) !== "Discharged"
           : statusLabel(p.enrollment_status) === status;
       const matchCounty = county === "All" || p.county === county;
+      // State filter — matches against the individual's enrolled program's state.
+      // Falls back to address_state if program isn't in the map.
+      const matchState = (() => {
+        if (selectedState === "All") return true;
+        // Check if their program name/code maps to the selected state
+        const progName = (p.program ?? "").toLowerCase().trim();
+        if (progName && programToState[progName] === selectedState) return true;
+        // Fallback: check address_state directly (full name or abbreviation)
+        const addrState = (p.address_state ?? "").trim();
+        if (addrState === selectedState) return true;
+        return false;
+      })();
       const score = computedScores[p.id] ?? p.risk_score ?? 0;
       const matchRisk =
         risk === "All" ||
         (risk === "High" && score >= 60) ||
         (risk === "Review" && score >= 35 && score < 60) ||
         (risk === "Standard" && score < 35);
-      return matchQ && matchStatus && matchCounty && matchRisk;
+      return matchQ && matchStatus && matchCounty && matchState && matchRisk;
     });
-  }, [query, status, risk, county, individuals, computedScores]);
+  }, [query, status, risk, county, selectedState, individuals, computedScores, programToState]);
 
-  const highRiskCount = individuals.filter(p => (computedScores[p.id] ?? p.risk_score ?? 0) >= 60).length;
-  const alertCount = individuals.filter(p => (p.alerts?.length ?? 0) > 0 || (p.open_incidents ?? 0) > 0).length;
+  // Counts derived from the filtered set so they update with all active filters
+  const highRiskCount = filtered.filter(p => (computedScores[p.id] ?? p.risk_score ?? 0) >= 60).length;
+  const alertCount = filtered.filter(p => (p.alerts?.length ?? 0) > 0 || (p.open_incidents ?? 0) > 0).length;
 
 
   return (
@@ -107,7 +160,9 @@ const PeopleSupported = () => {
               People Supported
             </h1>
             <p className="text-[13px] text-icm-text-dim mt-1 font-geist">
-              {loading ? "Loading…" : `${individuals.length} individuals · ${alertCount} need attention`}
+              {loading
+                ? "Loading…"
+                : `${filtered.length}${filtered.length !== individuals.length ? ` of ${individuals.length}` : ""} individuals · ${alertCount} need attention`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -138,6 +193,14 @@ const PeopleSupported = () => {
             />
           </div>
           <FilterSelect
+            value={selectedState}
+            onChange={setSelectedState}
+            options={["All", ...programStates]}
+            label="State"
+            disabled={statesLoading}
+            loadingLabel={statesLoading ? "Loading…" : undefined}
+          />
+          <FilterSelect
             value={status}
             onChange={(v) => setStatus(v as StatusFilter)}
             options={["All", "Active", "Transition", "Pending", "Discharged"]}
@@ -161,7 +224,9 @@ const PeopleSupported = () => {
             <p className="text-[12.5px] font-geist text-icm-text leading-snug">
               <span className="font-semibold">Your live caseload.</span>{" "}
               <span className="text-icm-text-dim">
-                {loading ? "Loading individuals…" : `${highRiskCount} high compliance risk · ${alertCount} need attention.`}
+                {loading
+                  ? "Loading individuals…"
+                  : `${highRiskCount} high compliance risk · ${alertCount} need attention${selectedState !== "All" ? ` (${selectedState})` : ""}.`}
               </span>
             </p>
           </div>
@@ -235,24 +300,33 @@ function FilterSelect({
   onChange,
   options,
   label,
+  disabled,
+  loadingLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
   label: string;
+  disabled?: boolean;
+  loadingLabel?: string;
 }) {
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none h-9 pl-3 pr-8 rounded-xl bg-icm-panel border border-icm-border text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent/40"
+        disabled={disabled}
+        className="appearance-none h-9 pl-3 pr-8 rounded-xl bg-icm-panel border border-icm-border text-[12px] font-geist text-icm-text focus:outline-none focus:border-icm-accent/40 disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {label}: {o}
-          </option>
-        ))}
+        {disabled && loadingLabel ? (
+          <option value="All">{label}: {loadingLabel}</option>
+        ) : (
+          options.map((o) => (
+            <option key={o} value={o}>
+              {label}: {o}
+            </option>
+          ))
+        )}
       </select>
       <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint pointer-events-none" />
     </div>

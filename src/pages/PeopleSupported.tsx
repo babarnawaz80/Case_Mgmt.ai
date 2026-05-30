@@ -15,6 +15,7 @@ import {
   User,
   Loader2,
   FileUp,
+  AlertTriangle,
 } from "lucide-react";
 import { ImportWizardModal } from "@/components/ImportWizardModal";
 import {
@@ -31,9 +32,9 @@ import { getRiskLabel, formatDate } from "@/lib/formatDate";
 import { collection, query as firestoreQuery, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePendingDuplicatePairs } from "@/hooks/useDuplicatePairs";
 
-
-type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending";
+type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending" | "Possible Duplicate";
 type RiskFilter = "All" | "High" | "Review" | "Standard";
 
 const PeopleSupported = () => {
@@ -43,6 +44,23 @@ const PeopleSupported = () => {
   const { openDrawer } = useRiskScore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("All");
+
+  // Duplicate detection — live count + IDs for banner and filter
+  const { data: pendingPairs } = usePendingDuplicatePairs(userProfile?.organizationId);
+  const duplicateIndividualIds = useMemo(() => {
+    const ids = new Set<string>();
+    pendingPairs.forEach((p) => { ids.add(p.individualAId); ids.add(p.individualBId); });
+    return ids;
+  }, [pendingPairs]);
+  // Map individualId → pairId so the row can link to the review panel
+  const duplicatePairIdMap = useMemo(() => {
+    const map = new Map<string, string>();
+    pendingPairs.forEach((p) => {
+      map.set(p.individualAId, p.id);
+      map.set(p.individualBId, p.id);
+    });
+    return map;
+  }, [pendingPairs]);
   const [risk, setRisk] = useState<RiskFilter>("All");
   const [county, setCounty] = useState("All");
   const [selectedState, setSelectedState] = useState("All");
@@ -113,6 +131,8 @@ const PeopleSupported = () => {
       const matchStatus =
         status === "All"
           ? statusLabel(p.enrollment_status) !== "Discharged"
+          : status === "Possible Duplicate"
+          ? duplicateIndividualIds.has(p.id)
           : statusLabel(p.enrollment_status) === status;
       const matchCounty = county === "All" || p.county === county;
       // State filter — matches against the individual's enrolled program's state.
@@ -200,12 +220,25 @@ const PeopleSupported = () => {
             disabled={statesLoading}
             loadingLabel={statesLoading ? "Loading…" : undefined}
           />
-          <FilterSelect
-            value={status}
-            onChange={(v) => setStatus(v as StatusFilter)}
-            options={["All", "Active", "Transition", "Pending", "Discharged"]}
-            label="Status"
-          />
+          {/* Status filter — custom to add "Possible Duplicate" with divider */}
+          <div className="relative">
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as StatusFilter)}
+              className={`appearance-none h-9 pl-3 pr-8 rounded-xl bg-icm-panel border text-[12px] font-geist focus:outline-none focus:border-icm-accent/40 ${
+                status === "Possible Duplicate"
+                  ? "border-icm-amber text-icm-amber bg-icm-amber-soft"
+                  : "border-icm-border text-icm-text"
+              }`}
+            >
+              {["All", "Active", "Transition", "Pending", "Discharged"].map((o) => (
+                <option key={o} value={o}>Status: {o}</option>
+              ))}
+              <option value="──────────" disabled>──────────────────</option>
+              <option value="Possible Duplicate">⚠ Possible Duplicate</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint pointer-events-none" />
+          </div>
           <FilterSelect
             value={risk}
             onChange={(v) => setRisk(v as RiskFilter)}
@@ -221,13 +254,22 @@ const PeopleSupported = () => {
             <div className="w-7 h-7 rounded-lg ai-gradient flex items-center justify-center shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <p className="text-[12.5px] font-geist text-icm-text leading-snug">
+            <p className="text-[12.5px] font-geist text-icm-text leading-snug flex items-center flex-wrap gap-x-1.5 gap-y-1">
               <span className="font-semibold">Your live caseload.</span>{" "}
               <span className="text-icm-text-dim">
                 {loading
                   ? "Loading individuals…"
                   : `${highRiskCount} high compliance risk · ${alertCount} need attention${selectedState !== "All" ? ` (${selectedState})` : ""}.`}
               </span>
+              {!loading && pendingPairs.length > 0 && (
+                <button
+                  onClick={() => navigate("/people/duplicates")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-semibold bg-icm-amber-soft text-icm-amber ring-1 ring-icm-amber/30 hover:bg-icm-amber/20 transition-colors"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {pendingPairs.length} possible duplicate{pendingPairs.length > 1 ? "s" : ""} →
+                </button>
+              )}
             </p>
           </div>
         </div>
@@ -272,6 +314,10 @@ const PeopleSupported = () => {
                 onOpenFaceSheet={() => navigate(`/people/${p.id}/facesheet`)}
                 onOpenProfile={() => navigate(`/people/${p.id}/profile`)}
                 onOpenRisk={() => openDrawer(p.id, `${p.first_name} ${p.last_name}`)}
+                duplicatePairId={duplicatePairIdMap.get(p.id)}
+                onReviewDuplicate={duplicatePairIdMap.has(p.id)
+                  ? () => navigate(`/people/duplicates?pairId=${duplicatePairIdMap.get(p.id)}`)
+                  : undefined}
               />
             ))}
             {filtered.length === 0 && (
@@ -333,13 +379,15 @@ function FilterSelect({
   );
 }
 
-function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfile, onOpenRisk }: {
+function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfile, onOpenRisk, duplicatePairId, onReviewDuplicate }: {
   person: Individual;
   computedScore?: number;
   onOpen: () => void;
   onOpenFaceSheet: () => void;
   onOpenProfile: () => void;
   onOpenRisk: () => void;
+  duplicatePairId?: string;
+  onReviewDuplicate?: () => void;
 }) {
   const age = calcAge(person.dob);
   const status = statusLabel(person.enrollment_status);
@@ -368,6 +416,12 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
               <span className="font-normal text-icm-text-dim"> ({person.preferred_name})</span>
             )}
           </button>
+          {duplicatePairId && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-icm-amber-soft text-icm-amber ring-icm-amber/20">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              Possible Duplicate
+            </span>
+          )}
           {(person.alerts?.length ?? 0) > 0 && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1 bg-red-50 text-red-600 ring-red-200">
               <Sparkles className="w-2.5 h-2.5" />
@@ -448,6 +502,14 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
         >
           <User className="w-3 h-3" /> Profile
         </button>
+        {onReviewDuplicate && (
+          <button
+            onClick={onReviewDuplicate}
+            className="h-8 px-3 rounded-lg border border-icm-amber bg-icm-amber-soft text-[11.5px] font-geist font-semibold text-icm-amber hover:bg-icm-amber/20 flex items-center gap-1.5 transition-colors"
+          >
+            <AlertTriangle className="w-3 h-3" /> Review →
+          </button>
+        )}
       </div>
     </div>
   );

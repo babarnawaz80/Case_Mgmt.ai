@@ -10,15 +10,25 @@ import {
 } from "lucide-react";
 
 const ACTION_CATEGORIES: Record<string, { label: string; color: string; icon: typeof ShieldCheck }> = {
-  participant_intake_created: { label: "Intake Created",    color: "text-icm-green bg-icm-green-soft",   icon: CheckCircle2 },
-  progress_note_created:     { label: "Note Created",      color: "text-icm-accent bg-icm-accent-soft", icon: FileText },
-  progress_note_signed:      { label: "Note Signed",       color: "text-icm-green bg-icm-green-soft",   icon: CheckCircle2 },
-  incident_created:          { label: "Incident Filed",    color: "text-icm-red bg-icm-red-soft",       icon: AlertTriangle },
-  incident_updated:          { label: "Incident Updated",  color: "text-icm-amber bg-icm-amber-soft",   icon: AlertTriangle },
-  login:                     { label: "Login",             color: "text-icm-accent bg-icm-accent-soft", icon: User },
-  logout:                    { label: "Logout",            color: "text-icm-text-dim bg-icm-bg",        icon: User },
-  settings_changed:          { label: "Settings",          color: "text-icm-amber bg-icm-amber-soft",   icon: Settings },
-  ai_assist:                 { label: "AI Assist",         color: "text-purple-600 bg-purple-50",       icon: Sparkles },
+  participant_intake_created: { label: "Intake Created",         color: "text-icm-green bg-icm-green-soft",   icon: CheckCircle2 },
+  progress_note_created:     { label: "Note Created",           color: "text-icm-accent bg-icm-accent-soft", icon: FileText },
+  progress_note_signed:      { label: "Note Signed",            color: "text-icm-green bg-icm-green-soft",   icon: CheckCircle2 },
+  incident_created:          { label: "Incident Filed",         color: "text-icm-red bg-icm-red-soft",       icon: AlertTriangle },
+  incident_updated:          { label: "Incident Updated",       color: "text-icm-amber bg-icm-amber-soft",   icon: AlertTriangle },
+  login:                     { label: "Login",                  color: "text-icm-accent bg-icm-accent-soft", icon: User },
+  logout:                    { label: "Logout",                 color: "text-icm-text-dim bg-icm-bg",        icon: User },
+  settings_changed:          { label: "Settings",               color: "text-icm-amber bg-icm-amber-soft",   icon: Settings },
+  ai_assist:                 { label: "AI Assist",              color: "text-purple-600 bg-purple-50",       icon: Sparkles },
+  // User Management category
+  user_created:              { label: "User Created",           color: "text-icm-green bg-icm-green-soft",   icon: User },
+  user_deactivated:          { label: "User Deactivated",       color: "text-icm-red bg-icm-red-soft",       icon: User },
+  user_deactivateed:         { label: "User Deactivated",       color: "text-icm-red bg-icm-red-soft",       icon: User },
+  user_activated:            { label: "User Activated",         color: "text-icm-green bg-icm-green-soft",   icon: User },
+  user_reactivated:          { label: "User Reactivated",       color: "text-icm-green bg-icm-green-soft",   icon: User },
+  user_reactivateed:         { label: "User Reactivated",       color: "text-icm-green bg-icm-green-soft",   icon: User },
+  user_suspended:            { label: "User Suspended",         color: "text-icm-amber bg-icm-amber-soft",   icon: User },
+  role_changed:              { label: "Role Changed",           color: "text-icm-amber bg-icm-amber-soft",   icon: ShieldCheck },
+  user_role_changed:         { label: "Role Changed",           color: "text-icm-amber bg-icm-amber-soft",   icon: ShieldCheck },
 };
 
 function formatTs(createdAt: unknown): string {
@@ -50,9 +60,23 @@ export default function AuditLogPage() {
     return ["All", ...Array.from(s).sort()];
   }, [entries]);
 
+  // Group filters: when a chip is selected, we match a set of actions
+  const USER_MGMT_ACTIONS = new Set(["user_deactivated","user_deactivateed","user_activated","user_reactivated","user_reactivateed","user_suspended","user_created","role_changed","user_role_changed"]);
+  const NOTE_ACTIONS      = new Set(["create_note","edit_note","progress_note_created","progress_note_signed","monitoring_form_submitted","monitoring_form_created","visit_summary_created","visit_summary_signed"]);
+  const AI_ACTIONS        = new Set(["apply_ambient","ai_assist","generate_pcp","draft_saved","draft_applied"]);
+
   const filtered = useMemo(() => {
     return entries.filter((e) => {
-      if (actionFilter !== "All" && e.action !== actionFilter) return false;
+      if (actionFilter !== "All") {
+        // Check if it's a group representative (first element of group)
+        const isUserMgmt = USER_MGMT_ACTIONS.has(actionFilter);
+        const isNote     = NOTE_ACTIONS.has(actionFilter);
+        const isAI       = AI_ACTIONS.has(actionFilter);
+        if (isUserMgmt && !USER_MGMT_ACTIONS.has(e.action)) return false;
+        else if (isNote && !NOTE_ACTIONS.has(e.action)) return false;
+        else if (isAI && !AI_ACTIONS.has(e.action)) return false;
+        else if (!isUserMgmt && !isNote && !isAI && e.action !== actionFilter) return false;
+      }
       if (search) {
         const hay = `${e.actorName} ${e.action} ${e.targetName ?? ""} ${e.details ?? ""}`.toLowerCase();
         if (!hay.includes(search.toLowerCase())) return false;
@@ -86,6 +110,33 @@ export default function AuditLogPage() {
               Live Firestore
             </span>
           </div>
+        </div>
+
+        {/* Quick filter chips */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {["All", "User Management", "Notes", "AI"].map((chip) => {
+            const USER_MGMT_ACTIONS = ["user_deactivated","user_deactivateed","user_activated","user_reactivated","user_reactivateed","user_suspended","user_created","role_changed","user_role_changed"];
+            const NOTE_ACTIONS      = ["create_note","edit_note","progress_note_created","progress_note_signed","monitoring_form_submitted","monitoring_form_created","visit_summary_created","visit_summary_signed"];
+            const AI_ACTIONS        = ["apply_ambient","ai_assist","generate_pcp","draft_saved","draft_applied"];
+            const isActive =
+              chip === "All"             ? actionFilter === "All" :
+              chip === "User Management" ? USER_MGMT_ACTIONS.includes(actionFilter) :
+              chip === "Notes"           ? NOTE_ACTIONS.includes(actionFilter) :
+              AI_ACTIONS.includes(actionFilter);
+            return (
+              <button
+                key={chip}
+                onClick={() => {
+                  if (chip === "All") { setActionFilter("All"); return; }
+                  const map: Record<string, string[]> = { "User Management": USER_MGMT_ACTIONS, Notes: NOTE_ACTIONS, AI: AI_ACTIONS };
+                  setActionFilter(map[chip][0]);
+                }}
+                className={`h-7 px-2.5 rounded-full text-[11.5px] font-geist font-semibold transition-colors ${isActive ? "bg-icm-text text-white" : "bg-icm-bg text-icm-text-dim hover:text-icm-text border border-icm-border"}`}
+              >
+                {chip}
+              </button>
+            );
+          })}
         </div>
 
         {/* Filters */}

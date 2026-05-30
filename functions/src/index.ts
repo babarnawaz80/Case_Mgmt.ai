@@ -116,3 +116,9 @@ export {
   cleanupExpiredConsents,
 } from "./api/consent";
 export { checkTrainingExpirations, seedTrainingData } from "./api/trainingAlerts";
+
+// ─── Guardian Portal (callable) ───────────────────────────────────────────────
+export { createGuardianPortalSession } from "./api/guardianPortal";
+
+// ─── Duplicate Detection ───────────────────────────────────────────────────────
+export { detectDuplicatesScheduled, detectDuplicatesOnCreate, detectDuplicatesOnDemand } from "./api/duplicates";

@@ -38,7 +38,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runDocumentationAgent = runDocumentationAgent;
 const admin = __importStar(require("firebase-admin"));
 const ai_1 = require("../../services/ai");
-async function runDocumentationAgent(individual, complianceFindings, runId, orgId, db) {
+async function runDocumentationAgent(individual, complianceFindings, runId, orgId, db, customPrompt) {
     var _a;
     const tasks = [];
     const logs = [];
@@ -83,7 +83,7 @@ async function runDocumentationAgent(individual, complianceFindings, runId, orgI
     for (const finding of draftsNeeded) {
         try {
             if (finding.type === "monitoring_form_overdue") {
-                await generateMonitoringFormDraft(individual, indName, runId, orgId, recentNotes, recentVisits, db);
+                await generateMonitoringFormDraft(individual, indName, runId, orgId, recentNotes, recentVisits, db, customPrompt);
                 draftsCount++;
                 logs.push({
                     org_id: orgId,
@@ -123,17 +123,19 @@ async function runDocumentationAgent(individual, complianceFindings, runId, orgI
     }
     return { tasks, logs, drafts_count: draftsCount };
 }
-async function generateMonitoringFormDraft(individual, indName, runId, orgId, recentNotes, recentVisits, db) {
+async function generateMonitoringFormDraft(individual, indName, runId, orgId, recentNotes, recentVisits, db, customPrompt) {
     const context = JSON.stringify({
         individual_name: indName,
         program: individual.program,
         recent_contact_notes: recentNotes.slice(0, 3),
         recent_visits: recentVisits.slice(0, 2),
     });
-    const systemPrompt = `You are an IDD case management specialist.
-Pre-fill a quarterly monitoring form based on the recent contact notes and visit summaries provided.
+    const baseFormat = `Pre-fill a quarterly monitoring form based on the recent contact notes and visit summaries provided.
 Return a JSON object with: health_status_summary (string), safety_status_summary (string), environment_summary (string), goal_progress (string), concerns_identified (string[]), recommended_follow_ups (string[]).
 Base all answers on the actual documentation provided. Label as AI DRAFT.`;
+    const systemPrompt = customPrompt
+        ? `${customPrompt}\n\n${baseFormat}`
+        : `You are an IDD case management specialist.\n${baseFormat}`;
     const result = await (0, ai_1.generateCompletion)(systemPrompt, `Pre-fill the quarterly monitoring form for ${indName} from recent documentation.`, context, "fast", orgId, "system", "brain_orchestrator_doc", { maxTokens: 1024, temperature: 0.2 });
     let parsedDraft = { raw_content: result.text };
     try {

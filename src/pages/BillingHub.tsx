@@ -14,8 +14,9 @@ import { submitToIddBilling, generate837P, type OrgBillingInfo } from "@/service
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { RemittanceReconciliation } from "@/components/billing/RemittanceReconciliation";
 
-type TabKey = "all" | "pending_scrub" | "scrub_passed" | "needs_attention" | "submitted" | "denied";
+type TabKey = "all" | "pending_scrub" | "scrub_passed" | "needs_attention" | "submitted" | "denied" | "reconciliation";
 
 const BillingHub = () => {
   const [tab, setTab] = useState<TabKey>("all");
@@ -86,6 +87,7 @@ const BillingHub = () => {
     { key: "needs_attention", label: "Needs Attention", count: needs_attention },
     { key: "submitted", label: "Submitted", count: submitted_this_month },
     { key: "denied", label: "Denied", count: records.filter(r => r.billing_status === "denied").length },
+    { key: "reconciliation", label: "Reconcile" },
   ];
 
   const toggleSelect = (id: string) => {
@@ -492,8 +494,13 @@ const BillingHub = () => {
           ))}
         </div>
 
-        {/* Filter bar */}
-        <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex flex-wrap items-center gap-2">
+        {/* Reconciliation tab — full-width takeover */}
+        {tab === "reconciliation" && (
+          <RemittanceReconciliation claims={records} />
+        )}
+
+        {/* Filter bar — hidden on reconciliation tab */}
+        {tab !== "reconciliation" && <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex flex-wrap items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-icm-text-faint shrink-0" />
           <input
             value={filterIndividual}
@@ -545,10 +552,10 @@ const BillingHub = () => {
               {selectedIds.size > 0 ? `Export ${selectedIds.size} selected` : "Export CSV"}
             </button>
           </div>
-        </div>
+        </div>}
 
-        {/* Batch submit bar */}
-        {selectedIds.size > 0 && (
+        {/* Batch submit bar — hidden on reconciliation tab */}
+        {tab !== "reconciliation" && selectedIds.size > 0 && (
           <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-3 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="text-[12px] font-geist text-icm-text">
@@ -584,8 +591,8 @@ const BillingHub = () => {
           </div>
         )}
 
-        {/* Claims table */}
-        <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+        {/* Claims table — hidden on reconciliation tab */}
+        {tab !== "reconciliation" && <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-16 gap-2 text-icm-text-dim">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -700,7 +707,7 @@ const BillingHub = () => {
               </table>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Integration footer */}
         <div className="rounded-xl border border-icm-border bg-icm-bg/40 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">

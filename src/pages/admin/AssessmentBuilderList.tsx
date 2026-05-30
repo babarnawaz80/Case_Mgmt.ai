@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { AdminOnly } from "@/components/platform/AdminOnly";
 import { useRole } from "@/contexts/RoleContext";
-import { templates, templateSummary } from "@/data/assessments";
+import { useAssessmentTemplates } from "@/hooks/useAssessmentTemplates";
 import {
   ClipboardList,
   Plus,
@@ -31,9 +31,16 @@ export default function AssessmentBuilderList() {
   const { isAdmin } = useRole();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
+  const { templates } = useAssessmentTemplates("all");
 
   if (!isAdmin) return <AdminOnly />;
-  const sum = templateSummary();
+
+  const sum = {
+    total: templates.length,
+    published: templates.filter((t) => t.status === "published").length,
+    draft: templates.filter((t) => t.status === "draft").length,
+    archived: templates.filter((t) => t.status === "archived").length,
+  };
   const filtered = templates.filter((t) =>
     t.name.toLowerCase().includes(q.toLowerCase()),
   );

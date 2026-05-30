@@ -1,46 +1,107 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Save, Send, Printer, X, ShieldAlert,
   CalendarClock, AlertTriangle, CheckCircle2, FileSignature, Loader2,
+  CalendarCheck, Clock,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { useVisitSummaries } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import BillingSectionFields from "@/components/billing/BillingSectionFields";
 import { createBillingRecord, updateAuthorizationUnits } from "@/hooks/useBillingRecords";
 import { getRateForCode } from "@/hooks/useAuthorizations";
 import { calculateBillingUnits } from "@/services/billingValidation";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  createScheduledVisit,
+  type ScheduledVisit,
+} from "@/hooks/useScheduledVisits";
+
+// ── Scheduling helpers ────────────────────────────────────────────────────────
+
+/** Normalise MM/DD/YYYY or YYYY-MM-DD → YYYY-MM-DD. Returns "" on failure. */
+function parseVisitDate(raw: string): string {
+  if (!raw) return "";
+  // MM/DD/YYYY
+  const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) return `${mdy[3]}-${mdy[1].padStart(2,"0")}-${mdy[2].padStart(2,"0")}`;
+  // YYYY-MM-DD already
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  // Fallback: try Date parse
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+}
+
+/** Add 60 minutes to an HH:mm string. */
+function addHour(hhmm: string): string {
+  if (!hhmm) return "11:00";
+  const [h, m] = hhmm.split(":").map(Number);
+  const total = h * 60 + (m || 0) + 60;
+  return `${String(Math.floor(total / 60) % 24).padStart(2,"0")}:${String(total % 60).padStart(2,"0")}`;
+}
 
 type ComplianceTone = "green" | "amber" | "red";
 
 const PersonVisitSummaryDetail = () => {
   const { id, visitId } = useParams<{ id: string; visitId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { individual: person, loading: individualLoading } = useIndividual(id);
   const { data: allVisits, loading: visitsLoading } = useVisitSummaries(id);
 
+  // ── Pre-fill from scheduled visit ────────────────────────────────────────
+  const fromScheduledId = searchParams.get("from_scheduled");
+  const [scheduledVisit, setScheduledVisit] = useState<ScheduledVisit | null>(null);
+  const [prefillBannerDismissed, setPrefillBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!fromScheduledId) return;
+    getDoc(doc(db, "scheduled_visits", fromScheduledId))
+      .then((snap) => {
+        if (snap.exists()) {
+          setScheduledVisit({ id: snap.id, ...(snap.data() as Omit<ScheduledVisit, "id">) });
+        }
+      })
+      .catch(() => {});
+  }, [fromScheduledId]);
+
   const isNew = visitId === "new";
   const initial = useMemo<any>(() => {
     if (!person) return undefined;
-    if (isNew) return {
-      id: "new",
-      personId: person.id,
-      visitDate: new Date().toISOString().split("T")[0],
-      startTime: "10:00",
-      endTime: "11:00",
-      location: "In-Home",
-      purposeOfSupport: "",
-      visitSummary: "",
-      nextVisitDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      status: "draft"
-    };
+    if (isNew) {
+      // Base defaults
+      const base = {
+        id: "new",
+        personId: person.id,
+        visitDate: new Date().toISOString().split("T")[0],
+        startTime: "10:00",
+        endTime: "11:00",
+        location: "In-Home",
+        purposeOfSupport: "",
+        visitSummary: "",
+        nextVisitDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        status: "draft",
+      };
+      // Merge pre-fill from scheduled visit (Part 3 requirement)
+      if (scheduledVisit) {
+        return {
+          ...base,
+          visitDate: scheduledVisit.visit_date ?? base.visitDate,
+          startTime: scheduledVisit.start_time ?? base.startTime,
+          endTime:   scheduledVisit.end_time   ?? base.endTime,
+          location:  scheduledVisit.location   ?? base.location,
+          purposeOfSupport: scheduledVisit.visit_type ?? base.purposeOfSupport,
+          linkedGoalId: scheduledVisit.linked_goal_id ?? "",
+        };
+      }
+      return base;
+    }
     return allVisits.find((v: any) => v.id === visitId);
-  }, [person, isNew, visitId, allVisits]);
+  }, [person, isNew, visitId, allVisits, scheduledVisit]);
 
   const [form, setForm] = useState<any>(undefined);
   const [showSubmit, setShowSubmit] = useState(false);
@@ -55,6 +116,8 @@ const PersonVisitSummaryDetail = () => {
   const [vsAuthNumber, setVsAuthNumber] = useState("");
 
   const { userProfile } = useAuth();
+  const isSupervisorOrAdmin =
+    userProfile?.role === "supervisor" || userProfile?.role === "admin";
 
   useEffect(() => {
     if (initial && !form) {
@@ -94,9 +157,15 @@ const PersonVisitSummaryDetail = () => {
   const handleSave = async (status: string = "draft") => {
     if (!form || !person) return;
     try {
-      const visitData = {
+      const isSubmitting = status === "submitted";
+      const approvalStatus = isSubmitting
+        ? (isSupervisorOrAdmin ? "approved" : "pending_review")
+        : undefined;
+
+      const visitData: any = {
         individual_id: person.id,
         individual_name: `${person.last_name}, ${person.first_name}`,
+        individualName: `${person.last_name}, ${person.first_name}`,
         visit_date: form.visitDate || form.visit_date || new Date().toISOString().split("T")[0],
         start_time: form.startTime || form.start_time || "",
         end_time: form.endTime || form.end_time || "",
@@ -111,6 +180,11 @@ const PersonVisitSummaryDetail = () => {
         updated_by: userProfile?.displayName ?? "",
         updated_on: new Date().toLocaleDateString(),
         organizationId: userProfile?.organizationId ?? "",
+        ...(approvalStatus !== undefined ? {
+          approvalStatus,
+          isBillingReady: isSupervisorOrAdmin ? true : false,
+          returnReasons: [],
+        } : {}),
       };
       if (isNew) {
         const docRef = await addDoc(collection(db, "visit_summaries"), visitData);
@@ -130,6 +204,19 @@ const PersonVisitSummaryDetail = () => {
     if (!form || !person) return;
     try {
       await handleSave("submitted");
+
+      // ── Link back to scheduled visit (Part 3) ───────────────────────────
+      if (fromScheduledId) {
+        try {
+          await updateDoc(doc(db, "scheduled_visits", fromScheduledId), {
+            status: "completed",
+            visit_summary_id: visitId === "new" ? undefined : visitId,
+            updated_at: new Date(),
+          });
+        } catch (svErr) {
+          console.warn("[scheduled_visit] Could not update status:", svErr);
+        }
+      }
 
       // Auto-create billing record if billable
       if (isBillable && vsServiceCode && userProfile?.organizationId) {
@@ -177,6 +264,50 @@ const PersonVisitSummaryDetail = () => {
         }
       }
 
+      // ── Auto-schedule next visit from "Next Visit Date" field ───────────────
+      // If the case manager filled in the Next Visit Date, create a
+      // scheduled_visits record so it appears on the dashboard calendar.
+      const rawNextDate = form.nextVisitDate || form.next_visit_date || "";
+      if (rawNextDate && userProfile?.organizationId && person) {
+        try {
+          const nextVisitDateYMD = parseVisitDate(rawNextDate);
+          if (nextVisitDateYMD) {
+            const rawTime   = form.nextVisitTime   || form.next_visit_time   || "10:00";
+            const rawLoc    = form.nextVisitLocation || form.next_visit_location || (form.location || "TBD");
+            // Derive a sensible visit type from purpose-of-support
+            const purpose   = (form.purposeOfSupport || form.purpose_of_support || "").toLowerCase();
+            const visitType =
+              purpose.includes("phone")    ? "Phone Contact"  :
+              purpose.includes("virtual")  ? "Virtual Visit"  :
+              purpose.includes("office")   ? "Office Visit"   :
+              purpose.includes("community")? "Community Visit" :
+              "In-Home Visit";
+            const individualName = `${person.last_name}, ${person.first_name}`;
+            await createScheduledVisit({
+              organizationId:  userProfile.organizationId,
+              individual_id:   person.id,
+              individual_name: individualName,
+              visit_type:      visitType as any,
+              visit_date:      nextVisitDateYMD,
+              start_time:      rawTime,
+              end_time:        addHour(rawTime),
+              location:        rawLoc,
+              assigned_to:     userProfile.uid ?? "",
+              assigned_to_name: userProfile.displayName ?? "",
+              notes:           `Follow-up from visit summary signed on ${new Date().toLocaleDateString()}.`,
+              reminder:        true,
+              reminder_timing: "1d",
+              reminder_sent:   false,
+              status:          "scheduled",
+              created_by:      userProfile.uid ?? "",
+            });
+            toast.success("Next visit scheduled and added to your calendar.");
+          }
+        } catch (svErr) {
+          console.warn("[scheduled_visit] Auto-schedule next visit failed (non-fatal):", svErr);
+        }
+      }
+
       setShowSubmit(false);
     } catch (err) {
       console.error(err);
@@ -218,7 +349,8 @@ const PersonVisitSummaryDetail = () => {
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
                 <button onClick={() => setShowSubmit(true)} disabled={!requiredOK} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                  <Send className="w-3.5 h-3.5" /> Submit
+                  <Send className="w-3.5 h-3.5" />
+                  {isSupervisorOrAdmin ? "Submit" : "Submit for Review"}
                 </button>
               </>
             )}
@@ -236,6 +368,77 @@ const PersonVisitSummaryDetail = () => {
             <CheckCircle2 className="w-4 h-4" />
             <span className="font-semibold">Submitted &amp; locked.</span>
             <span className="text-icm-green/80">This visit summary is read-only. Corrections require an addendum note.</span>
+          </div>
+        )}
+
+        {/* Approval status banners */}
+        {form.approvalStatus === "pending_review" && (
+          <div className="rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-4 py-3 flex items-center gap-3">
+            <Clock className="w-4 h-4 text-icm-amber shrink-0" />
+            <div>
+              <p className="text-[12.5px] font-geist font-semibold text-icm-text">Pending supervisor review</p>
+              <p className="text-[11.5px] font-geist text-icm-text-dim">This visit summary is awaiting review. You cannot edit it until reviewed.</p>
+            </div>
+          </div>
+        )}
+        {form.approvalStatus === "returned_for_correction" && (() => {
+          const reasons: any[] = form.returnReasons ?? [];
+          const last = reasons[reasons.length - 1];
+          return (
+            <div className="rounded-xl border border-icm-red/30 bg-icm-red-soft px-4 py-3 space-y-1">
+              <p className="text-[12.5px] font-geist font-semibold text-icm-red">
+                Returned for correction{last?.returnedByName ? ` by ${last.returnedByName}` : ""}
+              </p>
+              {last?.reason && <p className="text-[11.5px] font-geist text-icm-text"><span className="font-semibold">Reason:</span> {last.reason}</p>}
+              {last?.comment && <p className="text-[11.5px] font-geist text-icm-text-dim italic">"{last.comment}"</p>}
+            </div>
+          );
+        })()}
+        {form.approvalStatus === "approved" && (
+          <div className="rounded-xl border border-icm-green/20 bg-icm-green-soft px-4 py-2.5 text-[12px] text-icm-green flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="font-semibold">Approved{form.reviewedByName ? ` by ${form.reviewedByName}` : ""}.</span>
+            <span className="text-icm-green/80">This visit summary is billing-ready.</span>
+          </div>
+        )}
+        {form.approvalStatus === "approved_with_exception" && (
+          <div className="rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-4 py-2.5 text-[12px] text-icm-amber flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-semibold">Approved with exception{form.reviewedByName ? ` by ${form.reviewedByName}` : ""}.</span>
+              {form.exceptionReason && <p className="mt-0.5 text-[11.5px] text-icm-text-dim">Exception: {form.exceptionReason}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* ── Pre-fill from scheduled visit banner (Part 3) ───────────────────── */}
+        {scheduledVisit && !prefillBannerDismissed && isNew && (
+          <div className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <CalendarCheck className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+              <p className="text-[12.5px] font-geist text-teal-800 leading-snug">
+                <span className="font-semibold">
+                  Pre-filled from scheduled visit on{" "}
+                  {scheduledVisit.visit_date
+                    ? new Date(scheduledVisit.visit_date + "T12:00:00").toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "N/A"}.
+                </span>{" "}
+                <span className="text-teal-700">
+                  Review and complete before submitting.
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={() => setPrefillBannerDismissed(true)}
+              className="p-1 rounded hover:bg-teal-100 text-teal-500 shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 

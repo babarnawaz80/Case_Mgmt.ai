@@ -8,6 +8,7 @@ import * as admin from "firebase-admin";
 import { generateCompletion } from "../services/ai";
 import { consumeCredits } from "../services/credits";
 import { COLLECTIONS } from "../config/collections";
+import { PRODUCT_KNOWLEDGE } from "../config/productKnowledge";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -41,13 +42,19 @@ const CHAT_SYSTEM_PROMPT = (
     contextParts.push(`Current page: ${context.page}`);
   }
 
-  return `You are the AI assistant for ${orgName}, a Home and Community-Based Services (HCBS) case management platform.
+  return `${PRODUCT_KNOWLEDGE}
+
+---
+
+You are the CaseAI Assistant for ${orgName}, a Home and Community-Based Services (HCBS) case management platform.
+You have authoritative knowledge of the platform features described above — answer how-to questions about them precisely and without hallucination. If a user asks how something works in the platform, consult the Product Knowledge section above before answering.
 
 The case manager you are assisting is: ${userName}
 
 ${contextParts.length > 0 ? `Current context:\n${contextParts.join("\n")}` : ""}
 
 Your role:
+- Answer any how-to question about platform features accurately using the Product Knowledge above
 - Help case managers with documentation, compliance, billing, and care coordination
 - Answer questions about HCBS waiver programs, Indiana Medicaid (IHCP), billing codes
 - Help draft progress notes, ISP goals, incident reports, and care plans

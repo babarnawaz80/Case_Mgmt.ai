@@ -528,21 +528,30 @@ Return JSON with this exact structure:
 
     return (
       <div className="fixed inset-0 z-[100] bg-icm-bg flex flex-col">
-        {/* Header */}
-        <div className="h-14 shrink-0 px-6 flex items-center justify-between border-b border-icm-border bg-white">
-          <div className="flex items-center gap-3">
-            <Sparkles className="w-4 h-4 text-icm-accent" />
-            <h2 className="font-display font-semibold text-[15px] text-icm-text">Review & push to modules</h2>
-            <span className="text-[12px] text-icm-text-dim">· {personName} · Scribe session</span>
+        {/* Header — safe-area aware */}
+        <div
+          className="shrink-0 px-4 sm:px-6 flex items-center justify-between border-b border-icm-border bg-white"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            minHeight: "calc(3.5rem + env(safe-area-inset-top))",
+          }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles className="w-4 h-4 text-icm-accent shrink-0" />
+            <h2 className="font-display font-semibold text-[14px] sm:text-[15px] text-icm-text truncate">Review & push to modules</h2>
+            <span className="hidden sm:inline text-[12px] text-icm-text-dim truncate">· {personName} · Scribe session</span>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-icm-bg text-icm-text-dim">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-icm-bg text-icm-text-dim shrink-0 ml-2">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex-1 flex min-h-0">
-          {/* LEFT 60% */}
-          <div className="flex-1 flex flex-col min-w-0 border-r border-icm-border">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          {/* LEFT: Extracted items */}
+          <div className="flex-1 flex flex-col min-w-0 md:border-r border-icm-border overflow-hidden">
+            <div className="sm:hidden px-4 py-2 border-b border-icm-border bg-white shrink-0">
+              <p className="text-[12px] text-icm-text-dim truncate">{personName} · Scribe session</p>
+            </div>
             {/* Tabs */}
             <div className="shrink-0 px-6 pt-4 flex items-center gap-1 border-b border-icm-border">
               <button
@@ -611,7 +620,7 @@ Return JSON with this exact structure:
           </div>
 
           {/* RIGHT 40% */}
-          <div className="w-[40%] max-w-[480px] flex flex-col bg-white">
+          <div className="w-full md:w-[40%] md:max-w-[480px] flex flex-col bg-white border-t md:border-t-0 border-icm-border shrink-0 md:shrink-0 max-h-[45vh] md:max-h-none overflow-hidden">
             <div className="flex-1 overflow-y-auto px-5 py-5">
               <h3 className="text-[12px] uppercase tracking-wide font-semibold text-icm-text-faint mb-3">Review summary</h3>
               <div className="rounded-lg border border-icm-border p-4 space-y-2 mb-5">

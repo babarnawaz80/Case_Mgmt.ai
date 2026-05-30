@@ -12,8 +12,10 @@ import { writeAudit } from "@/lib/auditService";
 import { aiPrefilledDraft, type YesNoAnswer, type GoalProgress, type RecommendedAction } from "@/data/monitoringForms";
 import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
+import { serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import BillingSectionFields from "@/components/billing/BillingSectionFields";
+import { AttestationSection, EMPTY_ATTESTATION, type AttestationValue } from "@/components/icm/AttestationSection";
 import { createBillingRecord, updateAuthorizationUnits } from "@/hooks/useBillingRecords";
 import { getRateForCode } from "@/hooks/useAuthorizations";
 import { calculateBillingUnits } from "@/services/billingValidation";
@@ -49,11 +51,14 @@ const PersonMonitoringFormDetail = () => {
   }, [formId, id, isNew, allForms, individual]);
 
   const { userProfile } = useAuth();
+  const isSupervisorOrAdmin =
+    userProfile?.role === "supervisor" || userProfile?.role === "admin";
   const [form, setForm] = useState<any>(undefined);
   const [aiBanner, setAiBanner] = useState(true);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [attestation, setAttestation] = useState<AttestationValue>(EMPTY_ATTESTATION);
   const [aiPrefilling, setAiPrefilling] = useState(false);
   const prefillCalledRef = useRef(false);
 
@@ -207,13 +212,18 @@ const PersonMonitoringFormDetail = () => {
   const handleSave = async (status = "Draft") => {
     if (!form || !individual) return;
     try {
-      const formData = {
+      const isSubmitting = status === "Submitted";
+      const approvalStatus = isSubmitting
+        ? (isSupervisorOrAdmin ? "approved" : "pending_review")
+        : undefined;
+
+      const formData: any = {
         individual_id: id,
         type: form.type || "Quarterly",
         status: status,
         active: form.active || "Active",
         dueDate: form.dueDate || new Date().toISOString().split("T")[0],
-        submitted_date: status === "Submitted" ? new Date().toISOString().split("T")[0] : "",
+        submitted_date: isSubmitting ? new Date().toISOString().split("T")[0] : "",
         updated_by: userProfile?.displayName ?? "",
         updated_on: new Date().toLocaleDateString(),
         organizationId: userProfile?.organizationId ?? "",
@@ -228,7 +238,19 @@ const PersonMonitoringFormDetail = () => {
         s7_backupSummary: form.s7_backupSummary || {},
         s8_incidents: form.s8_incidents || [],
         s9_recommendedActions: form.s9_recommendedActions || [],
-        s10_contacts: form.s10_contacts || []
+        s10_contacts: form.s10_contacts || [],
+        attestation: attestation.attested ? attestation : null,
+        ...(approvalStatus !== undefined ? {
+          approvalStatus,
+          isBillingReady: isSupervisorOrAdmin ? true : false,
+          submittedForReviewAt: (!isSupervisorOrAdmin && isSubmitting) ? serverTimestamp() : null,
+          submittedForReviewBy: (!isSupervisorOrAdmin && isSubmitting) ? (userProfile?.uid ?? null) : null,
+          submittedByName: (!isSupervisorOrAdmin && isSubmitting)
+            ? (userProfile?.displayName || `${userProfile?.firstName ?? ""} ${userProfile?.lastName ?? ""}`.trim() || "Unknown")
+            : null,
+          returnReasons: [],
+          individualName: `${individual.first_name} ${individual.last_name}`,
+        } : {}),
       };
 
       if (isNew) {
@@ -342,7 +364,8 @@ const PersonMonitoringFormDetail = () => {
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
                 <button onClick={() => setSubmitOpen(true)} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Submit
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {isSupervisorOrAdmin ? "Submit" : "Submit for Review"}
                 </button>
               </>
             )}
@@ -385,6 +408,48 @@ const PersonMonitoringFormDetail = () => {
         {readOnly && (
           <div className="rounded-xl border border-icm-border bg-icm-bg px-4 py-3 text-[12.5px] text-icm-text-dim">
             This form is <span className="font-semibold text-icm-text">submitted</span> and read-only.
+          </div>
+        )}
+
+        {/* Approval status banners */}
+        {form.approvalStatus === "pending_review" && (
+          <div className="rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-4 py-3 flex items-center gap-3">
+            <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0" />
+            <div>
+              <p className="text-[12.5px] font-geist font-semibold text-icm-text">Pending supervisor review</p>
+              <p className="text-[11.5px] font-geist text-icm-text-dim">
+                This form is awaiting supervisor review. You cannot edit it until it is reviewed.
+              </p>
+            </div>
+          </div>
+        )}
+        {form.approvalStatus === "returned_for_correction" && (() => {
+          const reasons: any[] = form.returnReasons ?? [];
+          const last = reasons[reasons.length - 1];
+          return (
+            <div className="rounded-xl border border-icm-red/30 bg-icm-red-soft px-4 py-3 space-y-2">
+              <p className="text-[12.5px] font-geist font-semibold text-icm-red">
+                Returned for correction{last?.returnedByName ? ` by ${last.returnedByName}` : ""}
+              </p>
+              {last?.reason && <p className="text-[11.5px] font-geist text-icm-text"><span className="font-semibold">Reason:</span> {last.reason}</p>}
+              {last?.comment && <p className="text-[11.5px] font-geist text-icm-text-dim italic">"{last.comment}"</p>}
+            </div>
+          );
+        })()}
+        {form.approvalStatus === "approved" && (
+          <div className="rounded-xl border border-icm-green/20 bg-icm-green-soft px-4 py-2.5 text-[12px] text-icm-green flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="font-semibold">Approved{form.reviewedByName ? ` by ${form.reviewedByName}` : ""}.</span>
+            <span className="text-icm-green/80">This form is billing-ready.</span>
+          </div>
+        )}
+        {form.approvalStatus === "approved_with_exception" && (
+          <div className="rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-4 py-2.5 text-[12px] text-icm-amber flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-semibold">Approved with exception{form.reviewedByName ? ` by ${form.reviewedByName}` : ""}.</span>
+              {form.exceptionReason && <p className="mt-0.5 text-[11.5px] text-icm-text-dim">Exception: {form.exceptionReason}</p>}
+            </div>
           </div>
         )}
 
@@ -646,6 +711,15 @@ const PersonMonitoringFormDetail = () => {
         </div>
       </div>
 
+      {/* Attestation */}
+      <div className="px-4 sm:px-6 pb-2">
+        <AttestationSection
+          value={attestation}
+          onChange={setAttestation}
+          readOnly={readOnly}
+        />
+      </div>
+
       {/* Submit modal */}
       {submitOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSubmitOpen(false)}>
@@ -671,7 +745,7 @@ const PersonMonitoringFormDetail = () => {
                 Go back and review
               </button>
               <button onClick={handleFormSubmit} disabled={!confirmReviewed} className="h-9 px-4 rounded-lg bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
-                Submit
+                {isSupervisorOrAdmin ? "Submit" : "Submit for Review"}
               </button>
             </div>
           </div>

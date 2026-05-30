@@ -469,6 +469,17 @@ function Section({
   );
 }
 
+function approvalBadge(status: string | undefined) {
+  switch (status) {
+    case 'submitted_for_review': return <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-amber-soft text-icm-amber ring-1 ring-icm-amber/20">Pending Review</span>;
+    case 'supervisor_approved': return <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200">Supervisor Approved</span>;
+    case 'returned_for_correction': return <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-red-soft text-icm-red ring-1 ring-icm-red/20">Returned</span>;
+    case 'active': return <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">Active</span>;
+    case 'superseded': return <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-bg text-icm-text-dim ring-1 ring-icm-border">Superseded</span>;
+    default: return null;
+  }
+}
+
 function PlanTable({
   plans, onOpen, variant, onShare, onSetDate,
 }: {
@@ -508,9 +519,15 @@ function PlanTable({
             return (
               <tr key={p.id} className="hover:bg-icm-bg/40 transition-colors">
                 <td className="px-4 py-3">
-                  <button onClick={() => onOpen(p.id)} className="font-mono font-semibold text-icm-accent hover:underline">
-                    {displayId}
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={() => onOpen(p.id)} className="font-mono font-semibold text-icm-accent hover:underline">
+                      {displayId}
+                    </button>
+                    {(p as any).version && (
+                      <span className="text-[10.5px] font-geist text-icm-text-dim">v{(p as any).version}</span>
+                    )}
+                    {approvalBadge((p as any).approvalStatus)}
+                  </div>
                   {p.goals && p.goals.length > 0 && (
                     <div className="text-[11px] text-icm-text-dim mt-1 space-y-0.5 max-w-[220px]">
                       {p.goals.map((g: any, idx: number) => (

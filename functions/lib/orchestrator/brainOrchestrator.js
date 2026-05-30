@@ -50,6 +50,9 @@ const documentationAgent_1 = require("./agents/documentationAgent");
 const billingAgent_1 = require("./agents/billingAgent");
 const escalationAgent_1 = require("./agents/escalationAgent");
 const renewalAgent_1 = require("./agents/renewalAgent");
+const authorizationAgent_1 = require("./agents/authorizationAgent");
+const assessmentAgent_1 = require("./agents/assessmentAgent");
+const getGuidelinesEngine_1 = require("./utilities/getGuidelinesEngine");
 const ORCHESTRATOR_TASKS = "orchestrator_tasks";
 const ORCHESTRATOR_RUNS = "orchestrator_runs";
 const ORCHESTRATOR_LOGS = "orchestrator_logs";
@@ -133,8 +136,11 @@ async function runOrchestrator(orgId, runType, triggeredBy, db) {
     let escalationsTriggered = 0;
     let complianceScoresUpdated = 0;
     try {
-        // Load orchestrator settings
+        // Clear engine cache for this run (cache persists per warm instance, clear for fresh run)
+        (0, getGuidelinesEngine_1.clearEngineCache)();
+        // Load orchestrator settings and custom agent prompts
         const settings = await loadOrchestratorSettings(orgId, db);
+        const customPrompts = await loadAgentPrompts(orgId, db);
         // Load all active individuals for this org
         let individualsSnap;
         try {
@@ -193,7 +199,7 @@ async function runOrchestrator(orgId, runType, triggeredBy, db) {
                 let docResult = { tasks: [], logs: [], drafts_count: 0 };
                 if (settings.agents_enabled.documentation && complianceFindings.length > 0) {
                     try {
-                        docResult = await (0, documentationAgent_1.runDocumentationAgent)(individual, complianceFindings, runId, orgId, db);
+                        docResult = await (0, documentationAgent_1.runDocumentationAgent)(individual, complianceFindings, runId, orgId, db, customPrompts.documentation);
                         draftsGenerated += docResult.drafts_count;
                     }
                     catch (err) {
@@ -225,11 +231,31 @@ async function runOrchestrator(orgId, runType, triggeredBy, db) {
                 let renewalResult = { tasks: [], logs: [], drafts_count: 0 };
                 if (settings.agents_enabled.renewal) {
                     try {
-                        renewalResult = await (0, renewalAgent_1.runRenewalAgent)(individual, rulePack, runId, orgId, db);
+                        renewalResult = await (0, renewalAgent_1.runRenewalAgent)(individual, rulePack, runId, orgId, db, customPrompts.renewal);
                         draftsGenerated += renewalResult.drafts_count;
                     }
                     catch (err) {
                         errors.push(`Renewal agent failed for ${individual.id}: ${err.message}`);
+                    }
+                }
+                // ── Agent 6: Authorization ────────────────────────────────────────────
+                let authResult = { tasks: [], logs: [], drafts_count: 0 };
+                if (settings.agents_enabled.authorization !== false) {
+                    try {
+                        authResult = await (0, authorizationAgent_1.runAuthorizationAgent)(individual, runId, orgId, db);
+                    }
+                    catch (err) {
+                        errors.push(`Authorization agent failed for ${individual.id}: ${err.message}`);
+                    }
+                }
+                // ── Agent 7: Assessment Compliance ────────────────────────────────────
+                let assessmentResult = { tasks: [], logs: [], drafts_count: 0 };
+                if (settings.agents_enabled.assessment !== false) {
+                    try {
+                        assessmentResult = await (0, assessmentAgent_1.runAssessmentAgent)(individual, runId, orgId, db);
+                    }
+                    catch (err) {
+                        errors.push(`Assessment agent failed for ${individual.id}: ${err.message}`);
                     }
                 }
                 // ── Collect all tasks from all agents ─────────────────────────────────
@@ -239,6 +265,8 @@ async function runOrchestrator(orgId, runType, triggeredBy, db) {
                     ...billingResult.tasks,
                     ...escalationResult.tasks,
                     ...renewalResult.tasks,
+                    ...authResult.tasks,
+                    ...assessmentResult.tasks,
                 ];
                 const allLogs = [
                     ...complianceResult.logs,
@@ -246,6 +274,8 @@ async function runOrchestrator(orgId, runType, triggeredBy, db) {
                     ...billingResult.logs,
                     ...escalationResult.logs,
                     ...renewalResult.logs,
+                    ...authResult.logs,
+                    ...assessmentResult.logs,
                 ];
                 // ── Write tasks to both orchestrator_tasks and tasks (My Work) ─────────
                 for (const task of allTasks) {
@@ -423,6 +453,27 @@ function toIndividualRecord(id, data) {
         risk_score: data.risk_score,
         county: data.county,
     };
+}
+async function loadAgentPrompts(orgId, db) {
+    try {
+        const snap = await db
+            .doc(`organizations/${orgId}/settings/orchestrator_prompts`)
+            .get();
+        if (snap.exists) {
+            const data = snap.data();
+            return {
+                compliance: data.compliance || types_1.DEFAULT_AGENT_PROMPTS.compliance,
+                documentation: data.documentation || types_1.DEFAULT_AGENT_PROMPTS.documentation,
+                billing: data.billing || types_1.DEFAULT_AGENT_PROMPTS.billing,
+                escalation: data.escalation || types_1.DEFAULT_AGENT_PROMPTS.escalation,
+                renewal: data.renewal || types_1.DEFAULT_AGENT_PROMPTS.renewal,
+            };
+        }
+    }
+    catch (_a) {
+        // Non-fatal — use defaults
+    }
+    return Object.assign({}, types_1.DEFAULT_AGENT_PROMPTS);
 }
 function taskTypeToLabel(taskType) {
     var _a;

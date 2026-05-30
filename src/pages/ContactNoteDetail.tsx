@@ -45,7 +45,7 @@ const activityTypes = [
   "Training",
   "Other",
 ];
-const contactTypes = ["In-person", "Phone", "Video", "Email", "Other"];
+const contactTypes = ["In-person", "Phone", "Televisit / Video Call", "Video", "Email", "Other"];
 
 const inputCls =
   "w-full h-9 px-3 rounded-lg bg-icm-panel border border-icm-border text-[12.5px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-border-strong";

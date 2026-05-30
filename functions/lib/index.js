@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.manualOrchestratorRun = exports.scheduledOrchestrator = exports.dailyAuthRenewalCheck = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
+exports.detectDuplicatesOnDemand = exports.detectDuplicatesOnCreate = exports.detectDuplicatesScheduled = exports.createGuardianPortalSession = exports.seedTrainingData = exports.checkTrainingExpirations = exports.cleanupExpiredConsents = exports.submitConsentSignature = exports.verifyConsentOTP = exports.sendConsentOTP = exports.checkConsentToken = exports.sendConsentRequest = exports.generateRenewalLetter = exports.seedValentinaDemoData = exports.refinePCP = exports.generatePCP = exports.manualOrchestratorRun = exports.scheduledOrchestrator = exports.sendVisitReminders = exports.dailyAuthRenewalCheck = exports.onAssessmentLeadTransfer = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const v2_1 = require("firebase-functions/v2");
@@ -97,17 +97,55 @@ app.post("/api/agents/pcp-renewal/run", agents_1.runPcpRenewalAgent);
 // ─── Ambient / Deepgram Token API ─────────────────────────────────────────
 const ambient_1 = require("./api/ambient");
 app.post("/api/ambient/deepgram-token", ambient_1.deepgramToken);
+// ─── Intake Form API ──────────────────────────────────────────────────────
+const intakeFunctions_1 = require("./api/intakeFunctions");
+app.use("/api/intake", intakeFunctions_1.intakeRoutes);
+// ─── Assessment API ────────────────────────────────────────────────────────
+const assessmentFunctions_1 = require("./api/assessmentFunctions");
+app.use("/api/assessments", assessmentFunctions_1.assessmentRoutes);
 // ─── Export the Express app as a single Gen 2 Cloud Function ──────────────
 exports.api = (0, https_1.onRequest)({ cors: true }, app);
 // ─── Firestore Triggers ───────────────────────────────────────────────────
 var billing_claims_1 = require("./triggers/billing-claims");
 Object.defineProperty(exports, "onNewBillingClaim", { enumerable: true, get: function () { return billing_claims_1.onNewBillingClaim; } });
 Object.defineProperty(exports, "onWorkflowTaskDailyCheck", { enumerable: true, get: function () { return billing_claims_1.onWorkflowTaskDailyCheck; } });
+var assessmentTransfer_1 = require("./triggers/assessmentTransfer");
+Object.defineProperty(exports, "onAssessmentLeadTransfer", { enumerable: true, get: function () { return assessmentTransfer_1.onAssessmentLeadTransfer; } });
 // ─── Scheduled Functions ──────────────────────────────────────────────────
 var authorizationRenewal_1 = require("./api/authorizationRenewal");
 Object.defineProperty(exports, "dailyAuthRenewalCheck", { enumerable: true, get: function () { return authorizationRenewal_1.dailyAuthRenewalCheck; } });
+var visitReminders_1 = require("./triggers/visitReminders");
+Object.defineProperty(exports, "sendVisitReminders", { enumerable: true, get: function () { return visitReminders_1.sendVisitReminders; } });
 // ─── Brain Orchestrator ───────────────────────────────────────────────────────
 var brainOrchestrator_1 = require("./orchestrator/brainOrchestrator");
 Object.defineProperty(exports, "scheduledOrchestrator", { enumerable: true, get: function () { return brainOrchestrator_1.scheduledOrchestrator; } });
 Object.defineProperty(exports, "manualOrchestratorRun", { enumerable: true, get: function () { return brainOrchestrator_1.manualOrchestratorRun; } });
+// ─── PCP Generation ───────────────────────────────────────────────────────────
+var generatePCP_1 = require("./api/generatePCP");
+Object.defineProperty(exports, "generatePCP", { enumerable: true, get: function () { return generatePCP_1.generatePCP; } });
+var refinePCP_1 = require("./api/refinePCP");
+Object.defineProperty(exports, "refinePCP", { enumerable: true, get: function () { return refinePCP_1.refinePCP; } });
+var seedValentina_1 = require("./api/seedValentina");
+Object.defineProperty(exports, "seedValentinaDemoData", { enumerable: true, get: function () { return seedValentina_1.seedValentinaDemoData; } });
+var generateRenewalLetter_1 = require("./api/generateRenewalLetter");
+Object.defineProperty(exports, "generateRenewalLetter", { enumerable: true, get: function () { return generateRenewalLetter_1.generateRenewalLetter; } });
+// ─── Consent Management (callable + scheduled cleanup) ────────────────────────
+var consent_1 = require("./api/consent");
+Object.defineProperty(exports, "sendConsentRequest", { enumerable: true, get: function () { return consent_1.sendConsentRequest; } });
+Object.defineProperty(exports, "checkConsentToken", { enumerable: true, get: function () { return consent_1.checkConsentToken; } });
+Object.defineProperty(exports, "sendConsentOTP", { enumerable: true, get: function () { return consent_1.sendConsentOTP; } });
+Object.defineProperty(exports, "verifyConsentOTP", { enumerable: true, get: function () { return consent_1.verifyConsentOTP; } });
+Object.defineProperty(exports, "submitConsentSignature", { enumerable: true, get: function () { return consent_1.submitConsentSignature; } });
+Object.defineProperty(exports, "cleanupExpiredConsents", { enumerable: true, get: function () { return consent_1.cleanupExpiredConsents; } });
+var trainingAlerts_1 = require("./api/trainingAlerts");
+Object.defineProperty(exports, "checkTrainingExpirations", { enumerable: true, get: function () { return trainingAlerts_1.checkTrainingExpirations; } });
+Object.defineProperty(exports, "seedTrainingData", { enumerable: true, get: function () { return trainingAlerts_1.seedTrainingData; } });
+// ─── Guardian Portal (callable) ───────────────────────────────────────────────
+var guardianPortal_1 = require("./api/guardianPortal");
+Object.defineProperty(exports, "createGuardianPortalSession", { enumerable: true, get: function () { return guardianPortal_1.createGuardianPortalSession; } });
+// ─── Duplicate Detection ───────────────────────────────────────────────────────
+var duplicates_1 = require("./api/duplicates");
+Object.defineProperty(exports, "detectDuplicatesScheduled", { enumerable: true, get: function () { return duplicates_1.detectDuplicatesScheduled; } });
+Object.defineProperty(exports, "detectDuplicatesOnCreate", { enumerable: true, get: function () { return duplicates_1.detectDuplicatesOnCreate; } });
+Object.defineProperty(exports, "detectDuplicatesOnDemand", { enumerable: true, get: function () { return duplicates_1.detectDuplicatesOnDemand; } });
 //# sourceMappingURL=index.js.map

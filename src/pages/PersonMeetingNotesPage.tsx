@@ -19,8 +19,12 @@ import {
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
-import { useMeetingNotes, addMeetingNote, updateMeetingNote, deleteMeetingNote } from "@/hooks/useFirestore";
+import { useMeetingNotes, addMeetingNote, updateMeetingNote, deleteMeetingNote, useCarePlans } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
+import { createTask } from "@/hooks/useTasks";
+import { useAuth } from "@/contexts/AuthContext";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
 interface ActionItem {
@@ -33,22 +37,34 @@ interface ActionItem {
   reminder?: string;
 }
 
+type MeetingType = "Team Meeting" | "IDT Meeting" | "PCP Planning Meeting" | "Wraparound Meeting" | "Other";
+
 interface MeetingNote {
   id: string;
   date: string;
   startTime: string;
   endTime: string;
-  type: "Quarterly review" | "Annual planning" | "Crisis huddle" | "Provider check-in" | "Other";
+  type: MeetingType;
   attendees: string[];
+  externalAttendees?: string; // free text for non-org attendees
   facilitator: string;
   agenda: string;
   discussionNotes: string;
   actionItems: ActionItem[];
   linkedGoals: string[];
+  nextMeetingDate?: string;
   attachments: { name: string; size: string }[];
   createdAt: string;
   createdBy: string;
 }
+
+const MEETING_TYPES: MeetingType[] = [
+  "Team Meeting",
+  "IDT Meeting",
+  "PCP Planning Meeting",
+  "Wraparound Meeting",
+  "Other",
+];
 
 const PLAN_GOALS = [
   { id: "g1", text: "Increase community employment hours to 20/week" },
@@ -57,21 +73,12 @@ const PLAN_GOALS = [
   { id: "g4", text: "Independent transportation training (bus route 8)" },
 ];
 
-const TEAM_ROSTER = [
-  "Margaret Thompson (Guardian)",
-  "Sarah Chen, LCSW (Coordinator)",
-  "David Park (Supervisor)",
-  "Riverside Day Program",
-  "Dr. Aaron Patel (BH)",
-  "Aunt Linda Reyes (Natural support)",
-];
-
-const TYPE_TONE: Record<MeetingNote["type"], string> = {
-  "Quarterly review": "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
-  "Annual planning": "bg-icm-green-soft text-icm-green ring-icm-green/20",
-  "Crisis huddle": "bg-icm-red-soft text-icm-red ring-icm-red/20",
-  "Provider check-in": "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
-  Other: "bg-icm-bg text-icm-text-dim ring-icm-border",
+const TYPE_TONE: Record<MeetingType, string> = {
+  "Team Meeting":        "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
+  "IDT Meeting":         "bg-icm-green-soft text-icm-green ring-icm-green/20",
+  "PCP Planning Meeting":"bg-violet-100 text-violet-700 ring-violet-200",
+  "Wraparound Meeting":  "bg-icm-amber-soft text-icm-amber ring-icm-amber/20",
+  Other:                 "bg-icm-bg text-icm-text-dim ring-icm-border",
 };
 
 const PersonMeetingNotesPage = () => {
@@ -79,6 +86,23 @@ const PersonMeetingNotesPage = () => {
   const navigate = useNavigate();
   const { individual, loading } = useIndividual(id);
   const { data: notes = [], loading: notesLoading } = useMeetingNotes(id);
+  const { userProfile } = useAuth();
+  const { data: carePlans } = useCarePlans(id);
+
+  // Load org staff users for attendee multi-select
+  const [orgUsers, setOrgUsers] = useState<{ uid: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    if (!userProfile?.organizationId) return;
+    const q = query(collection(db, "users"), where("organizationId", "==", userProfile.organizationId));
+    const unsub = onSnapshot(q, (snap) => {
+      setOrgUsers(snap.docs.map((d) => ({
+        uid: d.id,
+        name: d.data().displayName ?? d.data().email ?? "User",
+        role: d.data().role ?? "",
+      })));
+    }, () => {});
+    return () => unsub();
+  }, [userProfile?.organizationId]);
   const personLabel = individual ? `${individual.last_name}, ${individual.first_name}` : "Person";
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -144,14 +168,43 @@ const PersonMeetingNotesPage = () => {
       const { id: _, ...cleanNote } = noteData;
       const payload = {
         ...cleanNote,
-        individual_id: id!
+        individual_id: id!,
+        organizationId: userProfile?.organizationId ?? "",
       };
       const docRef = await addMeetingNote(payload);
       writeAudit("create_note", "meeting_note", docRef.id, {
         individualId: id!,
-        attendees: noteData.attendees.length
+        attendees: noteData.attendees.length,
       });
-      toast.success("Meeting note documented successfully");
+
+      // Create a My Work task for each action item assigned to an org user
+      const individualName = individual
+        ? `${individual.first_name} ${individual.last_name}`
+        : "Individual";
+      const taskPromises = noteData.actionItems
+        .filter((a) => a.assignee && a.description)
+        .map((a) =>
+          createTask({
+            title: a.description,
+            description: `Action item from team meeting on ${noteData.date} (${noteData.type})`,
+            individualId: id!,
+            individualName,
+            organizationId: userProfile?.organizationId ?? "",
+            type: "Team Meeting",
+            priority: "medium",
+            status: "open",
+            source: "meeting_note",
+            dueDate: a.dueDate,
+            assignedTo: orgUsers.find((u) => u.name === a.assignee)?.uid ?? a.assignee,
+          }).catch(() => {/* non-fatal */})
+        );
+      await Promise.all(taskPromises);
+
+      if (noteData.actionItems.length > 0) {
+        toast.success(`Meeting documented · ${noteData.actionItems.length} task${noteData.actionItems.length > 1 ? "s" : ""} created in My Work`);
+      } else {
+        toast.success("Meeting note documented successfully");
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to save meeting note");
@@ -423,6 +476,10 @@ const PersonMeetingNotesPage = () => {
             createNote(n);
             setCreating(false);
           }}
+          orgUsers={orgUsers}
+          carePlanGoals={carePlans.flatMap((p) =>
+            (p.goals ?? []).map((g) => ({ id: g.id, text: g.goal ?? "" }))
+          )}
         />
       )}
     </ICMShell>
@@ -443,20 +500,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function CreateMeetingDialog({
   onClose,
   onCreate,
+  orgUsers,
+  carePlanGoals,
 }: {
   onClose: () => void;
   onCreate: (n: MeetingNote) => void;
+  orgUsers: { uid: string; name: string; role: string }[];
+  carePlanGoals: { id: string; text: string }[];
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:00");
-  const [type, setType] = useState<MeetingNote["type"]>("Quarterly review");
-  const [facilitator, setFacilitator] = useState("Sarah Chen, LCSW");
-  const [attendees, setAttendees] = useState<string[]>([
-    "Sarah Chen, LCSW (Coordinator)",
-    "Margaret Thompson (Guardian)",
-  ]);
+  const [type, setType] = useState<MeetingType>("Team Meeting");
+  const [facilitator, setFacilitator] = useState("");
+  const [attendees, setAttendees] = useState<string[]>([]);
+  const [externalAttendees, setExternalAttendees] = useState("");
+  const [nextMeetingDate, setNextMeetingDate] = useState("");
   const [agenda, setAgenda] = useState("");
   const [discussion, setDiscussion] = useState("");
   const [linkedGoals, setLinkedGoals] = useState<string[]>([]);
@@ -492,7 +552,7 @@ function CreateMeetingDialog({
 
   function submit() {
     if (!agenda.trim()) {
-      alert("Agenda is required.");
+      toast.error("Agenda is required.");
       return;
     }
     onCreate({
@@ -503,10 +563,12 @@ function CreateMeetingDialog({
       type,
       facilitator,
       attendees,
+      externalAttendees: externalAttendees.trim() || undefined,
       agenda,
       discussionNotes: discussion,
       actionItems: actions,
       linkedGoals,
+      nextMeetingDate: nextMeetingDate || undefined,
       attachments: [],
       createdAt: new Date().toISOString(),
       createdBy: facilitator,
@@ -551,12 +613,10 @@ function CreateMeetingDialog({
             <Field label="Type">
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as MeetingNote["type"])}
+                onChange={(e) => setType(e.target.value as MeetingType)}
                 className="w-full text-[12.5px] px-2.5 py-1.5 rounded-md border border-icm-border bg-white"
               >
-                {Object.keys(TYPE_TONE).map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
+                {MEETING_TYPES.map((t) => <option key={t}>{t}</option>)}
               </select>
             </Field>
           </div>
@@ -564,28 +624,38 @@ function CreateMeetingDialog({
             <input
               value={facilitator}
               onChange={(e) => setFacilitator(e.target.value)}
+              placeholder="Name of meeting facilitator"
               className="w-full text-[12.5px] px-2.5 py-1.5 rounded-md border border-icm-border bg-white"
             />
           </Field>
-          <Field label="Attendees">
+          <Field label="Attendees (organization staff)">
             <div className="flex flex-wrap gap-1.5">
-              {TEAM_ROSTER.map((a) => (
+              {orgUsers.map((u) => (
                 <button
-                  key={a}
+                  key={u.uid}
                   type="button"
-                  onClick={() => toggleAttendee(a)}
+                  onClick={() => toggleAttendee(u.name)}
                   className={`text-[11px] px-2 py-1 rounded-md ring-1 ${
-                    attendees.includes(a)
+                    attendees.includes(u.name)
                       ? "bg-icm-accent-soft text-icm-accent ring-icm-accent/20"
                       : "bg-white text-icm-text-dim ring-icm-border hover:text-icm-text"
                   }`}
                 >
-                  {a}
+                  {u.name}{u.role ? ` (${u.role})` : ""}
                 </button>
               ))}
+              {orgUsers.length === 0 && <p className="text-[11.5px] text-icm-text-faint italic">No org users found.</p>}
             </div>
           </Field>
-          <Field label="Agenda">
+          <Field label="External attendees (free text — guardian, providers, etc.)">
+            <input
+              value={externalAttendees}
+              onChange={(e) => setExternalAttendees(e.target.value)}
+              placeholder="e.g. Margaret Thompson (Guardian), Dr. Patel (BH)"
+              className="w-full text-[12.5px] px-2.5 py-1.5 rounded-md border border-icm-border bg-white"
+            />
+          </Field>
+          <Field label="Agenda (required)">
             <textarea
               rows={3}
               value={agenda}
@@ -594,7 +664,7 @@ function CreateMeetingDialog({
               className="w-full text-[12.5px] px-2.5 py-1.5 rounded-md border border-icm-border bg-white"
             />
           </Field>
-          <Field label="Discussion notes">
+          <Field label="Discussion summary">
             <textarea
               rows={3}
               value={discussion}
@@ -602,23 +672,31 @@ function CreateMeetingDialog({
               className="w-full text-[12.5px] px-2.5 py-1.5 rounded-md border border-icm-border bg-white"
             />
           </Field>
-          <Field label="Link to plan goals / outcomes">
+          <Field label="Link to care plan goals">
             <div className="space-y-1">
-              {PLAN_GOALS.map((g) => (
-                <label
-                  key={g.id}
-                  className="flex items-start gap-2 text-[11.5px] text-icm-text"
-                >
-                  <input
-                    type="checkbox"
-                    checked={linkedGoals.includes(g.id)}
-                    onChange={() => toggleGoal(g.id)}
-                    className="mt-0.5"
-                  />
-                  <span>{g.text}</span>
-                </label>
-              ))}
+              {carePlanGoals.length === 0
+                ? <p className="text-[11.5px] text-icm-text-faint italic">No active care plan goals found.</p>
+                : carePlanGoals.map((g) => (
+                  <label key={g.id} className="flex items-start gap-2 text-[11.5px] text-icm-text">
+                    <input
+                      type="checkbox"
+                      checked={linkedGoals.includes(g.id)}
+                      onChange={() => toggleGoal(g.id)}
+                      className="mt-0.5"
+                    />
+                    <span>{g.text}</span>
+                  </label>
+                ))
+              }
             </div>
+          </Field>
+          <Field label="Next meeting date (optional)">
+            <input
+              type="date"
+              value={nextMeetingDate}
+              onChange={(e) => setNextMeetingDate(e.target.value)}
+              className="w-full text-[12.5px] px-2.5 py-1.5 rounded-md border border-icm-border bg-white"
+            />
           </Field>
           <Field label="Action items">
             <div className="space-y-1.5 mb-2">
@@ -654,34 +732,30 @@ function CreateMeetingDialog({
                 className="w-full text-[12px] px-2 py-1 rounded border border-icm-border bg-white"
               />
               <div className="grid grid-cols-3 gap-1.5">
-                <input
-                  placeholder="Assignee"
+                <select
                   value={newAction.assignee}
-                  onChange={(e) =>
-                    setNewAction({ ...newAction, assignee: e.target.value })
-                  }
+                  onChange={(e) => setNewAction({ ...newAction, assignee: e.target.value })}
                   className="text-[12px] px-2 py-1 rounded border border-icm-border bg-white"
-                />
+                >
+                  <option value="">Assign to…</option>
+                  {orgUsers.map((u) => (
+                    <option key={u.uid} value={u.name}>{u.name}</option>
+                  ))}
+                </select>
                 <input
                   type="date"
                   value={newAction.dueDate}
-                  onChange={(e) =>
-                    setNewAction({ ...newAction, dueDate: e.target.value })
-                  }
+                  onChange={(e) => setNewAction({ ...newAction, dueDate: e.target.value })}
                   className="text-[12px] px-2 py-1 rounded border border-icm-border bg-white"
                 />
                 <select
                   value={newAction.linkedGoalId}
-                  onChange={(e) =>
-                    setNewAction({ ...newAction, linkedGoalId: e.target.value })
-                  }
+                  onChange={(e) => setNewAction({ ...newAction, linkedGoalId: e.target.value })}
                   className="text-[12px] px-2 py-1 rounded border border-icm-border bg-white"
                 >
                   <option value="">No goal link</option>
-                  {PLAN_GOALS.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.text.slice(0, 40)}
-                    </option>
+                  {carePlanGoals.map((g) => (
+                    <option key={g.id} value={g.id}>{g.text.slice(0, 40)}</option>
                   ))}
                 </select>
               </div>

@@ -203,6 +203,11 @@ const SettingsBillingConfig = () => {
           {tab === "iddbilling" && <IddBillingTab orgId={orgId ?? ""} />}
         </>
       )}
+
+      {/* Supervisor Approval Requirements — always visible at bottom */}
+      <div className="mt-4">
+        <ApprovalRequirementsSection orgId={orgId ?? ""} />
+      </div>
     </SettingsLayout>
   );
 };
@@ -869,6 +874,135 @@ function Toggle({ on, onChange, defaultOn }: { on?: boolean; onChange?: (v: bool
 }
 
 export default SettingsBillingConfig;
+
+// ── Approval Requirements Section ─────────────────────────────────────────────
+
+interface ApprovalConfig {
+  requireProgressNotes: boolean;
+  requireContactNotes: boolean;
+  requireVisitSummaries: boolean;
+  requireMonitoringForms: boolean;
+  overdueThresholdHours: number;
+}
+
+const DEFAULT_APPROVAL: ApprovalConfig = {
+  requireProgressNotes: true,
+  requireContactNotes: true,
+  requireVisitSummaries: true,
+  requireMonitoringForms: true,
+  overdueThresholdHours: 48,
+};
+
+function ApprovalRequirementsSection({ orgId }: { orgId: string }) {
+  const [config, setConfig] = React.useState<ApprovalConfig>(DEFAULT_APPROVAL);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!orgId) return;
+    getDoc(doc(db, "org_approval_config", orgId))
+      .then((snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setConfig({
+            requireProgressNotes: d.requireProgressNotes ?? true,
+            requireContactNotes: d.requireContactNotes ?? true,
+            requireVisitSummaries: d.requireVisitSummaries ?? true,
+            requireMonitoringForms: d.requireMonitoringForms ?? true,
+            overdueThresholdHours: d.overdueThresholdHours ?? 48,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [orgId]);
+
+  const handleSave = async () => {
+    if (!orgId) return;
+    setSaving(true);
+    try {
+      const { setDoc } = await import("firebase/firestore");
+      await setDoc(doc(db, "org_approval_config", orgId), {
+        ...config,
+        updatedAt: new Date(),
+      });
+      toast.success("Approval requirements saved");
+    } catch {
+      toast.error("Failed to save approval requirements");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-4 max-w-[1100px]">
+      <div>
+        <p className="font-manrope font-bold text-[14px] text-icm-text">
+          Supervisor Approval Requirements
+        </p>
+        <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
+          Configure which note types require supervisor approval before becoming billing-ready.
+          Case managers who submit notes will enter "Pending Review" status until a supervisor approves.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {[
+          { key: "requireProgressNotes" as const, label: "Progress Notes", desc: "Case manager progress notes require supervisor approval" },
+          { key: "requireContactNotes" as const, label: "Contact Notes", desc: "Contact notes require supervisor approval" },
+          { key: "requireVisitSummaries" as const, label: "Visit Summaries", desc: "Visit summaries require supervisor approval" },
+          { key: "requireMonitoringForms" as const, label: "Monitoring Forms", desc: "Monitoring forms require supervisor approval" },
+        ].map(({ key, label, desc }) => (
+          <div key={key} className="flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-geist font-medium text-icm-text">{label}</p>
+              <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">{desc}</p>
+            </div>
+            <Toggle on={config[key]} onChange={(v) => setConfig((prev) => ({ ...prev, [key]: v }))} />
+          </div>
+        ))}
+      </div>
+
+      <div className="h-px bg-icm-border" />
+
+      <div className="flex items-center gap-3">
+        <div>
+          <p className="text-[13px] font-geist font-medium text-icm-text">Overdue review threshold</p>
+          <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
+            Notes pending review longer than this are flagged as overdue in the supervisor queue.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <input
+            type="number"
+            min={1}
+            max={720}
+            value={config.overdueThresholdHours}
+            onChange={(e) =>
+              setConfig((prev) => ({
+                ...prev,
+                overdueThresholdHours: Math.max(1, Number(e.target.value)),
+              }))
+            }
+            className="w-20 h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text text-center focus:outline-none focus:border-icm-border-strong"
+          />
+          <span className="text-[12px] font-geist text-icm-text-dim">hours</span>
+        </div>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+      >
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        Save approval settings
+      </button>
+    </div>
+  );
+}
 
 // ── IDD Billing.AI Tab ───────────────────────────────────────────────────────────────────────────────
 

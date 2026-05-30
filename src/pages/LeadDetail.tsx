@@ -15,11 +15,15 @@ import {
   ShieldCheck,
   Stethoscope,
   ClipboardList,
+  ClipboardCheck,
   User2,
   AlertCircle,
   CheckCircle2,
   Download,
   FileSearch,
+  X,
+  Search,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -40,11 +44,13 @@ import {
   markLeadConverted,
 } from "@/data/leads";
 import { cn } from "@/lib/utils";
+import { useAssessmentTemplates } from "@/hooks/useAssessmentTemplates";
 
 export default function LeadDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [lead, setLead] = useState(() => (id ? getLead(id) : undefined));
+  const [showAssessmentSelector, setShowAssessmentSelector] = useState(false);
 
   const initials = useMemo(() => {
     if (!lead) return "??";
@@ -174,6 +180,13 @@ export default function LeadDetail() {
               <Button variant="outline" onClick={() => navigate(`/leads/${lead.id}/edit`)}>
                 <Pencil className="w-4 h-4 mr-1.5" /> Edit
               </Button>
+              <button
+                onClick={() => setShowAssessmentSelector(true)}
+                className="h-9 px-3.5 rounded-xl border border-icm-border text-[12px] font-geist font-medium hover:bg-muted/40 flex items-center gap-1.5"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                Start Assessment
+              </button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -381,7 +394,101 @@ export default function LeadDetail() {
           )}
         </Section>
       </div>
+
+      {showAssessmentSelector && (
+        <LeadAssessmentSelector
+          leadId={lead.id}
+          onClose={() => setShowAssessmentSelector(false)}
+          onSelect={(tplId) => {
+            setShowAssessmentSelector(false);
+            navigate(`/leads/${lead.id}/assessments/new?template=${tplId}`);
+          }}
+        />
+      )}
     </ICMShell>
+  );
+}
+
+function LeadAssessmentSelector({
+  leadId,
+  onClose,
+  onSelect,
+}: {
+  leadId: string;
+  onClose: () => void;
+  onSelect: (templateId: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const { templates } = useAssessmentTemplates("published");
+  const filtered = useMemo(
+    () => templates.filter((t) => t.name.toLowerCase().includes(q.toLowerCase())),
+    [q, templates]
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+      <div className="w-full max-w-[640px] max-h-[85vh] flex flex-col rounded-xl bg-icm-panel border border-icm-border shadow-elevated">
+        <div className="p-4 border-b border-icm-border flex items-center justify-between">
+          <div>
+            <h2 className="font-manrope font-bold text-[16px] text-icm-text">
+              Select Assessment Template
+            </h2>
+            <p className="text-[11.5px] text-icm-text-dim mt-0.5">
+              Pick a published template to begin the lead assessment.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3 overflow-y-auto">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-icm-text-faint" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search templates…"
+              className="h-9 w-full pl-8 pr-3 rounded-xl border border-icm-border bg-icm-bg text-[12px] focus:outline-none focus:border-icm-border-strong"
+            />
+          </div>
+
+          {filtered.map((t) => {
+            const qc = t.sections.reduce((a, s) => a + s.questions.length, 0);
+            return (
+              <div
+                key={t.id}
+                className="rounded-xl border border-icm-border bg-icm-bg p-3 flex items-center gap-3"
+              >
+                <ClipboardList className="w-5 h-5 text-icm-accent" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-manrope font-bold text-[13px] text-icm-text">{t.name}</p>
+                  <p className="text-[11px] text-icm-text-dim mt-0.5">
+                    {t.type} · {t.sections.length} sections · {qc} questions ·{" "}
+                    {t.estimatedMinutes} min · {t.version}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onSelect(t.id)}
+                  className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90"
+                >
+                  Select
+                </button>
+              </div>
+            );
+          })}
+
+          {filtered.length === 0 && (
+            <div className="text-center py-8 text-[12px] text-icm-text-dim">
+              No published templates found.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

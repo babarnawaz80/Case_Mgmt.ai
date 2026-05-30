@@ -138,7 +138,8 @@ service cloud.firestore {
       allow list: if isAuth();
       allow get: if isAuth() && ownedByOrg();
       allow create: if isCaseManager() && newDocInOrg();
-      allow update: if isCaseManager() && ownedByOrg();
+      // Supervisors can update approval status fields
+      allow update: if isAuth() && ownedByOrg();
       allow delete: if isAdmin() && ownedByOrg();
     }
 
@@ -147,7 +148,8 @@ service cloud.firestore {
       allow list: if isAuth();
       allow get: if isAuth() && ownedByOrg();
       allow create: if isCaseManager() && newDocInOrg();
-      allow update: if isCaseManager() && ownedByOrg();
+      // Supervisors can update approval status fields
+      allow update: if isAuth() && ownedByOrg();
       allow delete: if isAdmin() && ownedByOrg();
     }
 
@@ -183,8 +185,15 @@ service cloud.firestore {
       allow list: if isAuth();
       allow get: if isAuth() && ownedByOrg();
       allow create: if isCaseManager() && newDocInOrg();
-      allow update: if isCaseManager() && ownedByOrg();
+      // Case managers can update their own notes; supervisors can update approval status fields
+      allow update: if isAuth() && ownedByOrg();
       allow delete: if isAdmin() && ownedByOrg();
+    }
+
+    // Org Approval Config (supervisor approval requirements per org)
+    match /org_approval_config/{orgId} {
+      allow read: if isAuth() && myOrgId() == orgId;
+      allow write: if isSupervisor() && myOrgId() == orgId;
     }
 
     // Referrals
@@ -661,6 +670,43 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isCaseManager();
       allow update: if isCaseManager();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Guardian Portal Sessions ─────────────────────────────────────────────────
+    // Public read/write: access is gated by consentTokenHash match in the client,
+    // not Firebase Auth. Admin SDK (Cloud Functions) creates sessions.
+    match /guardian_portal_sessions/{id} {
+      allow read: if true;    // validated by token hash, not auth
+      allow create: if true;  // Cloud Function creates via Admin SDK; also callable from client
+      allow update: if true;  // Guardian updates lastActiveAt; staff revokes
+      allow delete: if isAdmin();
+    }
+
+    // ─── Guardian Messages ────────────────────────────────────────────────────────
+    match /guardian_messages/{id} {
+      allow read: if true;    // guardian reads via portal (no auth)
+      allow create: if true;  // guardian sends messages
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Consent Requests (top-level, for Guardian Portal reads) ────────────────
+    match /consent_requests/{id} {
+      allow read: if true;    // guardian reads their own consents via portal
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Duplicate Pairs (org-scoped duplicate detection results) ────────────────
+    match /duplicate_pairs/{pairId} {
+      // Any authenticated user in the same org can read their org's pairs
+      allow list: if isAuth();
+      allow get:  if isAuth();
+      // Cloud Functions write these on create; admins/supervisors can also update (resolve)
+      allow create: if isAuth();
+      allow update: if isSupervisor();
       allow delete: if isAdmin();
     }
 

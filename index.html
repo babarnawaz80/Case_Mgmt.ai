@@ -2,23 +2,58 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover is required for iOS safe-area insets in standalone mode -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ── Favicons ─────────────────────────────────────────────────────── -->
+    <link rel="icon" href="/icons/icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="/cm-favicon.png" type="image/png" />
+
+    <!-- ── PWA Manifest ──────────────────────────────────────────────────── -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- ── Theme colors (brand purple) ───────────────────────────────────── -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#7C3AED" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)"  content="#7C3AED" />
+
+    <!-- ── iOS PWA ───────────────────────────────────────────────────────── -->
+    <!-- Enables full-screen / standalone mode on iOS when added to home screen -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- "default" keeps the status bar opaque above the app — prevents overlap.
+         The header uses env(safe-area-inset-top) padding for proper spacing. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Label shown under the icon on the iOS home screen -->
+    <meta name="apple-mobile-web-app-title" content="CaseAI" />
+    <!-- Home-screen icons for iPhone / iPad -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
+
+    <!-- ── Android / Chrome ──────────────────────────────────────────────── -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="CaseAI" />
+
+    <!-- ── Microsoft Tiles (Edge / Windows) ─────────────────────────────── -->
+    <meta name="msapplication-TileColor" content="#7C3AED" />
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
+
+    <!-- ── Page metadata ─────────────────────────────────────────────────── -->
     <title>CaseManagement.AI — Enterprise Support Coordination Platform</title>
     <meta name="description" content="CaseManagement.AI — A HIPAA-compliant electronic health record and support coordination platform powered by iCareManager." />
     <meta name="author" content="iCareManager" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0d9488" />
 
+    <!-- ── Open Graph ────────────────────────────────────────────────────── -->
     <meta property="og:title" content="CaseManagement.AI by iCareManager" />
     <meta property="og:description" content="HIPAA-hardened clinical EHR and AI-assisted case management platform for HCBS waiver providers." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/cm-favicon.png" />
+    <meta property="og:image" content="/icons/icon-512.png" />
 
+    <!-- ── Twitter Card ──────────────────────────────────────────────────── -->
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="CaseManagement.AI" />
     <meta name="twitter:description" content="HIPAA-hardened support coordination EHR platform." />
-    <meta name="twitter:image" content="/cm-favicon.png" />
+    <meta name="twitter:image" content="/icons/icon-512.png" />
   </head>
 
   <body>

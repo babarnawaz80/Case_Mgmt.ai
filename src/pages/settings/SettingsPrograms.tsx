@@ -299,6 +299,30 @@ const SettingsPrograms = () => {
             </div>
           )}
 
+          {/* Signature Requirements section */}
+          <div className="space-y-3 mt-4">
+            <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+              Care Plan Signature Requirements
+            </p>
+            <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
+              <p className="text-[12.5px] font-geist text-icm-text-dim">
+                Configure which signatures are required before a care plan becomes active. Applies to all programs.
+              </p>
+              {[
+                { key: 'caseManager', label: 'Case Manager signature' },
+                { key: 'supervisor', label: 'Supervisor signature' },
+                { key: 'participant', label: 'Participant signature' },
+                { key: 'guardian', label: 'Guardian / Representative signature' },
+              ].map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-[13px] font-geist text-icm-text">{label}</span>
+                  <span className="text-[11.5px] text-icm-text-dim font-geist">Required (Indiana HCBS default)</span>
+                </div>
+              ))}
+              <p className="text-[11px] text-icm-text-faint font-geist">Per-program overrides coming soon.</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
             {programs.map((p) => (
               <div

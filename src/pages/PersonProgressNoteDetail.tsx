@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   ChevronLeft, Sparkles, Save, Send, Printer, X, AlertTriangle,
   CheckCircle2, FileText, Target, ListChecks, FileSignature, Ban, Loader2,
+  Clock,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
@@ -16,7 +17,7 @@ import { writeAudit } from "@/lib/auditService";
 import { AuthorCell } from "@/components/icm/AuthorCell";
 import { useAuth } from "@/contexts/AuthContext";
 import MentionInput from "@/components/icm/MentionInput";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createBillingRecord } from "@/hooks/useBillingRecords";
 
@@ -392,6 +393,115 @@ const PersonProgressNoteDetail = () => {
             <Ban className="w-4 h-4" />
             <span className="font-semibold">VOID</span>
             <span className="text-icm-red/80">Reason: {form.voidReason}</span>
+          </div>
+        )}
+
+        {/* Approval status banners */}
+        {(dbRecord as any)?.approvalStatus === "pending_review" && (
+          <div className="rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-4 py-3 flex items-start gap-3">
+            <Clock className="w-4 h-4 text-icm-amber mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12.5px] font-geist font-semibold text-icm-text">
+                Pending supervisor review
+              </p>
+              <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
+                {(() => {
+                  const ts = (dbRecord as any)?.submittedForReviewAt;
+                  if (!ts?.toMillis) return "Submitted recently.";
+                  const hours = Math.floor((Date.now() - ts.toMillis()) / 3600000);
+                  return `Submitted ${hours === 0 ? "< 1 hour" : `${hours} hour${hours !== 1 ? "s" : ""}`} ago. You cannot edit this note until it is reviewed.`;
+                })()}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {(dbRecord as any)?.approvalStatus === "returned_for_correction" && (() => {
+          const reasons: any[] = (dbRecord as any)?.returnReasons ?? [];
+          const last = reasons[reasons.length - 1];
+          return (
+            <div className="rounded-xl border border-icm-red/30 bg-icm-red-soft px-4 py-3 space-y-2">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 text-icm-red mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12.5px] font-geist font-semibold text-icm-red">
+                    Returned for correction
+                    {last?.returnedByName && ` by ${last.returnedByName}`}
+                    {last?.returnedAt && ` on ${new Date(last.returnedAt).toLocaleDateString()}`}
+                  </p>
+                  {last?.reason && (
+                    <p className="text-[11.5px] font-geist text-icm-text mt-1">
+                      <span className="font-semibold">Reason:</span> {last.reason}
+                    </p>
+                  )}
+                  {last?.comment && (
+                    <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5 italic">
+                      "{last.comment}"
+                    </p>
+                  )}
+                </div>
+              </div>
+              {noteId && noteId !== "new" && (
+                <div className="flex gap-2">
+                  <button
+                    className="h-8 px-3 rounded-xl border border-icm-border text-[11.5px] font-geist font-medium text-icm-text hover:bg-white"
+                    onClick={() => {/* editing is handled by un-locking the form */}}
+                  >
+                    Edit this note
+                  </button>
+                  <button
+                    className="h-8 px-3 rounded-xl bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold hover:opacity-90"
+                    onClick={async () => {
+                      if (!noteId) return;
+                      try {
+                        await updateDoc(doc(db, "progress_notes", noteId), {
+                          approvalStatus: "pending_review",
+                          submittedForReviewAt: serverTimestamp(),
+                        });
+                        toast.success("Note resubmitted for review");
+                      } catch (err) {
+                        toast.error("Failed to resubmit: " + (err as Error).message);
+                      }
+                    }}
+                  >
+                    Resubmit for Review
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {(dbRecord as any)?.approvalStatus === "approved" && (
+          <div className="rounded-xl border border-icm-green/20 bg-icm-green-soft px-4 py-2.5 text-[12px] text-icm-green flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="font-semibold">Approved</span>
+            {(dbRecord as any).reviewedByName && (
+              <span className="text-icm-green/80">
+                by {(dbRecord as any).reviewedByName}
+                {(dbRecord as any).reviewedAt?.toDate &&
+                  ` on ${(dbRecord as any).reviewedAt.toDate().toLocaleDateString()}`}
+                . This note is billing-ready.
+              </span>
+            )}
+          </div>
+        )}
+
+        {(dbRecord as any)?.approvalStatus === "approved_with_exception" && (
+          <div className="rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-4 py-2.5 text-[12px] text-icm-amber flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-semibold">Approved with exception</span>
+              {(dbRecord as any).reviewedByName && (
+                <span className="text-icm-amber/80 ml-1">by {(dbRecord as any).reviewedByName}.</span>
+              )}
+              {(dbRecord as any).exceptionReason && (
+                <p className="mt-0.5 text-[11.5px] text-icm-text-dim">
+                  Exception: {(dbRecord as any).exceptionReason}
+                </p>
+              )}
+              <p className="mt-0.5 text-[11.5px] text-icm-text-dim">This note is billing-ready with a flag.</p>
+            </div>
           </div>
         )}
 

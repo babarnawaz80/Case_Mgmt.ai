@@ -80,7 +80,7 @@ const activityTypes = [
   "Training",
   "Other",
 ];
-const contactTypes = ["In-person", "Phone", "Video", "Email", "Other"];
+const contactTypes = ["In-person", "Phone", "Televisit / Video Call", "Video", "Email", "Other"];
 
 const ContactNote = () => {
   const { id } = useParams<{ id: string }>();

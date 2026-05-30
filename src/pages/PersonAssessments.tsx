@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { useAssessments } from "@/hooks/useFirestore";
+import { useAssessmentTemplates } from "@/hooks/useAssessmentTemplates";
 import {
   listInstruments,
-  templates,
   getTemplate,
 } from "@/data/assessments";
 import { AuthorCell } from "@/components/icm/AuthorCell";
@@ -253,14 +253,14 @@ function TemplateSelector({
   onSelect: (templateId: string, withPrefill: boolean) => void;
 }) {
   const [q, setQ] = useState("");
+  const { templates: allTemplates } = useAssessmentTemplates("published");
   const published = useMemo(
     () =>
-      templates
-        .filter((t) => t.status === "published")
+      allTemplates
         .filter((t) => t.name.toLowerCase().includes(q.toLowerCase())),
-    [q],
+    [q, allTemplates],
   );
-  const annual = templates.find((t) => t.id === "tpl-annual");
+  const annual = allTemplates.find((t) => t.id === "tpl-annual");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">

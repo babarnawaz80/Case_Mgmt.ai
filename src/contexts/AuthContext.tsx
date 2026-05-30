@@ -15,7 +15,11 @@ import {
 } from '../lib/auth';
 import { audit } from '../lib/auditService';
 import { seedNotificationsForUser } from '../hooks/useFirestoreNotifications';
-import { seedDemoIfEmpty } from '../hooks/useDemoSeed';
+import { seedDemoIfEmpty, seedScheduledVisitsIfEmpty, seedApprovalDemoData } from '../hooks/useDemoSeed';
+import { seedAssessmentsIfEmpty } from '../lib/seedAssessments';
+import { seedGuardianPortalIfEmpty } from '../lib/seedGuardianPortal';
+import { seedCarePlanApprovalIfEmpty } from '../lib/seedCarePlanApproval';
+import { initFCM, setupForegroundMessages } from '../lib/fcm';
 
 interface AuthContextValue {
   // Auth state
@@ -97,12 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(userProfile);
           // Fire audit log — non-blocking, never let it crash the auth flow
           audit.login(user.uid).catch(e => console.warn('[AuthContext] Audit log failed (non-fatal):', e));
+          // Initialise FCM push notifications — non-blocking, never fatal
+          initFCM().catch(() => {});
+          setupForegroundMessages().catch(() => {});
           // Skip org seed for platform admins — they have no customer org
           if (userProfile.role !== 'platform_admin') {
             const orgId = userProfile.organizationId;
             const displayName = userProfile.displayName || user.email?.split('@')[0] || 'User';
             seedDemoIfEmpty(orgId, user.uid, displayName).catch(() => {});
+            seedScheduledVisitsIfEmpty(orgId, user.uid, displayName).catch(() => {});
+            seedApprovalDemoData(orgId, user.uid).catch(() => {});
             seedNotificationsForUser(user.uid, orgId).catch(() => {});
+            seedAssessmentsIfEmpty(orgId, user.uid).catch(() => {});
+            seedGuardianPortalIfEmpty(orgId).catch(() => {});
+            seedCarePlanApprovalIfEmpty(orgId, user.uid).catch(() => {});
           }
         } catch (error) {
           // ── IMPORTANT: do NOT call logOut() here ─────────────────────────────

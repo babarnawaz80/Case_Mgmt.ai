@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft, Sparkles, Save, FileSignature, Printer, FileText,
-  Search, Check, ChevronDown, ListChecks, Target, Loader2, AlertCircle,
+  Search, Check, ChevronDown, ListChecks, Target, Loader2, AlertCircle, Send,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividuals, useIndividual, calcAge } from "@/hooks/useIndividuals";
@@ -19,6 +19,7 @@ import { createBillingRecord } from "@/hooks/useBillingRecords";
 import { updateAuthorizationUnits } from "@/hooks/useBillingRecords";
 import { getRateForCode } from "@/hooks/useAuthorizations";
 import { calculateBillingUnits } from "@/services/billingValidation";
+import { serverTimestamp } from "firebase/firestore";
 
 /**
  * New Progress Note — wired to real Firestore.
@@ -66,8 +67,14 @@ const ProgressNoteNew = () => {
   // ── Save state ────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
 
+  // ── Approval modal state ──────────────────────────────────────────────────
+  const [showSubmitForReviewModal, setShowSubmitForReviewModal] = useState(false);
+
   // Resolved individual (could be from param or user selection)
   const individual = preloaded ?? individuals.find(i => i.id === selectedId) ?? null;
+
+  const isSupervisorOrAdmin =
+    userProfile?.role === "supervisor" || userProfile?.role === "admin";
 
   const inputCls = "w-full h-9 px-3 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text font-geist focus:outline-none focus:border-icm-accent transition-colors";
   const textareaCls = "w-full px-3 py-2.5 rounded-lg border border-icm-border bg-white text-[12.5px] text-icm-text font-geist focus:outline-none focus:border-icm-accent transition-colors resize-none";
@@ -109,6 +116,11 @@ const ProgressNoteNew = () => {
 
     setSaving(true);
     try {
+      const approvalStatus =
+        status === "pending_signature"
+          ? (isSupervisorOrAdmin ? "approved" : "pending_review")
+          : undefined;
+
       const noteId = await saveProgressNote({
         individualId: indId,
         organizationId: userProfile?.organizationId ?? "",
@@ -126,7 +138,17 @@ const ProgressNoteNew = () => {
         nextSteps,
         status,
         aiDrafted: aiUsed,
-      });
+        ...(approvalStatus !== undefined ? {
+          approvalStatus,
+          isBillingReady: isSupervisorOrAdmin ? true : false,
+          submittedForReviewAt: !isSupervisorOrAdmin && status === "pending_signature" ? serverTimestamp() : null,
+          submittedForReviewBy: !isSupervisorOrAdmin && status === "pending_signature" ? (userProfile?.uid ?? null) : null,
+          submittedByName: !isSupervisorOrAdmin && status === "pending_signature"
+            ? (`${userProfile?.firstName ?? ""} ${userProfile?.lastName ?? ""}`.trim() || userProfile?.displayName || "Unknown")
+            : null,
+          returnReasons: [],
+        } : {}),
+      } as any);
 
       // Auto-create billing record if billable and submitted for signature
       if (isBillable && !skipBilling && status === "pending_signature" && userProfile?.organizationId) {
@@ -176,7 +198,13 @@ const ProgressNoteNew = () => {
         }
       }
 
-      toast.success(status === "draft" ? "Draft saved" : "Submitted for signature", {
+      const toastMsg =
+        status === "draft"
+          ? "Draft saved"
+          : isSupervisorOrAdmin
+          ? "Submitted for signature"
+          : "Submitted for supervisor review";
+      toast.success(toastMsg, {
         description: `Progress note for ${ind.first_name} ${ind.last_name}`,
       });
       navigate(`/people/${indId}/progress-note/${noteId}`);
@@ -197,6 +225,12 @@ const ProgressNoteNew = () => {
     // For draft saves, skip billing validation
     if (status === "draft") {
       await doSave(status, true);
+      return;
+    }
+
+    // For case managers: show confirmation modal before submitting for review
+    if (!isSupervisorOrAdmin && status === "pending_signature") {
+      setShowSubmitForReviewModal(true);
       return;
     }
 
@@ -281,13 +315,23 @@ const ProgressNoteNew = () => {
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Save draft
             </button>
-            <button
-              onClick={() => handleSave("pending_signature")}
-              disabled={!isReady || saving}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-            >
-              <FileSignature className="w-3.5 h-3.5" /> Sign & submit
-            </button>
+            {isSupervisorOrAdmin ? (
+              <button
+                onClick={() => handleSave("pending_signature")}
+                disabled={!isReady || saving}
+                className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              >
+                <FileSignature className="w-3.5 h-3.5" /> Sign & submit
+              </button>
+            ) : (
+              <button
+                onClick={() => handleSave("pending_signature")}
+                disabled={!isReady || saving}
+                className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" /> Submit for Review
+              </button>
+            )}
           </div>
         </div>
 
@@ -501,6 +545,110 @@ const ProgressNoteNew = () => {
           onClose={() => setShowValidationModal(false)}
           isAdmin={userProfile?.role === "admin" || userProfile?.role === "supervisor"}
         />
+      )}
+
+      {/* Submit for Review confirmation modal (case managers only) */}
+      {showSubmitForReviewModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setShowSubmitForReviewModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-icm-border w-full max-w-md p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-manrope font-extrabold text-[18px] text-icm-text">
+              Submit note for supervisor review?
+            </h3>
+            <div className="mt-3 rounded-xl bg-icm-bg border border-icm-border p-3 text-[12px] font-geist text-icm-text-dim space-y-1">
+              {individual && (
+                <p>
+                  <span className="font-semibold text-icm-text">Person:</span>{" "}
+                  {individual.last_name}, {individual.first_name}
+                </p>
+              )}
+              {progressDate && (
+                <p>
+                  <span className="font-semibold text-icm-text">Date:</span> {progressDate}
+                </p>
+              )}
+              {activityType && (
+                <p>
+                  <span className="font-semibold text-icm-text">Activity:</span> {activityType}
+                </p>
+              )}
+              {isBillable && serviceCode && (
+                <p>
+                  <span className="font-semibold text-icm-text">Service code:</span> {serviceCode}
+                  {billingUnits > 0 && ` · ${billingUnits} units`}
+                </p>
+              )}
+            </div>
+            <div className="mt-3 rounded-xl border border-icm-amber/30 bg-icm-amber-soft px-3 py-2.5 text-[11.5px] font-geist text-icm-text">
+              <span className="font-semibold">Note:</span> This note will be locked for editing until your supervisor reviews it.
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowSubmitForReviewModal(false)}
+                className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowSubmitForReviewModal(false);
+                  // Run billing validation if needed
+                  if (isBillable && userProfile?.organizationId) {
+                    const indId = paramId ?? selectedId;
+                    const ind = individual ?? individuals.find(i => i.id === indId);
+                    setValidating(true);
+                    try {
+                      const result = await runBillingValidation({
+                        noteType: "progress_note",
+                        individualId: indId,
+                        individualName: ind ? `${ind.first_name} ${ind.last_name}` : "",
+                        organizationId: userProfile.organizationId,
+                        serviceCode,
+                        authorizationId,
+                        authorizationNumber,
+                        dateOfService: progressDate,
+                        startTime,
+                        endTime,
+                        units: billingUnits,
+                        isBillable,
+                        activityType,
+                        contactType,
+                        purposeOfActivity,
+                        additionalObservations,
+                        signature: true,
+                      });
+                      setValidationResult(result);
+                      if (result.status === "failed") {
+                        setPendingSaveStatus("pending_signature");
+                        setShowValidationModal(true);
+                        return;
+                      }
+                    } catch {
+                      // Proceed anyway
+                    } finally {
+                      setValidating(false);
+                    }
+                  }
+                  await doSave("pending_signature");
+                }}
+                disabled={saving}
+                className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5"
+              >
+                {saving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Submit for Review
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </ICMShell>
   );

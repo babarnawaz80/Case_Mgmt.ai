@@ -34,7 +34,8 @@ function ShellInner({ children, title, showAIPanel = true, rightPanel }: ICMShel
         <button
           onClick={toggle}
           title={open ? "Close Case Management AI" : "Open Case Management AI"}
-          className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full ai-gradient text-white flex items-center justify-center shadow-elevated hover:scale-105 active:scale-95 transition-all duration-200"
+          className="fixed right-6 z-40 w-12 h-12 rounded-full ai-gradient text-white flex items-center justify-center shadow-elevated hover:scale-105 active:scale-95 transition-all duration-200"
+          style={{ bottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
           {open ? <X className="w-5 h-5 text-white" /> : <Sparkles className="w-5 h-5 text-white" />}
         </button>

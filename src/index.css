@@ -604,3 +604,53 @@ textarea:focus-visible {
     display: none !important;
   }
 }
+
+/* ── Tiptap / ProseMirror consent editor ───────────────────────────────────── */
+.prose-consent-editor {
+  font-family: var(--font-geist, ui-sans-serif, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.65;
+  color: #1a1a2e;
+}
+.prose-consent-editor:focus { outline: none; }
+.prose-consent-editor h1 { font-size: 1.3em; font-weight: 700; margin: 12px 0 6px; font-family: var(--font-manrope, ui-sans-serif); }
+.prose-consent-editor h2 { font-size: 1.1em; font-weight: 700; margin: 10px 0 4px; font-family: var(--font-manrope, ui-sans-serif); }
+.prose-consent-editor p  { margin: 0 0 8px; }
+.prose-consent-editor ul { list-style: disc; padding-left: 20px; margin: 4px 0 8px; }
+.prose-consent-editor ol { list-style: decimal; padding-left: 20px; margin: 4px 0 8px; }
+.prose-consent-editor li { margin-bottom: 3px; }
+.prose-consent-editor hr { border: none; border-top: 1px solid #e5e7eb; margin: 12px 0; }
+.prose-consent-editor strong { font-weight: 700; }
+.prose-consent-editor em { font-style: italic; }
+.prose-consent-editor u  { text-decoration: underline; }
+.prose-consent-editor s  { text-decoration: line-through; }
+.prose-consent-editor p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ── Consent preview body (mobile + portal) ────────────────────────────────── */
+.consent-preview-body h1 { font-size: 1em; font-weight: bold; margin: 8px 0 4px; }
+.consent-preview-body h2 { font-size: 0.9em; font-weight: bold; margin: 6px 0 3px; }
+.consent-preview-body p  { margin: 0 0 6px; }
+.consent-preview-body ul, .consent-preview-body ol { padding-left: 14px; margin: 3px 0 6px; }
+.consent-preview-body li { margin-bottom: 2px; }
+.consent-preview-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
+.consent-preview-body strong { font-weight: 700; }
+
+/* ── Consent portal full render ─────────────────────────────────────────────── */
+.consent-body-html {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1a1a1a;
+}
+.consent-body-html h1 { font-size: 16px; font-weight: bold; margin: 12px 0 6px; }
+.consent-body-html h2 { font-size: 15px; font-weight: bold; margin: 10px 0 4px; }
+.consent-body-html p  { margin: 0 0 10px; }
+.consent-body-html ul, .consent-body-html ol { padding-left: 20px; margin: 6px 0; }
+.consent-body-html li { margin-bottom: 4px; }
+.consent-body-html hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
+.consent-body-html strong { font-weight: 600; }

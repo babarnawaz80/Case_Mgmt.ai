@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronDown, Sparkles, X, Save, Printer, Plus, Trash2,
   CheckCircle2, Clock, Mail, FileText, Users, Heart, ListChecks, Briefcase, History,
   AlertCircle, Compass, Star, Link2, ShieldCheck, GitBranch, Eye, ExternalLink,
-  Loader2, Download,
+  Loader2, Download, Send, AlertTriangle,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { useIndividual } from "@/hooks/useIndividuals";
@@ -14,7 +14,7 @@ import { useCarePlans, updateCarePlan, usePCP, useConsents } from "@/hooks/useFi
 import { AttestationSection, EMPTY_ATTESTATION, type AttestationValue } from "@/components/icm/AttestationSection";
 import { writeAudit } from "@/lib/auditService";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrgSettings } from "@/contexts/OrgSettingsContext";
 import { PCPDocumentViewer } from "@/components/pcp/PCPDocumentViewer";
@@ -58,6 +58,7 @@ const PersonCarePlanDetail = () => {
   const plan = allPlans.find((p: any) => p.id === planId);
 
   const { userProfile } = useAuth();
+  const isSupervisorOrAdmin = userProfile?.role === 'supervisor' || userProfile?.role === 'admin';
   const aiDraftCalledRef = useRef(false);
 
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
@@ -72,6 +73,10 @@ const PersonCarePlanDetail = () => {
   const [guardianConsentRequired, setGuardianConsentRequired] = useState(false);
   const [planAttestation, setPlanAttestation] = useState<AttestationValue>(EMPTY_ATTESTATION);
   const [exporting, setExporting] = useState(false);
+
+  // Submit for review state
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Use OrgSettingsContext — already loaded, has logoUrl and orgName
   const { logoUrl: orgLogoUrl, orgName } = useOrgSettings();
@@ -163,6 +168,41 @@ const PersonCarePlanDetail = () => {
     }
   };
 
+  const handleSubmitForReview = async () => {
+    if (!planId || !userProfile?.organizationId) return;
+    setSubmitting(true);
+    try {
+      await updateDoc(doc(db, "care_plans", planId), {
+        approvalStatus: 'submitted_for_review',
+        submittedForReviewAt: serverTimestamp(),
+        submittedForReviewBy: userProfile.uid,
+        submittedByName: userProfile.displayName ?? '',
+        organizationId: userProfile.organizationId,
+        individualId: id,
+        individualName: `${individual?.first_name ?? ''} ${individual?.last_name ?? ''}`.trim(),
+        returnReasons: [],
+        updatedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, "audit_log"), {
+        action: 'care_plan_submitted_for_review',
+        targetType: 'care_plan',
+        targetId: planId,
+        individualId: id,
+        actorId: userProfile.uid,
+        actorName: userProfile.displayName,
+        tenantId: userProfile.organizationId,
+        timestamp: serverTimestamp(),
+      });
+      toast.success("Care Plan submitted for supervisor review.");
+      setShowSubmitModal(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit for review.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const readOnly = plan.isCompleted;
   const toggle = (k: SectionKey) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
@@ -237,9 +277,19 @@ const PersonCarePlanDetail = () => {
                 <button onClick={handleSaveDraft} className="h-9 px-3 rounded-xl border border-icm-border text-[12px] font-medium text-icm-text-dim hover:text-icm-text hover:bg-icm-bg inline-flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Save draft
                 </button>
-                <button onClick={handleMarkComplete} className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Mark complete
-                </button>
+                {isSupervisorOrAdmin ? (
+                  <button onClick={handleMarkComplete} className="h-9 px-3 rounded-xl bg-icm-green text-white text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Mark complete
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowSubmitModal(true)}
+                    disabled={(plan as any).approvalStatus === 'submitted_for_review' || (plan as any).approvalStatus === 'supervisor_approved' || (plan as any).approvalStatus === 'active'}
+                    className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-medium hover:opacity-90 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Submit for Review →
+                  </button>
+                )}
               </>
             )}
             {/* Guardian consent toggle */}
@@ -341,6 +391,55 @@ const PersonCarePlanDetail = () => {
               No active "Guardian Consent for Plan Documents" consent record found for this individual.{" "}
               <a href={`/people/${id}/profile?tab=administrative`} className="text-icm-accent font-semibold underline underline-offset-2">Add consent record first →</a>
             </p>
+          </div>
+        )}
+
+        {/* Approval status banner */}
+        {(plan as any).approvalStatus === 'submitted_for_review' && (
+          <div className="rounded-xl border border-icm-amber/40 bg-icm-amber-soft px-4 py-3 flex items-center gap-3">
+            <Clock className="w-4 h-4 text-icm-amber shrink-0" />
+            <div>
+              <p className="text-[12.5px] font-geist font-semibold text-icm-amber">Pending supervisor review</p>
+              <p className="text-[11.5px] text-icm-text-dim font-geist">Submitted for review. Plan is locked until reviewed.</p>
+            </div>
+          </div>
+        )}
+        {(plan as any).approvalStatus === 'returned_for_correction' && ((plan as any).returnReasons?.length > 0) && (
+          <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-[13px] font-geist font-bold text-red-800">
+                  Returned for correction by {(plan as any).returnReasons[(plan as any).returnReasons.length - 1]?.returnedByName}
+                </p>
+                <p className="text-[12px] font-geist text-red-700 mt-1">
+                  Reason: {(plan as any).returnReasons[(plan as any).returnReasons.length - 1]?.reason}
+                </p>
+                <p className="text-[12px] font-geist text-red-600 mt-1 italic">
+                  "{(plan as any).returnReasons[(plan as any).returnReasons.length - 1]?.comment}"
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSubmitModal(true)}
+              className="mt-2 h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold hover:opacity-90"
+            >
+              Resubmit for Review
+            </button>
+          </div>
+        )}
+        {(plan as any).approvalStatus === 'supervisor_approved' && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-blue-600" />
+            <p className="text-[12.5px] font-geist text-blue-800">
+              <span className="font-semibold">Supervisor approved.</span> Collecting signatures.
+            </p>
+          </div>
+        )}
+        {(plan as any).approvalStatus === 'active' && (
+          <div className="rounded-xl border border-icm-green/30 bg-icm-green-soft px-4 py-3 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-icm-green" />
+            <p className="text-[12.5px] font-geist text-icm-green font-semibold">Active — All signatures collected.</p>
           </div>
         )}
 
@@ -832,7 +931,37 @@ const PersonCarePlanDetail = () => {
           onChange={setPlanAttestation}
           readOnly={readOnly}
         />
+
+        {/* Signatures section — visible when supervisor_approved or active */}
+        {((plan as any).approvalStatus === 'supervisor_approved' || (plan as any).approvalStatus === 'active') && (
+          <SignaturesSection
+            plan={plan}
+            planId={planId!}
+            userProfile={userProfile}
+            onSignatureUpdate={() => { /* plan will reload via hook */ }}
+          />
+        )}
       </div>
+
+      {/* Submit for Review modal */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowSubmitModal(false)}>
+          <div className="w-full max-w-[520px] bg-white rounded-2xl p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <h2 className="font-manrope font-bold text-[16px] text-icm-text">Submit Care Plan for Supervisor Review</h2>
+            <div className="rounded-xl bg-icm-bg p-4 text-[13px] font-geist text-icm-text-dim space-y-1">
+              <p><strong className="text-icm-text">{(plan as any).type || 'Person-Centered ISP'}</strong> — {individual?.last_name}, {individual?.first_name}</p>
+              <p>Version {(plan as any).version || 1} · Effective: {(plan as any).effective_date || (plan as any).effectiveDate || "—"}</p>
+              <p className="mt-2">Your supervisor will review this plan before it is sent for signatures. You will not be able to edit while it is pending review.</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowSubmitModal(false)} className="h-9 px-4 rounded-xl border border-icm-border text-[13px] font-geist text-icm-text-dim">Cancel</button>
+              <button onClick={handleSubmitForReview} disabled={submitting} className="h-9 px-5 rounded-xl bg-icm-text text-icm-panel text-[13px] font-geist font-semibold disabled:opacity-60">
+                {submitting ? "Submitting…" : "Submit for Review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hidden print document — revealed only for window.print() and PDF export */}
       {plan && individual && (
@@ -1011,6 +1140,211 @@ function SignaturePill({ status }: { status: "Signed" | "Pending" | "Not require
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ring-1 ${tone}`}>
       <Icon className="w-3 h-3" /> {status}
     </span>
+  );
+}
+
+// ─── Signatures Section ────────────────────────────────────────────────────────
+
+function SignaturesSection({ plan, planId, userProfile, onSignatureUpdate }: {
+  plan: any;
+  planId: string;
+  userProfile: any;
+  onSignatureUpdate: () => void;
+}) {
+  const [signing, setSigning] = useState(false);
+  const [waivingParticipant, setWaivingParticipant] = useState(false);
+  const [waiveReason, setWaiveReason] = useState("");
+  const [waiveNote, setWaiveNote] = useState("");
+
+  const sigs = plan.signatures || {};
+
+  const handleInternalSign = async (role: 'caseManager' | 'supervisor') => {
+    setSigning(true);
+    try {
+      const fieldPath = `signatures.${role}`;
+      await updateDoc(doc(db, 'care_plans', planId), {
+        [`${fieldPath}.signedAt`]: serverTimestamp(),
+        [`${fieldPath}.signedBy`]: userProfile?.uid,
+        [`${fieldPath}.signedByName`]: userProfile?.displayName,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("Signed successfully.");
+      onSignatureUpdate();
+    } catch {
+      toast.error("Failed to sign.");
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const handleWaiveParticipant = async () => {
+    if (!waiveReason || !waiveNote) return;
+    try {
+      await updateDoc(doc(db, 'care_plans', planId), {
+        'signatures.participant.signedAt': serverTimestamp(),
+        'signatures.participant.signedVia': 'waived',
+        'signatures.participant.waiveReason': waiveReason,
+        'signatures.participant.waiveNote': waiveNote,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("Participant signature waived.");
+      setWaivingParticipant(false);
+    } catch {
+      toast.error("Failed to waive.");
+    }
+  };
+
+  const isCaseManagerSigned = !!sigs.caseManager?.signedAt;
+  const isSupervisorSigned = !!sigs.supervisor?.signedAt;
+  const isGuardianSigned = !!sigs.guardian?.signedAt;
+  const isParticipantSigned = !!sigs.participant?.signedAt;
+
+  const totalRequired = 4;
+  const collected = [isCaseManagerSigned, isSupervisorSigned, isGuardianSigned, isParticipantSigned].filter(Boolean).length;
+
+  return (
+    <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-manrope font-bold text-[15px] text-icm-text">Signatures</h3>
+        <span className="text-[11.5px] font-geist text-icm-text-dim">{collected} of {totalRequired} collected</span>
+      </div>
+
+      {/* Internal sigs */}
+      <div>
+        <p className="text-[10px] font-geist font-bold uppercase tracking-widest text-icm-text-dim mb-2">Internal</p>
+        <div className="space-y-3">
+          <SigRow
+            label="Case Manager"
+            name={sigs.caseManager?.signedByName || userProfile?.displayName || "Case Manager"}
+            signed={isCaseManagerSigned}
+            signedAt={sigs.caseManager?.signedAt}
+            canSign={!isCaseManagerSigned && (userProfile?.role === 'case_manager' || userProfile?.role === 'admin')}
+            onSign={() => handleInternalSign('caseManager')}
+            signing={signing}
+          />
+          <SigRow
+            label="Supervisor"
+            name={sigs.supervisor?.signedByName || "Supervisor"}
+            signed={isSupervisorSigned}
+            signedAt={sigs.supervisor?.signedAt}
+            canSign={!isSupervisorSigned && (userProfile?.role === 'supervisor' || userProfile?.role === 'admin')}
+            onSign={() => handleInternalSign('supervisor')}
+            signing={signing}
+          />
+        </div>
+      </div>
+
+      {/* External sigs */}
+      <div>
+        <p className="text-[10px] font-geist font-bold uppercase tracking-widest text-icm-text-dim mb-2">External</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between py-2 border-b border-icm-border">
+            <div>
+              <p className="text-[13px] font-geist font-semibold text-icm-text">Guardian / Representative</p>
+              <p className="text-[11.5px] text-icm-text-dim font-geist">{sigs.guardian?.signedByName || "Not yet signed"}</p>
+            </div>
+            {isGuardianSigned ? (
+              <span className="text-icm-green text-[12px] font-geist font-semibold">✓ Signed</span>
+            ) : (
+              <button
+                onClick={() => toast.info("Use the Consents tab to send a signature request to the guardian.")}
+                className="h-8 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist hover:border-icm-border-strong"
+              >
+                Send request →
+              </button>
+            )}
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-[13px] font-geist font-semibold text-icm-text">Participant</p>
+              <p className="text-[11.5px] text-icm-text-dim font-geist">
+                {isParticipantSigned ? (sigs.participant?.signedVia === 'waived' ? 'Waived' : 'Signed') : "Not yet signed"}
+              </p>
+            </div>
+            {isParticipantSigned ? (
+              <span className="text-icm-green text-[12px] font-geist font-semibold">
+                {sigs.participant?.signedVia === 'waived' ? '⊘ Waived' : '✓ Signed'}
+              </span>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setWaivingParticipant(true)}
+                  className="h-8 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist hover:border-icm-border-strong"
+                >
+                  Waive
+                </button>
+                <button
+                  onClick={() => toast.info("Use the Consents tab to send a signature request.")}
+                  className="h-8 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist hover:border-icm-border-strong"
+                >
+                  Send request →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Waive participant modal */}
+      {waivingParticipant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setWaivingParticipant(false)}>
+          <div className="w-full max-w-[480px] bg-white rounded-2xl p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="font-manrope font-bold text-[15px] text-icm-text">Waive Participant Signature</h3>
+            <div>
+              <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide block mb-1">Reason *</label>
+              <select value={waiveReason} onChange={e => setWaiveReason(e.target.value)} className="w-full h-9 rounded-lg border border-icm-border px-2 text-[13px] font-geist">
+                <option value="">Select reason…</option>
+                <option>Guardian/representative is signing on behalf</option>
+                <option>Participant lacks decision-making capacity</option>
+                <option>Participant declined</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide block mb-1">Note *</label>
+              <textarea value={waiveNote} onChange={e => setWaiveNote(e.target.value)} rows={3} className="w-full rounded-lg border border-icm-border px-3 py-2 text-[13px] font-geist resize-none" placeholder="Document the reason for waiving…" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setWaivingParticipant(false)} className="h-9 px-4 rounded-xl border border-icm-border text-[13px] font-geist">Cancel</button>
+              <button disabled={!waiveReason || !waiveNote} onClick={handleWaiveParticipant} className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[13px] font-geist font-semibold disabled:opacity-40">Waive Signature</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SigRow({ label, name, signed, signedAt, canSign, onSign, signing }: {
+  label: string;
+  name: string;
+  signed: boolean;
+  signedAt: any;
+  canSign: boolean;
+  onSign: () => void;
+  signing: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-icm-border last:border-0">
+      <div>
+        <p className="text-[13px] font-geist font-semibold text-icm-text">{label}</p>
+        <p className="text-[11.5px] text-icm-text-dim font-geist">{name}</p>
+        {signed && signedAt && (
+          <p className="text-[10.5px] text-icm-green font-geist">
+            {signedAt?.toDate?.()?.toLocaleString() ?? ""}
+          </p>
+        )}
+      </div>
+      {signed ? (
+        <span className="text-icm-green font-geist text-[12px] font-semibold">✓ Signed</span>
+      ) : canSign ? (
+        <button onClick={onSign} disabled={signing} className="h-8 px-3 rounded-lg bg-icm-accent text-white text-[11.5px] font-geist font-semibold hover:opacity-90 disabled:opacity-60">
+          Sign now →
+        </button>
+      ) : (
+        <span className="text-[11.5px] text-icm-text-faint font-geist">Awaiting signature</span>
+      )}
+    </div>
   );
 }
 

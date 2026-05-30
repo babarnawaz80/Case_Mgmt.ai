@@ -22,6 +22,10 @@ export type AuditAction =
   | 'role_changed'
   | 'user_role_changed'
   | 'user_suspended'
+  | 'user_reactivated'
+  | 'user_deactivated'
+  | 'user_activated'
+  // Legacy typo aliases — kept so any stored Firestore events still match
   | 'user_reactivateed'
   | 'user_deactivateed'
   | 'engine_published'

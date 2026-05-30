@@ -116,6 +116,12 @@ async function fetchCounts(individualId: string): Promise<EChartCounts> {
     ).catch(() => null),
   ]);
 
+  // assessments count — separate query
+  const assessmentsCount = await getCountFromServer(query(
+    collection(db, "assessments"),
+    where("individual_id", "==", individualId),
+  )).catch(() => null);
+
   const data: EChartCounts = {
     // Documentation tiles
     "progress-note":          progressNotes?.data().count ?? 0,
@@ -126,6 +132,7 @@ async function fetchCounts(individualId: string): Promise<EChartCounts> {
     "care-plan":              carePlans?.data().count ?? 0,
     "workflow-manager":       workflows?.data().count ?? 0,
     "eligibility-verification": eligibility?.data().count ?? 0,
+    "assessments":            assessmentsCount?.data().count ?? 0,
     // Care tiles
     "referrals":              referrals?.data().count ?? 0,
     // Operations tiles

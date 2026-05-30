@@ -3,6 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { AdminOnly } from "@/components/platform/AdminOnly";
 import { useRole } from "@/contexts/RoleContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import {
+  saveAssessmentTemplate,
+  publishAssessmentTemplate,
+} from "@/hooks/useAssessmentTemplates";
 import {
   AssessmentSection,
   AssessmentTemplate,
@@ -192,6 +198,7 @@ function makeQuestion(type: QuestionType): Question {
 
 export default function AssessmentBuilderEdit() {
   const { isAdmin } = useRole();
+  const { userProfile } = useAuth();
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
 
@@ -212,6 +219,8 @@ export default function AssessmentBuilderEdit() {
   );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showSettings, setShowSettings] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   if (!isAdmin) return <AdminOnly />;
 
@@ -245,17 +254,58 @@ export default function AssessmentBuilderEdit() {
   function removeQuestion(sectionId: string, qid: string) {
     updateSection(sectionId, (s) => ({ ...s, questions: s.questions.filter((q) => q.id !== qid) }));
   }
-  function publish() {
-    if (tpl.sections.length === 0 || tpl.sections.every((s) => s.questions.length === 0)) {
-      alert("Add at least one section with at least one question before publishing.");
+
+  async function saveDraft() {
+    if (!userProfile) {
+      toast.error("Not signed in.");
       return;
     }
-    setTpl((prev) => ({ ...prev, status: "published" }));
-    // Persist into the in-memory list so runtime can pick it up.
-    const idx = templates.findIndex((t) => t.id === tpl.id);
-    if (idx >= 0) templates[idx] = { ...tpl, status: "published" };
-    else templates.push({ ...tpl, status: "published" });
-    alert("Template published. Case managers can now use it.");
+    setSaving(true);
+    try {
+      const docId = await saveAssessmentTemplate(tpl, {
+        uid: userProfile.uid,
+        organizationId: userProfile.organizationId,
+        displayName: userProfile.displayName ?? "",
+      });
+      setTpl((prev) => ({ ...prev, id: docId, status: "draft" }));
+      toast.success("Draft saved.");
+    } catch (err) {
+      console.error("[saveDraft]", err);
+      toast.error("Failed to save draft.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function publish() {
+    if (tpl.sections.length === 0 || tpl.sections.every((s) => s.questions.length === 0)) {
+      toast.error("Add at least one section with at least one question before publishing.");
+      return;
+    }
+    if (!userProfile) {
+      toast.error("Not signed in.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const docId = await publishAssessmentTemplate(tpl, {
+        uid: userProfile.uid,
+        organizationId: userProfile.organizationId,
+        displayName: userProfile.displayName ?? "",
+      });
+      setTpl((prev) => ({ ...prev, id: docId, status: "published" }));
+      // Also update in-memory list so other pages pick it up in this session
+      const idx = templates.findIndex((t) => t.id === tpl.id);
+      const published = { ...tpl, id: docId, status: "published" as const };
+      if (idx >= 0) templates[idx] = published;
+      else templates.push(published);
+      toast.success("Template published! Case managers can now use it.");
+    } catch (err) {
+      console.error("[publish]", err);
+      toast.error("Failed to publish template.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -327,17 +377,25 @@ export default function AssessmentBuilderEdit() {
           >
             <Settings className="w-3.5 h-3.5" />
           </button>
-          <button className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text flex items-center gap-1.5">
+          <button
+            onClick={() => setShowPreview(true)}
+            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text flex items-center gap-1.5"
+          >
             <Eye className="w-3.5 h-3.5" /> Preview
           </button>
-          <button className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text flex items-center gap-1.5">
-            <Save className="w-3.5 h-3.5" /> Save draft
+          <button
+            onClick={saveDraft}
+            disabled={saving}
+            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : "Save draft"}
           </button>
           <button
             onClick={publish}
-            className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90"
+            disabled={saving}
+            className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90 disabled:opacity-60"
           >
-            <Send className="w-3.5 h-3.5" /> Publish template
+            <Send className="w-3.5 h-3.5" /> {saving ? "Publishing…" : "Publish template"}
           </button>
         </div>
 
@@ -426,8 +484,91 @@ export default function AssessmentBuilderEdit() {
       {showSettings && (
         <SettingsPanel tpl={tpl} setTpl={setTpl} onClose={() => setShowSettings(false)} />
       )}
+
+      {/* Preview modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto py-8 px-4">
+          <div className="w-full max-w-[780px] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            {/* Preview header */}
+            <div className="sticky top-0 z-10 bg-icm-accent px-6 py-3 flex items-center justify-between">
+              <div>
+                <h2 className="font-manrope font-bold text-[15px] text-white">{tpl.name}</h2>
+                <p className="text-[11px] text-white/70 font-geist">Preview mode — submissions disabled</p>
+              </div>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="h-8 px-3 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[12px] font-geist font-medium flex items-center gap-1.5"
+              >
+                ✕ Close preview
+              </button>
+            </div>
+            {/* Preview body */}
+            <div className="p-6 space-y-8">
+              {tpl.sections.map((section, si) => (
+                <div key={section.id}>
+                  <h3 className="font-manrope font-bold text-[15px] text-icm-text mb-4 pb-2 border-b border-icm-border">
+                    {si + 1}. {section.name}
+                  </h3>
+                  <div className="space-y-5">
+                    {section.questions.map((q, qi) => (
+                      <div key={q.id} className="space-y-1.5">
+                        <label className="block text-[13px] font-geist font-semibold text-icm-text">
+                          {qi + 1}. {q.label}
+                          {q.required && <span className="text-icm-red ml-1">*</span>}
+                        </label>
+                        <PreviewQuestion q={q} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {tpl.sections.length === 0 && (
+                <p className="text-[13px] text-icm-text-dim text-center py-8">No sections yet. Add sections and questions in the builder.</p>
+              )}
+              <div className="rounded-xl border border-icm-border bg-icm-bg p-4 text-center">
+                <p className="text-[12.5px] text-icm-text-dim font-geist">
+                  Preview mode — this form cannot be submitted. Close the preview to continue editing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function PreviewQuestion({ q }: { q: Question }) {
+  const inputCls = "w-full h-9 rounded-lg border border-icm-border bg-white px-3 text-[13px] font-geist text-icm-text-dim cursor-not-allowed";
+  const taCls = "w-full rounded-lg border border-icm-border bg-white px-3 py-2 text-[13px] font-geist text-icm-text-dim resize-none cursor-not-allowed";
+  switch (q.type) {
+    case "short_text": return <input disabled placeholder={q.label} className={inputCls} />;
+    case "long_text":  return <textarea disabled rows={3} placeholder={q.label} className={taCls} />;
+    case "number":     return <input type="number" disabled placeholder="0" className={inputCls} />;
+    case "date":       return <input type="date" disabled className={inputCls} />;
+    case "date_range": return <div className="flex gap-2"><input type="date" disabled className={inputCls} /><input type="date" disabled className={inputCls} /></div>;
+    case "yes_no":
+      return <div className="flex gap-4">{["Yes","No"].map(o => <label key={o} className="flex items-center gap-2 text-[13px] text-icm-text-dim cursor-not-allowed"><input type="radio" disabled /> {o}</label>)}</div>;
+    case "yes_no_na":
+      return <div className="flex gap-4">{["Yes","No","N/A"].map(o => <label key={o} className="flex items-center gap-2 text-[13px] text-icm-text-dim cursor-not-allowed"><input type="radio" disabled /> {o}</label>)}</div>;
+    case "single_select":
+      return <select disabled className={inputCls}><option>Select an option…</option>{(q.options ?? []).map(o => <option key={o.label}>{o.label}</option>)}</select>;
+    case "single_radio":
+    case "multi_select":
+      return <div className="space-y-1.5">{(q.options ?? [{label:"Option 1"},{label:"Option 2"}]).map(o => <label key={o.label} className="flex items-center gap-2 text-[13px] text-icm-text-dim cursor-not-allowed"><input type={q.type === "multi_select" ? "checkbox" : "radio"} disabled /> {o.label}</label>)}</div>;
+    case "likert":
+      return <div className="flex gap-2 items-center">{Array.from({length: q.likertPoints ?? 5}, (_,i) => <button key={i} disabled className="w-9 h-9 rounded-lg border border-icm-border text-[12px] text-icm-text-dim">{i+1}</button>)}</div>;
+    case "rating":
+      return <div className="flex gap-1">{Array.from({length: q.max ?? 5}, (_,i) => <button key={i} disabled className="text-icm-text-faint text-[20px]">☆</button>)}</div>;
+    case "independence_level":
+      return <select disabled className={inputCls}><option>Select independence level…</option>{["Dependent","Maximum Assistance","Moderate Assistance","Minimal Assistance","Supervision","Modified Independence","Independence","Total Independence"].map(l => <option key={l}>{l}</option>)}</select>;
+    case "instructions":
+      return <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-2 text-[12.5px] text-icm-text-dim font-geist">{q.body ?? q.label}</div>;
+    case "divider":
+      return <hr className="border-icm-border" />;
+    default:
+      return <input disabled placeholder={q.label} className={inputCls} />;
+  }
 }
 
 function QuestionEditor({

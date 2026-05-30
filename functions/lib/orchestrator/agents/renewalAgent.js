@@ -50,7 +50,7 @@ function addDays(d, days) {
     r.setDate(r.getDate() + days);
     return r;
 }
-async function runRenewalAgent(individual, rulePack, runId, orgId, db) {
+async function runRenewalAgent(individual, rulePack, runId, orgId, db, customPrompt) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const tasks = [];
     const logs = [];
@@ -75,7 +75,7 @@ async function runRenewalAgent(individual, rulePack, runId, orgId, db) {
                 result: "Queued AI draft renewal packet generation",
             });
             // Generate AI draft renewal packet (non-blocking — best effort)
-            generateRenewalDraft(individual, runId, orgId, db).catch((err) => {
+            generateRenewalDraft(individual, runId, orgId, db, customPrompt).catch((err) => {
                 console.warn(`[RenewalAgent] Draft generation failed for ${individual.id}:`, err.message);
             });
             draftsCount++;
@@ -214,7 +214,7 @@ function computeNextAssessmentDate(individual, rulePack) {
     d.setMonth(d.getMonth() + rulePack.assessment_frequency_months);
     return d.toISOString().split("T")[0];
 }
-async function generateRenewalDraft(individual, runId, orgId, db) {
+async function generateRenewalDraft(individual, runId, orgId, db, customPrompt) {
     var _a;
     const indName = `${individual.first_name} ${individual.last_name}`;
     const twelveMonthsAgo = new Date();
@@ -249,11 +249,13 @@ async function generateRenewalDraft(individual, runId, orgId, db) {
         visit_summaries: visitSummaries.status === "fulfilled" ? visitSummaries.value.docs.map((d) => d.data()) : [],
         progress_notes: progressNotes.status === "fulfilled" ? progressNotes.value.docs.map((d) => d.data()) : [],
     });
-    const systemPrompt = `You are an experienced IDD case management specialist.
-Review this individual's 12-month documentation and create a brief renewal summary.
+    const baseFormat = `Review this individual's 12-month documentation and create a brief renewal summary.
 Return a JSON object with: goal_progress_summary (string), recommended_service_changes (string[]), key_highlights (string[]), and draft_goal_updates (string).
 Keep all content concise and evidence-based from the documentation provided.
 Label everything as AI DRAFT — requires CM review before submission.`;
+    const systemPrompt = customPrompt
+        ? `${customPrompt}\n\n${baseFormat}`
+        : `You are an experienced IDD case management specialist.\n${baseFormat}`;
     const result = await (0, ai_1.generateCompletion)(systemPrompt, `Analyze the 12-month documentation for ${indName} and draft a PCP renewal summary.`, context, "fast", orgId, "system", "brain_orchestrator_renewal", { maxTokens: 2048, temperature: 0.3 });
     let parsedDraft = { raw_summary: result.text };
     try {

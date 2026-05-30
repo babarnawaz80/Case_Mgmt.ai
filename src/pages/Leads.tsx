@@ -20,6 +20,8 @@ import {
   Calendar,
   Paperclip,
   ChevronRight,
+  AlertTriangle,
+  Link,
 } from "lucide-react";
 import {
   getLeads,
@@ -28,12 +30,15 @@ import {
   type LeadStatus,
 } from "@/data/leads";
 import { cn } from "@/lib/utils";
+import { usePendingLeads } from "@/hooks/usePendingLeads";
+import type { PendingLead } from "@/hooks/usePendingLeads";
 
 export default function Leads() {
   const navigate = useNavigate();
   const [leads] = useState(() => getLeads());
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<LeadStatus | "All">("All");
+  const [status, setStatus] = useState<LeadStatus | "All" | "Pending Review">("All");
+  const { pendingLeads, loading: pendingLoading } = usePendingLeads();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -44,16 +49,16 @@ export default function Leads() {
         l.referralOrg.toLowerCase().includes(q) ||
         l.referrerName.toLowerCase().includes(q) ||
         l.county.toLowerCase().includes(q);
-      const matchStatus = status === "All" || l.status === status;
+      const matchStatus = status === "All" || status === "Pending Review" || l.status === status;
       return matchQ && matchStatus;
     });
   }, [leads, query, status]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { All: leads.length };
+    const c: Record<string, number> = { All: leads.length, "Pending Review": pendingLeads.length };
     LEAD_STATUSES.forEach((s) => (c[s] = leads.filter((l) => l.status === s).length));
     return c;
-  }, [leads]);
+  }, [leads, pendingLeads.length]);
 
   return (
     <ICMShell title="Leads" showAIPanel={false}>
@@ -75,29 +80,47 @@ export default function Leads() {
               with <span className="font-semibold">Start Services</span>.
             </p>
           </div>
-          <Button
-            onClick={() => navigate("/leads/new")}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Lead
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => navigate("/leads/intake-links")}
+              variant="outline"
+              className="border-teal-300 text-teal-700 hover:bg-teal-50 hover:border-teal-400"
+            >
+              <Link className="w-4 h-4 mr-1.5" />
+              Intake Links
+            </Button>
+            <Button
+              onClick={() => navigate("/leads/new")}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              New Lead
+            </Button>
+          </div>
         </div>
 
         {/* Status pills */}
         <div className="flex flex-wrap gap-2">
-          {(["All", ...LEAD_STATUSES] as const).map((s) => (
+          {(["All", ...LEAD_STATUSES, "Pending Review"] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setStatus(s)}
+              onClick={() => setStatus(s as LeadStatus | "All" | "Pending Review")}
               className={cn(
                 "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
                 status === s
-                  ? "bg-primary text-primary-foreground border-primary"
+                  ? s === "Pending Review"
+                    ? "bg-orange-500 text-white border-orange-500"
+                    : "bg-primary text-primary-foreground border-primary"
                   : "bg-card text-icm-text-dim border-icm-border hover:border-icm-border-strong"
               )}
             >
-              {s} <span className="opacity-70 ml-1">{counts[s] ?? 0}</span>
+              {s}
+              {s === "Pending Review" && pendingLeads.length > 0 && (
+                <span className={cn("ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold", status === s ? "bg-white/30" : "bg-orange-100 text-orange-700")}>
+                  {pendingLeads.length}
+                </span>
+              )}
+              {s !== "Pending Review" && <span className="opacity-70 ml-1">{counts[s] ?? 0}</span>}
             </button>
           ))}
         </div>
@@ -113,7 +136,7 @@ export default function Leads() {
               className="pl-9 bg-card"
             />
           </div>
-          <Select value={status} onValueChange={(v) => setStatus(v as LeadStatus | "All")}>
+          <Select value={status === "Pending Review" ? "All" : status} onValueChange={(v) => setStatus(v as LeadStatus | "All")}>
             <SelectTrigger className="w-44 bg-card">
               <SelectValue />
             </SelectTrigger>
@@ -129,7 +152,29 @@ export default function Leads() {
         </div>
 
         {/* Leads list */}
-        {filtered.length === 0 ? (
+        {status === "Pending Review" ? (
+          pendingLoading ? (
+            <div className="rounded-xl border border-icm-border bg-card p-12 text-center">
+              <p className="text-sm text-icm-text-dim">Loading pending leads…</p>
+            </div>
+          ) : pendingLeads.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-icm-border bg-card p-12 text-center">
+              <Inbox className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm text-icm-text-dim">No pending leads to review.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-icm-border bg-card overflow-hidden">
+              {pendingLeads.map((l, i) => (
+                <PendingLeadRow
+                  key={l.id}
+                  lead={l}
+                  isLast={i === pendingLeads.length - 1}
+                  onClick={() => navigate(`/leads/pending/${l.id}`)}
+                />
+              ))}
+            </div>
+          )
+        ) : filtered.length === 0 ? (
           <div className="rounded-xl border border-dashed border-icm-border bg-card p-12 text-center">
             <Inbox className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-sm text-icm-text-dim">No leads match your filters.</p>
@@ -227,4 +272,78 @@ function calcAge(dob: string): number | null {
   if (isNaN(d.getTime())) return null;
   const diff = Date.now() - d.getTime();
   return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+}
+
+function PendingLeadRow({
+  lead,
+  isLast,
+  onClick,
+}: {
+  lead: PendingLead;
+  isLast: boolean;
+  onClick: () => void;
+}) {
+  const urgencyBadge = () => {
+    if (lead.urgencyLevel === "crisis") return "bg-red-100 text-red-700 border-red-200";
+    if (lead.urgencyLevel === "urgent") return "bg-orange-100 text-orange-700 border-orange-200";
+    return "bg-gray-100 text-gray-600 border-gray-200";
+  };
+
+  const submittedDate = lead.submittedAt
+    ? new Date(lead.submittedAt.seconds * 1000).toLocaleDateString()
+    : "—";
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full text-left grid grid-cols-12 gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors items-center",
+        !isLast && "border-b border-icm-border",
+        lead.urgencyLevel === "crisis" && "bg-red-50/30"
+      )}
+    >
+      <div className="col-span-12 md:col-span-4 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm shrink-0">
+          {(lead.firstName[0] ?? "?") + (lead.lastName[0] ?? "")}
+        </div>
+        <div className="min-w-0">
+          <div className="font-semibold text-sm text-icm-text truncate">
+            {lead.firstName} {lead.lastName}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            {lead.primaryDiagnosis || "Diagnosis pending"}
+          </div>
+        </div>
+      </div>
+
+      <div className="col-span-6 md:col-span-3 text-xs">
+        <div className="text-muted-foreground">Referred by</div>
+        <div className="text-icm-text truncate font-medium">{lead.referrerName || "—"}</div>
+        <div className="text-muted-foreground truncate">{lead.referrerOrganization}</div>
+      </div>
+
+      <div className="col-span-6 md:col-span-2 text-xs">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Calendar className="w-3 h-3" />
+          {submittedDate}
+        </div>
+        {lead.intakeLinkLabel && (
+          <div className="text-icm-text-faint truncate mt-0.5">via {lead.intakeLinkLabel}</div>
+        )}
+      </div>
+
+      <div className="col-span-6 md:col-span-2 flex flex-wrap gap-1.5 items-center">
+        <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase", urgencyBadge())}>
+          {lead.urgencyLevel}
+        </span>
+        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-orange-50 text-orange-600 border-orange-200 uppercase">
+          Pending Review
+        </span>
+      </div>
+
+      <div className="col-span-6 md:col-span-1 flex items-center justify-end gap-2">
+        <ChevronRight className="w-4 h-4 text-muted-foreground hidden md:block" />
+      </div>
+    </button>
+  );
 }

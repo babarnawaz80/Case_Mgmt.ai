@@ -14,6 +14,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { demoSuccess } from "@/lib/demoToast";
+import { toast } from "sonner";
+import { createScheduledVisit } from "@/hooks/useScheduledVisits";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Participant {
   id: string;
@@ -51,6 +54,7 @@ export function PreVisitModal({
   guardianContact = "linda.brown@email.com",
 }: PreVisitModalProps) {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const [purpose, setPurpose] = useState("Quarterly check-in");
   const [includeIndividual, setIncludeIndividual] = useState(true);
   const [includeGuardian, setIncludeGuardian] = useState(true);
@@ -79,7 +83,37 @@ export function PreVisitModal({
 
   const canStart = consent && (scheduleMode === "now" || (scheduleDate && scheduleTime));
 
-  const startVisit = () => {
+  const startVisit = async () => {
+    if (scheduleMode === "later" && scheduleDate && scheduleTime) {
+      // ── "Schedule for later" → write to scheduled_visits ─────────────────
+      try {
+        await createScheduledVisit({
+          organizationId:  userProfile?.organizationId ?? "org-1",
+          individual_id:   personId,
+          individual_name: personName,
+          visit_type:      "Virtual Visit",
+          visit_date:      scheduleDate,
+          start_time:      scheduleTime,
+          end_time:        addHourPreVisit(scheduleTime),
+          location:        "Virtual / Video call",
+          assigned_to:     userProfile?.uid ?? "",
+          assigned_to_name: userProfile?.displayName ?? "",
+          notes:           `Purpose: ${purpose}`,
+          reminder:        true,
+          reminder_timing: "1h",
+          reminder_sent:   false,
+          status:          "scheduled",
+          created_by:      userProfile?.uid ?? "",
+        });
+        toast.success(`Virtual visit scheduled for ${scheduleDate} at ${scheduleTime} — added to your calendar.`);
+        onClose();
+      } catch (err) {
+        console.error("[PreVisitModal] schedule failed:", err);
+        toast.error("Could not save the scheduled visit. Please try again.");
+      }
+      return;
+    }
+    // ── "Start now" → launch virtual visit session ────────────────────────
     const sessionId = `vs-${Date.now().toString(36)}`;
     const params = new URLSearchParams({
       person: personId,
@@ -89,6 +123,12 @@ export function PreVisitModal({
     onClose();
     navigate(`/visit/${sessionId}?${params.toString()}`);
   };
+
+  function addHourPreVisit(hhmm: string): string {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = h * 60 + (m || 0) + 60;
+    return `${String(Math.floor(total / 60) % 24).padStart(2,"0")}:${String(total % 60).padStart(2,"0")}`;
+  }
 
   return (
     <AnimatePresence>

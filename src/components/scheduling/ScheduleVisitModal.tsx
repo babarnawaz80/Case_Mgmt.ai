@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   X, CalendarPlus, MapPin, Users, Bell, Link2,
-  Clock, CheckCircle2, Loader2, Search,
+  Clock, CheckCircle2, Loader2, Search, Video, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -183,6 +183,11 @@ export function ScheduleVisitModal({ open, onClose, individualId: propIndividual
   const [linkedGoalText, setLinkedGoalText] = useState("");
   const [linkedTaskId, setLinkedTaskId] = useState("");
   const [linkedTaskTitle, setLinkedTaskTitle] = useState("");
+  // Televisit-specific fields
+  const [tvPlatform, setTvPlatform] = useState<"zoom"|"teams"|"meet"|"">("");
+  const [tvMeetingLink, setTvMeetingLink] = useState("");
+
+  const isTelevisit = visitType === "Televisit / Video Call";
   const [notes, setNotes] = useState("");
   const [reminder, setReminder] = useState(false);
   const [reminderTiming, setReminderTiming] = useState<ReminderTiming>("1h");
@@ -323,7 +328,7 @@ export function ScheduleVisitModal({ open, onClose, individualId: propIndividual
         visit_date: visitDate,
         start_time: startTime,
         end_time: endTime,
-        location: location || "TBD",
+        location: isTelevisit ? (tvPlatform ? `Virtual — ${tvPlatform === "zoom" ? "Zoom" : tvPlatform === "teams" ? "Teams" : "Google Meet"}` : "Virtual") : (location || "TBD"),
         assigned_to: assignedTo || userProfile.uid,
         assigned_to_name: assignedToName || (userProfile.displayName ?? ""),
         linked_goal_id: linkedGoalId || undefined,
@@ -464,18 +469,54 @@ export function ScheduleVisitModal({ open, onClose, individualId: propIndividual
             </div>
           </section>
 
-          {/* ── Location ────────────────────────────────────────────────────── */}
-          <section className="space-y-3">
-            <SectionLabel icon={<MapPin className="w-3.5 h-3.5" />} title="Location" />
-            <Field label="Address / Location">
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Pre-fills from individual profile…"
-                className={inputCls}
-              />
-            </Field>
-          </section>
+          {/* ── Location / Televisit ────────────────────────────────────────── */}
+          {isTelevisit ? (
+            <section className="space-y-3">
+              <SectionLabel icon={<Video className="w-3.5 h-3.5" />} title="Video Platform" />
+              <div className="grid grid-cols-3 gap-2">
+                {(["zoom","teams","meet"] as const).map((p) => {
+                  const labels = { zoom:"Zoom", teams:"Teams", meet:"Google Meet" };
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setTvPlatform(tvPlatform === p ? "" : p)}
+                      className={`h-9 rounded-lg text-[12px] font-geist font-semibold border transition-all ${
+                        tvPlatform === p
+                          ? "bg-teal-600 text-white border-teal-600"
+                          : "border-icm-border text-icm-text hover:border-teal-400 bg-white"
+                      }`}
+                    >
+                      {labels[p]}
+                    </button>
+                  );
+                })}
+              </div>
+              <Field label="Meeting Link (optional)">
+                <div className="relative">
+                  <Link2 className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-icm-text-dim pointer-events-none" />
+                  <input
+                    value={tvMeetingLink}
+                    onChange={(e) => setTvMeetingLink(e.target.value)}
+                    placeholder="Paste Zoom / Teams / Meet link…"
+                    className={`${inputCls} pl-8`}
+                  />
+                </div>
+              </Field>
+            </section>
+          ) : (
+            <section className="space-y-3">
+              <SectionLabel icon={<MapPin className="w-3.5 h-3.5" />} title="Location" />
+              <Field label="Address / Location">
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Pre-fills from individual profile…"
+                  className={inputCls}
+                />
+              </Field>
+            </section>
+          )}
 
           {/* ── Assigned Staff ───────────────────────────────────────────────── */}
           <section className="space-y-3">

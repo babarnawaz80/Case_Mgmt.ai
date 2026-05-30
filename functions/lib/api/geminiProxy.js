@@ -47,6 +47,7 @@ exports.geminiProxy = geminiProxy;
 const admin = __importStar(require("firebase-admin"));
 const ai_1 = require("../services/ai");
 const collections_1 = require("../config/collections");
+const productKnowledge_1 = require("../config/productKnowledge");
 // ─── Constants ────────────────────────────────────────────────────────────────
 const RATE_LIMIT_MAX = 20; // calls per window
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour in ms
@@ -101,7 +102,7 @@ async function checkAndIncrementRateLimit(uid) {
 }
 // ─── Handler ──────────────────────────────────────────────────────────────────
 async function geminiProxy(req, res) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     // ── 1. Auth: verify Firebase ID token ─────────────────────────────────────
     const authHeader = (_a = req.headers.authorization) !== null && _a !== void 0 ? _a : "";
     if (!authHeader.startsWith("Bearer ")) {
@@ -113,7 +114,7 @@ async function geminiProxy(req, res) {
     try {
         decodedToken = await admin.auth().verifyIdToken(idToken);
     }
-    catch (_c) {
+    catch (_h) {
         res.status(401).json({ error: "Invalid or expired auth token" });
         return;
     }
@@ -132,7 +133,7 @@ async function geminiProxy(req, res) {
         return;
     }
     // ── 3. Validate request body ───────────────────────────────────────────────
-    const { prompt, systemPrompt, maxTokens, temperature } = req.body;
+    const { prompt, systemPrompt, maxTokens, temperature, inlineData } = req.body;
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
         res.status(400).json({ error: "prompt is required and must be a non-empty string" });
         return;
@@ -178,9 +179,42 @@ async function geminiProxy(req, res) {
     // ── 5. Call Gemini via the server-side AI abstraction layer ────────────────
     //    generateCompletion uses Vertex AI + ADC — no API key anywhere.
     try {
-        const result = await (0, ai_1.generateCompletion)((systemPrompt === null || systemPrompt === void 0 ? void 0 : systemPrompt.trim()) || "You are a helpful AI assistant for a healthcare case management platform.", prompt.trim(), "", // no additional context prefix
-        "fast", // use the standard fast model (gemini-2.5-flash)
-        organizationId, uid, "gemini_proxy", { maxTokens: resolvedMaxTokens, temperature: resolvedTemperature });
+        const basePrompt = (systemPrompt === null || systemPrompt === void 0 ? void 0 : systemPrompt.trim())
+            || "You are CaseAI Assistant, a helpful AI for a healthcare case management platform.";
+        const fullSystemPrompt = inlineData
+            ? basePrompt // Skip PRODUCT_KNOWLEDGE for document reads to save tokens
+            : `${productKnowledge_1.PRODUCT_KNOWLEDGE}\n\n---\n\n${basePrompt}`;
+        let result;
+        if ((inlineData === null || inlineData === void 0 ? void 0 : inlineData.data) && (inlineData === null || inlineData === void 0 ? void 0 : inlineData.mimeType)) {
+            // ── Inline document path (PDF read) ─────────────────────────────────────
+            // Bypasses generateCompletion to pass the file as an inline data part.
+            const ai = (0, ai_1.getAiClient)();
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [{
+                        role: "user",
+                        parts: [
+                            { inlineData: { mimeType: inlineData.mimeType, data: inlineData.data } },
+                            { text: prompt.trim() },
+                        ],
+                    }],
+                config: {
+                    systemInstruction: fullSystemPrompt,
+                    maxOutputTokens: resolvedMaxTokens,
+                    temperature: resolvedTemperature,
+                },
+            });
+            const text = (_b = response.text) !== null && _b !== void 0 ? _b : "";
+            result = {
+                text,
+                inputTokens: (_d = (_c = response.usageMetadata) === null || _c === void 0 ? void 0 : _c.promptTokenCount) !== null && _d !== void 0 ? _d : 0,
+                outputTokens: (_f = (_e = response.usageMetadata) === null || _e === void 0 ? void 0 : _e.candidatesTokenCount) !== null && _f !== void 0 ? _f : 0,
+            };
+        }
+        else {
+            // ── Standard text-only path ──────────────────────────────────────────────
+            result = await (0, ai_1.generateCompletion)(fullSystemPrompt, prompt.trim(), "", "fast", organizationId, uid, "gemini_proxy", { maxTokens: resolvedMaxTokens, temperature: resolvedTemperature });
+        }
         res.status(200).json({
             text: result.text,
             inputTokens: result.inputTokens,
@@ -191,7 +225,7 @@ async function geminiProxy(req, res) {
         });
     }
     catch (err) {
-        const code = (_b = err.message) !== null && _b !== void 0 ? _b : "";
+        const code = (_g = err.message) !== null && _g !== void 0 ? _g : "";
         if (code === "AI_PAUSED") {
             res.status(403).json({ error: "AI features are currently paused for your organization" });
             return;

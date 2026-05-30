@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { ScheduleVisitModal } from "@/components/scheduling/ScheduleVisitModal";
 import { demoSuccess, demoToast } from "@/lib/demoToast";
 import {
   Sparkles,
@@ -144,8 +145,9 @@ import { AICheckInsTab } from "@/components/icm/AICheckInsTab";
 import { StatCard } from "@/components/icm/StatCard";
 import { useSearchParams } from "react-router-dom";
 import { loadCheckIns } from "@/lib/aiCheckIns";
+import { usePendingReview, type PendingNote } from "@/hooks/usePendingReview";
 
-type TopView = "my_work" | "ai_checkins" | "completed";
+type TopView = "my_work" | "pending_review" | "ai_checkins" | "completed";
 type TabKey = "today" | "week" | "all" | "completed";
 type GroupMode = "individual" | "due";
 
@@ -216,7 +218,7 @@ const MyWork = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("tab") as TopView | null) ?? "my_work";
   const [view, setViewRaw] = useState<TopView>(
-    initialView === "completed" || initialView === "ai_checkins"
+    initialView === "completed" || initialView === "ai_checkins" || initialView === "pending_review"
       ? initialView
       : "my_work"
   );
@@ -269,6 +271,8 @@ const MyWork = () => {
   const [briefDismissed, setBriefDismissed] = useState(false);
   const [focused, setFocused] = useState(false);
   const [showSessionDone, setShowSessionDone] = useState(false);
+  // ── Schedule Visit modal (opened when completing a "schedule" task) ───────
+  const [scheduleForTask, setScheduleForTask] = useState<{ individualId?: string; taskId: string } | null>(null);
 
   // Use optimistic tasks everywhere below
   // (aliased for backwards compat with existing code that references `tasks`)
@@ -407,6 +411,19 @@ const MyWork = () => {
   }
 
   function completeTask(id: string) {
+    // ── Intercept "schedule visit" tasks to open scheduling modal ────────────
+    const task = allTasks.find((t) => t.id === id);
+    const isScheduleTask =
+      task &&
+      (task.title.toLowerCase().includes("schedule") ||
+        (task as any).type === "schedule_visit") &&
+      task.status !== "Completed";
+    if (isScheduleTask) {
+      setScheduleForTask({ individualId: task.individualId, taskId: id });
+      setActionTask(null);
+      return;
+    }
+
     // Optimistic update locally
     setLocalCompleted((prev) => new Set([...prev, id]));
     setActionTask(null);
@@ -568,11 +585,18 @@ const MyWork = () => {
               {(() => {
                 const checkInsList = loadCheckIns();
                 const pendingAI = checkInsList.filter((c) => c.status === "Pending Review").length;
-                return [
-                  { key: "my_work" as const, label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
-                  { key: "ai_checkins" as const, label: "AI Check-Ins", count: pendingAI, alert: pendingAI > 0 },
-                  { key: "completed" as const, label: "Completed", count: counts.completed, alert: false },
+                const isSupervisor = userProfile?.role === "supervisor" || userProfile?.role === "admin";
+                const tabs: { key: TopView; label: string; count: number; alert: boolean }[] = [
+                  { key: "my_work", label: "My Work", count: counts.overdue, alert: counts.overdue > 0 },
                 ];
+                if (isSupervisor) {
+                  tabs.push({ key: "pending_review", label: "Pending Review", count: 0, alert: false });
+                }
+                tabs.push(
+                  { key: "ai_checkins", label: "AI Check-Ins", count: pendingAI, alert: pendingAI > 0 },
+                  { key: "completed", label: "Completed", count: counts.completed, alert: false }
+                );
+                return tabs;
               })().map((t) => {
                 const active = view === t.key;
                 return (
@@ -620,7 +644,8 @@ const MyWork = () => {
         {/* AI Check-Ins tab */}
         {view === "ai_checkins" && <AICheckInsTab />}
 
-
+        {/* Pending Review tab */}
+        {view === "pending_review" && <PendingReviewTab />}
 
         {/* Stat strip — quiet, minimal */}
         {view === "my_work" && (
@@ -804,7 +829,7 @@ const MyWork = () => {
         )}
 
         {/* Content */}
-        {view !== "ai_checkins" && (grouped.length === 0 ? (
+        {view !== "ai_checkins" && view !== "pending_review" && (grouped.length === 0 ? (
           <EmptyState tab={tab} onJumpWeek={() => setTab("week")} />
         ) : (
           <div className="space-y-2">
@@ -923,6 +948,21 @@ const MyWork = () => {
         />
       )}
       {addOpen && <AddTaskModal onClose={() => setAddOpen(false)} />}
+      {/* Schedule Visit modal — triggered when completing a "schedule" task */}
+      {scheduleForTask && (
+        <ScheduleVisitModal
+          open={true}
+          individualId={scheduleForTask.individualId}
+          onClose={() => setScheduleForTask(null)}
+          onSaved={() => {
+            // Complete the task after visit is scheduled
+            const tid = scheduleForTask.taskId;
+            setScheduleForTask(null);
+            setLocalCompleted((prev) => new Set([...prev, tid]));
+            firestoreCompleteTask(tid).catch(console.error);
+          }}
+        />
+      )}
       {showSessionDone && (
         <FocusedSessionDone
           onClose={() => {
@@ -1729,6 +1769,134 @@ function MyWorkAIPanel({ onStartFocused }: { onStartFocused: () => void }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+// ── Pending Review Tab ───────────────────────────────────────────────────────
+
+function PendingReviewTab() {
+  const { notes, loading } = usePendingReview();
+  const navigate = useNavigate();
+  const now = Date.now();
+
+  const overdue = notes.filter((n) => {
+    const ms = n.submittedAt?.toMillis?.() ?? 0;
+    return now - ms > 48 * 3600 * 1000;
+  });
+  const recent = notes.filter((n) => {
+    const ms = n.submittedAt?.toMillis?.() ?? 0;
+    return now - ms <= 48 * 3600 * 1000;
+  });
+
+  function hoursAgo(ts: any): string {
+    const ms = ts?.toMillis?.() ?? 0;
+    const hours = Math.floor((now - ms) / 3600000);
+    return hours === 0 ? "< 1 hour" : `${hours} hour${hours !== 1 ? "s" : ""}`;
+  }
+
+  const noteTypeColors: Record<string, string> = {
+    "Progress Note": "bg-icm-accent-soft text-icm-accent ring-icm-accent/20",
+    "Contact Note": "bg-teal-50 text-teal-700 ring-teal-200",
+    "Visit Summary": "bg-blue-50 text-blue-700 ring-blue-200",
+    "Monitoring Form": "bg-violet-50 text-violet-700 ring-violet-200",
+  };
+
+  function NoteCard({ note, isOverdue }: { note: PendingNote; isOverdue: boolean }) {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border p-4 space-y-2",
+          isOverdue ? "border-red-200 bg-red-50/40" : "border-icm-border bg-icm-panel"
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={cn(
+                "px-1.5 py-0.5 rounded-full text-[10px] font-geist font-bold ring-1",
+                noteTypeColors[note.noteType] ?? "bg-icm-bg text-icm-text-dim ring-icm-border"
+              )}
+            >
+              ● {note.noteType.toUpperCase()}
+            </span>
+            <span
+              className={cn(
+                "text-[11.5px] font-geist font-semibold",
+                isOverdue ? "text-red-700" : "text-icm-text-dim"
+              )}
+            >
+              {isOverdue ? "⚠ " : ""}{hoursAgo(note.submittedAt)} pending
+            </span>
+          </div>
+          <button
+            onClick={() =>
+              navigate(`/supervisor/review/${note.collection}/${note.id}`)
+            }
+            className="h-8 px-3 rounded-xl bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold hover:opacity-90 shrink-0"
+          >
+            Review →
+          </button>
+        </div>
+        <div>
+          <p className="font-geist font-semibold text-[13px] text-icm-text">
+            {note.individualName}
+          </p>
+          <p className="text-[11.5px] text-icm-text-dim font-geist">
+            {note.date}
+            {note.serviceCode && ` · ${note.serviceCode}`}
+            {note.units ? ` · ${note.units} units` : ""}
+          </p>
+          <p className="text-[11px] text-icm-text-faint font-geist mt-0.5">
+            Submitted by: {note.submittedByName}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="py-8 text-center text-icm-text-dim text-[13px] font-geist">
+        Loading pending reviews…
+      </div>
+    );
+  }
+
+  if (notes.length === 0) {
+    return (
+      <div className="py-12 flex flex-col items-center gap-3 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-icm-green-soft flex items-center justify-center">
+          <CheckCircle2 className="w-6 h-6 text-icm-green" />
+        </div>
+        <p className="font-manrope font-bold text-[14px] text-icm-text">All caught up!</p>
+        <p className="text-[12px] text-icm-text-dim">No notes are pending your review.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {overdue.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-geist font-bold uppercase tracking-widest text-red-600">
+            Overdue Review (past 48 hours) · {overdue.length}
+          </p>
+          {overdue.map((n) => (
+            <NoteCard key={n.id} note={n} isOverdue />
+          ))}
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-geist font-bold uppercase tracking-widest text-icm-text-dim">
+            Pending Review (within 48 hours) · {recent.length}
+          </p>
+          {recent.map((n) => (
+            <NoteCard key={n.id} note={n} isOverdue={false} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

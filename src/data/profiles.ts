@@ -525,6 +525,7 @@ export type TabKey =
   | "program"
   | "contacts"
   | "documents"
+  | "consents"
   | "administrative";
 
 export function tabCompleteness(p: ProfileData, baseFirst: string, baseLast: string, baseDob: string): TabCompleteness[] {

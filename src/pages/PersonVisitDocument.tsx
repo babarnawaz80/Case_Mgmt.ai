@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { addVisitSummary } from "@/hooks/useFirestore";
+import { AttestationSection, EMPTY_ATTESTATION, type AttestationValue } from "@/components/icm/AttestationSection";
 import { writeAudit as writeAuditFirebase } from "@/lib/auditService";
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
@@ -97,6 +98,7 @@ const PersonVisitDocument = () => {
   const [participantSignature, setParticipantSignature] = useState("");
   const [guardianSignature, setGuardianSignature] = useState("");
   const [attested, setAttested] = useState(false);
+  const [participantAttestation, setParticipantAttestation] = useState<AttestationValue>(EMPTY_ATTESTATION);
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [now, setNow] = useState(Date.now());
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -412,6 +414,12 @@ const PersonVisitDocument = () => {
             <span>I attest that the information documented above is accurate and reflects the services delivered to {individual.first_name} on this date.</span>
           </label>
         </div>
+
+        {/* Participant / Guardian attestation */}
+        <AttestationSection
+          value={participantAttestation}
+          onChange={setParticipantAttestation}
+        />
 
         {errors.length > 0 && (
           <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 space-y-2">

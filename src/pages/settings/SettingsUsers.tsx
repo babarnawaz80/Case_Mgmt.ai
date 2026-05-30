@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
 import {
@@ -9,6 +9,8 @@ import {
   doc,
   setDoc,
   updateDoc,
+  addDoc,
+  getDocs,
   serverTimestamp,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -30,6 +32,8 @@ import {
   UserCheck,
   UserMinus,
   LogOut,
+  ChevronDown,
+  Settings,
 } from "lucide-react";
 import { ImportWizardModal } from "@/components/ImportWizardModal";
 import { credentialBadge } from "@/data/staffProvider";
@@ -86,6 +90,14 @@ const SettingsUsers = () => {
   const [showImport, setShowImport] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRoleValue, setBulkRoleValue] = useState<RoleKey>("case_manager");
+  const [showBulkRoleConfirm, setShowBulkRoleConfirm] = useState(false);
+  const [showBulkDeactivateConfirm, setShowBulkDeactivateConfirm] = useState(false);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const headerCheckboxRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -176,17 +188,126 @@ const SettingsUsers = () => {
     const statusMap = { suspend: "locked", reactivate: "active", deactivate: "inactive" } as const;
     const newStatus = statusMap[action];
     const labelMap = { suspend: "suspended", reactivate: "reactivated", deactivate: "deactivated" };
+    // Lookup target user's display name for the audit record
+    const targetUser = users.find((u) => u.id === userId);
+    const targetName = targetUser ? `${targetUser.firstName} ${targetUser.lastName}`.trim() || targetUser.email : userId;
     try {
       await updateDoc(doc(db, "users", userId), {
         status: newStatus,
         isActive: newStatus === "active",
         updatedAt: serverTimestamp(),
       });
-      await writeAudit(`user_${action}ed`, "user_management", userId, { action, status: newStatus });
+      // Use canonical (non-typo) action names for new events
+      const auditAction = action === "deactivate"
+        ? "user_deactivated" as const
+        : action === "reactivate"
+        ? "user_activated" as const
+        : "user_suspended" as const;
+      await writeAudit(auditAction, "user_management", userId, {
+        action,
+        status: newStatus,
+        actor_name: userProfile?.displayName ?? userProfile?.email ?? "Admin",
+        actor_user_id: userProfile?.uid ?? "",
+        target_user_id: userId,
+        target_user_name: targetName,
+      });
       toast.success(`User ${labelMap[action]} successfully`);
     } catch (err: any) {
       console.error(err);
       toast.error(`Failed to ${action} user`, { description: err?.message });
+    }
+  };
+
+  // Header checkbox indeterminate state
+  useEffect(() => {
+    if (!headerCheckboxRef.current) return;
+    const total = filtered.length;
+    const selected = filtered.filter((u) => selectedIds.has(u.id)).length;
+    headerCheckboxRef.current.indeterminate = selected > 0 && selected < total;
+    headerCheckboxRef.current.checked = total > 0 && selected === total;
+  }, [filtered, selectedIds]);
+
+  const toggleSelectAll = () => {
+    const allSelected = filtered.every((u) => selectedIds.has(u.id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((u) => u.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkChangeRole = async () => {
+    setBulkProcessing(true);
+    try {
+      const affected = users.filter((u) => selectedIds.has(u.id));
+      await Promise.all(
+        affected.map((u) =>
+          updateDoc(doc(db, "users", u.id), {
+            role: bulkRoleValue,
+            updatedAt: serverTimestamp(),
+          })
+        )
+      );
+      await addDoc(collection(db, "audit_log"), {
+        action: "bulk_role_change",
+        isBulkChange: true,
+        newRole: bulkRoleValue,
+        affectedUsers: affected.map((u) => ({ id: u.id, email: u.email })),
+        changedBy: userProfile?.uid,
+        changedByName: userProfile?.displayName,
+        tenantId: orgId,
+        timestamp: serverTimestamp(),
+      });
+      toast.success(`Role updated for ${affected.length} user${affected.length !== 1 ? "s" : ""}`);
+      setSelectedIds(new Set());
+      setShowBulkRoleConfirm(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update roles");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    setBulkProcessing(true);
+    try {
+      const affected = users.filter((u) => selectedIds.has(u.id));
+      await Promise.all(
+        affected.map((u) =>
+          updateDoc(doc(db, "users", u.id), {
+            status: "inactive",
+            isActive: false,
+            updatedAt: serverTimestamp(),
+          })
+        )
+      );
+      await addDoc(collection(db, "audit_log"), {
+        action: "bulk_deactivate",
+        isBulkChange: true,
+        affectedUsers: affected.map((u) => ({ id: u.id, email: u.email })),
+        changedBy: userProfile?.uid,
+        changedByName: userProfile?.displayName,
+        tenantId: orgId,
+        timestamp: serverTimestamp(),
+      });
+      toast.success(`Deactivated ${affected.length} user${affected.length !== 1 ? "s" : ""}`);
+      setSelectedIds(new Set());
+      setShowBulkDeactivateConfirm(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to deactivate users");
+    } finally {
+      setBulkProcessing(false);
     }
   };
 
@@ -212,6 +333,48 @@ const SettingsUsers = () => {
 
       {tab === "users" ? (
         <>
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-icm-accent/30 bg-icm-accent-soft/40 flex-wrap">
+              <span className="text-[12px] font-geist font-semibold text-icm-accent">
+                {selectedIds.size} user{selectedIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <div className="flex items-center gap-1 ml-auto flex-wrap">
+                <div className="relative">
+                  <select
+                    value={bulkRoleValue}
+                    onChange={(e) => setBulkRoleValue(e.target.value as RoleKey)}
+                    className="h-8 pl-2 pr-6 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist text-icm-text appearance-none cursor-pointer"
+                  >
+                    {roles.map((r) => (
+                      <option key={r.key} value={r.key}>{r.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-icm-text-dim pointer-events-none" />
+                </div>
+                <button
+                  onClick={() => setShowBulkRoleConfirm(true)}
+                  className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[11.5px] font-geist font-semibold text-icm-text hover:border-icm-border-strong transition-colors"
+                >
+                  Change Role
+                </button>
+                <button
+                  onClick={() => setShowBulkDeactivateConfirm(true)}
+                  className="h-8 px-3 rounded-lg border border-icm-red/30 bg-icm-red-soft/50 text-icm-red text-[11.5px] font-geist font-semibold hover:bg-icm-red-soft transition-colors"
+                >
+                  Deactivate
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="h-8 w-8 rounded-lg border border-icm-border bg-icm-panel text-icm-text-dim hover:border-icm-border-strong transition-colors inline-flex items-center justify-center"
+                  title="Clear selection"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Toolbar */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
@@ -274,6 +437,14 @@ const SettingsUsers = () => {
               <table className="w-full text-[12px] font-geist">
                 <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
                   <tr>
+                    <th className="px-3 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        ref={headerCheckboxRef}
+                        onChange={toggleSelectAll}
+                        className="rounded border-icm-border accent-icm-accent w-3.5 h-3.5 cursor-pointer"
+                      />
+                    </th>
                     <th className="text-left px-3 py-2 font-semibold">User</th>
                     <th className="text-left px-3 py-2 font-semibold">Email</th>
                     <th className="text-left px-3 py-2 font-semibold">Role</th>
@@ -285,7 +456,7 @@ const SettingsUsers = () => {
                 <tbody>
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-icm-text-dim text-[12px]">
+                      <td colSpan={7} className="px-3 py-8 text-center text-icm-text-dim text-[12px]">
                         No users found matching your filters.
                       </td>
                     </tr>
@@ -294,8 +465,26 @@ const SettingsUsers = () => {
                     <tr
                       key={u.id}
                       onClick={() => navigate(`/settings/users/${u.id}`)}
-                      className="border-t border-icm-border hover:bg-icm-bg cursor-pointer"
+                      className={cn(
+                        "border-t border-icm-border hover:bg-icm-bg cursor-pointer",
+                        selectedIds.has(u.id) && "bg-icm-accent-soft/20"
+                      )}
                     >
+                      <td
+                        className="px-3 py-2.5 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelect(u.id);
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(u.id)}
+                          onChange={() => toggleSelect(u.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-icm-border accent-icm-accent w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <span
@@ -445,6 +634,85 @@ const SettingsUsers = () => {
           onComplete={() => setShowImport(false)}
         />
       )}
+
+      {/* Bulk Change Role Confirm */}
+      {showBulkRoleConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="rounded-2xl bg-icm-panel border border-icm-border shadow-elevated w-full max-w-md p-5">
+            <h2 className="font-manrope font-bold text-[15px] text-icm-text mb-1">
+              Change role for {selectedIds.size} user{selectedIds.size !== 1 ? "s" : ""}?
+            </h2>
+            <p className="text-[12px] font-geist text-icm-text-dim mb-3">
+              New role: <strong className="text-icm-text">{roles.find((r) => r.key === bulkRoleValue)?.name}</strong>
+              <br />Permissions change immediately.
+            </p>
+            <div className="space-y-1 mb-4 max-h-40 overflow-y-auto">
+              {users.filter((u) => selectedIds.has(u.id)).map((u) => (
+                <div key={u.id} className="flex items-center gap-2 text-[11.5px] font-geist text-icm-text-dim">
+                  <span>{u.firstName} {u.lastName}</span>
+                  <span className="text-icm-text-faint">·</span>
+                  <span>{u.email}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowBulkRoleConfirm(false)}
+                className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkChangeRole}
+                disabled={bulkProcessing}
+                className="h-9 px-4 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {bulkProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Confirm Change
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Deactivate Confirm */}
+      {showBulkDeactivateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="rounded-2xl bg-icm-panel border border-icm-border shadow-elevated w-full max-w-md p-5">
+            <h2 className="font-manrope font-bold text-[15px] text-icm-text mb-1">
+              Deactivate {selectedIds.size} user{selectedIds.size !== 1 ? "s" : ""}?
+            </h2>
+            <p className="text-[12px] font-geist text-icm-text-dim mb-3">
+              These accounts will be set to inactive immediately.
+            </p>
+            <div className="space-y-1 mb-4 max-h-40 overflow-y-auto">
+              {users.filter((u) => selectedIds.has(u.id)).map((u) => (
+                <div key={u.id} className="flex items-center gap-2 text-[11.5px] font-geist text-icm-text-dim">
+                  <span>{u.firstName} {u.lastName}</span>
+                  <span className="text-icm-text-faint">·</span>
+                  <span>{u.email}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowBulkDeactivateConfirm(false)}
+                className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDeactivate}
+                disabled={bulkProcessing}
+                className="h-9 px-4 rounded-xl bg-icm-red text-white text-[12px] font-geist font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {bulkProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </SettingsLayout>
   );
 };
@@ -534,63 +802,476 @@ function FilterSelect({
   );
 }
 
+// ─── Built-in role seed data ─────────────────────────────────────────────────
+type ModuleAccess = "view" | "edit" | "none";
+
+const BUILT_IN_ROLES: Array<{
+  key: string;
+  name: string;
+  description: string;
+  color: string;
+  isBuiltIn: boolean;
+  permissions: Record<string, ModuleAccess | boolean>;
+}> = [
+  {
+    key: "admin",
+    name: "Admin",
+    description: "Full system access",
+    color: "#7c3aed",
+    isBuiltIn: true,
+    permissions: {
+      dashboard: "edit", peoplelist: "edit", mywork: "edit", messages: "edit",
+      reports: "edit", incidents: "edit", billing: "edit", platform: "edit", adminsettings: "edit",
+      facesheet: "edit", contactnotes: "edit", progressnotes: "edit", visitsummaries: "edit",
+      careplan: "edit", monitoringforms: "edit", assessments: "edit", eligibility: "edit",
+      authorizations: "edit", casemanagement: "edit", referrals: "edit", consents: "edit",
+      documents: "edit", leads: "edit",
+      canCreateContactNotes: true, canEditOthersNotes: true, canDeleteNotes: true,
+      canSignNotes: true, canSignOthersNotes: true, canCreateProgressNotes: true,
+      canMarkBillable: true, canCreateMonitoringForms: true, canEditSubmittedForms: true,
+      canCreateCarePlans: true, canSubmitCarePlans: true, canApproveCarePlans: true,
+      canStartAssessments: true, canSubmitAssessments: true, canEditSubmittedAssessments: true,
+      canReportIncidents: true, canViewOrgWideIncidents: true, canCloseIncidents: true,
+      canCreateReferrals: true, canSubmitAuthorizations: true, canApproveAuthorizations: true,
+      canAddEligibility: true, canAcceptLeads: true, canConvertLeads: true,
+      canViewPlatform: true, canRunComplianceAgents: true, canPublishEngines: true,
+      canManageUsers: true, canManagePrograms: true, canManageProviders: true,
+      canManageTemplates: true, canViewAuditLogs: true, canViewOrgAuditLogs: true,
+      canRunStandardReports: true, canExportReports: true, canViewOrgReports: true,
+      canBuildCustomReports: true,
+      canUseAmbientListening: true, canViewTranscripts: true, canApplyAmbientOutput: true,
+      canUseAIPrefill: true, canUseMonitoringPrefill: true, canUseProgressNotePrefill: true,
+      canUseVisitSummaryPrefill: true, canUseAssessmentPrefill: true,
+      canUseAIDraftGeneration: true, canViewAISuggestions: true, canUseAIChat: true,
+      canViewOrchestrator: true, canRunOrchestratorAgents: true, canViewComplianceRecommendations: true,
+      canSendConsentRequests: true, canManageIntakeForms: true,
+      canViewAIAuditLog: true, canViewOrgAIAuditLog: true,
+      canExportIndividuals: true, canPrintDocuments: true, canUploadDocuments: true, canDeleteDocuments: true,
+    },
+  },
+  {
+    key: "supervisor",
+    name: "Supervisor",
+    description: "Team oversight + approvals",
+    color: "#0891b2",
+    isBuiltIn: true,
+    permissions: {
+      dashboard: "edit", peoplelist: "edit", mywork: "edit", messages: "edit",
+      reports: "edit", incidents: "edit", billing: "edit", platform: "none", adminsettings: "none",
+      facesheet: "edit", contactnotes: "edit", progressnotes: "edit", visitsummaries: "edit",
+      careplan: "edit", monitoringforms: "edit", assessments: "edit", eligibility: "edit",
+      authorizations: "edit", casemanagement: "edit", referrals: "edit", consents: "edit",
+      documents: "edit", leads: "edit",
+      canCreateContactNotes: true, canEditOthersNotes: true, canDeleteNotes: true,
+      canSignNotes: true, canSignOthersNotes: true, canCreateProgressNotes: true,
+      canMarkBillable: true, canCreateMonitoringForms: true, canEditSubmittedForms: true,
+      canCreateCarePlans: true, canSubmitCarePlans: true, canApproveCarePlans: true,
+      canStartAssessments: true, canSubmitAssessments: true, canEditSubmittedAssessments: true,
+      canReportIncidents: true, canViewOrgWideIncidents: true, canCloseIncidents: true,
+      canCreateReferrals: true, canSubmitAuthorizations: true, canApproveAuthorizations: true,
+      canAddEligibility: true, canAcceptLeads: true, canConvertLeads: true,
+      canViewPlatform: false, canRunComplianceAgents: false, canPublishEngines: false,
+      canManageUsers: false, canManagePrograms: false, canManageProviders: false,
+      canManageTemplates: true, canViewAuditLogs: true, canViewOrgAuditLogs: true,
+      canRunStandardReports: true, canExportReports: true, canViewOrgReports: true,
+      canBuildCustomReports: true,
+      canUseAmbientListening: true, canViewTranscripts: true, canApplyAmbientOutput: true,
+      canUseAIPrefill: true, canUseMonitoringPrefill: true, canUseProgressNotePrefill: true,
+      canUseVisitSummaryPrefill: true, canUseAssessmentPrefill: true,
+      canUseAIDraftGeneration: true, canViewAISuggestions: true, canUseAIChat: true,
+      canViewOrchestrator: true, canRunOrchestratorAgents: true, canViewComplianceRecommendations: true,
+      canSendConsentRequests: true, canManageIntakeForms: true,
+      canViewAIAuditLog: true, canViewOrgAIAuditLog: true,
+      canExportIndividuals: true, canPrintDocuments: true, canUploadDocuments: true, canDeleteDocuments: false,
+    },
+  },
+  {
+    key: "case_manager",
+    name: "Case Manager",
+    description: "Caseload and documentation",
+    color: "#059669",
+    isBuiltIn: true,
+    permissions: {
+      dashboard: "edit", peoplelist: "edit", mywork: "edit", messages: "edit",
+      reports: "view", incidents: "edit", billing: "none", platform: "none", adminsettings: "none",
+      facesheet: "edit", contactnotes: "edit", progressnotes: "edit", visitsummaries: "edit",
+      careplan: "edit", monitoringforms: "edit", assessments: "edit", eligibility: "edit",
+      authorizations: "view", casemanagement: "edit", referrals: "edit", consents: "edit",
+      documents: "edit", leads: "edit",
+      canCreateContactNotes: true, canEditOthersNotes: false, canDeleteNotes: false,
+      canSignNotes: true, canSignOthersNotes: false, canCreateProgressNotes: true,
+      canMarkBillable: true, canCreateMonitoringForms: true, canEditSubmittedForms: false,
+      canCreateCarePlans: true, canSubmitCarePlans: true, canApproveCarePlans: false,
+      canStartAssessments: true, canSubmitAssessments: true, canEditSubmittedAssessments: false,
+      canReportIncidents: true, canViewOrgWideIncidents: false, canCloseIncidents: false,
+      canCreateReferrals: true, canSubmitAuthorizations: false, canApproveAuthorizations: false,
+      canAddEligibility: true, canAcceptLeads: false, canConvertLeads: false,
+      canViewPlatform: false, canRunComplianceAgents: false, canPublishEngines: false,
+      canManageUsers: false, canManagePrograms: false, canManageProviders: false,
+      canManageTemplates: false, canViewAuditLogs: false, canViewOrgAuditLogs: false,
+      canRunStandardReports: true, canExportReports: false, canViewOrgReports: false,
+      canBuildCustomReports: false,
+      canUseAmbientListening: true, canViewTranscripts: true, canApplyAmbientOutput: true,
+      canUseAIPrefill: true, canUseMonitoringPrefill: true, canUseProgressNotePrefill: true,
+      canUseVisitSummaryPrefill: true, canUseAssessmentPrefill: true,
+      canUseAIDraftGeneration: true, canViewAISuggestions: true, canUseAIChat: true,
+      canViewOrchestrator: true, canRunOrchestratorAgents: true, canViewComplianceRecommendations: true,
+      canSendConsentRequests: true, canManageIntakeForms: true,
+      canViewAIAuditLog: true, canViewOrgAIAuditLog: false,
+      canExportIndividuals: false, canPrintDocuments: true, canUploadDocuments: true, canDeleteDocuments: false,
+    },
+  },
+  {
+    key: "billing",
+    name: "Billing",
+    description: "Billing and claims only",
+    color: "#d97706",
+    isBuiltIn: true,
+    permissions: {
+      dashboard: "view", peoplelist: "view", mywork: "view", messages: "view",
+      reports: "none", incidents: "none", billing: "edit", platform: "none", adminsettings: "none",
+      facesheet: "view", contactnotes: "view", progressnotes: "view", visitsummaries: "view",
+      careplan: "view", monitoringforms: "view", assessments: "view", eligibility: "view",
+      authorizations: "view", casemanagement: "view", referrals: "view", consents: "view",
+      documents: "view", leads: "none",
+      canCreateContactNotes: false, canEditOthersNotes: false, canDeleteNotes: false,
+      canSignNotes: false, canSignOthersNotes: false, canCreateProgressNotes: false,
+      canMarkBillable: false, canCreateMonitoringForms: false, canEditSubmittedForms: false,
+      canCreateCarePlans: false, canSubmitCarePlans: false, canApproveCarePlans: false,
+      canStartAssessments: false, canSubmitAssessments: false, canEditSubmittedAssessments: false,
+      canReportIncidents: false, canViewOrgWideIncidents: false, canCloseIncidents: false,
+      canCreateReferrals: false, canSubmitAuthorizations: false, canApproveAuthorizations: false,
+      canAddEligibility: false, canAcceptLeads: false, canConvertLeads: false,
+      canViewPlatform: false, canRunComplianceAgents: false, canPublishEngines: false,
+      canManageUsers: false, canManagePrograms: false, canManageProviders: false,
+      canManageTemplates: false, canViewAuditLogs: false, canViewOrgAuditLogs: false,
+      canRunStandardReports: true, canExportReports: false, canViewOrgReports: false,
+      canBuildCustomReports: false,
+      canUseAmbientListening: false, canViewTranscripts: false, canApplyAmbientOutput: false,
+      canUseAIPrefill: false, canUseMonitoringPrefill: false, canUseProgressNotePrefill: false,
+      canUseVisitSummaryPrefill: false, canUseAssessmentPrefill: false,
+      canUseAIDraftGeneration: false, canViewAISuggestions: false, canUseAIChat: false,
+      canViewOrchestrator: false, canRunOrchestratorAgents: false, canViewComplianceRecommendations: false,
+      canSendConsentRequests: false, canManageIntakeForms: false,
+      canViewAIAuditLog: false, canViewOrgAIAuditLog: false,
+      canExportIndividuals: false, canPrintDocuments: true, canUploadDocuments: false, canDeleteDocuments: false,
+    },
+  },
+  {
+    key: "read_only",
+    name: "Read Only",
+    description: "View only — no edits",
+    color: "#64748b",
+    isBuiltIn: true,
+    permissions: {
+      dashboard: "view", peoplelist: "view", mywork: "view", messages: "view",
+      reports: "view", incidents: "view", billing: "view", platform: "view", adminsettings: "view",
+      facesheet: "view", contactnotes: "view", progressnotes: "view", visitsummaries: "view",
+      careplan: "view", monitoringforms: "view", assessments: "view", eligibility: "view",
+      authorizations: "view", casemanagement: "view", referrals: "view", consents: "view",
+      documents: "view", leads: "view",
+      canCreateContactNotes: false, canEditOthersNotes: false, canDeleteNotes: false,
+      canSignNotes: false, canSignOthersNotes: false, canCreateProgressNotes: false,
+      canMarkBillable: false, canCreateMonitoringForms: false, canEditSubmittedForms: false,
+      canCreateCarePlans: false, canSubmitCarePlans: false, canApproveCarePlans: false,
+      canStartAssessments: false, canSubmitAssessments: false, canEditSubmittedAssessments: false,
+      canReportIncidents: false, canViewOrgWideIncidents: false, canCloseIncidents: false,
+      canCreateReferrals: false, canSubmitAuthorizations: false, canApproveAuthorizations: false,
+      canAddEligibility: false, canAcceptLeads: false, canConvertLeads: false,
+      canViewPlatform: false, canRunComplianceAgents: false, canPublishEngines: false,
+      canManageUsers: false, canManagePrograms: false, canManageProviders: false,
+      canManageTemplates: false, canViewAuditLogs: false, canViewOrgAuditLogs: false,
+      canRunStandardReports: false, canExportReports: false, canViewOrgReports: false,
+      canBuildCustomReports: false,
+      canUseAmbientListening: false, canViewTranscripts: false, canApplyAmbientOutput: false,
+      canUseAIPrefill: false, canUseMonitoringPrefill: false, canUseProgressNotePrefill: false,
+      canUseVisitSummaryPrefill: false, canUseAssessmentPrefill: false,
+      canUseAIDraftGeneration: false, canViewAISuggestions: false, canUseAIChat: false,
+      canViewOrchestrator: false, canRunOrchestratorAgents: false, canViewComplianceRecommendations: false,
+      canSendConsentRequests: false, canManageIntakeForms: false,
+      canViewAIAuditLog: true, canViewOrgAIAuditLog: false,
+      canExportIndividuals: false, canPrintDocuments: true, canUploadDocuments: false, canDeleteDocuments: false,
+    },
+  },
+];
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: "bg-purple-100 text-purple-700",
+  supervisor: "bg-cyan-100 text-cyan-700",
+  case_manager: "bg-emerald-100 text-emerald-700",
+  billing: "bg-amber-100 text-amber-700",
+  read_only: "bg-slate-100 text-slate-600",
+};
+
+const ROLE_DOTS: Record<string, string> = {
+  admin: "bg-purple-600",
+  supervisor: "bg-cyan-600",
+  case_manager: "bg-emerald-600",
+  billing: "bg-amber-500",
+  read_only: "bg-slate-500",
+};
+
+interface RoleRow {
+  id: string;
+  roleName: string;
+  description: string;
+  userCount: number;
+  isBuiltIn: boolean;
+}
+
 function RolesPermissionsView() {
+  const navigate = useNavigate();
+  const { userProfile } = useAuth();
+  const orgId = userProfile?.organizationId;
+
+  const [roleRows, setRoleRows] = useState<RoleRow[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [openRoleMenu, setOpenRoleMenu] = useState<string | null>(null);
+  const roleMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close role menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) {
+        setOpenRoleMenu(null);
+      }
+    }
+    if (openRoleMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openRoleMenu]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setLoadingRoles(true);
+
+    // Load role_permissions docs for this org
+    const q = query(collection(db, "role_permissions"), where("tenantId", "==", orgId));
+    const unsub = onSnapshot(
+      q,
+      async (snap) => {
+        if (snap.empty) {
+          // Seed built-in roles
+          try {
+            await Promise.all(
+              BUILT_IN_ROLES.map((r) =>
+                setDoc(doc(db, "role_permissions", r.key), {
+                  roleName: r.name,
+                  description: r.description,
+                  color: r.color,
+                  isBuiltIn: r.isBuiltIn,
+                  tenantId: orgId,
+                  userCount: 0,
+                  permissions: r.permissions,
+                  createdAt: serverTimestamp(),
+                })
+              )
+            );
+          } catch (err) {
+            console.error("Failed to seed roles:", err);
+          }
+          // Snapshot listener will re-fire after seeding
+          return;
+        }
+
+        const rows: RoleRow[] = snap.docs.map((d) => ({
+          id: d.id,
+          roleName: d.data().roleName ?? d.id,
+          description: d.data().description ?? "",
+          userCount: d.data().userCount ?? 0,
+          isBuiltIn: d.data().isBuiltIn ?? false,
+        }));
+
+        // Sort by built-in order
+        const ORDER = ["admin", "supervisor", "case_manager", "billing", "read_only"];
+        rows.sort((a, b) => {
+          const ai = ORDER.indexOf(a.id);
+          const bi = ORDER.indexOf(b.id);
+          if (ai === -1 && bi === -1) return a.roleName.localeCompare(b.roleName);
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return ai - bi;
+        });
+
+        setRoleRows(rows);
+        setLoadingRoles(false);
+      },
+      (err) => {
+        console.error("RolesPermissionsView:", err);
+        // Fallback: show built-in roles from local data without Firestore
+        setRoleRows(
+          BUILT_IN_ROLES.map((r) => ({
+            id: r.key,
+            roleName: r.name,
+            description: r.description,
+            userCount: 0,
+            isBuiltIn: true,
+          }))
+        );
+        setLoadingRoles(false);
+      }
+    );
+
+    return unsub;
+  }, [orgId]);
+
+  const handleCreateRole = async () => {
+    if (!orgId) return;
+    try {
+      const newRef = await addDoc(collection(db, "role_permissions"), {
+        roleName: "New Role",
+        description: "Custom role",
+        color: "#64748b",
+        isBuiltIn: false,
+        tenantId: orgId,
+        userCount: 0,
+        permissions: {},
+        createdAt: serverTimestamp(),
+      });
+      navigate(`/settings/users/roles/${newRef.id}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create role");
+    }
+  };
+
+  if (loadingRoles) {
+    return (
+      <div className="space-y-2 animate-pulse">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-12 rounded-xl bg-icm-bg" />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">
-          Default roles
+      <div className="flex items-center justify-between">
+        <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim">
+          Roles & Permissions
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {roles.map((r) => (
-            <div key={r.key} className="rounded-xl border border-icm-border bg-icm-panel p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold ring-1", roleBadgeTone(r.key))}>
-                  {r.name}
-                </span>
-                <span className="text-[10.5px] text-icm-text-faint font-mono">{r.userCount} users</span>
-              </div>
-              <p className="text-[11.5px] font-geist text-icm-text-dim mt-2 leading-relaxed">{r.description}</p>
-            </div>
-          ))}
-        </div>
+        <button
+          onClick={handleCreateRole}
+          className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+        >
+          + Create Role
+        </button>
       </div>
 
-      <div>
-        <p className="text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-2">
-          Permissions matrix
-        </p>
-        <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px] font-geist">
-              <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
-                <tr>
-                  <th className="text-left px-3 py-2 font-semibold sticky left-0 bg-icm-bg z-10">Module</th>
-                  {roles.map((r) => (
-                    <th key={r.key} className="text-center px-3 py-2 font-semibold">{r.name}</th>
-                  ))}
+      <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+        <table className="w-full text-[12px] font-geist">
+          <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-4 py-2.5 font-semibold">Role</th>
+              <th className="text-left px-3 py-2.5 font-semibold w-16">Users</th>
+              <th className="text-left px-3 py-2.5 font-semibold">Description</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roleRows.map((r) => {
+              const dotClass = ROLE_DOTS[r.id] ?? "bg-slate-400";
+              const badgeClass = ROLE_COLORS[r.id] ?? "bg-slate-100 text-slate-600";
+              return (
+                <tr key={r.id} className="border-t border-icm-border hover:bg-icm-bg">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("w-2 h-2 rounded-full shrink-0", dotClass)} />
+                      <span className={cn("px-2 py-0.5 rounded-full text-[10.5px] font-geist font-semibold", badgeClass)}>
+                        {r.roleName}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 font-mono text-icm-text-dim">{r.userCount}</td>
+                  <td className="px-3 py-3 text-icm-text-dim">{r.description}</td>
+                  <td className="px-3 py-3 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => navigate(`/settings/users/roles/${r.id}`)}
+                        className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-geist font-semibold text-icm-text hover:border-icm-border-strong transition-colors inline-flex items-center gap-1"
+                      >
+                        <Settings className="w-3 h-3" />
+                        Edit
+                      </button>
+                      <div className="relative" ref={openRoleMenu === r.id ? roleMenuRef : undefined}>
+                        <button
+                          onClick={() => setOpenRoleMenu(openRoleMenu === r.id ? null : r.id)}
+                          className={cn(
+                            "h-7 w-7 rounded-lg text-icm-text-dim flex items-center justify-center transition-colors",
+                            openRoleMenu === r.id
+                              ? "bg-icm-accent/10 text-icm-accent"
+                              : "hover:bg-icm-bg border border-icm-border"
+                          )}
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                        {openRoleMenu === r.id && (
+                          <div className="absolute right-0 top-8 z-50 w-40 rounded-xl border border-icm-border bg-white shadow-elevated py-1 text-[12px] font-geist">
+                            <button
+                              onClick={() => {
+                                setOpenRoleMenu(null);
+                                toast.info("Rename — edit the role name in the editor.");
+                                navigate(`/settings/users/roles/${r.id}`);
+                              }}
+                              className="w-full px-3 py-2 text-left text-icm-text hover:bg-icm-bg transition-colors"
+                            >
+                              Rename
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setOpenRoleMenu(null);
+                                if (!orgId) return;
+                                try {
+                                  const srcDoc = await import("firebase/firestore").then(({ getDoc, doc: _doc }) =>
+                                    getDoc(_doc(db, "role_permissions", r.id))
+                                  );
+                                  if (!srcDoc.exists()) return;
+                                  const newRef = await addDoc(collection(db, "role_permissions"), {
+                                    ...srcDoc.data(),
+                                    roleName: `${r.roleName} (copy)`,
+                                    isBuiltIn: false,
+                                    tenantId: orgId,
+                                    createdAt: serverTimestamp(),
+                                  });
+                                  toast.success("Role duplicated");
+                                  navigate(`/settings/users/roles/${newRef.id}`);
+                                } catch (err) {
+                                  toast.error("Failed to duplicate role");
+                                }
+                              }}
+                              className="w-full px-3 py-2 text-left text-icm-text hover:bg-icm-bg transition-colors"
+                            >
+                              Duplicate
+                            </button>
+                            {!r.isBuiltIn && (
+                              <button
+                                onClick={async () => {
+                                  setOpenRoleMenu(null);
+                                  try {
+                                    await updateDoc(doc(db, "role_permissions", r.id), {
+                                      isActive: false,
+                                      updatedAt: serverTimestamp(),
+                                    });
+                                    toast.success("Role deactivated");
+                                  } catch (err) {
+                                    toast.error("Failed to deactivate role");
+                                  }
+                                }}
+                                className="w-full px-3 py-2 text-left text-icm-red hover:bg-icm-red-soft/50 transition-colors"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {permissionsMatrix.map((row) => (
-                  <tr key={row.module} className="border-t border-icm-border">
-                    <td className="px-3 py-2 text-icm-text font-medium sticky left-0 bg-icm-panel z-10">{row.module}</td>
-                    {roles.map((r) => {
-                      const p = row.perms[r.key];
-                      return (
-                        <td key={r.key} className="px-3 py-2 text-center">
-                          <span className={cn("inline-flex items-center justify-center min-w-[44px] h-6 rounded-full text-[10px] font-geist font-semibold ring-1", permTone(p))}>
-                            {permLabel(p)}
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

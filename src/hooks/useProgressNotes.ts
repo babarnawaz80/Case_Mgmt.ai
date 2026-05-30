@@ -285,6 +285,7 @@ export const CONTACT_TYPES = [
   "In-Person",
   "Telephone",
   "Telehealth",
+  "Televisit / Video Call",
   "Email",
   "Home Visit",
   "Community Visit",

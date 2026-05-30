@@ -16,10 +16,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useIndividual } from "@/hooks/useIndividuals";
+import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
-import { addAssessment, addWorkflowTask } from "@/hooks/useFirestore";
+import { doc, onSnapshot, addDoc, updateDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addAssessment, addWorkflowTask, useConsents } from "@/hooks/useFirestore";
 import { writeAudit } from "@/lib/auditService";
+import { fetchAssessmentTemplate } from "@/hooks/useAssessmentTemplates";
 import {
   AssessmentAnswer,
   AssessmentTemplate,
@@ -31,13 +33,19 @@ import {
 } from "@/data/assessments";
 
 export default function PersonAssessmentForm() {
-  const { id, assessmentId } = useParams<{ id: string; assessmentId: string }>();
+  // Note: when used as a lead assessment (/leads/:leadId/assessments/new),
+  // `id` will be undefined and `leadId` will be set instead.
+  const { id, assessmentId, leadId } = useParams<{ id?: string; assessmentId?: string; leadId?: string }>();
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const { individual, loading } = useIndividual(id);
+  const { userProfile } = useAuth();
+  // For lead assessments, we don't require an individual record
+  const isLeadAssessment = !!leadId && !id;
 
   const [existing, setExisting] = useState<any>(null);
   const [loadingExisting, setLoadingExisting] = useState(false);
+  const [firestoreTemplate, setFirestoreTemplate] = useState<AssessmentTemplate | null>(null);
 
   useEffect(() => {
     if (!assessmentId || assessmentId === "new") return;
@@ -52,7 +60,17 @@ export default function PersonAssessmentForm() {
   }, [assessmentId]);
 
   const templateId = existing?.templateId ?? search.get("template") ?? "";
-  const template = getTemplate(templateId);
+
+  // Try mock first, then Firestore
+  const mockTemplate = getTemplate(templateId);
+  const template: AssessmentTemplate | null = mockTemplate ?? firestoreTemplate;
+
+  useEffect(() => {
+    if (!templateId || mockTemplate) return;
+    fetchAssessmentTemplate(templateId).then((t) => {
+      if (t) setFirestoreTemplate(t as AssessmentTemplate);
+    });
+  }, [templateId, mockTemplate]);
   const usePrefill = search.get("prefill") === "1";
 
   const initialAnswers: AssessmentAnswer[] = useMemo(() => {
@@ -72,6 +90,52 @@ export default function PersonAssessmentForm() {
     template?.sections[0]?.id ?? null,
   );
   const [submitted, setSubmitted] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(
+    assessmentId && assessmentId !== "new" ? assessmentId : null
+  );
+
+  // Save draft to Firestore
+  async function saveDraft() {
+    if (!template || !userProfile?.organizationId) {
+      toast.error("Cannot save — missing template or user profile.");
+      return;
+    }
+    setSavingDraft(true);
+    try {
+      const draftData = {
+        individual_id: id ?? "",
+        individualId: id ?? "",
+        organizationId: userProfile.organizationId,
+        leadId: leadId ?? null,
+        templateId: template.id,
+        templateVersion: template.version ?? "v1.0",
+        status: "draft",
+        answers,
+        savedAt: new Date().toISOString(),
+        updatedBy: userProfile.uid,
+        updated_at: serverTimestamp(),
+      };
+      if (draftId) {
+        // Update existing draft
+        await updateDoc(doc(db, "assessments", draftId), draftData);
+        toast.success("Draft saved.");
+      } else {
+        // Create new draft
+        const ref = await addDoc(collection(db, "assessments"), {
+          ...draftData,
+          created_at: serverTimestamp(),
+        });
+        setDraftId(ref.id);
+        toast.success("Draft saved.");
+      }
+    } catch (err) {
+      console.error("[saveDraft]", err);
+      toast.error("Failed to save draft. Please try again.");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
 
   // 7.1 — Signatures / attestation, attachments, validation errors
   const [signCM, setSignCM] = useState("");
@@ -81,6 +145,14 @@ export default function PersonAssessmentForm() {
   const [attachments, setAttachments] = useState<{ name: string; size: number; type: string }[]>([]);
   const [missingIds, setMissingIds] = useState<string[]>([]);
   const [generatedTasks, setGeneratedTasks] = useState<{ title: string; due: string }[]>([]);
+
+  // Guardian consent flag
+  const [guardianConsentRequired, setGuardianConsentRequired] = useState(false);
+  const { data: consents } = useConsents(id);
+  const hasActiveConsent = consents.some(
+    (c) => c.status === "Active" && c.consent_type === "Guardian Consent for Plan Documents"
+  );
+  const consentBlocked = guardianConsentRequired && !hasActiveConsent;
   const [historyCount, setHistoryCount] = useState<number>(() => {
     try {
       const h = JSON.parse(localStorage.getItem(`icm.assessments.history.${id}`) ?? "[]");
@@ -89,7 +161,7 @@ export default function PersonAssessmentForm() {
   });
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  if (!individual || !template) {
+  if ((!individual && !isLeadAssessment) || !template) {
     if (loading || loadingExisting) {
       return (
         <div className="p-10 text-center text-[13px] text-icm-text-dim flex items-center justify-center gap-2">
@@ -98,11 +170,19 @@ export default function PersonAssessmentForm() {
         </div>
       );
     }
+    if (!template) {
+      return (
+        <div className="p-10 text-center text-[13px] text-icm-text-dim flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading template…
+        </div>
+      );
+    }
     return (
       <div className="p-10 text-center text-[13px] text-icm-text-dim">
         Assessment template not found.{" "}
         <button
-          onClick={() => navigate(`/people/${id}/assessments`)}
+          onClick={() => navigate(id ? `/people/${id}/assessments` : "/leads")}
           className="text-icm-accent hover:underline"
         >
           Back
@@ -231,6 +311,7 @@ export default function PersonAssessmentForm() {
     const record = {
       individual_id: id!,
       individualId: id!,
+      organizationId: userProfile?.organizationId ?? "",
       templateId: template!.id,
       templateVersion: template!.version,
       date: new Date().toLocaleDateString("en-US"),
@@ -387,13 +468,29 @@ export default function PersonAssessmentForm() {
         </span>
         {!readonly && (
           <>
-            <button className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-medium text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5">
+            {/* Guardian consent toggle */}
+            <label className="flex items-center gap-2 cursor-pointer text-[12px] font-geist text-icm-text-dim select-none">
+              <input
+                type="checkbox"
+                checked={guardianConsentRequired}
+                onChange={(e) => setGuardianConsentRequired(e.target.checked)}
+                className="rounded border-icm-border"
+              />
+              Guardian consent required
+            </label>
+            <button
+              onClick={saveDraft}
+              disabled={savingDraft}
+              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-medium text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5 disabled:opacity-60"
+            >
               <Save className="w-3.5 h-3.5" />
-              Save draft
+              {savingDraft ? "Saving…" : "Save draft"}
             </button>
             <button
-              onClick={submit}
-              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
+              onClick={() => { if (consentBlocked) { toast.error("Guardian consent required before sharing. Add consent record first."); return; } submit(); }}
+              disabled={consentBlocked}
+              title={consentBlocked ? "Guardian consent required before sharing. Add consent record first." : undefined}
+              className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-semibold inline-flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send className="w-3.5 h-3.5" />
               Submit
@@ -401,6 +498,16 @@ export default function PersonAssessmentForm() {
           </>
         )}
       </div>
+      {consentBlocked && (
+        <div className="mx-4 mt-3 rounded-xl border border-icm-amber/40 bg-icm-amber-soft px-4 py-3 flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0" />
+          <p className="text-[12.5px] font-geist text-icm-text">
+            <span className="font-semibold">Guardian consent required before sharing.</span>{" "}
+            Add consent record first.{" "}
+            <a href={`/people/${id}/profile?tab=administrative`} className="text-icm-accent underline underline-offset-2 font-semibold">Go to consent records →</a>
+          </p>
+        </div>
+      )}
 
       <div className="max-w-[1200px] mx-auto p-6 grid grid-cols-1 lg:grid-cols-[220px_1fr_240px] gap-5">
         {/* Section nav */}

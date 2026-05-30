@@ -441,3 +441,281 @@ export async function seedDemoIfEmpty(
     console.warn('[DemoSeed] Seeding skipped or failed silently:', err);
   }
 }
+
+// ─── Demo Scheduled Visits ─────────────────────────────────────────────────
+
+/**
+ * Seeds 3 demo scheduled visits if no scheduled_visits exist for the org.
+ * Uses the first active individuals found in the org to populate the visits
+ * (tries Smith/Brown/Walker by name, falls back to first available).
+ * Safe to call on every login — fully idempotent.
+ */
+export async function seedScheduledVisitsIfEmpty(
+  organizationId: string,
+  userId: string,
+  userName: string,
+): Promise<void> {
+  try {
+    // Guard: skip if any scheduled_visits already exist for this org
+    const existing = await getDocs(
+      query(
+        collection(db, 'scheduled_visits'),
+        where('organizationId', '==', organizationId),
+        limit(1),
+      )
+    );
+    if (!existing.empty) return;
+
+    // Fetch active individuals
+    const indsSnap = await getDocs(
+      query(
+        collection(db, 'individuals'),
+        where('organizationId', '==', organizationId),
+        limit(40),
+      )
+    );
+    if (indsSnap.empty) return;
+
+    const inds = indsSnap.docs.map((d) => ({
+      id: d.id,
+      first_name: d.data().first_name ?? '',
+      last_name: d.data().last_name ?? '',
+    }));
+
+    // Helper: find by last name or fall back to index
+    const find = (lastName: string, fallback: number) => {
+      const match = inds.find((p) =>
+        p.last_name.toLowerCase() === lastName.toLowerCase()
+      );
+      return match ?? inds[fallback] ?? inds[0];
+    };
+
+    const ind1 = find('Smith', 0);
+    const ind2 = find('Brown', 1);
+    const ind3 = find('Walker', 2);
+
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = futureDateStr(1);
+
+    const visits = [
+      {
+        organizationId,
+        individual_id: ind1.id,
+        individual_name: `${ind1.last_name}, ${ind1.first_name}`,
+        visit_type: 'In-Home Visit',
+        visit_date: today,
+        start_time: '14:00',
+        end_time: '15:00',
+        location: 'Carroll County residence',
+        assigned_to: userId,
+        assigned_to_name: userName,
+        linked_goal_text: 'Community Integration',
+        notes: 'Quarterly in-home monitoring visit. Review community integration progress.',
+        reminder: true,
+        reminder_timing: '1h',
+        reminder_sent: false,
+        status: 'scheduled',
+        created_by: userId,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      },
+      {
+        organizationId,
+        individual_id: ind2.id,
+        individual_name: `${ind2.last_name}, ${ind2.first_name}`,
+        visit_type: 'In-Home Visit',
+        visit_date: tomorrow,
+        start_time: '10:00',
+        end_time: '11:00',
+        location: 'Individual home',
+        assigned_to: userId,
+        assigned_to_name: userName,
+        notes: 'Quarterly in-home visit per monitoring schedule.',
+        reminder: true,
+        reminder_timing: '1d',
+        reminder_sent: false,
+        status: 'scheduled',
+        created_by: userId,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      },
+      {
+        organizationId,
+        individual_id: ind3.id,
+        individual_name: `${ind3.last_name}, ${ind3.first_name}`,
+        visit_type: 'Phone Contact',
+        visit_date: today,
+        start_time: '16:00',
+        end_time: '16:30',
+        location: 'Phone',
+        assigned_to: userId,
+        assigned_to_name: userName,
+        notes: 'Scheduled phone check-in.',
+        reminder: false,
+        reminder_sent: false,
+        status: 'scheduled',
+        created_by: userId,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      },
+    ];
+
+    for (const v of visits) {
+      await addDoc(collection(db, 'scheduled_visits'), v);
+    }
+
+    console.log('[DemoSeed] ✅ Seeded 3 demo scheduled visits');
+  } catch (err) {
+    console.warn('[DemoSeed] Scheduled visits seeding failed silently:', err);
+  }
+}
+
+/**
+ * Seeds 3 demo approval workflow documents:
+ * 1. A progress note pending review (52h ago)
+ * 2. A contact note returned for correction
+ * 3. A visit summary approved with exception
+ *
+ * Idempotent — skips if any doc with approvalStatus already exists for this org.
+ */
+export async function seedApprovalDemoData(
+  organizationId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    // Guard: skip if approval demo data already seeded
+    const guardQ = query(
+      collection(db, 'progress_notes'),
+      where('organizationId', '==', organizationId),
+      where('approvalStatus', '==', 'pending_review'),
+      limit(1),
+    );
+    const guardSnap = await getDocs(guardQ);
+    if (!guardSnap.empty) return; // already seeded
+
+    // Find first individual in org
+    const indsQ = query(
+      collection(db, 'individuals'),
+      where('organizationId', '==', organizationId),
+      limit(3),
+    );
+    const indsSnap = await getDocs(indsQ);
+    if (indsSnap.empty) return; // no individuals yet
+
+    const inds = indsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const ind0 = inds[0];
+    const ind1 = inds[1] ?? ind0;
+    const ind2 = inds[2] ?? ind0;
+
+    const now = new Date();
+    const hoursAgoTs = (h: number) => Timestamp.fromDate(new Date(now.getTime() - h * 3600 * 1000));
+
+    // 1. Progress note — pending_review (52 hours ago)
+    await addDoc(collection(db, 'progress_notes'), {
+      organizationId,
+      individualId: ind0.id,
+      individualName: `${ind0.first_name} ${ind0.last_name}`,
+      authorId: userId,
+      authorName: 'Sarah Coordinator',
+      activityType: 'Case Management',
+      contactType: 'Home Visit',
+      progressDate: '2026-05-28',
+      startTime: '10:00',
+      endTime: '11:00',
+      isBillable: true,
+      serviceCode: 'T2022',
+      units: 3,
+      purposeOfActivity: 'Quarterly check-in and service review with individual and family.',
+      goalsProgress: [],
+      additionalObservations: '',
+      nextSteps: 'Schedule follow-up in 30 days.',
+      status: 'pending_signature',
+      aiDrafted: false,
+      approvalStatus: 'pending_review',
+      isBillingReady: false,
+      submittedForReviewAt: hoursAgoTs(52),
+      submittedForReviewBy: userId,
+      submittedByName: 'Sarah Coordinator',
+      returnReasons: [],
+      createdAt: hoursAgoTs(52),
+      updatedAt: hoursAgoTs(52),
+    });
+
+    // 2. Contact note — returned_for_correction
+    await addDoc(collection(db, 'contact_notes'), {
+      organizationId,
+      individualId: ind1.id,
+      individualName: `${ind1.first_name} ${ind1.last_name}`,
+      authorId: userId,
+      authorName: 'Sarah Coordinator',
+      contactType: 'Phone',
+      date: '2026-05-26',
+      progressDate: '2026-05-26',
+      status: 'pending_signature',
+      purposeOfActivity: 'Phone check-in regarding medication management.',
+      goalsProgress: [],
+      additionalObservations: '',
+      nextSteps: '',
+      isBillable: false,
+      aiDrafted: false,
+      approvalStatus: 'returned_for_correction',
+      isBillingReady: false,
+      submittedForReviewAt: hoursAgoTs(24),
+      submittedForReviewBy: userId,
+      submittedByName: 'Sarah Coordinator',
+      returnedAt: hoursAgoTs(8),
+      returnedBy: 'supervisor-demo',
+      returnedByName: 'Sam Supervisor',
+      returnReasons: [{
+        returnedAt: new Date(now.getTime() - 8 * 3600 * 1000).toISOString(),
+        returnedBy: 'supervisor-demo',
+        returnedByName: 'Sam Supervisor',
+        reason: 'Narrative insufficient',
+        comment: 'Please provide more detail about the specific topics discussed during the call.',
+      }],
+      createdAt: hoursAgoTs(24),
+      updatedAt: hoursAgoTs(8),
+    });
+
+    // 3. Visit summary — approved_with_exception
+    await addDoc(collection(db, 'visit_summaries'), {
+      organizationId,
+      individual_id: ind2.id,
+      individualId: ind2.id,
+      individualName: `${ind2.first_name} ${ind2.last_name}`,
+      individual_name: `${ind2.first_name} ${ind2.last_name}`,
+      author_uid: userId,
+      authorId: userId,
+      authorName: 'Sarah Coordinator',
+      visit_date: '2026-05-22',
+      visitDate: '2026-05-22',
+      start_time: '14:00',
+      end_time: '15:00',
+      location: '123 Main St, Indianapolis, IN',
+      purpose_of_support: 'Monthly home visit to review support plan and assess current needs.',
+      what_went_well: 'Individual was engaged and participated actively in the discussion.',
+      what_is_not_working: '',
+      next_steps: 'Coordinate with day program provider.',
+      status: 'submitted',
+      approvalStatus: 'approved_with_exception',
+      isBillingReady: true,
+      exceptionReason: 'Note submitted 3 days after visit date. Approved as content is complete and accurate.',
+      reviewedAt: hoursAgoTs(2),
+      reviewedBy: 'supervisor-demo',
+      reviewedByName: 'Sam Supervisor',
+      submittedForReviewAt: hoursAgoTs(10),
+      submittedForReviewBy: userId,
+      submittedByName: 'Sarah Coordinator',
+      returnReasons: [],
+      author_name: 'Sarah Coordinator',
+      updated_by: 'Sarah Coordinator',
+      updated_on: new Date().toLocaleDateString(),
+      createdAt: hoursAgoTs(72),
+      updatedAt: hoursAgoTs(2),
+    });
+
+    console.log('[DemoSeed] ✅ Seeded approval workflow demo data');
+  } catch (err) {
+    console.warn('[DemoSeed] Approval demo seeding failed silently:', err);
+  }
+}

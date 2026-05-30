@@ -12,11 +12,20 @@ export interface Coordinator {
   highRiskCount: number;
 }
 
+export interface NoteVersion {
+  versionNumber: number;
+  narrative: string;
+  savedAt: string;
+  savedBy: string;
+  reason?: string; // amendment reason
+}
+
 export interface SubmittedNote {
   id: string;
   personId: string;
   personName: string;
   coordinator: string;
+  coordinatorId?: string; // Firebase UID for inbox notification
   serviceCode: string;
   units: number;
   submittedAt: string; // ISO
@@ -24,10 +33,18 @@ export interface SubmittedNote {
   hasAttachments: boolean;
   hasPlanLink: boolean;
   authorizationOk: boolean;
-  status: "Pending" | "Approved" | "Rejected" | "Returned" | "Approved with override";
+  status: "Pending" | "Approved" | "Rejected" | "Returned" | "Approved with override" | "Amendment pending approval";
   narrative: string;
   startedAt: string;
   endedAt: string;
+  // Rejection / return workflow
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  // Amendment workflow
+  versionNumber?: number;
+  versions?: NoteVersion[];
+  amendmentReason?: string;
 }
 
 export interface PlanRenewal {

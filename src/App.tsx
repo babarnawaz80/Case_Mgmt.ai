@@ -44,6 +44,7 @@ function lazyWithRetry<T extends React.ComponentType<unknown>>(
 
 // ── Lazy page imports (each becomes its own chunk) ──────────────────────────
 const ConsentPortal = lazyWithRetry(() => import("./pages/ConsentPortal"));
+const GuardianPortal = lazyWithRetry(() => import("./pages/GuardianPortal"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 const SignDocument = lazyWithRetry(() => import("./pages/SignDocument"));
@@ -79,6 +80,7 @@ const PersonVisitDocument = lazyWithRetry(() => import("./pages/PersonVisitDocum
 const ExceptionsQueue = lazyWithRetry(() => import("./pages/ExceptionsQueue"));
 const SupervisorDashboard = lazyWithRetry(() => import("./pages/SupervisorDashboard"));
 const SupervisorReviewNote = lazyWithRetry(() => import("./pages/SupervisorReviewNote"));
+const SupervisorNoteReview = lazyWithRetry(() => import("./pages/SupervisorNoteReview"));
 const SupervisorCompliance = lazyWithRetry(() => import("./pages/SupervisorCompliance"));
 const PersonEligibilityVerification = lazyWithRetry(() => import("./pages/PersonEligibilityVerification"));
 const PersonEligibilityVerificationDetail = lazyWithRetry(() => import("./pages/PersonEligibilityVerificationDetail"));
@@ -208,6 +210,7 @@ const SuperAdminAIUsage = lazyWithRetry(() => import("./pages/superadmin/SuperAd
 const SuperAdminSupport = lazyWithRetry(() => import("./pages/superadmin/SuperAdminSupport"));
 const SuperAdminHealth = lazyWithRetry(() => import("./pages/superadmin/SuperAdminHealth"));
 const PlatformLogin = lazyWithRetry(() => import("./pages/PlatformLogin"));
+const DuplicateReviewPanel = lazyWithRetry(() => import("./pages/DuplicateReviewPanel"));
 
 // Static non-page imports (must not be lazy-loaded)
 
@@ -254,6 +257,9 @@ const App = () => (
             <Route path="/sign/:token" element={<SignDocument />} />
             {/* Public consent portal — no login required, opened from SMS link */}
             <Route path="/consent/:token" element={<ConsentPortal />} />
+            {/* Guardian portal — public, token-validated, mobile consumer experience */}
+            <Route path="/guardian-portal/:token/*" element={<GuardianPortal />} />
+            <Route path="/guardian-portal/:token" element={<GuardianPortal />} />
             {/* Public intake form — no login required, shared with external providers */}
             <Route path="/intake/:orgToken" element={<IntakeForm />} />
             <Route path="/companion/:token" element={<Companion />} />
@@ -266,6 +272,7 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/people" element={<ProtectedRoute><PeopleSupported /></ProtectedRoute>} />
             <Route path="/people/new" element={<ProtectedRoute><NewParticipantIntake /></ProtectedRoute>} />
+            <Route path="/people/duplicates" element={<ProtectedRoute><DuplicateReviewPanel /></ProtectedRoute>} />
             <Route path="/people/:id/profile" element={<ProtectedRoute><PersonProfile /></ProtectedRoute>} />
             <Route path="/people/:id/facesheet" element={<ProtectedRoute><PersonFaceSheet /></ProtectedRoute>} />
            <Route path="/people/:id/echart" element={<ProtectedRoute><EChart /></ProtectedRoute>} />
@@ -286,6 +293,7 @@ const App = () => (
             <Route path="/exceptions" element={<ProtectedRoute requireRole="supervisor"><ExceptionsQueue /></ProtectedRoute>} />
             <Route path="/supervisor" element={<ProtectedRoute requireRole="supervisor"><SupervisorDashboard /></ProtectedRoute>} />
             <Route path="/supervisor/review/:docId" element={<ProtectedRoute requireRole="supervisor"><SupervisorReviewNote /></ProtectedRoute>} />
+            <Route path="/supervisor/review/:collectionName/:noteId" element={<ProtectedRoute requireRole="supervisor"><SupervisorNoteReview /></ProtectedRoute>} />
             <Route path="/supervisor/compliance" element={<ProtectedRoute requireRole="supervisor"><SupervisorCompliance /></ProtectedRoute>} />
             <Route path="/people/:id/visit-summary/:visitId" element={<ProtectedRoute><PersonVisitSummaryDetail /></ProtectedRoute>} />
             <Route path="/people/:id/eligibility-verification" element={<ProtectedRoute><PersonEligibilityVerification /></ProtectedRoute>} />

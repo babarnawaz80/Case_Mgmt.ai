@@ -109,6 +109,7 @@ const RuleLibrary = lazyWithRetry(() => import("./pages/platform/RuleLibrary"));
 const NewAgentWizard = lazyWithRetry(() => import("./pages/platform/NewAgentWizard"));
 const AgentDetail = lazyWithRetry(() => import("./pages/platform/AgentDetail"));
 const BrainOrchestrator = lazyWithRetry(() => import("./pages/platform/BrainOrchestrator"));
+const PlanShareViewer = lazyWithRetry(() => import("./pages/PlanShareViewer"));
 const AssessmentBuilderList = lazyWithRetry(() => import("./pages/admin/AssessmentBuilderList"));
 const AssessmentBuilderEdit = lazyWithRetry(() => import("./pages/admin/AssessmentBuilderEdit"));
 const PersonAssessments = lazyWithRetry(() => import("./pages/PersonAssessments"));
@@ -244,6 +245,7 @@ const App = () => (
             <Route path="/platform-login" element={<PlatformLogin />} />
             <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="/companion/:token" element={<Companion />} />
+            <Route path="/shared/:token" element={<PlanShareViewer />} />
             <Route path="/care-assistant/:linkToken" element={<CareAssistant />} />
 
             {/* ── AUTHENTICATED ROUTES — require login ──────────────────── */}

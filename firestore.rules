@@ -553,6 +553,17 @@ service cloud.firestore {
       allow delete: if isAdmin() && ownedByOrg();
     }
 
+    // ─── Plan Shares (HIPAA secure links) ────────────────────────────────────
+    // Anyone can READ a share record (passcode verification happens client-side).
+    // Only authenticated users (case managers+) can CREATE shares.
+    // Only authenticated admins can delete shares.
+    match /plan_shares/{shareId} {
+      allow read: if true;                          // token is the secret; public read needed for passcode gate
+      allow create: if isCaseManager();             // only authenticated staff can create shares
+      allow update: if true;                        // access log updates happen from the public viewer
+      allow delete: if isAdmin();
+    }
+
     // ─── Default: Deny All ───────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

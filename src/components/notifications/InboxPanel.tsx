@@ -264,7 +264,7 @@ function InboxPanel({ onClose }: { onClose: () => void }) {
       {/* Slide-over panel */}
       <div
         ref={panelRef}
-        className="fixed top-0 right-0 h-full w-full sm:w-[420px] bg-icm-panel border-l border-icm-border shadow-[−4px_0_40px_rgba(0,0,0,0.12)] z-50 flex flex-col animate-in slide-in-from-right duration-200"
+        className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-icm-panel border-l border-icm-border shadow-[-4px_0_40px_rgba(0,0,0,0.12)] z-50 flex flex-col animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-icm-border shrink-0">
@@ -294,7 +294,7 @@ function InboxPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Tabs — pill chips */}
-        <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-icm-border shrink-0 overflow-x-auto scrollbar-none">
+        <div className="flex items-center flex-wrap gap-1.5 px-4 py-2.5 border-b border-icm-border shrink-0">
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;

@@ -67,12 +67,14 @@ export function IndividualComplianceGrid({
   loading,
 }: IndividualComplianceGridProps) {
   const navigate = useNavigate();
+  const PAGE_SIZE = 50;
   const [sortField, setSortField] = useState<SortField>("compliance_score");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [search, setSearch] = useState("");
   const [cmFilter, setCmFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState<"all" | "green" | "amber" | "red">("all");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   // Build task counts per individual
   const taskCounts = useMemo(() => {
@@ -141,6 +143,13 @@ export function IndividualComplianceGrid({
 
     return list;
   }, [individuals, search, cmFilter, tierFilter, sortField, sortDir]);
+
+  // Reset to page 1 when filters change (search/cm/tier changes rebuild sorted)
+  // Note: page resets happen naturally because sorted length changes trigger re-render
+  // Requires Firestore composite index for server-side: tenantId + status + lastName
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePageNum = Math.min(page, totalPages);
+  const paged = sorted.slice((safePageNum - 1) * PAGE_SIZE, safePageNum * PAGE_SIZE);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -228,7 +237,7 @@ export function IndividualComplianceGrid({
           <option value="red">Below 70% (At risk)</option>
         </select>
         <span className="text-[10.5px] font-geist text-icm-text-faint ml-auto">
-          {sorted.length} individuals
+          {sorted.length} individual{sorted.length !== 1 ? "s" : ""}{sorted.length > PAGE_SIZE ? ` · Page ${safePageNum}/${totalPages}` : ""}
         </span>
       </div>
 
@@ -267,7 +276,7 @@ export function IndividualComplianceGrid({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((ind) => {
+              {paged.map((ind) => {
                 const daysLastVisit = daysSince(ind.last_visit_date);
                 const pcpDue = ind.pcp_due_date ?? ind.isp_due_date;
                 const daysPcp = daysUntil(pcpDue);
@@ -392,6 +401,34 @@ export function IndividualComplianceGrid({
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {sorted.length > PAGE_SIZE && (
+        <div className="px-4 py-3 border-t border-icm-border flex items-center justify-between gap-3 bg-icm-bg/40">
+          <p className="text-[11.5px] font-geist text-icm-text-dim">
+            Showing {((safePageNum - 1) * PAGE_SIZE) + 1}–{Math.min(safePageNum * PAGE_SIZE, sorted.length)} of {sorted.length} individuals
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={safePageNum <= 1}
+              className="h-7 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist text-icm-text-dim hover:bg-icm-bg disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← Prev
+            </button>
+            <span className="text-[11.5px] font-geist text-icm-text-dim">
+              Page {safePageNum} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePageNum >= totalPages}
+              className="h-7 px-3 rounded-lg border border-icm-border text-[11.5px] font-geist text-icm-text-dim hover:bg-icm-bg disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -727,15 +727,7 @@ const Index = () => {
 
         {/* Chat Content */}
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* Empty state: justify-end pushes content to bottom so it sits flush above the input,
-              creating the ChatGPT/Gemini effect of greeting+input as one centered block.
-              Active state: top-anchored scrolling for messages. */}
-          <div
-            className={`flex-1 overflow-y-auto flex flex-col items-center px-6 ${
-              thread.length === 0 ? "justify-end pb-2" : "py-8 justify-start"
-            }`}
-            id="chat-scroll-area"
-          >
+          <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-8" id="chat-scroll-area">
           {thread.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -932,67 +924,14 @@ const Index = () => {
 
 
 
-          {/* Suggested Prompts + Snapshot — inside scroll area, empty state only */}
-          {thread.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="flex flex-col items-center gap-2.5 mt-4 w-full max-w-2xl pb-2"
-            >
-              <div className="grid grid-cols-2 gap-2 w-full">
-                {suggestedPrompts.slice(0, 8).map((prompt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSend(prompt.text)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200 justify-center"
-                  >
-                    <prompt.icon className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="truncate">{prompt.text}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-center gap-2 items-center w-full">
-                <div className="relative" ref={snapshotRef}>
-                  <button
-                    onClick={() => setSnapshotPickerOpen((v) => !v)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Individual Snapshot
-                  </button>
-                  {snapshotPickerOpen && (
-                    <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
-                      <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">Pick an individual</p>
-                        <input autoFocus value={snapshotQuery} onChange={(e) => setSnapshotQuery(e.target.value)} placeholder="Search…"
-                          className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400" />
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {individuals.filter((p) => `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`.toLowerCase().includes(snapshotQuery.trim().toLowerCase())).map((p) => (
-                          <button key={p.id} onClick={() => openSnapshotFor(p.id)} className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors">
-                            <PersonAvatar person={p as any} size={28} shape="circle" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{p.first_name} {p.last_name}</p>
-                              <p className="text-[11px] text-muted-foreground truncate">{p.county} · {p.enrollment_status}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
           </div>{/* closes inner scroll area */}
 
-          {/* Sticky input — no border/bg in empty state so it blends with scroll content above */}
-          <div className={`shrink-0 px-6 py-3 flex flex-col items-center ${
+          {/* Bottom section: transparent + no border on empty state (input flows naturally after stats),
+              bordered + frosted on active chat (sticky below messages) */}
+          <div className={`shrink-0 px-6 flex flex-col items-center ${
             thread.length > 0
-              ? "border-t border-border/60 bg-background/95 backdrop-blur-sm"
-              : "bg-transparent"
+              ? "border-t border-border/60 bg-background/95 backdrop-blur-sm py-3"
+              : "pb-6 pt-1 bg-transparent"
           }`}>
 
           {/* Chat Input */}
@@ -1168,7 +1107,61 @@ const Index = () => {
             </div>
           </motion.div>
 
-          </div>{/* closes sticky input area */}
+          {/* Suggestion chips + Snapshot — shown BELOW input on empty state */}
+          {thread.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="flex flex-col items-center gap-2.5 mt-3 w-full max-w-2xl"
+            >
+              <div className="grid grid-cols-2 gap-2 w-full">
+                {suggestedPrompts.slice(0, 8).map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSend(prompt.text)}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full glass text-xs text-muted-foreground hover:text-foreground hover:glow-border transition-all duration-200 justify-center"
+                  >
+                    <prompt.icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="truncate">{prompt.text}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-center gap-2 items-center w-full mt-1">
+                <div className="relative" ref={snapshotRef}>
+                  <button
+                    onClick={() => setSnapshotPickerOpen((v) => !v)}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Individual Snapshot
+                  </button>
+                  {snapshotPickerOpen && (
+                    <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">
+                      <div className="px-3 py-2 border-b border-border bg-gradient-to-r from-purple-600/10 to-violet-600/5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">Pick an individual</p>
+                        <input autoFocus value={snapshotQuery} onChange={(e) => setSnapshotQuery(e.target.value)} placeholder="Search…"
+                          className="mt-1.5 w-full bg-card border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-purple-400" />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {individuals.filter((p) => `${p.first_name} ${p.last_name} ${p.preferred_name ?? ""}`.toLowerCase().includes(snapshotQuery.trim().toLowerCase())).map((p) => (
+                          <button key={p.id} onClick={() => openSnapshotFor(p.id)} className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors">
+                            <PersonAvatar person={p as any} size={28} shape="circle" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{p.first_name} {p.last_name}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{p.county} · {p.enrollment_status}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          </div>{/* closes bottom section */}
         </div>{/* closes flex-1 min-h-0 flex flex-col */}
       </div>
     </div>

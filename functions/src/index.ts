@@ -126,6 +126,9 @@ export { detectDuplicatesScheduled, detectDuplicatesOnCreate, detectDuplicatesOn
 // ─── Document AI Scanning (Firestore trigger) ──────────────────────────────────
 export { scanDocumentOnCreate } from "./api/scanDocument";
 
+// ─── One-time data migrations (callable) ──────────────────────────────────────
+export { migrateIndividualStates } from "./api/migrateIndividualStates";
+
 // ─── Provider Portal (callable functions) ─────────────────────────────────────
 export {
   generateProviderPortalToken,

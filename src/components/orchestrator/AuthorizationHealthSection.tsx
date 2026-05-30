@@ -27,7 +27,6 @@ export function AuthorizationHealthSection({ individuals }: AuthHealthSectionPro
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (individuals.length === 0) return;
     const orgId = userProfile?.organizationId;
     if (!orgId) return;
 
@@ -37,14 +36,30 @@ export function AuthorizationHealthSection({ individuals }: AuthHealthSectionPro
         const today = new Date();
         const s: AuthStats = { totalActive: 0, expiringIn90: 0, expiringIn30: 0, expiringIn14: 0, expired: 0, overPace: 0 };
 
-        const authSnap = await getDocs(
-          query(collection(db, "service_authorizations"), where("organizationId", "==", orgId), where("status", "==", "Active"))
-        ).catch(() => ({ docs: [] as any[] }));
+        // Query without status filter to handle case variations ("Active" vs "active"),
+        // then filter in-memory for active records.
+        const [snapActive, snapLower] = await Promise.all([
+          getDocs(query(collection(db, "service_authorizations"),
+            where("organizationId", "==", orgId), where("status", "==", "Active")
+          )).catch(() => ({ docs: [] as any[] })),
+          getDocs(query(collection(db, "service_authorizations"),
+            where("organizationId", "==", orgId), where("status", "==", "active")
+          )).catch(() => ({ docs: [] as any[] })),
+        ]);
 
-        for (const d of authSnap.docs) {
+        // Deduplicate by doc ID
+        const seen = new Set<string>();
+        const allDocs: any[] = [];
+        for (const snap of [snapActive, snapLower]) {
+          for (const d of snap.docs) {
+            if (!seen.has(d.id)) { seen.add(d.id); allDocs.push(d); }
+          }
+        }
+
+        for (const d of allDocs) {
           const a = d.data();
           s.totalActive++;
-          const endRaw = a.end_date || a.expirationDate;
+          const endRaw = a.end_date || a.endDate || a.expirationDate;
           if (!endRaw) continue;
           const end = new Date(endRaw);
           const days = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -54,7 +69,7 @@ export function AuthorizationHealthSection({ individuals }: AuthHealthSectionPro
           else if (days <= 90) { s.expiringIn90++; }
 
           // Pace check
-          const startRaw = a.start_date || a.effectiveDate;
+          const startRaw = a.start_date || a.startDate || a.effectiveDate;
           if (startRaw && (a.units_authorized || a.authorizedUnits) && (a.units_used || a.unitsUsed) && days > 0) {
             const start = new Date(startRaw);
             const elapsed = Math.max(1, Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
@@ -72,7 +87,7 @@ export function AuthorizationHealthSection({ individuals }: AuthHealthSectionPro
       } catch { /* non-fatal */ }
       finally { setLoading(false); }
     })();
-  }, [individuals, userProfile?.organizationId]);
+  }, [userProfile?.organizationId]);
 
   const cards = stats ? [
     { label: "Active Authorizations", value: stats.totalActive, icon: Shield, tone: "green" as const },

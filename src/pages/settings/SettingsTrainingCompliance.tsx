@@ -14,9 +14,22 @@ import {
 interface StaffUser {
   id: string;
   displayName: string;
+  firstName?: string;
+  lastName?: string;
   role: string;
   email: string;
   status: string;
+}
+
+/** Returns "First Last" from available name fields, falling back to email prefix. */
+function staffDisplayName(s: StaffUser): string {
+  const first = s.firstName?.trim();
+  const last  = s.lastName?.trim();
+  if (first || last) return [first, last].filter(Boolean).join(" ");
+  // displayName might already be "First Last" — use it if it doesn't look like an email
+  if (s.displayName && !s.displayName.includes("@")) return s.displayName;
+  // Fall back: use the part before @ in the email
+  return (s.email || s.displayName || "Staff").split("@")[0];
 }
 
 interface TrainingRecord {
@@ -159,7 +172,7 @@ export default function SettingsTrainingCompliance() {
 
   const filteredStaff = useMemo(() => staff.filter(s => {
     if (filterRole !== "all" && s.role !== filterRole) return false;
-    if (search && !s.displayName?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !staffDisplayName(s).toLowerCase().includes(search.toLowerCase()) && !s.email?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }), [staff, filterRole, search]);
 
@@ -201,7 +214,7 @@ export default function SettingsTrainingCompliance() {
       });
       const hasIssue = cells.some(c => c === "Overdue" || c === "Missing");
       const hasExpiring = cells.some(c => c === "Expiring");
-      return [s.displayName, s.role, ...cells, hasIssue ? "Needs Attention" : hasExpiring ? "Expiring Soon" : "Current"];
+      return [staffDisplayName(s), s.role?.replace(/_/g, " "), ...cells, hasIssue ? "Needs Attention" : hasExpiring ? "Expiring Soon" : "Current"];
     });
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -303,8 +316,8 @@ export default function SettingsTrainingCompliance() {
                         <tr key={s.id} className="hover:bg-icm-bg/40">
                           <td className="px-4 py-2.5">
                             <button onClick={() => navigate(`/settings/users/${s.id}`)}
-                              className="font-semibold text-icm-accent hover:underline">{s.displayName || s.email}</button>
-                            <p className="text-[10px] text-icm-text-faint capitalize">{s.role?.replace("_", " ")}</p>
+                              className="font-semibold text-icm-accent hover:underline">{staffDisplayName(s)}</button>
+                            <p className="text-[10px] text-icm-text-faint capitalize">{s.role?.replace(/_/g, " ")}</p>
                           </td>
                           {cells.map((cell, i) => (
                             <td key={i} className={cn("px-3 py-2.5 text-center text-[14px]", CELL_CLASSES[cell.status])}>
@@ -341,7 +354,7 @@ export default function SettingsTrainingCompliance() {
                       </div>
                       <p className="font-geist font-bold text-[13.5px] text-icm-text">{item.trainingName}</p>
                       <p className="text-[12px] font-geist text-icm-text-dim mt-0.5">
-                        {item.staffMember.displayName} · {item.staffMember.role?.replace("_", " ")} ·{" "}
+                        {staffDisplayName(item.staffMember)} · {item.staffMember.role?.replace(/_/g, " ")} ·{" "}
                         {item.status === "expired"
                           ? `Expired: ${item.record.expirationDate}`
                           : `Expires: ${item.record.expirationDate}`}
@@ -353,7 +366,7 @@ export default function SettingsTrainingCompliance() {
                         <ExternalLink className="w-3 h-3" /> View Profile
                       </button>
                       <button
-                        onClick={() => sendReminder(item.staffMember.id, item.staffMember.displayName, item.trainingName)}
+                        onClick={() => sendReminder(item.staffMember.id, staffDisplayName(item.staffMember), item.trainingName)}
                         disabled={sendingReminder === item.staffMember.id + item.trainingName}
                         className="h-7 px-2.5 rounded-lg bg-icm-accent text-white text-[11.5px] font-geist font-semibold disabled:opacity-50 inline-flex items-center gap-1">
                         {sendingReminder === item.staffMember.id + item.trainingName

@@ -519,6 +519,11 @@ function BasicInfoTab({
     // Mutate the singleton so risk engine picks it up immediately
     profile.livingSituation = newVal;
 
+    // Persist to Firestore
+    updateIndividual(personId, { living_situation: newVal }).catch((err) => {
+      console.error("Failed to save living situation:", err);
+    });
+
     // Recalculate risk and show toast if level changed
     try {
       const before = calculateRiskScore(personId);
@@ -746,6 +751,7 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
           ])}
           emptyText="No diagnoses recorded. Primary diagnosis is required for Care Plan."
           addLabel="Add diagnosis"
+          onAdd={() => demoToast("Add diagnosis")}
         />
       </Section>
 
@@ -762,6 +768,7 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
           ])}
           emptyText="No medications recorded."
           addLabel="Add medication"
+          onAdd={() => demoToast("Add medication")}
         />
         <p className="text-[11px] text-icm-text-faint mt-2 font-geist">
           Medication records here are reference only. Administration is managed in the eMAR module.
@@ -779,6 +786,7 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
           ])}
           emptyText="No allergies recorded."
           addLabel="Add allergy"
+          onAdd={() => demoToast("Add allergy")}
         />
       </Section>
 
@@ -834,6 +842,7 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
           ])}
           emptyText="No providers added."
           addLabel="Add provider"
+          onAdd={() => demoToast("Add provider")}
         />
       </Section>
 
@@ -859,6 +868,7 @@ function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Ind
           ])}
           emptyText="No insurance on file."
           addLabel="Add insurance"
+          onAdd={() => demoToast("Add insurance")}
         />
       </Section>
 
@@ -1167,6 +1177,7 @@ function CourtTab({ profile, person }: { profile: ProfileData; person: Individua
               ]] : []}
               emptyText="No active court cases recorded."
               addLabel="Add case"
+              onAdd={() => demoToast("Add court case")}
             />
           </Section>
 
@@ -1892,13 +1903,13 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
                   {c.notes && ` · ${c.notes}`}
                 </p>
               </div>
-              <button className="text-icm-text-faint hover:text-icm-text">
+              <button className="text-icm-text-faint hover:text-icm-text" onClick={() => demoToast("Edit contact")}>
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
           {profile.emergencyContacts.length === 0 && <Empty text="No emergency contacts." />}
-          <button className="mt-1 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1" id="add-emergency-contact">
+          <button onClick={() => demoToast("Add emergency contact")} className="mt-1 h-8 px-3 rounded-lg border border-dashed border-icm-border text-[11.5px] text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1" id="add-emergency-contact">
             <Plus className="w-3.5 h-3.5" /> Add contact
           </button>
         </div>
@@ -1942,24 +1953,18 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
         </div>
       </Section>
 
-      <Section title="Care Team">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between py-1.5 border-b border-icm-border/40">
-            <span className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">Case Manager</span>
-            <span className="text-[12.5px] text-icm-text font-geist">{profile.caseManager}</span>
-          </div>
-          <div className="flex items-center justify-between py-1.5 border-b border-icm-border/40">
-            <span className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">Supervisor</span>
-            <span className="text-[12.5px] text-icm-text font-geist">{profile.supervisor ?? "—"}</span>
-          </div>
-          <div className="flex items-center justify-between py-1.5">
-            <span className="text-[11px] uppercase tracking-wide text-icm-text-faint font-geist">Program Coordinator</span>
-            <span className="text-[12.5px] text-icm-text font-geist">{profile.programCoordinator ?? "—"}</span>
-          </div>
+      <Section title="Care Team" onSave={async (data) => {
+        await updateIndividual(person.id, {
+          assigned_case_manager: String(data.care_case_manager ?? ""),
+          supervisor: String(data.care_supervisor ?? ""),
+          program_coordinator: String(data.care_program_coordinator ?? ""),
+        });
+      }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <EditableField label="Case Manager" name="care_case_manager" defaultValue={person.assigned_case_manager ?? profile.caseManager ?? ""} />
+          <EditableField label="Supervisor" name="care_supervisor" defaultValue={person.supervisor ?? profile.supervisor ?? ""} />
+          <EditableField label="Program Coordinator" name="care_program_coordinator" defaultValue={person.program_coordinator ?? profile.programCoordinator ?? ""} />
         </div>
-        <p className="text-[11px] text-icm-text-faint mt-2 font-geist italic">
-          Manage team assignments in Admin Settings.
-        </p>
       </Section>
 
       <Section title="Support Circle">
@@ -1985,6 +1990,7 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
           ])}
           emptyText="No support circle members yet."
           addLabel="Add member"
+          onAdd={() => demoToast("Add support circle member")}
         />
       </Section>
 
@@ -2010,6 +2016,7 @@ function ContactsTab({ profile, person }: { profile: ProfileData; person: Indivi
           ])}
           emptyText="No external providers yet."
           addLabel="Add provider"
+          onAdd={() => demoToast("Add external provider")}
         />
         {stale.length > 0 && (
           <div className="mt-3 rounded-lg border border-icm-accent/20 bg-icm-accent-soft p-3 text-[11.5px] font-geist text-icm-text flex items-start gap-2">
@@ -2049,7 +2056,7 @@ function DocumentsTab({ profile }: { profile: ProfileData }) {
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-icm-text-faint" />
             <input placeholder="Search documents…" className="modal-input pl-7" />
           </div>
-          <button className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90 flex items-center gap-1">
+          <button onClick={() => demoToast("Upload document")} className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-semibold hover:opacity-90 flex items-center gap-1">
             <Upload className="w-3.5 h-3.5" /> Upload document
           </button>
         </div>
@@ -2639,77 +2646,56 @@ function Section({ title, children, onSave }: {
   children: React.ReactNode;
   onSave?: (data: Record<string, string>) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const handleSave = async () => {
-    if (onSave) {
-      setSaving(true);
-      try {
-        const formData = formRef.current ? new FormData(formRef.current) : new FormData();
-        const data = Object.fromEntries(formData.entries()) as Record<string, string>;
-        await onSave(data);
-        toast.success(`${title} saved`);
-      } catch (err) {
-        console.error(`Failed to save ${title}:`, err);
-        toast.error(`Failed to save ${title}`);
-      } finally {
-        setSaving(false);
-      }
-    } else {
-      demoToast(`${title} saved`);
+    if (!onSave) return;
+    setSaving(true);
+    try {
+      const formData = formRef.current ? new FormData(formRef.current) : new FormData();
+      const data = Object.fromEntries(formData.entries()) as Record<string, string>;
+      await onSave(data);
+      setSaved(true);
+      toast.success(`${title} saved`);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error(`Failed to save ${title}:`, err);
+      toast.error(`Failed to save ${title}`);
+    } finally {
+      setSaving(false);
     }
-    setEditing(false);
   };
 
   return (
-    <section className={cn(
-      "rounded-xl border bg-icm-panel p-4 transition-colors",
-      editing ? "border-icm-accent ring-1 ring-icm-accent/30" : "border-icm-border"
-    )}>
+    <section className="rounded-xl border border-icm-border bg-icm-panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="icm-section-title">
-          {title}
-          {editing && <span className="ml-2 text-[10px] font-geist font-medium uppercase tracking-wide text-icm-accent">Editing</span>}
-        </h3>
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="text-[11px] font-geist text-icm-text-dim hover:text-icm-text px-2 py-1 rounded-md hover:bg-icm-bg"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="text-[11px] font-geist font-medium text-white bg-icm-accent hover:opacity-90 px-2.5 py-1 rounded-md disabled:opacity-60 flex items-center gap-1.5"
-            >
-              {saving && <Loader2 className="w-3 h-3 animate-spin" />}
-              Save
-            </button>
-          </div>
-        ) : (
+        <h3 className="icm-section-title">{title}</h3>
+        {onSave && (
           <button
             type="button"
-            onClick={() => setEditing(true)}
-            className="text-[11px] font-geist text-icm-accent hover:underline flex items-center gap-1"
+            onClick={handleSave}
+            disabled={saving}
+            className="text-[11px] font-geist font-medium text-white bg-icm-accent hover:opacity-90 px-2.5 py-1 rounded-md disabled:opacity-60 flex items-center gap-1.5"
           >
-            <Pencil className="w-3 h-3" /> Edit
+            {saving
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : saved
+                ? <CheckCircle2 className="w-3 h-3" />
+                : null}
+            {saved ? "Saved" : "Save"}
           </button>
         )}
       </div>
       <form ref={formRef} onSubmit={(e) => e.preventDefault()}>
-        <fieldset disabled={!editing} className={cn(!editing && "pointer-events-none select-text")}>
+        <fieldset>
           {children}
         </fieldset>
       </form>
-      <style>{`.modal-input { width:100%; height:32px; padding:0 8px; border-radius:8px; border:1px solid hsl(var(--icm-border)); background:white; font-size:12px; color:hsl(var(--icm-text)); font-family: inherit; }
-      textarea.modal-input { padding:8px; height:auto; }
-      fieldset:disabled .modal-input { background: hsl(var(--icm-bg)); color: hsl(var(--icm-text)); cursor: default; }`}</style>
+      <style>{`.modal-input { width:100%; height:32px; padding:0 8px; border-radius:8px; border:1px solid hsl(var(--icm-border)); background:hsl(var(--icm-panel)); font-size:12px; color:hsl(var(--icm-text)); font-family: inherit; transition: border-color 0.15s; }
+      .modal-input:focus { outline: none; border-color: hsl(var(--icm-accent)); box-shadow: 0 0 0 2px hsl(var(--icm-accent)/0.15); }
+      textarea.modal-input { padding:8px; height:auto; resize:vertical; }`}</style>
     </section>
   );
 }

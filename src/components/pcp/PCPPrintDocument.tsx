@@ -139,46 +139,62 @@ export function PCPPrintDocument({ plan, individual, organization }: PCPPrintDoc
     : null;
   const orgName = organization?.name || organization?.orgName || "CaseManagement.AI";
 
+  // Org identity block — used in both header and footer
+  const OrgIdentity = ({ size = "large" }: { size?: "large" | "small" }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: size === "large" ? "10pt" : "6pt" }}>
+      {orgLogo ? (
+        <img
+          src={orgLogo}
+          alt={orgName as string}
+          onError={() => setLogoError(true)}
+          style={{
+            height: size === "large" ? "48pt" : "18pt",
+            maxWidth: size === "large" ? "160pt" : "80pt",
+            objectFit: "contain",
+            display: "block",
+          }}
+        />
+      ) : (
+        <div style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontWeight: "bold",
+          fontSize: size === "large" ? "17pt" : "9pt",
+          letterSpacing: "0.04em",
+          color: "#111",
+          lineHeight: 1.1,
+        }}>
+          {orgName as string}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div id="pcp-print-root" className="pcp-print-document">
+
       {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "16pt", marginBottom: "8pt" }}>
-        {/* Left: Org logo or name */}
-        <div style={{ flex: "1", minWidth: "100pt" }}>
-          {orgLogo ? (
-            <img
-              src={orgLogo}
-              alt={orgName as string}
-              onError={() => setLogoError(true)}
-              style={{ maxHeight: "56pt", maxWidth: "140pt", objectFit: "contain", display: "block" }}
-            />
-          ) : (
-            <div style={{ fontFamily: "Georgia, serif", fontWeight: "bold", fontSize: "14pt", lineHeight: 1.3 }}>
-              {orgName as string}
-            </div>
-          )}
+      {/* Top row: org logo left, powered-by right */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10pt" }}>
+        <OrgIdentity size="large" />
+        <div style={{ fontSize: "7.5pt", color: "#777", textAlign: "right", marginTop: "4pt" }}>
+          Powered by CaseManagement.AI
         </div>
+      </div>
 
-        {/* Center: Plan title */}
-        <div style={{ flex: "2", textAlign: "center" }}>
-          <div style={{ fontWeight: "bold", fontSize: "15pt", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "Georgia, serif" }}>
-            Person-Centered Plan
-          </div>
-          <div style={{ fontSize: "10pt", marginTop: "4pt" }}>
-            {(p.plan_type as string) || "Individual Support Plan (ISP)"}
-          </div>
-          <div style={{ fontSize: "8.5pt", marginTop: "3pt", fontFamily: "monospace" }}>
-            Plan ID: {planId} &nbsp;|&nbsp; Status: {(p.status as string) || "Draft"}
-          </div>
-          <div style={{ fontSize: "8.5pt", marginTop: "2pt" }}>
-            Effective: {fmtDate((p.effective_date || p.effectiveDate) as string)} &nbsp;|&nbsp;
-            Annual Date: {fmtDate((p.annual_plan_date || p.annualPlanDate || p.internalDueDate) as string)}
-          </div>
+      {/* Plan title centered */}
+      <div style={{ textAlign: "center", marginBottom: "6pt" }}>
+        <div style={{ fontWeight: "bold", fontSize: "16pt", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "Georgia, serif" }}>
+          Person-Centered Plan
         </div>
-
-        {/* Right: Branding */}
-        <div style={{ flex: "1", textAlign: "right", fontSize: "7.5pt", color: "#666" }}>
-          Powered by<br /><strong style={{ color: "#333" }}>CaseManagement.AI</strong>
+        <div style={{ fontSize: "10pt", marginTop: "3pt", color: "#444" }}>
+          {(p.plan_type as string) || "Individual Support Plan (ISP)"}
+        </div>
+        <div style={{ fontSize: "8.5pt", marginTop: "3pt", fontFamily: "monospace", color: "#333" }}>
+          Plan ID: {planId} &nbsp;|&nbsp; Status: {(p.status as string) || "Draft"}
+        </div>
+        <div style={{ fontSize: "8.5pt", marginTop: "2pt", color: "#444" }}>
+          Effective: {fmtDate((p.effective_date || p.effectiveDate) as string)} &nbsp;|&nbsp;
+          Annual Date: {fmtDate((p.annual_plan_date || p.annualPlanDate || p.internalDueDate) as string)}
         </div>
       </div>
 
@@ -470,7 +486,20 @@ export function PCPPrintDocument({ plan, individual, organization }: PCPPrintDoc
       {/* ── FOOTER (every page) ───────────────────────────────────────────── */}
       <div className="print-footer">
         <span>{fullName} — {planId} — CONFIDENTIAL</span>
-        <span>Generated: {footerDate} · CaseManagement.AI</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8pt" }}>
+          <span style={{ fontSize: "7.5pt", color: "#777" }}>Generated: {footerDate}</span>
+          {orgLogo ? (
+            <img
+              src={orgLogo}
+              alt={orgName as string}
+              style={{ height: "14pt", maxWidth: "60pt", objectFit: "contain" }}
+            />
+          ) : (
+            <span style={{ fontSize: "7.5pt", fontWeight: "bold", color: "#333" }}>
+              {orgName as string}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

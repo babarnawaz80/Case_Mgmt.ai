@@ -31,6 +31,16 @@ const DEFAULT_PROMPTS = {
   escalation: `You are an escalation coordinator for a case management organization. Draft supervisor notifications that are direct, factual, and actionable. Each notification must include: individual name and ID, specific compliance gap with days overdue, regulatory risk, and recommended immediate action. Lead with priority level: CRITICAL, HIGH, or MEDIUM. Keep messages concise — supervisors need to act quickly. Do not editorialize.`,
 
   renewal: `You are a DD waiver service renewal specialist. Generate renewal packets that anticipate state review committee requirements. Include: justification for continued services, evidence of progress toward current plan goals, changes in support needs, updated risk documentation, and identification of any missing items that could cause renewal denial. Use person-first language throughout. Base all content on the individual's documentation record. Flag any gaps explicitly. Label all output as AI DRAFT — Requires CM Review before submission.`,
+
+  authorization: `You are the Authorization Agent for a DD waiver case management organization. Monitor all service authorizations and ensure no authorization expires without a renewal being initiated.
+
+EXPIRATION THRESHOLDS: 90 days = log informational · 60 days = planning task · 30 days = high-priority task + notify CM · 14 days = critical task + notify CM and supervisor · 7 days or less = escalate immediately + notify supervisor and director.
+
+PACE MONITORING: Flag any authorization where projected unit exhaustion is more than 14 days before the auth end date. For Supported Living and Community Habilitation, use a tighter threshold of 7 days.
+
+MESSAGING: Be direct and specific — include days remaining, auth number, and service name in every message. For expired auths with continued service delivery, lead with "BILLING GAP DETECTED". For pace warnings, always include the daily usage rate and projected exhaustion date.
+
+PRIORITY RULES: Billing gap violations always take priority. Expired authorizations are always CRITICAL regardless of other factors. When an individual has both a PCP compliance issue AND an auth expiration, surface both separately.`,
 };
 
 type AgentKey = keyof typeof DEFAULT_PROMPTS;
@@ -92,6 +102,15 @@ const AGENT_CONFIG: Record<AgentKey, {
     bg: "bg-purple-50",
     border: "border-l-purple-500",
     description: "Generates PCP/ISP renewal packets from 12 months of documentation. This prompt controls the renewal packet structure and clinical emphasis.",
+    usesAI: true,
+  },
+  authorization: {
+    label: "Authorization Agent",
+    icon: Shield,
+    color: "text-orange-600",
+    bg: "bg-orange-50",
+    border: "border-l-orange-500",
+    description: "Monitors service authorization expiration dates and unit utilization pace. Controls thresholds, escalation rules, and how renewal tasks are phrased.",
     usesAI: true,
   },
 };
@@ -225,7 +244,7 @@ export function PromptStudio() {
 
   const [prompts, setPrompts] = useState<typeof DEFAULT_PROMPTS>({ ...DEFAULT_PROMPTS });
   const [metas, setMetas] = useState<Record<AgentKey, PromptMeta>>({
-    compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {},
+    compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {}, authorization: {},
   });
   const [loading, setLoading] = useState(true);
 
@@ -241,10 +260,11 @@ export function PromptStudio() {
             billing: data.billing || DEFAULT_PROMPTS.billing,
             escalation: data.escalation || DEFAULT_PROMPTS.escalation,
             renewal: data.renewal || DEFAULT_PROMPTS.renewal,
+            authorization: data.authorization || DEFAULT_PROMPTS.authorization,
           });
           // Load per-agent metadata if stored
           const metaObj: Record<AgentKey, PromptMeta> = {
-            compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {},
+            compliance: {}, documentation: {}, billing: {}, escalation: {}, renewal: {}, authorization: {},
           };
           for (const key of Object.keys(metaObj) as AgentKey[]) {
             if (data[`${key}_updated_at`]) {

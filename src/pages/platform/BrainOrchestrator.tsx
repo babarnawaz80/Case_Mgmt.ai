@@ -13,6 +13,7 @@ import { IndividualComplianceGrid } from "@/components/orchestrator/IndividualCo
 import { PromptStudio } from "@/components/orchestrator/PromptStudio";
 import { ForwardComplianceCalendar, buildDeadlines } from "@/components/orchestrator/ForwardComplianceCalendar";
 import { OrchestratorRecommendations } from "@/components/orchestrator/OrchestratorRecommendations";
+import { AuthorizationHealthSection } from "@/components/orchestrator/AuthorizationHealthSection";
 import { cn } from "@/lib/utils";
 import { type Deadline } from "@/components/orchestrator/ForwardComplianceCalendar";
 
@@ -140,6 +141,7 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
             <div className={activeTab === "overview" ? "p-5" : "hidden"}>
               {mountedTabs.has("overview") && (
                 <div className="space-y-5">
+                  <AuthorizationHealthSection individuals={individuals} />
                   <IndividualComplianceGrid
                     individuals={individuals}
                     tasks={tasks}

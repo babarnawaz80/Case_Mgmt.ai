@@ -95,3 +95,14 @@ export { scheduledOrchestrator, manualOrchestratorRun } from "./orchestrator/bra
 export { generatePCP } from "./api/generatePCP";
 export { refinePCP } from "./api/refinePCP";
 export { seedValentinaDemoData } from "./api/seedValentina";
+export { generateRenewalLetter } from "./api/generateRenewalLetter";
+
+// ─── Consent Management (callable + scheduled cleanup) ────────────────────────
+export {
+  sendConsentRequest,
+  checkConsentToken,
+  sendConsentOTP,
+  verifyConsentOTP,
+  submitConsentSignature,
+  cleanupExpiredConsents,
+} from "./api/consent";

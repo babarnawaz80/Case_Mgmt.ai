@@ -27,6 +27,7 @@ import { runDocumentationAgent } from "./agents/documentationAgent";
 import { runBillingAgent } from "./agents/billingAgent";
 import { runEscalationAgent } from "./agents/escalationAgent";
 import { runRenewalAgent } from "./agents/renewalAgent";
+import { runAuthorizationAgent } from "./agents/authorizationAgent";
 
 const ORCHESTRATOR_TASKS = "orchestrator_tasks";
 const ORCHESTRATOR_RUNS = "orchestrator_runs";
@@ -239,6 +240,16 @@ async function runOrchestrator(
           }
         }
 
+        // ── Agent 6: Authorization ────────────────────────────────────────────
+        let authResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
+        if ((settings.agents_enabled as any).authorization !== false) {
+          try {
+            authResult = await runAuthorizationAgent(individual, runId, orgId, db);
+          } catch (err) {
+            errors.push(`Authorization agent failed for ${individual.id}: ${(err as Error).message}`);
+          }
+        }
+
         // ── Collect all tasks from all agents ─────────────────────────────────
         const allTasks = [
           ...complianceResult.tasks,
@@ -246,6 +257,7 @@ async function runOrchestrator(
           ...billingResult.tasks,
           ...escalationResult.tasks,
           ...renewalResult.tasks,
+          ...authResult.tasks,
         ];
 
         const allLogs = [
@@ -254,6 +266,7 @@ async function runOrchestrator(
           ...billingResult.logs,
           ...escalationResult.logs,
           ...renewalResult.logs,
+          ...authResult.logs,
         ];
 
         // ── Write tasks to both orchestrator_tasks and tasks (My Work) ─────────

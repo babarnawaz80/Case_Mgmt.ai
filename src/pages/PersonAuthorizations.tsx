@@ -12,6 +12,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProgressNotes } from "@/hooks/useProgressNotes";
 import { useCarePlans } from "@/hooks/useFirestore";
 import { toast } from "sonner";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   Plus,
   Loader2,
@@ -27,6 +30,9 @@ import {
   X,
   TrendingUp,
   TrendingDown,
+  Copy,
+  Save,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -175,90 +181,89 @@ function RenewalLetterModal({
   individualName: string;
   onClose: () => void;
 }) {
-  const { currentUser } = useAuth();
-  const { data: progressNotes } = useProgressNotes(auth.individualId);
-  const { data: carePlans } = useCarePlans(auth.individualId);
   const [letter, setLetter] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [generated, setGenerated] = useState(false);
+  const [letterId, setLetterId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [letterError, setLetterError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const generate = async () => {
-    setLoading(true);
+  // Pre-filled renewal fields
+  const newStartDate = auth.end_date
+    ? new Date(new Date(auth.end_date).getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+    : "";
+  const newEndDate = auth.end_date
+    ? new Date(new Date(auth.end_date).getTime() + 366 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+    : "";
+
+  const [renewalFields, setRenewalFields] = useState({
+    serviceName: auth.service_name,
+    payer: auth.payer,
+    procedureCode: auth.procedure_code,
+    billingPeriod: auth.billing_period || "Monthly",
+    unitsRequested: auth.units_authorized,
+    newStartDate,
+    newEndDate,
+    notes: "",
+  });
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setLetterError(null);
+    setLetter("");
     try {
-      const token = await currentUser?.getIdToken();
-      const recentNotes = progressNotes
-        .slice(0, 3)
-        .map((n: any) =>
-          `Date: ${n.date ?? n.progressDate}\nNote: ${n.purposeOfActivity ?? n.note_body ?? ""}`
-        )
-        .join("\n\n");
-      const goals = carePlans[0]?.goals?.map((g: any) => g.goal).join("; ") ?? "See care plan";
-
-      const prompt = `You are a case management specialist. Draft a professional prior authorization request letter for Medicaid reimbursement.
-
-Individual: ${individualName}
-Service: ${auth.service_name}
-Procedure Code: ${auth.procedure_code}
-Authorization #: ${auth.auth_number}
-Payer: ${auth.payer}
-Units Requested: ${auth.units_authorized}
-Billing Period: ${auth.billing_period}
-Dates: ${auth.start_date} to ${auth.end_date}
-Current Units Used: ${auth.units_used} of ${auth.units_authorized}
-
-Recent Progress Notes (last 3 months):
-${recentNotes || "No recent notes available."}
-
-Current Care Plan Goals:
-${goals}
-
-Write a complete, formal prior authorization renewal request letter. Include:
-1. Date and payer address block
-2. Individual demographics (use name provided)
-3. Service being requested with medical necessity justification
-4. Evidence of progress from progress notes
-5. Goals alignment from care plan
-6. Units requested and justification
-7. Supporting documentation statement
-8. Signature block
-
-Label this "AI DRAFTED — REVIEW BEFORE SENDING" at the top.`;
-
-      const res = await fetch(
-        "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/chat",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: prompt }),
-        }
-      );
-      const { reply } = await res.json();
-      setLetter(reply ?? "");
-      setGenerated(true);
-    } catch {
-      toast.error("Failed to generate letter.");
+      const fns = getFunctions();
+      const fn = httpsCallable(fns, "generateRenewalLetter");
+      const result = await fn({ individualId: auth.individualId, authorizationId: auth.id }) as any;
+      const data = result.data;
+      if (data.success && data.letterText) {
+        setLetter(data.letterText);
+        setLetterId(data.letterId);
+      } else {
+        setLetterError(data.message || "Generation returned empty result. Please try again.");
+      }
+    } catch (err: any) {
+      setLetterError(err.message || "Failed to generate letter. Please try again.");
     } finally {
-      setLoading(false);
+      setGenerating(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    try {
+      await addDoc(collection(db, "renewal_letters"), {
+        authorizationId: auth.id,
+        individualId: auth.individualId,
+        individualName,
+        serviceName: renewalFields.serviceName,
+        authNumber: auth.auth_number,
+        renewalFields,
+        letterText: letter || null,
+        status: "draft",
+        createdAt: serverTimestamp(),
+      });
+      toast.success("Renewal draft saved.");
+      onClose();
+    } catch {
+      toast.error("Failed to save draft.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handlePrint = () => {
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`
-      <html><head><title>Authorization Renewal Request</title>
-      <style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;font-size:14px;line-height:1.6}
-      pre{white-space:pre-wrap;font-family:inherit}</style></head>
-      <body><pre>${letter}</pre></body></html>
-    `);
+    win.document.write(`<html><head><title>Renewal Letter</title><style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;font-size:14px;line-height:1.6}pre{white-space:pre-wrap;font-family:inherit}</style></head><body><pre>${letter}</pre></body></html>`);
     win.document.close();
     win.print();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-icm-border bg-icm-panel shadow-elevated overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-icm-border">
+      <div className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border border-icm-border bg-icm-panel shadow-elevated overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-icm-border shrink-0">
           <div>
             <h2 className="font-manrope font-bold text-[15px] text-icm-text">Draft Renewal Request</h2>
             <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
@@ -270,61 +275,142 @@ Label this "AI DRAFTED — REVIEW BEFORE SENDING" at the top.`;
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {!generated && (
-            <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft p-4 text-[12.5px] font-geist text-icm-text">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-icm-accent" />
-                <span className="font-semibold">AI Renewal Letter Generator</span>
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Section 1 — Pre-filled renewal details */}
+          <div className="rounded-xl border border-icm-border bg-icm-bg p-4 space-y-3">
+            <p className="text-[10.5px] font-geist font-bold uppercase tracking-wider text-icm-text-dim">Renewal Details</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Service Name", key: "serviceName" as const },
+                { label: "Payer", key: "payer" as const },
+                { label: "Procedure Code", key: "procedureCode" as const },
+                { label: "Billing Period", key: "billingPeriod" as const },
+              ].map(({ label, key }) => (
+                <div key={key}>
+                  <label className="text-[10px] font-geist font-semibold uppercase tracking-wider text-icm-text-faint block mb-1">{label}</label>
+                  <input
+                    value={renewalFields[key] as string}
+                    onChange={e => setRenewalFields(f => ({ ...f, [key]: e.target.value }))}
+                    className="w-full h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist text-icm-text"
+                  />
+                </div>
+              ))}
+              <div>
+                <label className="text-[10px] font-geist font-semibold uppercase tracking-wider text-icm-text-faint block mb-1">Units Requested</label>
+                <input
+                  type="number"
+                  value={renewalFields.unitsRequested}
+                  onChange={e => setRenewalFields(f => ({ ...f, unitsRequested: parseInt(e.target.value) || 0 }))}
+                  className="w-full h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist text-icm-text"
+                />
               </div>
-              <p className="text-icm-text-dim">
-                Gemini will review {individualName}'s recent progress notes, care plan goals,
-                and current authorization details to draft a Medicaid prior authorization request letter.
-              </p>
-              <button
-                onClick={generate}
-                disabled={loading}
-                className="mt-3 h-9 px-4 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-accent text-white hover:opacity-90 disabled:opacity-50 transition"
-              >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                {loading ? "Generating…" : "Generate Letter"}
-              </button>
+              <div>
+                <label className="text-[10px] font-geist font-semibold uppercase tracking-wider text-icm-text-faint block mb-1">New Start Date</label>
+                <input type="date" value={renewalFields.newStartDate} onChange={e => setRenewalFields(f => ({ ...f, newStartDate: e.target.value }))}
+                  className="w-full h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist text-icm-text" />
+              </div>
+              <div>
+                <label className="text-[10px] font-geist font-semibold uppercase tracking-wider text-icm-text-faint block mb-1">New End Date</label>
+                <input type="date" value={renewalFields.newEndDate} onChange={e => setRenewalFields(f => ({ ...f, newEndDate: e.target.value }))}
+                  className="w-full h-8 px-2.5 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist text-icm-text" />
+              </div>
             </div>
-          )}
+            <div>
+              <label className="text-[10px] font-geist font-semibold uppercase tracking-wider text-icm-text-faint block mb-1">Notes</label>
+              <textarea value={renewalFields.notes} onChange={e => setRenewalFields(f => ({ ...f, notes: e.target.value }))} rows={2}
+                placeholder="Any additional notes for this renewal..."
+                className="w-full px-2.5 py-2 rounded-lg border border-icm-border bg-white text-[12.5px] font-geist text-icm-text resize-none" />
+            </div>
+          </div>
 
-          {generated && (
-            <>
-              <div className="rounded-lg border border-icm-amber/30 bg-icm-amber-soft px-3 py-2 text-[11.5px] font-geist text-icm-text flex items-center gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-icm-amber shrink-0" />
-                AI drafted — review carefully before sending. Verify all demographics and clinical details.
+          {/* Section 2 — AI Letter Generator */}
+          <div className="rounded-xl border border-icm-accent/20 bg-icm-accent-soft/40 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-icm-accent" />
+              <span className="text-[12.5px] font-geist font-semibold text-icm-text">AI Renewal Letter Generator</span>
+            </div>
+
+            {/* Not yet generated */}
+            {!generating && !letter && !letterError && (
+              <>
+                <p className="text-[12px] font-geist text-icm-text-dim">
+                  Gemini will review {individualName}'s progress notes, monitoring forms, care plan goals, and authorization history to draft a clinical Medicaid renewal letter.
+                </p>
+                <button onClick={handleGenerate}
+                  className="h-9 px-4 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-accent text-white hover:opacity-90 transition">
+                  <Sparkles className="w-3.5 h-3.5" /> Generate Letter
+                </button>
+              </>
+            )}
+
+            {/* Loading */}
+            {generating && (
+              <div className="flex flex-col items-center py-6 text-center space-y-2">
+                <Loader2 className="w-8 h-8 text-icm-accent animate-spin" />
+                <p className="text-[13px] font-geist font-semibold text-icm-text">Gemini is reviewing {individualName}'s records…</p>
+                <p className="text-[11.5px] font-geist text-icm-text-dim">Reading progress notes, care plan goals, and authorization history.</p>
+                <p className="text-[11px] font-geist text-icm-text-faint">This takes about 15–30 seconds.</p>
               </div>
-              <textarea
-                value={letter}
-                onChange={(e) => setLetter(e.target.value)}
-                rows={20}
-                className="w-full rounded-xl border border-icm-border bg-icm-bg px-4 py-3 text-[12.5px] font-mono text-icm-text resize-none focus:outline-none focus:ring-2 focus:ring-icm-accent/40"
-              />
-            </>
-          )}
+            )}
+
+            {/* Error */}
+            {letterError && !generating && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-2 rounded-lg bg-icm-red-soft border border-icm-red/20 px-3 py-2.5">
+                  <AlertTriangle className="w-4 h-4 text-icm-red shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[12px] font-geist font-semibold text-icm-red">Failed to generate letter</p>
+                    <p className="text-[11px] font-geist text-icm-text-dim mt-0.5">{letterError}</p>
+                  </div>
+                </div>
+                <button onClick={handleGenerate}
+                  className="h-8 px-3 rounded-lg text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-accent text-white hover:opacity-90 transition">
+                  <RefreshCw className="w-3.5 h-3.5" /> Try Again
+                </button>
+              </div>
+            )}
+
+            {/* Generated letter */}
+            {letter && !generating && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-icm-green" />
+                    <span className="text-[11.5px] font-geist font-semibold text-icm-text">Letter generated</span>
+                    <span className="text-[10px] font-geist font-bold px-1.5 py-0.5 rounded bg-icm-amber-soft text-icm-amber">AI Draft — Review before sending</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => { navigator.clipboard.writeText(letter); toast.success("Copied to clipboard"); }}
+                      className="h-7 px-2.5 rounded-lg border border-icm-border text-[11px] font-geist text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1">
+                      <Copy className="w-3 h-3" /> Copy
+                    </button>
+                    <button onClick={handlePrint}
+                      className="h-7 px-2.5 rounded-lg border border-icm-border text-[11px] font-geist text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1">
+                      <Printer className="w-3 h-3" /> Print/PDF
+                    </button>
+                    <button onClick={handleGenerate} disabled={generating}
+                      className="h-7 px-2.5 rounded-lg border border-icm-border text-[11px] font-geist text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Regenerate
+                    </button>
+                  </div>
+                </div>
+                <textarea value={letter} onChange={e => setLetter(e.target.value)} rows={16}
+                  style={{ minHeight: "300px" }}
+                  className="w-full rounded-xl border border-icm-border bg-white px-4 py-3 text-[12px] font-mono text-icm-text resize-y focus:outline-none focus:ring-2 focus:ring-icm-accent/40" />
+              </div>
+            )}
+          </div>
         </div>
 
-        {generated && (
-          <div className="px-5 py-3 border-t border-icm-border flex items-center gap-3">
-            <button
-              onClick={handlePrint}
-              className="h-9 px-4 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 bg-icm-accent text-white hover:opacity-90 transition"
-            >
-              <Printer className="w-3.5 h-3.5" /> Print Letter
-            </button>
-            <button
-              onClick={generate}
-              disabled={loading}
-              className="h-9 px-4 rounded-xl text-[12px] font-geist font-semibold flex items-center gap-1.5 border border-icm-border text-icm-text-dim hover:text-icm-text transition"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Regenerate
-            </button>
-          </div>
-        )}
+        {/* Section 3 — Actions */}
+        <div className="px-5 py-3 border-t border-icm-border flex items-center justify-between gap-3 shrink-0">
+          <button onClick={onClose} className="h-9 px-4 rounded-lg border border-icm-border text-[12px] font-geist font-medium text-icm-text-dim hover:bg-icm-bg">Cancel</button>
+          <button onClick={handleSaveDraft} disabled={saving}
+            className="h-9 px-4 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-50 inline-flex items-center gap-1.5">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            Save as Draft
+          </button>
+        </div>
       </div>
     </div>
   );

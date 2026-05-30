@@ -11,12 +11,11 @@ import { AgentActivityFeed } from "@/components/orchestrator/AgentActivityFeed";
 import { RunHistory } from "@/components/orchestrator/RunHistory";
 import { IndividualComplianceGrid } from "@/components/orchestrator/IndividualComplianceGrid";
 import { PromptStudio } from "@/components/orchestrator/PromptStudio";
-import { ForwardComplianceCalendar, buildDeadlines } from "@/components/orchestrator/ForwardComplianceCalendar";
+import { ForwardComplianceCalendar, buildDeadlines, type Deadline } from "@/components/orchestrator/ForwardComplianceCalendar";
 import { OrchestratorRecommendations } from "@/components/orchestrator/OrchestratorRecommendations";
 import { AuthorizationHealthSection } from "@/components/orchestrator/AuthorizationHealthSection";
 import { StateComplianceBreakdown } from "@/components/orchestrator/StateComplianceBreakdown";
 import { cn } from "@/lib/utils";
-import { type Deadline } from "@/components/orchestrator/ForwardComplianceCalendar";
 
 // ─── Tab config ────────────────────────────────────────────────────────────────
 

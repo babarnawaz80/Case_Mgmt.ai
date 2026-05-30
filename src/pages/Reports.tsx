@@ -127,15 +127,16 @@ const SAVED_REPORTS: SavedReport[] = [
   },
 ];
 
+// IDs match the REPORTS array in @/data/reports.ts — this is the source of truth
 const STANDARD_REPORTS = [
-  { id: "s1", name: "Caseload Overview", icon: Users, description: "All active individuals with risk scores, program, and coordinator.", category: "People" },
-  { id: "s2", name: "Compliance Dashboard", icon: Shield, description: "Documentation rates, overdue assessments, and PCISP status.", category: "Compliance" },
-  { id: "s3", name: "Billing Summary", icon: CreditCard, description: "Claims, unbilled units, and revenue by service type.", category: "Billing" },
-  { id: "s4", name: "Incident Summary", icon: AlertTriangle, description: "All incidents by severity, type, and resolution status.", category: "Incidents" },
-  { id: "s5", name: "Documentation Rate", icon: ClipboardList, description: "Note completion rates by coordinator and program.", category: "Documentation" },
-  { id: "s6", name: "Plan Expiration Tracker", icon: BookOpen, description: "Upcoming PCP/ISP expirations for the next 90 days.", category: "Plans" },
-  { id: "s7", name: "Workflow Status", icon: TrendingUp, description: "Open, overdue, and completed workflow tasks across the org.", category: "Operations" },
-  { id: "s8", name: "IPMG Audit Evidence Packet", icon: FileText, description: "Full audit-ready export per §17.5.5 — includes coverage matrix and compliance run history.", category: "Audit" },
+  { id: "caseload-summary",        name: "Caseload Overview",            icon: Users,         description: "All active individuals with risk scores, program, and coordinator.", category: "People" },
+  { id: "pcp-compliance",          name: "Compliance Dashboard",          icon: Shield,        description: "Documentation rates, overdue assessments, and PCP/ISP status.", category: "Compliance" },
+  { id: "billing-summary",         name: "Billing Summary",               icon: CreditCard,    description: "Claims, unbilled units, and revenue by service type.", category: "Billing" },
+  { id: "incident-summary",        name: "Incident Summary",              icon: AlertTriangle, description: "All incidents by severity, type, and resolution status.", category: "Incidents" },
+  { id: "doc-completeness",        name: "Documentation Rate",            icon: ClipboardList, description: "Note completion rates by coordinator and program.", category: "Documentation" },
+  { id: "assessment-due",          name: "Plan Expiration Tracker",       icon: BookOpen,      description: "Upcoming PCP/ISP expirations for the next 90 days.", category: "Plans" },
+  { id: "task-status",             name: "Workflow Status",               icon: TrendingUp,    description: "Open, overdue, and completed workflow tasks across the org.", category: "Operations" },
+  { id: "s8",                      name: "IPMG Audit Evidence Packet",    icon: FileText,      description: "Full audit-ready export per §17.5.5 — includes coverage matrix and compliance run history.", category: "Audit" },
 ];
 
 const CATEGORIES = ["All", "Compliance", "Documentation", "Billing", "Incidents", "Plans", "People", "Operations", "Audit"];
@@ -670,7 +671,7 @@ const Reports = () => {
         {activeTab === "standard" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {filteredStandard.map((r) => (
-              <button key={r.id} onClick={() => r.id === "s8" ? navigate("/reports/audit-evidence") : navigate(`/reports/${r.id}`)} className="group rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-accent transition-colors flex items-start gap-3">
+              <button key={r.id} onClick={() => r.id === "s8" ? navigate("/reports/audit-evidence") : navigate(`/reports/${r.id}`)} className="group rounded-xl border border-icm-border bg-icm-panel p-4 text-left hover:border-icm-accent transition-colors flex items-start gap-3" data-report-id={r.id}>
                 <div className="w-9 h-9 rounded-lg bg-icm-accent-soft flex items-center justify-center shrink-0">
                   <r.icon className="text-icm-accent" style={{ width: 18, height: 18 }} />
                 </div>

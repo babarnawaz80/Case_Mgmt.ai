@@ -727,7 +727,13 @@ const Index = () => {
 
         {/* Chat Content */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 py-8" id="chat-scroll-area">
+          {/* Empty state: no flex-1 so scroll area stays at content height,
+              input+chips in sticky section appear immediately below stats.
+              Active chat: flex-1 so messages fill remaining space. */}
+          <div
+            className={`${thread.length > 0 ? "flex-1" : ""} overflow-y-auto flex flex-col items-center px-6 py-8`}
+            id="chat-scroll-area"
+          >
           {thread.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}

@@ -175,7 +175,13 @@ const Index = () => {
   const { tasks, loading: tasksLoading } = useTasks();
   const { notes, loading: notesLoading } = useAllProgressNotes();
   const [message, setMessage] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // Open sidebar automatically on desktop if the user has prior chat history
+  const [historyOpen, setHistoryOpen] = useState(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      return loadHistory().length > 0;
+    }
+    return false;
+  });
   const [chatHistoryItems, setChatHistoryItems] = useState<ChatHistoryItem[]>(loadHistory);
   const [hoveredHistoryId, setHoveredHistoryId] = useState<string | null>(null);
   const [selectedIndividualId, setSelectedIndividualId] = useState<string | null>(null);
@@ -620,7 +626,7 @@ const Index = () => {
             </button>
             {thread.length > 0 && (
               <button
-                onClick={() => { setThread([]); setMessage(""); setActiveIndividualId(null); setSelectedIndividualId(null); }}
+                onClick={startNewChat}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-border/50"
                 title="New chat"
               >
@@ -628,14 +634,18 @@ const Index = () => {
                 New chat
               </button>
             )}
-            <NavLink to="/home" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title="Go to Chat Home">
+            <button
+              onClick={startNewChat}
+              className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+              title="Back to home"
+            >
               <img
                 src={brandLogo}
                 alt="CaseManagement AI by iCareManager"
                 className="h-8 w-auto object-contain"
               />
               <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
-            </NavLink>
+            </button>
             {/* Org customer logo */}
             {logoUrl && !logoError && (() => {
               const isExternal = logoLinkUrl && (logoLinkUrl.startsWith("http://") || logoLinkUrl.startsWith("https://"));

@@ -145,7 +145,17 @@ function IndividualSearchSelect({
                   <p className="text-[12.5px] font-geist font-semibold text-icm-text">
                     {p.last_name}, {p.first_name}
                   </p>
-                  <p className="text-[10.5px] font-mono text-icm-text-dim">{p.id}</p>
+                  {(() => {
+                    const dob = p.dob || p.date_of_birth;
+                    const meta = p.medicaid_id
+                      ? `MA# ${p.medicaid_id}`
+                      : dob
+                        ? `DOB ${dob}`
+                        : p.program || "";
+                    return meta ? (
+                      <p className="text-[10.5px] font-geist text-icm-text-dim">{meta}</p>
+                    ) : null;
+                  })()}
                 </div>
               </button>
             ))

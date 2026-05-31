@@ -1084,7 +1084,7 @@ export function useAllAuthorizations(
       }
     );
     return unsub;
-  }, [organizationId, caseManagerId]);
+  }, [organizationId]);
 
   return { data, loading, error };
 }

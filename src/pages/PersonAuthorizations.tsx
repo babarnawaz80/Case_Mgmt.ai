@@ -604,7 +604,7 @@ const PersonAuthorizations = () => {
                           <UnitBar auth={auth} />
                         </td>
                         <td className="px-4 py-3 text-icm-text-dim capitalize whitespace-nowrap">
-                          {auth.billing_period.replace("_", "-")}
+                          {auth.billing_period ? auth.billing_period.replace("_", "-") : "—"}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <p className="text-icm-text-dim text-[11px]">

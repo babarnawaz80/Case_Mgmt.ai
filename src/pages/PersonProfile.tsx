@@ -1301,187 +1301,47 @@ function ProgramTab({ profile, person }: { profile: ProfileData; person: Individ
     return unsub;
   }, [individualId]);
 
-  // Merge Firestore enrollments with static seed data (Firestore wins if any exist)
-  const displayEnrollments = fsEnrollments.length > 0 ? fsEnrollments : profile.enrollments;
+  // Use Firestore enrollments only (subcollection is source of truth)
+  const indState = (person as any).state || (person as any).address_state;
 
-  const indState = profile.state || (profile as any).address_state;
-
-  // ── Program assignment state ─────────────────────────────────────────────
-  const [programModalOpen, setProgramModalOpen] = useState(false);
-  const [availablePrograms, setAvailablePrograms] = useState<Array<{
-    id: string; name: string; state: string; payer: string; code: string; active: boolean;
-  }>>([]);
-  const [loadingPrograms, setLoadingPrograms] = useState(false);
-  const [assigningProgram, setAssigningProgram] = useState(false);
-  const [programSearch, setProgramSearch] = useState("");
-
-  // Current program data (denormalized on individual doc)
-  const currentProgram = (person as any).programName ?? (person as any).program ?? null;
-  const currentProgramId = (person as any).programId ?? null;
-  const currentProgramState = (person as any).state ?? (person as any).address_state ?? null;
-  const currentProgramPayer = (person as any).payer ?? null;
-  const currentProgramCode = (person as any).programCode ?? null;
-
-  const openProgramModal = async () => {
-    setProgramModalOpen(true);
-    setLoadingPrograms(true);
-    setProgramSearch("");
-    try {
-      if (!userProfile?.organizationId) return;
-      const snap = await getDocs(
-        query(
-          collection(db, "programs"),
-          where("organizationId", "==", userProfile.organizationId)
-        )
-      );
-      setAvailablePrograms(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as any))
-          .filter((p: any) => p.active !== false)
-      );
-    } catch {
-      toast.error("Could not load programs.");
-    } finally {
-      setLoadingPrograms(false);
-    }
-  };
-
-  const assignProgram = async (prog: { id: string; name: string; state: string; payer: string; code: string }) => {
+  // Discharge an active enrollment
+  const handleDischarge = async (enrollmentId: string, programName: string) => {
     if (!individualId) return;
-    setAssigningProgram(true);
+    if (!confirm(`Discharge ${person.first_name} from "${programName}"?`)) return;
     try {
-      await updateDoc(doc(db, "individuals", individualId), {
-        programId:   prog.id,
-        programName: prog.name,
-        programCode: prog.code,
-        program:     prog.name,
-        // Program enrollment state — authoritative for orchestrator/reporting.
-        // Canonicalized ("IN" → "Indiana") so stored values stay uniform.
-        state:       canonicalState(prog.state) ?? prog.state,
-        payer:       prog.payer,
-        updatedAt:   serverTimestamp(),
+      await updateDoc(doc(db, "individuals", individualId, "program_enrollments", enrollmentId), {
+        status: "Discharged",
+        dischargeDate: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
+        dischargedBy: userProfile?.displayName ?? "Case Manager",
+        updatedAt: serverTimestamp(),
       });
-      toast.success(`Program updated to ${prog.name} (${prog.state})`);
-      setProgramModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to update program.");
-    } finally {
-      setAssigningProgram(false);
+      // Re-derive individual.state from most recent remaining active enrollment
+      const remaining = fsEnrollments.filter(e => e.id !== enrollmentId && e.status === "Active");
+      if (remaining.length > 0) {
+        const mostRecent = remaining[remaining.length - 1] as any;
+        if (mostRecent.programState) {
+          await updateDoc(doc(db, "individuals", individualId), {
+            state: mostRecent.programState,
+            programId: mostRecent.programId ?? "",
+            programName: mostRecent.program ?? "",
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } else {
+        // No active enrollments left — clear program state
+        await updateDoc(doc(db, "individuals", individualId), {
+          state: null,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      toast.success(`Discharged from ${programName}`);
+    } catch (err: any) {
+      toast.error("Failed to discharge: " + err.message);
     }
   };
-
-  const filteredPrograms = programSearch
-    ? availablePrograms.filter((p) =>
-        `${p.name} ${p.state} ${p.payer}`.toLowerCase().includes(programSearch.toLowerCase())
-      )
-    : availablePrograms;
 
   return (
     <div className="space-y-4">
-
-      {/* ── Current Program ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-icm-border bg-icm-bg">
-          <p className="text-[10.5px] font-geist font-bold uppercase tracking-wider text-icm-text-dim">
-            Current Program
-          </p>
-          <button
-            onClick={openProgramModal}
-            className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-geist font-semibold text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
-          >
-            {currentProgram ? "Change Program" : "+ Assign Program"}
-          </button>
-        </div>
-        {currentProgram ? (
-          <div className="p-4">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <ProgramDetailRow label="Program" value={currentProgram} />
-              <ProgramDetailRow label="State" value={currentProgramState} />
-              <ProgramDetailRow label="Payer" value={currentProgramPayer} />
-              <ProgramDetailRow label="Code" value={currentProgramCode} />
-            </dl>
-          </div>
-        ) : (
-          <div className="p-5 text-center">
-            <p className="text-[13px] text-icm-text-dim font-geist">No program assigned yet.</p>
-            <button
-              onClick={openProgramModal}
-              className="mt-2 h-8 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
-            >
-              + Assign Program
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Assign Program Modal ─────────────────────────────────────────────── */}
-      {programModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setProgramModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-[520px] rounded-2xl bg-icm-panel border border-icm-border shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-icm-border">
-              <div>
-                <h2 className="font-manrope font-bold text-[15px] text-icm-text">Assign Program</h2>
-                <p className="text-[11.5px] text-icm-text-dim font-geist">
-                  Select the program for {person.first_name} {person.last_name}
-                </p>
-              </div>
-              <button onClick={() => setProgramModalOpen(false)} className="w-8 h-8 rounded-lg hover:bg-icm-bg text-icm-text-dim flex items-center justify-center">
-                ✕
-              </button>
-            </div>
-            <div className="p-3 border-b border-icm-border">
-              <input
-                value={programSearch}
-                onChange={(e) => setProgramSearch(e.target.value)}
-                placeholder="Search programs…"
-                className="w-full h-9 px-3 rounded-xl border border-icm-border bg-white text-[12.5px] font-geist focus:outline-none focus:border-icm-border-strong"
-                autoFocus
-              />
-            </div>
-            <div className="max-h-[360px] overflow-y-auto">
-              {loadingPrograms ? (
-                <div className="py-8 flex items-center justify-center gap-2 text-icm-text-dim">
-                  <div className="w-4 h-4 border-2 border-icm-accent border-t-transparent rounded-full animate-spin" />
-                  <span className="text-[12px] font-geist">Loading programs…</span>
-                </div>
-              ) : filteredPrograms.length === 0 ? (
-                <p className="text-center text-[12px] text-icm-text-dim py-8">No active programs found.</p>
-              ) : (
-                <div className="p-2 space-y-1.5">
-                  {filteredPrograms.map((prog) => (
-                    <div
-                      key={prog.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-icm-border p-3 hover:border-icm-border-strong hover:bg-icm-bg transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-manrope font-bold text-[13.5px] text-icm-text">{prog.name}</p>
-                        <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">
-                          {[prog.state, prog.payer, prog.code ? `Code: ${prog.code}` : null]
-                            .filter(Boolean).join(" · ")}
-                        </p>
-                      </div>
-                      <button
-                        disabled={assigningProgram}
-                        onClick={() => assignProgram(prog)}
-                        className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[11.5px] font-geist font-semibold shrink-0 hover:opacity-90 disabled:opacity-50"
-                      >
-                        Select
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Orchestrator Engine Status */}
       {orchEngine !== null && (
@@ -1542,37 +1402,74 @@ function ProgramTab({ profile, person }: { profile: ProfileData; person: Individ
         </div>
       )}
 
-      <Section title="Current Programs">
-        <DataTable
-          columns={["Program", "Service Category", "Start", "Status", "Case Manager"]}
-          rows={displayEnrollments.map((e) => [
-            <span key="p" className="font-semibold">{e.program}</span>,
-            e.serviceCategory,
-            e.startDate,
-            <ProgramStatusBadge key="s" status={e.status as any} />,
-            e.caseManager,
-          ])}
-          emptyText="Not enrolled in any program yet."
-          addLabel="Enroll in program"
-          onAdd={() => setEnrollModalOpen(true)}
-        />
-      </Section>
-
-      <Section title="Service Categories">
-        {displayEnrollments.map((e) => (
-          <div
-            key={e.serviceCategory}
-            className="rounded-lg border border-icm-border bg-icm-bg p-3 mb-2 last:mb-0"
+      {/* ── Program Enrollments ────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-icm-border bg-icm-bg">
+          <p className="text-[10.5px] font-geist font-bold uppercase tracking-wider text-icm-text-dim">Programs</p>
+          <button
+            onClick={() => setEnrollModalOpen(true)}
+            className="h-7 px-2.5 rounded-lg border border-icm-border bg-icm-panel text-[11px] font-geist font-semibold text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5 transition-colors"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-[13px] font-semibold text-icm-text font-geist">{e.serviceCategory}</p>
-            </div>
-            <p className="text-[11.5px] text-icm-text-dim mt-0.5">
-              Program: {e.program} · Status: {e.status} · Started: {e.startDate}
-            </p>
+            + Enroll in program
+          </button>
+        </div>
+
+        {fsEnrollments.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-[13px] text-icm-text-dim font-geist">Not enrolled in any program yet.</p>
+            <button
+              onClick={() => setEnrollModalOpen(true)}
+              className="mt-2 h-8 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:opacity-90"
+            >
+              + Enroll in program
+            </button>
           </div>
-        ))}
-      </Section>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px] font-geist">
+              <thead>
+                <tr className="border-b border-icm-border bg-icm-bg/40">
+                  <th className="text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-icm-text-faint">Program</th>
+                  <th className="text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-icm-text-faint">State</th>
+                  <th className="text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-icm-text-faint">Service Category</th>
+                  <th className="text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-icm-text-faint">Start</th>
+                  <th className="text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-icm-text-faint">Status</th>
+                  <th className="text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-icm-text-faint">Case Manager</th>
+                  <th className="px-4 py-2 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {fsEnrollments.map((e: any) => (
+                  <tr key={e.id} className="border-b border-icm-border last:border-0 hover:bg-icm-bg/40 transition-colors">
+                    <td className="px-4 py-2.5 font-semibold text-icm-text">{e.program}</td>
+                    <td className="px-4 py-2.5 text-icm-text-dim">{(e as any).programState ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-icm-text-dim">{e.serviceCategory ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-icm-text-dim whitespace-nowrap">{e.startDate ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <ProgramStatusBadge status={e.status as any} />
+                      {e.dischargeDate && (
+                        <span className="text-[10px] text-icm-text-faint ml-1.5">{e.dischargeDate}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-icm-text-dim">{e.caseManager ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      {e.status === "Active" && (
+                        <button
+                          onClick={() => handleDischarge(e.id, e.program)}
+                          className="text-[10.5px] font-geist font-semibold text-icm-red hover:underline"
+                          title="Discharge from program"
+                        >
+                          Discharge
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Service Providers — live from individual_providers collection */}
       {individualId && (
@@ -1605,45 +1502,61 @@ function EnrollProgramModal({
   onClose: () => void;
 }) {
   const { userProfile } = useAuth();
-  const [programs, setPrograms] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [programs, setPrograms] = useState<Array<{
+    id: string; name: string; state: string; code: string; payer: string;
+  }>>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    programId: "",
-    programName: "",
-    serviceCategory: "",
-    startDate: new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }),
-    status: "Active" as "Active" | "Pending" | "On Hold",
-  });
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [serviceCategory, setServiceCategory] = useState("");
+  const [startDate, setStartDate] = useState(
+    new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
+  );
 
-  // Load org programs from Firestore
   useEffect(() => {
     if (!userProfile?.organizationId) return;
-    const q = query(
-      collection(db, "programs"),
-      where("organizationId", "==", userProfile.organizationId)
-    );
-    getDocs(q).then((snap) => {
-      setPrograms(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-      setLoadingPrograms(false);
-    }).catch(() => setLoadingPrograms(false));
+    getDocs(query(collection(db, "programs"), where("organizationId", "==", userProfile.organizationId)))
+      .then((snap) => {
+        setPrograms(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+        setLoadingPrograms(false);
+      }).catch(() => setLoadingPrograms(false));
   }, [userProfile?.organizationId]);
 
+  const selectedProgram = programs.find(p => p.id === selectedProgramId) ?? null;
+
   const handleSave = async () => {
-    if (!form.programName) { toast.error("Select a program"); return; }
+    if (!selectedProgram) { toast.error("Select a program"); return; }
     setSaving(true);
     try {
+      const programState = canonicalState(selectedProgram.state) ?? selectedProgram.state ?? null;
+
+      // Save to program_enrollments subcollection
       await addDoc(collection(db, "individuals", individualId, "program_enrollments"), {
-        program: form.programName,
-        serviceCategory: form.serviceCategory || form.programName,
-        startDate: form.startDate,
-        status: form.status,
-        caseManager: caseManagerName,
-        enrolledAt: serverTimestamp(),
-        enrolledBy: userProfile?.uid ?? "",
-        organizationId: userProfile?.organizationId ?? "",
+        program:         selectedProgram.name,
+        programId:       selectedProgram.id,
+        programState,                          // stored so table can display it without a join
+        serviceCategory: serviceCategory.trim() || selectedProgram.name,
+        startDate,
+        status:          "Active",
+        caseManager:     caseManagerName,
+        enrolledAt:      serverTimestamp(),
+        enrolledBy:      userProfile?.uid ?? "",
+        organizationId:  userProfile?.organizationId ?? "",
       });
-      toast.success("Enrolled in " + form.programName);
+
+      // Update individual's top-level state from this (most recent) enrollment
+      if (programState) {
+        await updateDoc(doc(db, "individuals", individualId), {
+          state:       programState,
+          programId:   selectedProgram.id,
+          programName: selectedProgram.name,
+          program:     selectedProgram.name,
+          payer:       selectedProgram.payer ?? null,
+          updatedAt:   serverTimestamp(),
+        });
+      }
+
+      toast.success(`Enrolled in ${selectedProgram.name} · State: ${programState ?? "—"}`);
       onClose();
     } catch (err: any) {
       toast.error("Failed to save: " + err.message);
@@ -1678,74 +1591,61 @@ function EnrollProgramModal({
             </p>
           ) : (
             <select
-              value={form.programId}
-              onChange={(e) => {
-                const prog = programs.find((p) => p.id === e.target.value);
-                setForm((f) => ({ ...f, programId: e.target.value, programName: prog?.name ?? "" }));
-              }}
+              value={selectedProgramId}
+              onChange={(e) => setSelectedProgramId(e.target.value)}
               className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
             >
               <option value="">Select a program…</option>
               {programs.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} {p.code ? `(${p.code})` : ""}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.state ? ` — ${p.state}` : ""}
+                </option>
               ))}
             </select>
+          )}
+          {/* Show resolved state under the dropdown — not editable, set by program */}
+          {selectedProgram && (
+            <p className="text-[11.5px] font-geist text-icm-text-dim mt-1">
+              State: <span className="font-semibold text-icm-text">{canonicalState(selectedProgram.state) ?? selectedProgram.state ?? "—"}</span>
+              <span className="ml-2 text-icm-text-faint">· Set automatically from program</span>
+            </p>
           )}
         </div>
 
         {/* Service Category */}
         <div className="space-y-1.5">
-          <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Service Category</label>
+          <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Service Category <span className="text-icm-text-faint normal-case">(optional)</span></label>
           <input
             type="text"
             placeholder="e.g. Medicaid | Case Management"
-            value={form.serviceCategory}
-            onChange={(e) => setForm((f) => ({ ...f, serviceCategory: e.target.value }))}
+            value={serviceCategory}
+            onChange={(e) => setServiceCategory(e.target.value)}
             className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
           />
         </div>
 
-        {/* Start Date + Status row */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Start Date</label>
-            <input
-              type="date"
-              value={form.startDate.split("/").length === 3
-                ? `${form.startDate.split("/")[2]}-${form.startDate.split("/")[0].padStart(2,"0")}-${form.startDate.split("/")[1].padStart(2,"0")}`
-                : form.startDate}
-              onChange={(e) => {
-                const d = new Date(e.target.value + "T12:00:00");
-                setForm((f) => ({ ...f, startDate: d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }) }));
-              }}
-              className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Status</label>
-            <select
-              value={form.status}
-              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}
-              className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
-            >
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="On Hold">On Hold</option>
-            </select>
-          </div>
+        {/* Start Date */}
+        <div className="space-y-1.5">
+          <label className="text-[11px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Start Date</label>
+          <input
+            type="date"
+            defaultValue={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => {
+              const d = new Date(e.target.value + "T12:00:00");
+              setStartDate(d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }));
+            }}
+            className="w-full h-9 rounded-lg border border-icm-border bg-icm-bg px-3 text-[13px] font-geist text-icm-text focus:outline-none focus:border-icm-accent"
+          />
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button
-            onClick={onClose}
-            className="h-8 px-4 rounded-lg border border-icm-border text-[12.5px] font-geist font-semibold text-icm-text-dim hover:text-icm-text"
-          >
+          <button onClick={onClose} className="h-8 px-4 rounded-lg border border-icm-border text-[12.5px] font-geist font-semibold text-icm-text-dim hover:text-icm-text">
             Cancel
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !form.programName}
+            disabled={saving || !selectedProgramId}
             className="h-8 px-4 rounded-lg bg-icm-accent text-white text-[12.5px] font-geist font-semibold hover:bg-icm-accent/90 disabled:opacity-50 flex items-center gap-1.5"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}

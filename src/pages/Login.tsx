@@ -352,7 +352,7 @@ export default function Login() {
 
           <div className="absolute top-8 left-8 right-8 flex items-center justify-between text-white/90">
             <span className="text-[12px] font-semibold tracking-[0.2em] uppercase">
-              HIPAA-compliant AI · SOC 2 in progress
+              HIPAA Compliant
             </span>
           </div>
 

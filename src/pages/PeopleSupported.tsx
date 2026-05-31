@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -16,7 +16,17 @@ import {
   Loader2,
   FileUp,
   AlertTriangle,
+  CheckSquare,
+  Square,
+  ChevronUp,
+  X,
+  UserCog,
+  FolderInput,
+  Activity,
+  Check,
 } from "lucide-react";
+import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { toast } from "sonner";
 import { ImportWizardModal } from "@/components/ImportWizardModal";
 import {
   useIndividuals,
@@ -170,6 +180,92 @@ const PeopleSupported = () => {
   const highRiskCount = filtered.filter(p => (computedScores[p.id] ?? p.risk_score ?? 0) >= 60).length;
   const alertCount = filtered.filter(p => (p.alerts?.length ?? 0) > 0 || (p.open_incidents ?? 0) > 0).length;
 
+  // ── Bulk selection state ───────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"status" | "program" | "case_manager" | null>(null);
+  const [bulkValue, setBulkValue] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [programOptions, setProgramOptions] = useState<string[]>([]);
+  const bulkRef = useRef<HTMLDivElement>(null);
+
+  // Load program names for the Move to Program dropdown
+  useEffect(() => {
+    const orgId = userProfile?.organizationId;
+    if (!orgId) return;
+    getDocs(firestoreQuery(collection(db, "programs"), where("organizationId", "==", orgId)))
+      .then((snap) => {
+        const names = snap.docs.map(d => d.data().name as string).filter(Boolean).sort();
+        setProgramOptions(names);
+      })
+      .catch(() => {});
+  }, [userProfile?.organizationId]);
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      // Deselect all filtered
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        filtered.forEach(p => next.delete(p.id));
+        return next;
+      });
+    } else {
+      // Select all filtered
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        filtered.forEach(p => next.add(p.id));
+        return next;
+      });
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setBulkAction(null);
+    setBulkValue("");
+  }
+
+  async function applyBulkAction() {
+    if (!bulkAction || !bulkValue.trim() || selectedIds.size === 0) return;
+    setBulkSaving(true);
+    try {
+      // Firestore batch — max 500 ops; split if needed
+      const ids = Array.from(selectedIds);
+      const CHUNK = 400;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + CHUNK).forEach(id => {
+          const ref = doc(db, "individuals", id);
+          if (bulkAction === "status") {
+            batch.update(ref, { enrollment_status: bulkValue.toLowerCase(), updated_at: serverTimestamp() });
+          } else if (bulkAction === "program") {
+            batch.update(ref, { program: bulkValue, updated_at: serverTimestamp() });
+          } else if (bulkAction === "case_manager") {
+            batch.update(ref, { assigned_case_manager: bulkValue, updated_at: serverTimestamp() });
+          }
+        });
+        await batch.commit();
+      }
+      const label = bulkAction === "status" ? `Status → ${bulkValue}` : bulkAction === "program" ? `Program → ${bulkValue}` : `Case Manager → ${bulkValue}`;
+      toast.success(`Updated ${selectedIds.size} ${selectedIds.size === 1 ? "person" : "people"}: ${label}`);
+      clearSelection();
+    } catch (err: any) {
+      toast.error("Bulk update failed: " + (err?.message ?? err));
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
 
   return (
     <ICMShell title="People Supported" showAIPanel={false}>
@@ -311,14 +407,139 @@ const PeopleSupported = () => {
           </div>
         )}
 
+        {/* ── Bulk action toolbar ───────────────────────────────────────────── */}
+        {someSelected && (
+          <div className="sticky top-2 z-30 rounded-xl border border-icm-accent/30 bg-icm-panel shadow-elevated px-4 py-3 flex flex-wrap items-center gap-3" ref={bulkRef}>
+            {/* Selection count */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={clearSelection} className="w-6 h-6 rounded flex items-center justify-center text-icm-text-dim hover:text-icm-text hover:bg-icm-bg">
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[13px] font-geist font-semibold text-icm-text">
+                {selectedIds.size} selected
+              </span>
+            </div>
+
+            <div className="w-px h-5 bg-icm-border" />
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              {/* Change Status */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setBulkAction(bulkAction === "status" ? null : "status"); setBulkValue(""); }}
+                  className={`h-8 px-3 rounded-lg text-[11.5px] font-geist font-semibold flex items-center gap-1.5 border transition-colors ${bulkAction === "status" ? "bg-icm-accent text-white border-icm-accent" : "border-icm-border text-icm-text-dim hover:text-icm-text hover:border-icm-accent/40"}`}
+                >
+                  <Activity className="w-3.5 h-3.5" /> Change Status
+                </button>
+                {bulkAction === "status" && (
+                  <select
+                    value={bulkValue}
+                    onChange={e => setBulkValue(e.target.value)}
+                    className="h-8 px-2 rounded-lg border border-icm-accent/40 bg-icm-bg text-[12px] font-geist focus:outline-none focus:border-icm-accent"
+                    autoFocus
+                  >
+                    <option value="">— Select status —</option>
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="transition">Transition</option>
+                    <option value="discharged">Discharged</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Move to Program */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setBulkAction(bulkAction === "program" ? null : "program"); setBulkValue(""); }}
+                  className={`h-8 px-3 rounded-lg text-[11.5px] font-geist font-semibold flex items-center gap-1.5 border transition-colors ${bulkAction === "program" ? "bg-icm-accent text-white border-icm-accent" : "border-icm-border text-icm-text-dim hover:text-icm-text hover:border-icm-accent/40"}`}
+                >
+                  <FolderInput className="w-3.5 h-3.5" /> Move to Program
+                </button>
+                {bulkAction === "program" && (
+                  <select
+                    value={bulkValue}
+                    onChange={e => setBulkValue(e.target.value)}
+                    className="h-8 px-2 rounded-lg border border-icm-accent/40 bg-icm-bg text-[12px] font-geist focus:outline-none focus:border-icm-accent"
+                    autoFocus
+                  >
+                    <option value="">— Select program —</option>
+                    {programOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                    {programOptions.length === 0 && <option disabled>No programs configured</option>}
+                  </select>
+                )}
+              </div>
+
+              {/* Reassign Case Manager */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setBulkAction(bulkAction === "case_manager" ? null : "case_manager"); setBulkValue(""); }}
+                  className={`h-8 px-3 rounded-lg text-[11.5px] font-geist font-semibold flex items-center gap-1.5 border transition-colors ${bulkAction === "case_manager" ? "bg-icm-accent text-white border-icm-accent" : "border-icm-border text-icm-text-dim hover:text-icm-text hover:border-icm-accent/40"}`}
+                >
+                  <UserCog className="w-3.5 h-3.5" /> Assign Case Manager
+                </button>
+                {bulkAction === "case_manager" && (
+                  <input
+                    value={bulkValue}
+                    onChange={e => setBulkValue(e.target.value)}
+                    placeholder="Case manager name…"
+                    autoFocus
+                    className="h-8 px-2 rounded-lg border border-icm-accent/40 bg-icm-bg text-[12px] font-geist focus:outline-none focus:border-icm-accent w-44"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Apply button */}
+            {bulkAction && bulkValue.trim() && (
+              <button
+                onClick={applyBulkAction}
+                disabled={bulkSaving}
+                className="h-8 px-4 rounded-lg bg-icm-accent text-white text-[12px] font-geist font-semibold flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50 shrink-0"
+              >
+                {bulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Apply to {selectedIds.size}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* People rows */}
         {!loading && (
           <div className="space-y-2.5">
+            {/* Select-all header row */}
+            {filtered.length > 0 && (
+              <div className="flex items-center gap-3 px-3 py-1.5">
+                <button
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-2 text-[11.5px] font-geist font-medium text-icm-text-dim hover:text-icm-text transition-colors"
+                  title={allFilteredSelected ? "Deselect all" : "Select all"}
+                >
+                  {allFilteredSelected
+                    ? <CheckSquare className="w-4 h-4 text-icm-accent" />
+                    : someSelected && filtered.some(p => selectedIds.has(p.id))
+                      ? <CheckSquare className="w-4 h-4 text-icm-accent/50" />
+                      : <Square className="w-4 h-4" />
+                  }
+                  <span>
+                    {allFilteredSelected
+                      ? `All ${filtered.length} selected`
+                      : someSelected
+                        ? `${selectedIds.size} selected · Select all ${filtered.length}`
+                        : `Select all ${filtered.length}`
+                    }
+                  </span>
+                </button>
+              </div>
+            )}
+
             {filtered.map((p) => (
               <PersonRow
                 key={p.id}
                 person={p}
                 computedScore={computedScores[p.id]}
+                selected={selectedIds.has(p.id)}
+                onToggleSelect={() => toggleSelect(p.id)}
                 onOpen={() => navigate(`/people/${p.id}/echart`)}
                 onOpenFaceSheet={() => navigate(`/people/${p.id}/facesheet`)}
                 onOpenProfile={() => navigate(`/people/${p.id}/profile`)}
@@ -388,9 +609,11 @@ function FilterSelect({
   );
 }
 
-function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfile, onOpenRisk, duplicatePairId, onReviewDuplicate }: {
+function PersonRow({ person, computedScore, selected, onToggleSelect, onOpen, onOpenFaceSheet, onOpenProfile, onOpenRisk, duplicatePairId, onReviewDuplicate }: {
   person: Individual;
   computedScore?: number;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onOpen: () => void;
   onOpenFaceSheet: () => void;
   onOpenProfile: () => void;
@@ -404,7 +627,17 @@ function PersonRow({ person, computedScore, onOpen, onOpenFaceSheet, onOpenProfi
 
 
   return (
-    <div className="rounded-xl border border-icm-border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all">
+    <div className={`rounded-xl border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all ${selected ? "border-icm-accent/50 bg-icm-accent-soft/20" : "border-icm-border"}`}>
+      {/* Checkbox */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
+        className="shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors hover:border-icm-accent focus:outline-none"
+        style={{ borderColor: selected ? "hsl(var(--icm-accent))" : undefined }}
+        title={selected ? "Deselect" : "Select"}
+      >
+        {selected && <Check className="w-3 h-3 text-icm-accent" />}
+      </button>
+
       {/* Avatar — shows photo if uploaded, falls back to risk-tinted initials */}
       <PersonAvatar
         person={person}

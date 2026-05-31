@@ -87,23 +87,21 @@ async function runMigrationIfNeeded(orgId: string) {
     const q = query(collection(db, "programs"), where("organizationId", "==", orgId));
     const snap = await getDocs(q);
 
-    // 1. Update programs missing the state field
+    // 1. Fix programs whose stored state doesn't match their name.
+    //    E.g. "NJ Case Mgmt" stored as state:"Indiana" → fix to "New Jersey".
     const updatePromises: Promise<void>[] = [];
     snap.docs.forEach((d) => {
       const data = d.data();
-      if (!data.state || data.state === "IN") {
-        // Find matching migration entry by name
-        const migration = STATE_MIGRATIONS.find(
-          (m) => data.name && data.name.toLowerCase().includes(m.nameMatch.toLowerCase())
+      const migration = STATE_MIGRATIONS.find(
+        (m) => data.name && data.name.toLowerCase().includes(m.nameMatch.toLowerCase())
+      );
+      if (migration && data.state !== migration.state) {
+        updatePromises.push(
+          updateDoc(doc(db, "programs", d.id), {
+            state: migration.state,
+            updatedAt: serverTimestamp(),
+          })
         );
-        if (migration) {
-          updatePromises.push(
-            updateDoc(doc(db, "programs", d.id), {
-              state: migration.state,
-              updatedAt: serverTimestamp(),
-            })
-          );
-        }
       }
     });
     await Promise.all(updatePromises);

@@ -1,10 +1,8 @@
 "use strict";
 // migrateIndividualStates.ts
-// Callable migration — sets individual.state from the PROGRAM the individual
-// is enrolled in (programs collection → state field).
-//
-// This is safe to run multiple times (always overwrites).
-// "Seed Demo Data" button on the Orchestrator page calls this.
+// Step 1: Fix the programs collection — infer state from program NAME.
+//         "NJ Case Mgmt" → New Jersey, "Case MGMT Indiana" → Indiana, etc.
+// Step 2: Update every individual → individual.state = their program's state.
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -42,113 +40,148 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.migrateIndividualStates = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
-// Full-name canonicalization (IN → Indiana, NJ → New Jersey, etc.)
+// ─── State detection from text ────────────────────────────────────────────────
+// Maps substrings found in program names → canonical state
+// Ordered most-specific first so "New Jersey" beats "New"
+const NAME_STATE_HINTS = [
+    { pattern: /\bNJ\b/i, state: "New Jersey" },
+    { pattern: /new\s*jersey/i, state: "New Jersey" },
+    { pattern: /\bIN\b(?!dian)/, state: "Indiana" }, // "IN" but not "Individual"
+    { pattern: /indiana/i, state: "Indiana" },
+    { pattern: /\bOH\b/i, state: "Ohio" },
+    { pattern: /\bohio\b/i, state: "Ohio" },
+    { pattern: /\bIL\b/i, state: "Illinois" },
+    { pattern: /illinois/i, state: "Illinois" },
+    { pattern: /\bCA\b/i, state: "California" },
+    { pattern: /california/i, state: "California" },
+    { pattern: /\bTX\b/i, state: "Texas" },
+    { pattern: /\btexas\b/i, state: "Texas" },
+    { pattern: /\bMD\b/i, state: "Maryland" },
+    { pattern: /maryland/i, state: "Maryland" },
+    { pattern: /\bVA\b/i, state: "Virginia" },
+    { pattern: /virginia/i, state: "Virginia" },
+    { pattern: /\bMN\b/i, state: "Minnesota" },
+    { pattern: /minnesota/i, state: "Minnesota" },
+    { pattern: /\bGA\b/i, state: "Georgia" },
+    { pattern: /\bgeorgia\b/i, state: "Georgia" },
+    { pattern: /\bAZ\b/i, state: "Arizona" },
+    { pattern: /arizona/i, state: "Arizona" },
+    { pattern: /\bCO\b/i, state: "Colorado" },
+    { pattern: /colorado/i, state: "Colorado" },
+    { pattern: /\bMA\b/i, state: "Massachusetts" },
+    { pattern: /massachusetts/i, state: "Massachusetts" },
+    { pattern: /\bOR\b/i, state: "Oregon" },
+    { pattern: /\boregon\b/i, state: "Oregon" },
+    { pattern: /case\s*mgmt/i, state: "Indiana" }, // demo default
+    { pattern: /case\s*management/i, state: "Indiana" }, // demo default
+];
+/** Infer state from a program name string */
+function inferStateFromName(name) {
+    for (const { pattern, state } of NAME_STATE_HINTS) {
+        if (pattern.test(name))
+            return state;
+    }
+    return null;
+}
+/** Convert abbreviation to full name */
 const ABBR_TO_NAME = {
-    IN: "Indiana", NJ: "New Jersey", OH: "Ohio",
-    IL: "Illinois", CA: "California", TX: "Texas",
-    VA: "Virginia", MD: "Maryland", MN: "Minnesota",
-    GA: "Georgia", AZ: "Arizona", CO: "Colorado",
+    IN: "Indiana", NJ: "New Jersey", OH: "Ohio", IL: "Illinois",
+    CA: "California", TX: "Texas", VA: "Virginia", MD: "Maryland",
+    MN: "Minnesota", GA: "Georgia", AZ: "Arizona", CO: "Colorado",
     MA: "Massachusetts", OR: "Oregon", PA: "Pennsylvania",
-    MI: "Michigan", FL: "Florida", NY: "New York",
-    NC: "North Carolina", WA: "Washington",
 };
 function toFullName(raw) {
-    var _a, _b;
+    var _a;
     if (!raw || !raw.trim())
         return null;
     const s = raw.trim();
-    return (_b = (_a = ABBR_TO_NAME[s.toUpperCase()]) !== null && _a !== void 0 ? _a : ABBR_TO_NAME[s]) !== null && _b !== void 0 ? _b : (s.length > 2 ? s : null);
+    return (_a = ABBR_TO_NAME[s.toUpperCase()]) !== null && _a !== void 0 ? _a : (s.length > 2 ? s : null);
 }
+// ─── Migration ────────────────────────────────────────────────────────────────
 exports.migrateIndividualStates = (0, https_1.onCall)({ cors: true, memory: "512MiB", timeoutSeconds: 300 }, async (request) => {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f;
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Must be authenticated.");
     const db = admin.firestore();
-    let fixed = 0;
-    let alreadyCorrect = 0;
-    // ── Step 1: Load ALL programs → build { id → fullNameState } ─────────────
+    // ── Step 1: Fix programs — infer state from program NAME ─────────────────
+    // "NJ Case Mgmt" was stored with state:"Indiana". We override by reading
+    // the program NAME, which is the ground truth.
     const programsSnap = await db.collection("programs").limit(300).get();
-    // Map programId → canonical state name
+    const programBatch = db.batch();
+    let programsFixed = 0;
+    // Build corrected map: programId → canonical state (from name, not stored state)
     const programStateMap = {};
-    // Also map programName (lowercase) → canonical state, as a name-based fallback
-    const programNameStateMap = {};
     for (const p of programsSnap.docs) {
-        const d = p.data();
-        const pState = toFullName(d.state);
-        if (!pState)
-            continue;
-        programStateMap[p.id] = pState;
-        if (d.name) {
-            programNameStateMap[d.name.toLowerCase().trim()] = pState;
+        const data = p.data();
+        const nameInferred = inferStateFromName((_a = data.name) !== null && _a !== void 0 ? _a : "");
+        const storedFull = toFullName(data.state);
+        // Name-inferred state wins over stored state (fixes "NJ Case Mgmt → Indiana")
+        const correct = (_b = nameInferred !== null && nameInferred !== void 0 ? nameInferred : storedFull) !== null && _b !== void 0 ? _b : "Indiana";
+        programStateMap[p.id] = correct;
+        if (storedFull !== correct) {
+            programBatch.update(p.ref, {
+                state: correct,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            programsFixed++;
         }
     }
-    // ── Step 2: Update every individual with the program's state ─────────────
+    await programBatch.commit();
+    // ── Step 2: Fix individuals — set state from their program ───────────────
     const indsSnap = await db.collection("individuals").limit(500).get();
-    const batches = [db.batch()];
-    let writeCount = 0;
+    const indBatch = db.batch();
+    let indFixed = 0;
+    let indSkipped = 0;
     for (const d of indsSnap.docs) {
         const data = d.data();
-        // ── Resolve the correct state from program ──────────────────────────
-        let correctState = null;
-        // 1. programId → programs collection (most reliable)
+        // Resolve state: programId → corrected program map (exact)
+        let correct = null;
         if (data.programId && programStateMap[data.programId]) {
-            correctState = programStateMap[data.programId];
+            correct = programStateMap[data.programId];
         }
-        // 2. programName → programs collection (name match)
-        if (!correctState) {
-            const pName = (data.programName || data.program || "").toLowerCase().trim();
-            if (pName && programNameStateMap[pName]) {
-                correctState = programNameStateMap[pName];
-            }
-        }
-        // 3. Partial name match (e.g. "Case MGMT" in "Case MGMT - Region 3")
-        if (!correctState) {
+        // Fallback: match by program name in the map
+        if (!correct) {
             const pName = (data.programName || data.program || "").toLowerCase().trim();
             if (pName) {
-                for (const [name, state] of Object.entries(programNameStateMap)) {
-                    if (pName.includes(name) || name.includes(pName)) {
-                        correctState = state;
+                for (const p of programsSnap.docs) {
+                    if (((_c = p.data().name) !== null && _c !== void 0 ? _c : "").toLowerCase().trim() === pName) {
+                        correct = (_d = programStateMap[p.id]) !== null && _d !== void 0 ? _d : null;
                         break;
                     }
                 }
             }
         }
-        // 4. enrollment_state / enrollmentState field on the individual
-        if (!correctState) {
-            correctState = toFullName(data.enrollment_state || data.enrollmentState);
+        // Fallback: infer from the program name stored on the individual
+        if (!correct) {
+            correct = inferStateFromName(data.programName || data.program || "");
         }
-        // 5. Last resort: Indiana (demo default)
-        if (!correctState) {
-            correctState = "Indiana";
-        }
-        // ── Write only if different ───────────────────────────────────────
-        const current = (_b = (_a = toFullName(data.state)) !== null && _a !== void 0 ? _a : data.state) !== null && _b !== void 0 ? _b : "";
-        if (current === correctState) {
-            alreadyCorrect++;
+        // Last resort: Indiana
+        if (!correct)
+            correct = "Indiana";
+        // Write only if different from what's currently stored
+        const current = (_f = (_e = toFullName(data.state)) !== null && _e !== void 0 ? _e : data.state) !== null && _f !== void 0 ? _f : "";
+        if (current === correct) {
+            indSkipped++;
             continue;
         }
-        if (writeCount > 0 && writeCount % 490 === 0) {
-            batches.push(db.batch());
-        }
-        batches[batches.length - 1].update(d.ref, {
-            state: correctState,
+        indBatch.update(d.ref, {
+            state: correct,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        writeCount++;
-        fixed++;
+        indFixed++;
     }
-    for (const b of batches)
-        await b.commit();
-    // ── Step 3: Seed service_authorizations if not yet done ───────────────────
+    await indBatch.commit();
+    // ── Step 3: Seed service_authorizations if missing ───────────────────────
     const authSeeded = await seedServiceAuthorizationsIfNeeded(db);
     return {
         success: true,
-        individualsFixed: fixed,
-        individualsAlreadyCorrect: alreadyCorrect,
+        programsFixed,
+        individualsFixed: indFixed,
+        individualsSkipped: indSkipped,
         authorizationsSeeded: authSeeded,
-        programsLoaded: programsSnap.size,
     };
 });
+// ─── Seed service_authorizations (once) ──────────────────────────────────────
 async function seedServiceAuthorizationsIfNeeded(db) {
     const existing = await db.collection("service_authorizations")
         .where("_seededByMigration", "==", true).limit(1).get();
@@ -179,7 +212,8 @@ async function seedServiceAuthorizationsIfNeeded(db) {
             individualId: doc.id,
             individualName: `${ind.first_name || ""} ${ind.last_name || ""}`.trim(),
             organizationId: orgId, tenantId: orgId,
-            service_name: t.service_name, auth_number: `AUTH-2026-${100 + i}`,
+            service_name: t.service_name,
+            auth_number: `AUTH-2026-${100 + i}`,
             status: "active",
             start_date: fmt(add(today, -180)), end_date: fmt(add(today, t.daysOffset)),
             startDate: fmt(add(today, -180)), endDate: fmt(add(today, t.daysOffset)),

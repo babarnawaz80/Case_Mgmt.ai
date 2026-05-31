@@ -288,15 +288,15 @@ function SeedDemoDataButton() {
     setSeeding(true);
     try {
       const fn = httpsCallable<object, {
+        programsFixed: number;
         individualsFixed: number;
-        individualsAlreadyCorrect: number;
+        individualsSkipped: number;
         authorizationsSeeded: number;
-        programsLoaded: number;
       }>(fns, "migrateIndividualStates");
       const res = await fn({});
-      const { individualsFixed, programsLoaded, authorizationsSeeded } = res.data;
-      toast.success("States synced from enrolled programs", {
-        description: `${programsLoaded} programs loaded · ${individualsFixed} individual${individualsFixed !== 1 ? "s" : ""} updated`,
+      const { programsFixed, individualsFixed } = res.data;
+      toast.success("States synced from program names", {
+        description: `${programsFixed} program${programsFixed !== 1 ? "s" : ""} corrected · ${individualsFixed} individual${individualsFixed !== 1 ? "s" : ""} updated`,
       });
       setDone(true);
       setTimeout(() => window.location.reload(), 1500);

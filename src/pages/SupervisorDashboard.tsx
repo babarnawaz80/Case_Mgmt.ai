@@ -75,6 +75,31 @@ function usePendingNotes(orgId: string | undefined) {
   return { notes, loading };
 }
 
+// ──── Published reports (from Report Builder → Publish to supervisor dashboard) ──
+interface PublishedReport { id: string; name: string; description?: string; category?: string; createdBy?: string; }
+
+function usePublishedReports(orgId: string | undefined) {
+  const [reports, setReports] = useState<PublishedReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!orgId) { setLoading(false); return; }
+    const q = query(
+      collection(db, "reports"),
+      where("organizationId", "==", orgId),
+      where("published", "==", true),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setReports(snap.docs.map((d) => {
+        const data = d.data();
+        return { id: d.id, name: data.name || data.title || "Untitled Report", description: data.description, category: data.category, createdBy: data.createdBy };
+      }));
+      setLoading(false);
+    }, (err) => { console.warn("[publishedReports]", err.message); setLoading(false); });
+    return unsub;
+  }, [orgId]);
+  return { reports, loading };
+}
+
 // ──── KPI card ───────────────────────────────────────────────────────────────
 function Kpi({ icon, label, value, sub, color }: {
   icon: React.ReactNode;
@@ -103,6 +128,7 @@ const SupervisorDashboard = () => {
   const { individuals, loading: loadingPeople } = useIndividuals();
   const { totalOpen: openIncidents, overdue: overdueIncidents, loading: loadingIncidents } = useIncidentSummary();
   const { notes: pendingNotes, loading: loadingNotes } = usePendingNotes(orgId);
+  const { reports: publishedReports } = usePublishedReports(orgId);
 
   const loading = loadingPeople || loadingIncidents;
 
@@ -262,6 +288,39 @@ const SupervisorDashboard = () => {
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Compliance report
                 </button>
               </div>
+            </div>
+
+            {/* Published Reports — pushed here from the Report Builder */}
+            <div className="rounded-xl border border-icm-border bg-icm-panel p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-manrope font-bold text-[13px] text-icm-text inline-flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-icm-accent" /> Published Reports
+                </h3>
+                <button onClick={() => navigate("/reports")} className="text-[11px] font-geist font-semibold text-icm-accent hover:underline">
+                  All reports →
+                </button>
+              </div>
+              {publishedReports.length === 0 ? (
+                <p className="text-[11.5px] text-icm-text-dim font-geist py-2">
+                  No reports published yet. Publish one from the Report Builder to share it here.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {publishedReports.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => navigate(`/reports/${r.id}`)}
+                      className="w-full text-left rounded-lg border border-icm-border px-3 py-2 hover:bg-icm-bg transition-colors group"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[12px] font-geist font-semibold text-icm-text truncate">{r.name}</p>
+                        <ArrowRight className="w-3.5 h-3.5 text-icm-text-faint group-hover:text-icm-accent shrink-0" />
+                      </div>
+                      {r.description && <p className="text-[10.5px] text-icm-text-dim font-geist truncate mt-0.5">{r.description}</p>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

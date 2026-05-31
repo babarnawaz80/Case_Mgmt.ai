@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   Sparkles,
@@ -24,8 +24,10 @@ import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { writeAudit as mockWriteAudit } from "@/data/supervisor";
 import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from "firebase/firestore";
 import { writeAudit } from "@/lib/auditService";
+import { useIndividuals, type Individual } from "@/hooks/useIndividuals";
+import { individualState } from "@/lib/stateUtils";
 
 // ------------------ Field catalog ------------------
 
@@ -125,6 +127,51 @@ const SCENARIO_ROWS: RowOut[] = [
   },
 ];
 
+// ------------------ Real-data row builder ------------------
+// Maps a live Individual record into the abstract FIELDS catalog so the
+// builder preview, filters, grouping and exports run on REAL caseload data.
+
+function daysSince(dateStr?: string): number | "" {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
+}
+
+function riskLevelLabel(score?: number): string {
+  if (score == null) return "Low";
+  if (score >= 60) return "High";
+  if (score >= 35) return "Moderate";
+  return "Low";
+}
+
+function buildRowFromIndividual(ind: Individual): RowOut {
+  const since = daysSince(ind.last_visit_date);
+  const coordinator =
+    ind.assigned_case_manager_name ||
+    ind.assigned_case_manager ||
+    (ind as any).program_coordinator ||
+    "Unassigned";
+  return {
+    "participant.id": ind.id ?? "",
+    "participant.name": `${ind.first_name ?? ""} ${ind.last_name ?? ""}`.trim() || "—",
+    "participant.state": individualState(ind) ?? "",
+    "participant.program": ind.program ?? "",
+    "participant.coordinator": coordinator,
+    "participant.riskLevel": riskLevelLabel(ind.risk_score),
+    "contact.lastMonthly": ind.last_visit_date ?? "",
+    "contact.daysSince": since === "" ? "" : since,
+    "contact.overdue": since !== "" && since > 30 ? "Y" : "N",
+    "visit.lastInHome": ind.last_visit_date ?? "",
+    "visit.inHomeLast90": since !== "" && since <= 90 ? "Y" : "N",
+    "note.rejected30": 0,
+    "note.pendingReview": ind.open_tasks ?? 0,
+    "plan.expiryDate": ind.next_isp_date ?? ind.pcp_due_date ?? "",
+    "assessment.nextDue": ind.next_isp_date ?? "",
+    "billing.unbilledUnits": 0,
+  };
+}
+
 // ------------------ Component ------------------
 
 const PROMPT_EXAMPLE =
@@ -150,8 +197,11 @@ const DEFAULT_FILTERS: Filter[] = [
 
 const ReportBuilder = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("id");
   const { currentUser, userProfile } = useAuth();
   const orgId = userProfile?.organizationId || currentUser?.organizationId || "demo";
+  const { individuals } = useIndividuals();
   const [prompt, setPrompt] = useState(PROMPT_EXAMPLE);
   const [interpreted, setInterpreted] = useState(true);
   const [interpreting, setInterpreting] = useState(false);
@@ -159,6 +209,36 @@ const ReportBuilder = () => {
   const [selectedFields, setSelectedFields] = useState<string[]>(DEFAULT_FIELDS);
   const [filters, setFilters] = useState<Filter[]>(DEFAULT_FILTERS);
   const [groupBy, setGroupBy] = useState<string>("participant.coordinator");
+  const [loadingExisting, setLoadingExisting] = useState(!!editId);
+  // Real Firestore doc id (only set once we confirm the doc exists), so Save
+  // updates the right record and we never updateDoc a non-existent seeded id.
+  const [savedDocId, setSavedDocId] = useState<string | null>(null);
+
+  // ── Edit mode: load an existing saved report by ?id= ──
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+    getDoc(doc(db, "reports", editId))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) { setLoadingExisting(false); return; }
+        const d = snap.data() as any;
+        if (d.name || d.title) setReportName(d.name || d.title);
+        if (d.prompt) setPrompt(d.prompt);
+        if (Array.isArray(d.selectedFields) && d.selectedFields.length) setSelectedFields(d.selectedFields);
+        if (Array.isArray(d.filters)) {
+          setFilters(d.filters.map((f: any, i: number) => ({ id: `f${i + 1}`, fieldId: f.fieldId, op: f.op, value: f.value ?? "" })));
+        }
+        if (typeof d.groupBy === "string") setGroupBy(d.groupBy);
+        if (Array.isArray(d.roleAccess)) setRoleAccess(d.roleAccess);
+        if (d.published) setPublished(true);
+        setSavedDocId(editId);   // confirmed real doc — future saves update it
+        setInterpreted(true);
+        setLoadingExisting(false);
+      })
+      .catch(() => setLoadingExisting(false));
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [schedule, setSchedule] = useState({
     frequency: "Weekly",
@@ -214,17 +294,28 @@ Return JSON:
           const jsonMatch = rawText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
+            let parsedFieldCount = selectedFields.length;
+            let parsedFilterCount = filters.length;
             if (parsed.reportName) setReportName(parsed.reportName);
             if (Array.isArray(parsed.selectedFields) && parsed.selectedFields.length > 0) {
-              setSelectedFields(parsed.selectedFields.filter((id: string) => FIELDS.find(f => f.id === id)));
+              const valid = parsed.selectedFields.filter((id: string) => FIELDS.find(f => f.id === id));
+              setSelectedFields(valid);
+              parsedFieldCount = valid.length;
             }
             if (Array.isArray(parsed.filters)) {
-              setFilters(parsed.filters.map((f: any, i: number) => ({ id: `f${i + 1}`, fieldId: f.fieldId, op: f.op, value: f.value ?? "" })));
+              const mapped = parsed.filters
+                .filter((f: any) => FIELDS.find(fd => fd.id === f.fieldId))
+                .map((f: any, i: number) => ({ id: `f${i + 1}`, fieldId: f.fieldId, op: f.op, value: f.value ?? "" }));
+              setFilters(mapped);
+              parsedFilterCount = mapped.length;
             }
             if (parsed.groupBy !== undefined) setGroupBy(parsed.groupBy);
+            setInterpreted(true);
+            flash(`AI parsed the prompt into ${parsedFilterCount} filters and ${parsedFieldCount} fields.`);
+          } else {
+            setInterpreted(true);
+            flash("Couldn't parse the prompt — showing defaults. Adjust fields/filters below.");
           }
-          setInterpreted(true);
-          flash(`AI parsed the prompt into ${filters.length + 1} filters and ${selectedFields.length} fields.`);
         } catch {
           // Fall through to defaults
           setInterpreted(true);
@@ -321,12 +412,21 @@ Return JSON:
     return true;
   }
 
+  // Source rows = REAL caseload data when available; fall back to the demo
+  // scenario only if no individuals have loaded yet (e.g. empty org).
+  const sourceRows = useMemo<RowOut[]>(() => {
+    if (individuals && individuals.length > 0) {
+      return individuals.map(buildRowFromIndividual);
+    }
+    return SCENARIO_ROWS;
+  }, [individuals]);
+
   const filteredRows = useMemo(() => {
-    if (filters.length === 0) return SCENARIO_ROWS;
-    return SCENARIO_ROWS.filter((row) =>
+    if (filters.length === 0) return sourceRows;
+    return sourceRows.filter((row) =>
       filters.every((f) => !f.value ? true : evaluateFilter(row, f))
     );
-  }, [filters]);
+  }, [filters, sourceRows]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, RowOut[]> = {};
@@ -358,138 +458,138 @@ Return JSON:
     setFilters((arr) => arr.filter((f) => f.id !== id));
   }
 
+  // Build export rows from the currently FILTERED real data, using the
+  // selected columns with human-readable headers.
+  function buildExportRows(): Record<string, unknown>[] {
+    return filteredRows.map((r) => {
+      const obj: Record<string, unknown> = {};
+      selectedFields.forEach((id) => {
+        const label = FIELDS.find((f) => f.id === id)?.label ?? id;
+        obj[label] = r[id] ?? "";
+      });
+      return obj;
+    });
+  }
+
   function exportCsv() {
-    const cols = selectedFields;
-    const header = cols.map((id) => FIELDS.find((f) => f.id === id)?.label ?? id).join(",");
-    const lines = SCENARIO_ROWS.map((r) =>
-      cols.map((c) => JSON.stringify(r[c] ?? "")).join(","),
-    );
-    const blob = new Blob([header + "\n" + lines.join("\n")], { type: "text/csv" });
+    const rows = buildExportRows();
+    if (rows.length === 0) { flash("No rows to export with current filters."); return; }
+    const headers = Object.keys(rows[0]);
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => esc(r[h])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${reportName.replace(/\s+/g, "_")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    mockWriteAudit({
-      ts: new Date().toISOString(),
-      actor: "Admin (Jordan Reeves)",
-      action: "report.export",
-      report: reportName,
-      format: "CSV",
-      rows: SCENARIO_ROWS.length,
-    });
-    flash("Exported as CSV.");
+    mockWriteAudit({ ts: new Date().toISOString(), actor: currentUser?.email || "User", action: "report.export", report: reportName, format: "CSV", rows: rows.length });
+    flash(`Exported ${rows.length} rows as CSV.`);
   }
 
-  function exportXlsx() {
-    // For demo: emit a tab-separated .xls — opens in Excel without deps.
-    const cols = selectedFields;
-    const header = cols.map((id) => FIELDS.find((f) => f.id === id)?.label ?? id).join("\t");
-    const lines = SCENARIO_ROWS.map((r) => cols.map((c) => r[c] ?? "").join("\t"));
-    const blob = new Blob([header + "\n" + lines.join("\n")], {
-      type: "application/vnd.ms-excel",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${reportName.replace(/\s+/g, "_")}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
-    mockWriteAudit({
-      ts: new Date().toISOString(),
-      actor: "Admin (Jordan Reeves)",
-      action: "report.export",
-      report: reportName,
-      format: "XLSX",
-      rows: SCENARIO_ROWS.length,
-    });
-    flash("Exported as Excel.");
+  async function exportXlsx() {
+    const rows = buildExportRows();
+    if (rows.length === 0) { flash("No rows to export with current filters."); return; }
+    try {
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+      XLSX.writeFile(wb, `${reportName.replace(/\s+/g, "_")}.xlsx`);
+      mockWriteAudit({ ts: new Date().toISOString(), actor: currentUser?.email || "User", action: "report.export", report: reportName, format: "XLSX", rows: rows.length });
+      flash(`Exported ${rows.length} rows as Excel.`);
+    } catch (err) {
+      console.error("[exportXlsx]", err);
+      flash("Excel export failed.");
+    }
   }
 
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  // Build the full report payload from current state.
+  function buildPayload(overrides: Record<string, any> = {}) {
+    return {
+      title: reportName,
+      name: reportName,
+      type: "ai",
+      prompt,
+      content: JSON.stringify({ selectedFields, filters, groupBy }),
+      selectedFields,
+      filters,
+      groupBy,
+      roleAccess,
+      published,
+      rows: filteredRows.length,
+      description:
+        prompt.trim().slice(0, 140) ||
+        `Custom AI report with ${filters.length} filters and ${selectedFields.length} fields.`,
+      category: "Compliance",
+      lastRun: "Just now",
+      format: "XLSX",
+      createdBy: currentUser?.displayName || currentUser?.email || "You",
+      generatedBy: currentUser?.uid || "unknown",
+      organizationId: orgId,
+      ...overrides,
+    };
+  }
+
+  // Persist: update existing doc when we have a confirmed id, else create one.
+  async function persistReport(overrides: Record<string, any> = {}): Promise<string | null> {
+    if (savedDocId) {
+      await updateDoc(doc(db, "reports", savedDocId), { ...buildPayload(overrides), updatedAt: serverTimestamp() });
+      return savedDocId;
+    }
+    const ref = await addDoc(collection(db, "reports"), { ...buildPayload(overrides), starred: false, createdAt: serverTimestamp() });
+    setSavedDocId(ref.id);
+    return ref.id;
+  }
 
   async function saveReport() {
-    if (!reportName.trim()) {
-      flash("Please enter a report name first.");
-      return;
-    }
-    if (!orgId) {
-      flash("Your profile is still loading — try again in a moment.");
-      return;
-    }
+    if (!reportName.trim()) { flash("Please enter a report name first."); return; }
+    if (!orgId) { flash("Your profile is still loading — try again in a moment."); return; }
     setSaving(true);
     try {
-      await addDoc(collection(db, "reports"), {
-        title: reportName,
-        name: reportName,
-        type: "ai",
-        prompt,
-        content: JSON.stringify({
-          selectedFields,
-          filters,
-          groupBy,
-        }),
-        selectedFields,
-        filters,
-        groupBy,
-        roleAccess,
-        published,
-        rows: filteredRows.length,
-        description:
-          prompt.trim().slice(0, 140) ||
-          `Custom AI report with ${filters.length} filters and ${selectedFields.length} fields.`,
-        category: "Compliance",
-        lastRun: "Just now",
-        starred: false,
-        format: "XLSX",
-        createdBy: currentUser?.displayName || currentUser?.email || "You",
-        generatedBy: currentUser?.uid || "unknown",
-        organizationId: orgId,
-        createdAt: serverTimestamp(),
-      });
-
-      try {
-        await writeAudit("draft_saved", "report", "new_report", { reportName });
-      } catch { /* audit is non-critical */ }
-
-      mockWriteAudit({
-        ts: new Date().toISOString(),
-        actor: currentUser?.email || "User",
-        action: "report.save",
-        report: reportName,
-        fields: selectedFields.length,
-        filters: filters.length,
-        groupBy,
-        roleAccess,
-      });
-
-      flash("Report saved — opening My Reports…");
-      // Navigate back so the user immediately sees the new report in the list
+      const wasEditing = !!savedDocId;
+      const id = await persistReport();
+      try { await writeAudit(wasEditing ? "draft_updated" : "draft_saved", "report", id ?? "new_report", { reportName }); } catch { /* non-critical */ }
+      mockWriteAudit({ ts: new Date().toISOString(), actor: currentUser?.email || "User", action: wasEditing ? "report.update" : "report.save", report: reportName, fields: selectedFields.length, filters: filters.length, groupBy, roleAccess });
+      flash(wasEditing ? "Report updated — opening My Reports…" : "Report saved — opening My Reports…");
       setTimeout(() => navigate("/reports"), 700);
     } catch (err: any) {
       console.error("Failed to save report:", err);
       const msg = err?.message ?? String(err);
-      if (msg.includes("permission") || msg.includes("PERMISSION_DENIED")) {
-        flash("Permission denied saving report — contact your administrator.");
-      } else {
-        flash(`Failed to save report: ${msg.slice(0, 80)}`);
-      }
+      flash(msg.includes("permission") || msg.includes("PERMISSION_DENIED")
+        ? "Permission denied saving report — contact your administrator."
+        : `Failed to save report: ${msg.slice(0, 80)}`);
     } finally {
       setSaving(false);
     }
   }
 
-  function publish() {
-    setPublished(true);
-    mockWriteAudit({
-      ts: new Date().toISOString(),
-      actor: "Admin (Jordan Reeves)",
-      action: "report.publish_to_dashboard",
-      report: reportName,
-      roleAccess,
-    });
-    flash("Published to supervisor dashboard.");
+  // Publish = persist with published:true and Supervisor in roleAccess so it
+  // surfaces on the supervisor dashboard / shared reports list.
+  async function publish() {
+    if (!reportName.trim()) { flash("Please enter a report name first."); return; }
+    if (!orgId) { flash("Your profile is still loading — try again."); return; }
+    setPublishing(true);
+    const nextRoles = roleAccess.includes("Supervisor") ? roleAccess : [...roleAccess, "Supervisor"];
+    try {
+      await persistReport({ published: true, roleAccess: nextRoles });
+      setPublished(true);
+      setRoleAccess(nextRoles);
+      mockWriteAudit({ ts: new Date().toISOString(), actor: currentUser?.email || "User", action: "report.publish_to_dashboard", report: reportName, roleAccess: nextRoles });
+      flash("Published to supervisor dashboard.");
+    } catch (err: any) {
+      console.error("Failed to publish report:", err);
+      flash(`Failed to publish: ${(err?.message ?? "").slice(0, 80)}`);
+    } finally {
+      setPublishing(false);
+    }
   }
 
   function saveSchedule() {
@@ -522,7 +622,7 @@ Return JSON:
             <div className="flex items-center gap-2">
               <Wand2 className="w-5 h-5 text-icm-text-dim" />
               <h1 className="font-manrope text-[22px] font-extrabold text-icm-text leading-tight tracking-[-0.02em]">
-                Ad Hoc Report Builder
+                {savedDocId ? "Edit Report" : "Ad Hoc Report Builder"}
               </h1>
             </div>
             <p className="text-[12.5px] text-icm-text-dim mt-1 font-geist">
@@ -805,20 +905,19 @@ Return JSON:
             <div className="flex-1" />
             <button
               onClick={publish}
-              className={`h-8 px-3 rounded-lg text-[11.5px] font-semibold inline-flex items-center gap-1.5 ${
+              disabled={publishing}
+              className={`h-8 px-3 rounded-lg text-[11.5px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 ${
                 published
                   ? "bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20"
                   : "bg-icm-text text-white hover:opacity-90"
               }`}
             >
-              {published ? (
-                <>
-                  <Check className="w-3 h-3" /> Published to dashboard
-                </>
+              {publishing ? (
+                <><span className="w-3 h-3 border-2 border-current/40 border-t-current rounded-full animate-spin" /> Publishing…</>
+              ) : published ? (
+                <><Check className="w-3 h-3" /> Published — update dashboard</>
               ) : (
-                <>
-                  <Send className="w-3 h-3" /> Publish to supervisor dashboard
-                </>
+                <><Send className="w-3 h-3" /> Publish to supervisor dashboard</>
               )}
             </button>
           </div>
@@ -830,14 +929,14 @@ Return JSON:
             <div className="flex items-center gap-2">
               <Eye className="w-3.5 h-3.5 text-icm-text-dim" />
               <span className="text-[12px] font-semibold text-icm-text">
-                Live preview · {filteredRows.length} of {SCENARIO_ROWS.length} rows
-                {filteredRows.length < SCENARIO_ROWS.length && (
+                Live preview · {filteredRows.length} of {sourceRows.length} rows
+                {filteredRows.length < sourceRows.length && (
                   <span className="ml-2 text-[10.5px] font-normal text-icm-accent">(filtered)</span>
                 )}
               </span>
             </div>
             <span className="text-[10.5px] text-icm-text-dim">
-              Data pulled from iCM read replica · last sync 2 min ago
+              {sourceRows === SCENARIO_ROWS ? "Sample data · no live caseload loaded" : "Live caseload data"}
             </span>
           </div>
           <div className="overflow-x-auto">

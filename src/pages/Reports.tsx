@@ -652,7 +652,7 @@ const Reports = () => {
               <div>
                 <p className="text-[10.5px] font-mono uppercase tracking-wider text-icm-text-faint mb-2 flex items-center gap-1.5"><Star className="w-3 h-3" /> Starred</p>
                 <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden divide-y divide-icm-border/60">
-                  {starred.map((r) => <ReportRow key={r.id} report={r} onToggleStar={toggleStar} onRun={() => navigate(`/reports/${r.id}`)} onEdit={() => navigate("/reports/builder")} />)}
+                  {starred.map((r) => <ReportRow key={r.id} report={r} onToggleStar={toggleStar} onRun={() => navigate(`/reports/${r.id}`)} onEdit={() => navigate(`/reports/builder?id=${r.id}`)} />)}
                 </div>
               </div>
             )}
@@ -660,7 +660,7 @@ const Reports = () => {
               <div>
                 {starred.length > 0 && <p className="text-[10.5px] font-mono uppercase tracking-wider text-icm-text-faint mb-2">All Reports</p>}
                 <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden divide-y divide-icm-border/60">
-                  {rest.map((r) => <ReportRow key={r.id} report={r} onToggleStar={toggleStar} onRun={() => navigate(`/reports/${r.id}`)} onEdit={() => navigate("/reports/builder")} />)}
+                  {rest.map((r) => <ReportRow key={r.id} report={r} onToggleStar={toggleStar} onRun={() => navigate(`/reports/${r.id}`)} onEdit={() => navigate(`/reports/builder?id=${r.id}`)} />)}
                 </div>
               </div>
             )}

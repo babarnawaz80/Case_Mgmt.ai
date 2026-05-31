@@ -468,14 +468,14 @@ export default function NewParticipantIntake() {
         address: {
           street: data.street,
           city: data.city,
-          state: data.state,
+          state: data.state,    // RESIDENCE address — can be anywhere, NOT used for compliance
           zip: data.zip,
         },
-        // Flat canonical state field — this is what the AI Orchestrator,
-        // Compliance-by-State, and the state filter read. Derived from the
-        // enrollment state (which determines compliance rules) first, then
-        // the residence state. Canonicalized so "IN" → "Indiana".
-        address_state: canonicalState(data.enrollmentState || data.state) ?? undefined,
+        // PROGRAM enrollment state — this is what the AI Orchestrator,
+        // Compliance-by-State, and reporting read. Driven by the program the
+        // individual is enrolled in (State of Enrollment), NOT their residence
+        // address. Canonicalized so "IN" → "Indiana".
+        state: canonicalState(data.enrollmentState) ?? undefined,
         county: data.county,
         residence_type: data.residenceType,
         phone: data.phone,

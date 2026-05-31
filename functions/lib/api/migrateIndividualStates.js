@@ -84,51 +84,52 @@ exports.migrateIndividualStates = (0, https_1.onCall)({ cors: true, memory: "512
     const snap = await db.collection("individuals").limit(500).get();
     for (const d of snap.docs) {
         const data = d.data();
-        const existing = data.address_state;
-        // Already has a value — canonicalize it ("IN" → "Indiana") if needed.
-        if (existing && existing.trim()) {
-            const canonical = canonicalize(existing);
-            if (canonical !== existing.trim()) {
-                batch.update(d.ref, {
-                    address_state: canonical,
-                    updated_at: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                normalized++;
-            }
-            else {
-                skipped++;
-            }
-            continue;
+        // The authoritative state for the orchestrator is the PROGRAM enrollment
+        // state, stored in the top-level `state` field. The residence address
+        // (address_state / address.state) is NOT used for compliance.
+        const programState = data.state; // set by Change Program / intake
+        const legacyState = data.address_state; // legacy backfill fallback
+        // Determine the canonical program state for this individual.
+        let resolved = null;
+        if (programState && programState.trim()) {
+            resolved = canonicalize(programState);
         }
-        // Try to infer state from county
-        let assignedState = null;
-        const county = data.county || data.address_county || "";
-        if (county) {
-            for (const [c, s] of Object.entries(COUNTY_STATE_MAP)) {
-                if (county.toLowerCase().includes(c.toLowerCase().replace(" county", ""))) {
-                    assignedState = s;
-                    break;
+        else if (legacyState && legacyState.trim()) {
+            // Promote legacy residence-backfill into the program-state field
+            resolved = canonicalize(legacyState);
+        }
+        else {
+            // Infer for demo records that have no state at all
+            const county = data.county || data.address_county || "";
+            if (county) {
+                for (const [c, s] of Object.entries(COUNTY_STATE_MAP)) {
+                    if (county.toLowerCase().includes(c.toLowerCase().replace(" county", ""))) {
+                        resolved = s;
+                        break;
+                    }
                 }
             }
-        }
-        // Heuristic: check first/last name hints for NJ
-        if (!assignedState) {
-            const firstName = data.first_name || data.firstName || "";
-            const lastName = data.last_name || data.lastName || "";
-            const fullName = `${firstName} ${lastName}`;
-            if (NJ_HINTS.some(h => fullName.toLowerCase().includes(h.toLowerCase()))) {
-                assignedState = "New Jersey";
+            if (!resolved) {
+                const fullName = `${data.first_name || data.firstName || ""} ${data.last_name || data.lastName || ""}`;
+                if (NJ_HINTS.some(h => fullName.toLowerCase().includes(h.toLowerCase())))
+                    resolved = "New Jersey";
             }
+            if (!resolved)
+                resolved = "Indiana"; // demo default
         }
-        // Default: assign Indiana for demo tenant
-        if (!assignedState) {
-            assignedState = "Indiana";
+        // Already correct on the authoritative field — skip.
+        if (programState && programState.trim() === resolved) {
+            skipped++;
+            continue;
         }
         batch.update(d.ref, {
-            address_state: assignedState,
+            state: resolved, // ← authoritative program-state field
             updated_at: admin.firestore.FieldValue.serverTimestamp(),
         });
-        updated++;
+        if (programState && programState.trim())
+            normalized++;
+        else
+            updated++;
     }
     await batch.commit();
     // ── Seed service_authorizations for demo ──────────────────────────────────

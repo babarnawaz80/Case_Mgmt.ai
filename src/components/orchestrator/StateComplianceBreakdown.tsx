@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { type Individual } from "@/hooks/useIndividuals";
 import { getDocs, query, collection, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { canonicalState, stateDisplayLabel } from "@/lib/stateUtils";
+import { individualState, stateDisplayLabel } from "@/lib/stateUtils";
 
 /** Returns a display label for a canonical state value */
 function stateLabel(canonical: string): string {
@@ -35,9 +35,9 @@ export function StateComplianceBreakdown({ individuals, selectedState }: Props) 
   const navigate = useNavigate();
   const [engines, setEngines] = useState<Record<string, { name: string; id: string } | null | "loading">>({});
 
-  // Resolve individual's state field, canonicalized ("IN"/"Indiana" → "Indiana")
+  // Program enrollment state (NOT residence), canonicalized ("IN" → "Indiana")
   function indState(ind: Individual): string | null {
-    return canonicalState((ind as any).address_state || (ind as any).state);
+    return individualState(ind);
   }
 
   // Count individuals with NO valid state

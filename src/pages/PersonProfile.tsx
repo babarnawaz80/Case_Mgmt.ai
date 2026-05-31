@@ -44,6 +44,7 @@ import { useServiceAuthorizations, useConsents, addConsent, updateConsent, compu
 import { useAuth } from "@/contexts/AuthContext";
 import { calculateRiskScore } from "@/lib/riskEngine";
 import { getRiskLabel } from "@/lib/formatDate";
+import { canonicalState } from "@/lib/stateUtils";
 
 const PersonServiceProviders = lazy(() => import("./PersonServiceProviders"));
 const PersonConsentsTab = lazy(() => import("./PersonConsentsTab"));
@@ -1354,7 +1355,9 @@ function ProgramTab({ profile, person }: { profile: ProfileData; person: Individ
         programName: prog.name,
         programCode: prog.code,
         program:     prog.name,
-        state:       prog.state,
+        // Program enrollment state — authoritative for orchestrator/reporting.
+        // Canonicalized ("IN" → "Indiana") so stored values stay uniform.
+        state:       canonicalState(prog.state) ?? prog.state,
         payer:       prog.payer,
         updatedAt:   serverTimestamp(),
       });

@@ -100,6 +100,14 @@ export interface Individual {
   referral_source?: string;
 
   // Program / Service
+  // `state` is the PROGRAM enrollment state (set by Change Program / intake).
+  // This — NOT the residence address (address_state) — is the authoritative
+  // state for the AI Orchestrator, compliance, and reporting.
+  state?: string;
+  programId?: string;
+  programName?: string;
+  programCode?: string;
+  payer?: string;
   program_type?: string;
   waiver_type?: string;
   service_category?: string;
@@ -266,7 +274,14 @@ function toIndividual(id: string, data: DocumentData): Individual {
     living_situation: data.living_situation,
     communication_notes: data.communication_notes,
 
-    // Address (split fields)
+    // Program enrollment state (authoritative for orchestrator/reporting)
+    state: data.state,
+    programId: data.programId,
+    programName: data.programName ?? data.program,
+    programCode: data.programCode,
+    payer: data.payer,
+
+    // Address (split fields) — RESIDENCE only, never used for compliance
     address_street: data.address_street,
     address_city: data.address_city,
     address_state: data.address_state,

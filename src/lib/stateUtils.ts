@@ -50,7 +50,24 @@ export function stateDisplayLabel(canonical: string): string {
   return abbr ? `${canonical} (${abbr})` : canonical;
 }
 
-/** Reads an individual's state field (supports address_state or state) and canonicalizes it. */
-export function individualState(ind: { address_state?: string; state?: string } | any): string | null {
-  return canonicalState((ind as any)?.address_state || (ind as any)?.state);
+/**
+ * Returns an individual's canonical state FOR COMPLIANCE / ORCHESTRATOR / REPORTING.
+ *
+ * IMPORTANT: this is the PROGRAM enrollment state — the state the program the
+ * individual is enrolled in operates in — NOT their residence address. The
+ * residence address (`address_state` / nested `address.state`) can be anywhere
+ * and must never drive compliance bucketing.
+ *
+ * Priority:
+ *   1. `state`          — program enrollment state (set by Change Program / intake)
+ *   2. `program_state`  — explicit alias if present
+ *   3. `address_state`  — legacy fallback ONLY for older seeded records that were
+ *                         backfilled before the program-state field existed.
+ */
+export function individualState(ind: any): string | null {
+  return canonicalState(
+    (ind as any)?.state ||
+    (ind as any)?.program_state ||
+    (ind as any)?.address_state
+  );
 }

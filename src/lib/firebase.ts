@@ -35,6 +35,10 @@ try {
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager(),
       }),
+      // Drop `undefined` fields instead of throwing on write. Many call sites
+      // pass optional fields as `undefined` (e.g. scheduled-visit linked goal/
+      // task/notes), which otherwise fails the entire addDoc/setDoc.
+      ignoreUndefinedProperties: true,
     });
   } else {
     db = getFirestore(app);

@@ -15,10 +15,12 @@ import { test, expect } from '@playwright/test';
 import { injectAuth, ensureAuth, authStateFile } from '../../inject-auth';
 import { attachCrashGuard } from '../../crash-guard';
 
-test.use({ storageState: authStateFile('case-manager') });
+// Admin auth: the admin account has a populated individual picker (a
+// case manager's caseload may be empty, which would only skip the test).
+test.use({ storageState: authStateFile('admin') });
 
 test.beforeEach(async ({ page }) => {
-  await injectAuth(page, 'case-manager');
+  await injectAuth(page, 'admin');
 });
 
 test('scheduling a visit with no linked goal/task/notes does not fail', async ({ page }) => {
@@ -34,14 +36,14 @@ test('scheduling a visit with no linked goal/task/notes does not fail', async ({
     .getByRole('button', { name: /^(New|Schedule)$/ })
     .first();
   if (!(await openBtn.count())) {
-    console.log('DBG skip: no open btn'); test.skip(true, 'Schedule entry button not found on dashboard.');
+    test.skip(true, 'Schedule entry button not found on dashboard.');
     return;
   }
   await openBtn.click();
 
   const heading = page.getByText('Schedule a Visit', { exact: false });
   if (!(await heading.isVisible({ timeout: 4000 }).catch(() => false))) {
-    console.log('DBG skip: modal did not open'); test.skip(true, 'Schedule-a-Visit modal did not open.');
+    test.skip(true, 'Schedule-a-Visit modal did not open.');
     return;
   }
 
@@ -53,7 +55,7 @@ test('scheduling a visit with no linked goal/task/notes does not fail', async ({
   // element (the modal's close button is also z-50).
   const result = page.locator('div[class*="top-full"] button').first();
   if (!(await result.isVisible({ timeout: 5000 }).catch(() => false))) {
-    console.log('DBG skip: no results in dropdown'); test.skip(true, 'No individual results available.');
+    test.skip(true, 'No individual results available.');
     return;
   }
   await result.click();

@@ -161,22 +161,6 @@ export default function PersonManagedDocuments() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [alertPanelDoc, setAlertPanelDoc] = useState<{ id: string; name: string } | null>(null);
 
-  // ─── AI scan stats ─────────────────────────────────────────────────────────
-  const aiStats = useMemo(() => {
-    const files = nodes.filter((n) => n.type === "file");
-    const scanned = files.filter((n) => (n as any).aiScanned === true);
-    const flagged = files.filter((n) => ((n as any).aiAlertCount ?? 0) > 0);
-    const lastScan = files
-      .filter((n) => (n as any).aiScannedAt)
-      .sort((a, b) => {
-        const at = (a as any).aiScannedAt?.seconds ?? 0;
-        const bt = (b as any).aiScannedAt?.seconds ?? 0;
-        return bt - at;
-      })[0];
-    const scanning = files.some((n) => (n as any).scanStatus === "pending" && !(n as any).aiScanned);
-    return { total: files.length, scanned: scanned.length, flagged: flagged.length, lastScan, scanning };
-  }, [nodes]);
-
   const nodes = useMemo(() => {
     return (dbDocs || []).map((d: any) => ({
       id: d.id,
@@ -192,6 +176,22 @@ export default function PersonManagedDocuments() {
       dataUrl: d.data_url || "",
     }));
   }, [dbDocs]);
+
+  // ─── AI scan stats ─────────────────────────────────────────────────────────
+  const aiStats = useMemo(() => {
+    const files = nodes.filter((n) => n.type === "file");
+    const scanned = files.filter((n) => (n as any).aiScanned === true);
+    const flagged = files.filter((n) => ((n as any).aiAlertCount ?? 0) > 0);
+    const lastScan = files
+      .filter((n) => (n as any).aiScannedAt)
+      .sort((a, b) => {
+        const at = (a as any).aiScannedAt?.seconds ?? 0;
+        const bt = (b as any).aiScannedAt?.seconds ?? 0;
+        return bt - at;
+      })[0];
+    const scanning = files.some((n) => (n as any).scanStatus === "pending" && !(n as any).aiScanned);
+    return { total: files.length, scanned: scanned.length, flagged: flagged.length, lastScan, scanning };
+  }, [nodes]);
 
   useEffect(() => {
     if (!docsLoading && (dbDocs || []).length === 0 && id) {

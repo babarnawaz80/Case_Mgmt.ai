@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { localYMD } from "@/lib/formatDate";
 
 export type TaskStatus = "open" | "in_progress" | "completed" | "overdue";
 export type TaskPriority = "high" | "medium" | "low";
@@ -106,10 +107,10 @@ export function useTasks() {
 export function useTaskSummary() {
   const { tasks, loading } = useTasks();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localYMD();
   const endOfWeek = new Date();
   endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()));
-  const eow = endOfWeek.toISOString().split("T")[0];
+  const eow = localYMD(endOfWeek);
 
   const overdue = tasks.filter((t) => t.status !== "completed" && t.dueDate < today).length;
   const dueToday = tasks.filter((t) => t.status !== "completed" && t.dueDate === today).length;

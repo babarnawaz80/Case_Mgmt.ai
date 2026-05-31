@@ -45,7 +45,13 @@ export function fmt12(time24: string): string {
 }
 
 function toYMD(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Use LOCAL date parts, not toISOString() (which converts to UTC and shifts
+  // the date by a day in UTC-negative timezones — making tomorrow's visits show
+  // as "Today" and vice-versa). visit_date strings are local YYYY-MM-DD.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function fmtMonthYear(d: Date): string {

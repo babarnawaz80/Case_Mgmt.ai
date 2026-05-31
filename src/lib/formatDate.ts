@@ -4,6 +4,19 @@
  */
 
 /**
+ * Local YYYY-MM-DD for a date (defaults to now). Use for comparing against
+ * stored date-only strings ("today", due dates, visit dates). Do NOT use
+ * `toISOString().slice(0,10)` for this — it converts to UTC and shifts the
+ * date by a day in UTC-negative timezones.
+ */
+export function localYMD(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
  * Formats an ISO date string or timestamp to a long human-readable date+time.
  * e.g. "May 23, 2026 · 1:12 PM"
  */

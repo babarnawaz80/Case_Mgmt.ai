@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "crash-gate": "node scripts/crash-gate.mjs",
+    "deploy": "firebase deploy --only hosting"
   },
   "dependencies": {
     "@firebase/auth": "^1.13.1",

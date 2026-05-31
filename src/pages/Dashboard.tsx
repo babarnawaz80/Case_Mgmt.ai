@@ -198,10 +198,10 @@ function CensusCard({ census, activeCensus }: { census: number; activeCensus: nu
 }
 
 /* ============================================================
-   Card 2 — Incidents: two stat chips, no ring
+   Card 2 — Incidents (redesigned)
 ============================================================ */
-function IncidentsCard({ totalOpen, overdue, closedThisMonth }: {
-  totalOpen: number; overdue: number; closedThisMonth: number;
+function IncidentsCard({ totalOpen, overdue, inReview, critical, closedThisMonth }: {
+  totalOpen: number; overdue: number; inReview: number; critical: number; closedThisMonth: number;
 }) {
   const t = HERO_TONES.amber;
   return (
@@ -209,29 +209,96 @@ function IncidentsCard({ totalOpen, overdue, closedThisMonth }: {
       to="/incidents"
       className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
     >
+      {/* Top row: icon + badge */}
       <div className="flex items-start justify-between">
-        <div className={`w-10 h-10 rounded-xl ${t.iconBg} flex items-center justify-center`}>
+        <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center">
           <AlertTriangle className="w-5 h-5 text-icm-amber" />
         </div>
+        {critical > 0 && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-geist font-semibold bg-amber-100 text-amber-700">
+            {critical} critical
+          </span>
+        )}
       </div>
+
+      {/* Label + headline */}
       <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">Incidents</p>
-      <p className="font-manrope text-[40px] font-extrabold leading-none tracking-tight text-icm-text mt-1">
-        {totalOpen.toString().padStart(2, "0")}
+      <p className="font-manrope font-extrabold leading-none tracking-tight text-icm-text mt-1">
+        <span className="text-[40px]">{totalOpen.toString().padStart(2, "0")}</span>
+        <span className="text-[18px] font-medium text-icm-text-dim ml-2">open</span>
       </p>
-      <p className="text-[12px] text-icm-text-dim font-geist mt-0.5">Total open</p>
-      {/* Two stat chips */}
-      <div className="flex gap-2 mt-3">
-        <div className="flex-1 rounded-xl px-2 py-2 bg-red-50 text-center">
-          <p className="font-manrope font-bold text-[22px] text-red-600 leading-none">{overdue}</p>
-          <p className="text-[10.5px] text-red-500 font-geist mt-0.5">overdue</p>
+
+      {/* 3-chip grid */}
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
+          <p className="font-manrope font-bold text-[20px] text-red-600 leading-none">{overdue}</p>
+          <p className="text-[10px] text-icm-text-dim font-geist mt-1">overdue</p>
         </div>
-        <div className="flex-1 rounded-xl px-2 py-2 bg-green-50 text-center">
-          <p className="font-manrope font-bold text-[22px] text-green-600 leading-none">{closedThisMonth}</p>
-          <p className="text-[10.5px] text-green-600 font-geist mt-0.5">closed</p>
+        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
+          <p className="font-manrope font-bold text-[20px] text-amber-600 leading-none">{inReview}</p>
+          <p className="text-[10px] text-icm-text-dim font-geist mt-1">in progress</p>
+        </div>
+        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
+          <p className="font-manrope font-bold text-[20px] text-green-600 leading-none">{closedThisMonth}</p>
+          <p className="text-[10px] text-icm-text-dim font-geist mt-1">closed</p>
         </div>
       </div>
+
+      {/* Text link */}
       <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
-        View All <ArrowRight className="w-3 h-3" />
+        View all <ArrowRight className="w-3 h-3" />
+      </span>
+      <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
+    </NavLink>
+  );
+}
+
+/* ============================================================
+   Card 3 — Billing (redesigned — no donut)
+============================================================ */
+function BillingCard() {
+  const t = HERO_TONES.emerald;
+  return (
+    <NavLink
+      to="/billing"
+      className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
+    >
+      {/* Top row: icon + badge */}
+      <div className="flex items-start justify-between">
+        <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center">
+          <CreditCard className="w-5 h-5 text-icm-green" />
+        </div>
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-geist font-semibold bg-green-100 text-green-700">
+          ▲ +1.4% this month
+        </span>
+      </div>
+
+      {/* Label + headline */}
+      <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">Billing</p>
+      <p className="font-manrope font-extrabold leading-none tracking-tight text-icm-text mt-1">
+        <span className="text-[40px]">98%</span>
+        <span className="text-[18px] font-medium text-icm-text-dim ml-2">clean rate</span>
+      </p>
+
+      {/* 3-chip grid */}
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
+          <p className="font-manrope font-bold text-[20px] text-red-600 leading-none">4</p>
+          <p className="text-[10px] text-icm-text-dim font-geist mt-1">denied</p>
+        </div>
+        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
+          <p className="font-manrope font-bold text-[20px] text-amber-600 leading-none">$1.2k</p>
+          <p className="text-[10px] text-icm-text-dim font-geist mt-1">at risk</p>
+        </div>
+        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
+          <p className="font-manrope font-bold text-[20px] text-green-600 leading-none">$48k</p>
+          <p className="text-[10px] text-icm-text-dim font-geist mt-1">submitted</p>
+        </div>
+      </div>
+
+      {/* Text link */}
+      <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
+        Billing hub <ArrowRight className="w-3 h-3" />
       </span>
       <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
     </NavLink>
@@ -323,18 +390,7 @@ function HeroRow() {
   const attentionDenominator = activeIndividuals.length;
   const incidentSummary = useIncidentSummary();
 
-  // Card 3 — Billing (unchanged)
-  const billing: HeroKpi = {
-    label: "Billing",
-    value: "98%",
-    sub: "Claims clean rate",
-    icon: CreditCard,
-    to: "/billing",
-    cta: "Billing Hub",
-    tone: "emerald",
-    trend: { value: "+1.4%", positive: true },
-    meter: { value: 98, centerLabel: "98%", color: "hsl(var(--icm-green))" },
-  };
+  // Card 3 — Billing rendered via dedicated BillingCard component
 
   // Card 4 — People Needing Attention: amber, two-line breakdown
   const attention: HeroMeter = {
@@ -359,14 +415,16 @@ function HeroRow() {
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {/* Card 1 — Census: horizontal split bar */}
       <CensusCard census={census} activeCensus={activeCensus} />
-      {/* Card 2 — Incidents: two stat chips, no ring */}
+      {/* Card 2 — Incidents */}
       <IncidentsCard
         totalOpen={incidentSummary.totalOpen}
         overdue={incidentSummary.overdue}
+        inReview={incidentSummary.inReview}
+        critical={incidentSummary.critical}
         closedThisMonth={incidentSummary.closedThisMonth}
       />
-      {/* Card 3 — Billing: unchanged */}
-      <HeroKpiCard kpi={billing} />
+      {/* Card 3 — Billing */}
+      <BillingCard />
       {/* Card 4 — People Needing Attention: amber ring */}
       <HeroMeterCard kpi={attention} />
     </div>

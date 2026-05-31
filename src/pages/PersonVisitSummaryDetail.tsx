@@ -6,6 +6,7 @@ import {
   CalendarCheck, Clock,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { SmartTextarea } from "@/components/ui/smart-textarea";
 import { useIndividual } from "@/hooks/useIndividuals";
 import { useVisitSummaries } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
@@ -526,13 +527,13 @@ const PersonVisitSummaryDetail = () => {
         {/* VISIT CONTENT */}
         <Section title="Visit Content">
           <Field label="Purpose of Support" required aiSource={aiSourceFor("purposeOfSupport")}>
-            <textarea disabled={isReadOnly} maxLength={8000} value={form.purposeOfSupport ?? ""} onChange={(e) => update("purposeOfSupport", e.target.value)} className={textareaCls} rows={3} />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={8000} value={form.purposeOfSupport ?? ""} onChange={(v) => update("purposeOfSupport", v)} className={textareaCls} rows={3} />
           </Field>
           <Field label="What is Working?" aiSource={aiSourceFor("whatIsWorking")} hint="AI pulled this from last monitoring form and recent notes">
-            <textarea disabled={isReadOnly} maxLength={8000} value={form.whatIsWorking ?? ""} onChange={(e) => update("whatIsWorking", e.target.value)} className={textareaCls} rows={4} />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={8000} value={form.whatIsWorking ?? ""} onChange={(v) => update("whatIsWorking", v)} className={textareaCls} rows={4} />
           </Field>
           <Field label="What is Not Working?" aiSource={aiSourceFor("whatIsNotWorking")} hint="AI pulled this from recent notes and risk flags">
-            <textarea disabled={isReadOnly} maxLength={8000} value={form.whatIsNotWorking ?? ""} onChange={(e) => update("whatIsNotWorking", e.target.value)} className={textareaCls} rows={4} />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={8000} value={form.whatIsNotWorking ?? ""} onChange={(v) => update("whatIsNotWorking", v)} className={textareaCls} rows={4} />
           </Field>
         </Section>
 
@@ -549,10 +550,10 @@ const PersonVisitSummaryDetail = () => {
             <button onClick={() => navigate(`/people/${id}/echart`)} className="text-[11.5px] font-geist font-semibold text-icm-amber hover:underline shrink-0">View flag →</button>
           </div>
           <Field label="Immediate Action Needed" aiSource={aiSourceFor("immediateAction")}>
-            <textarea disabled={isReadOnly} maxLength={8000} value={form.immediateAction ?? ""} onChange={(e) => update("immediateAction", e.target.value)} className={textareaCls} rows={3} placeholder="Document any immediate health or safety concerns observed during this visit." />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={8000} value={form.immediateAction ?? ""} onChange={(v) => update("immediateAction", v)} className={textareaCls} rows={3} placeholder="Document any immediate health or safety concerns observed during this visit." />
           </Field>
           <Field label="Visit Summary and Next Steps" required aiSource={aiSourceFor("visitSummary")}>
-            <textarea disabled={isReadOnly} maxLength={8000} value={form.visitSummary ?? ""} onChange={(e) => update("visitSummary", e.target.value)} className={textareaCls} rows={5} />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={8000} value={form.visitSummary ?? ""} onChange={(v) => update("visitSummary", v)} className={textareaCls} rows={5} />
           </Field>
         </Section>
 

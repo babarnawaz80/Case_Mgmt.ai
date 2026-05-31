@@ -7,6 +7,7 @@ import {
   Clock,
 } from "lucide-react";
 import { ICMShell } from "@/components/icm/ICMShell";
+import { SmartTextarea } from "@/components/ui/smart-textarea";
 import { useIndividual } from "@/hooks/useIndividuals";
 import {
   buildAIPreFilledProgressNote, ACTIVITY_TYPES, NON_BILLABLE_REASONS,
@@ -609,7 +610,7 @@ const PersonProgressNoteDetail = () => {
         {/* SECTION 2 — Activity Documentation */}
         <Section title="Activity Documentation">
           <Field label="Purpose of Activity" required aiSource={aiSourceFor("purposeOfActivity")}>
-            <textarea disabled={isReadOnly} maxLength={4000} value={form.purposeOfActivity ?? ""} onChange={(e) => update("purposeOfActivity", e.target.value)} className={textareaCls} rows={4} placeholder="Describe the purpose and context of this activity" />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={4000} value={form.purposeOfActivity ?? ""} onChange={(v) => update("purposeOfActivity", v)} className={textareaCls} rows={4} placeholder="Describe the purpose and context of this activity" />
           </Field>
         </Section>
 
@@ -647,7 +648,7 @@ const PersonProgressNoteDetail = () => {
         {/* SECTION 4 — Additional Documentation */}
         <Section title="Additional Documentation" titleIcon={<ListChecks className="w-4 h-4 text-icm-text-dim" />}>
           <Field label="Additional observations" aiSource={aiSourceFor("additionalObservations")}>
-            <textarea disabled={isReadOnly} maxLength={4000} value={form.additionalObservations ?? ""} onChange={(e) => update("additionalObservations", e.target.value)} rows={4} className={textareaCls} placeholder="Any additional observations, concerns, or context not captured above" />
+            <SmartTextarea disabled={isReadOnly} noSmart={isReadOnly} maxLength={4000} value={form.additionalObservations ?? ""} onChange={(v) => update("additionalObservations", v)} rows={4} className={textareaCls} placeholder="Any additional observations, concerns, or context not captured above" />
           </Field>
           <Field label="Next steps" aiSource={aiSourceFor("nextSteps")}>
             {isReadOnly ? (
@@ -804,11 +805,12 @@ function GoalCard({ goal, disabled, onChange }: { goal: GoalProgressEntry; disab
         <button className="text-[11px] font-semibold text-icm-accent hover:underline shrink-0">View full goal →</button>
       </div>
       <Field label="Progress this session">
-        <textarea
+        <SmartTextarea
           disabled={disabled}
+          noSmart={disabled}
           maxLength={2000}
           value={goal.progressNotes ?? ""}
-          onChange={(e) => onChange({ progressNotes: e.target.value })}
+          onChange={(v) => onChange({ progressNotes: v })}
           rows={3}
           className={textareaCls}
           placeholder="What progress was made toward this goal during this activity?"

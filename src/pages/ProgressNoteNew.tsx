@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useProgressNotes";
 import { toast } from "sonner";
 import BillingSectionFields from "@/components/billing/BillingSectionFields";
+import { SmartTextarea } from "@/components/ui/smart-textarea";
 import ValidationFailureModal from "@/components/billing/ValidationFailureModal";
 import { runBillingValidation, type ValidationResult } from "@/services/billingValidation";
 import { createBillingRecord } from "@/hooks/useBillingRecords";
@@ -462,10 +463,10 @@ const ProgressNoteNew = () => {
         {/* Activity Documentation */}
         <Section title="Activity Documentation">
           <Field label="Purpose of Activity" required>
-            <textarea
+            <SmartTextarea
               rows={4}
               value={purposeOfActivity}
-              onChange={e => setPurpose(e.target.value)}
+              onChange={setPurpose}
               placeholder="Describe the purpose and context of this activity…"
               className={textareaCls}
             />
@@ -487,19 +488,19 @@ const ProgressNoteNew = () => {
         {/* Additional */}
         <Section title="Additional Documentation" titleIcon={<ListChecks className="w-4 h-4 text-icm-text-dim" />}>
           <Field label="Additional observations">
-            <textarea
+            <SmartTextarea
               rows={3}
               value={additionalObservations}
-              onChange={e => setObservations(e.target.value)}
+              onChange={setObservations}
               placeholder="Any additional observations, concerns, or context not captured above…"
               className={textareaCls}
             />
           </Field>
           <Field label="Next steps">
-            <textarea
+            <SmartTextarea
               rows={3}
               value={nextSteps}
-              onChange={e => setNextSteps(e.target.value)}
+              onChange={setNextSteps}
               placeholder="What follow-up actions are planned?"
               className={textareaCls}
             />

@@ -133,6 +133,8 @@ export function useIncidentSummary() {
   const summary = {
     totalOpen: 0,
     overdue: 0,
+    inReview: 0,
+    critical: 0,
     closedThisMonth: 0,
   };
 
@@ -143,6 +145,13 @@ export function useIncidentSummary() {
 
     summary.totalOpen = incidents.filter(i =>
       i.status === "open" || i.status === "in_review"
+    ).length;
+
+    summary.inReview = incidents.filter(i => i.status === "in_review").length;
+
+    summary.critical = incidents.filter(i =>
+      (i.status === "open" || i.status === "in_review") &&
+      (i.severity === "critical" || i.severity === "major")
     ).length;
 
     summary.overdue = incidents.filter(i => {

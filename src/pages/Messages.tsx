@@ -141,6 +141,7 @@ const GEMINI_PROXY_URL =
   "https://us-central1-casemanagement-ai.cloudfunctions.net/api/api/gemini-proxy";
 
 const MSG_REWRITE_ACTIONS = [
+  { id: "translate",    label: "Translate to English", icon: "🌐", description: "Translate any language into English" },
   { id: "improve",      label: "Improve writing",     icon: "✨", description: "Clearer, natural phrasing" },
   { id: "concise",      label: "Make concise",         icon: "✂️", description: "Shorter, same meaning" },
   { id: "professional", label: "More professional",    icon: "💼", description: "Formal workplace tone" },
@@ -148,6 +149,7 @@ const MSG_REWRITE_ACTIONS = [
 ];
 
 const MSG_REWRITE_PROMPTS: Record<string, string> = {
+  translate:    "Translate the following message into English. Preserve names, dates, and meaning exactly. If it is already entirely in English, return it unchanged. Return ONLY the English translation — no notes or explanations.",
   improve:      "Improve the clarity and naturalness of the following message. Make it clear, friendly, and easy to read. Do not change the meaning or add new information. Return ONLY the rewritten message, no explanations.",
   concise:      "Make the following message more concise. Remove unnecessary words while keeping the full meaning and tone intact. Return ONLY the shortened message, no explanations.",
   professional: "Rewrite the following message in a professional tone suitable for workplace communication between healthcare staff. Return ONLY the rewritten message, no explanations.",

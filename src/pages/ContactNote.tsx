@@ -6,6 +6,7 @@ import { useIndividual, useIndividuals } from "@/hooks/useIndividuals";
 import { Plus, Eye, Printer, Trash2, X, Search, Check, ChevronDown, Loader2, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { SmartTextarea } from "@/components/ui/smart-textarea";
 import {
   collection, addDoc, onSnapshot, query, where,
   serverTimestamp, orderBy, limit, type DocumentData,
@@ -630,13 +631,13 @@ const ContactNote = () => {
 
               <Field label="Purpose of Activity">
                 <div className="relative">
-                  <textarea value={form.purpose || ""} onChange={(e) => set("purpose", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <SmartTextarea value={form.purpose || ""} onChange={(v) => set("purpose", v)} className={textareaCls} rows={2} maxLength={4000} />
                   <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.purpose || "").length} / 4000</span>
                 </div>
               </Field>
               <Field label="Relevant Background / Circumstances">
                 <div className="relative">
-                  <textarea value={form.background || ""} onChange={(e) => set("background", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <SmartTextarea value={form.background || ""} onChange={(v) => set("background", v)} className={textareaCls} rows={2} maxLength={4000} />
                   <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.background || "").length} / 4000</span>
                 </div>
               </Field>
@@ -645,19 +646,19 @@ const ContactNote = () => {
               </Field>
               <Field label="Details of Activity">
                 <div className="relative">
-                  <textarea value={form.details || ""} onChange={(e) => set("details", e.target.value)} className={textareaCls} rows={3} maxLength={4000} />
+                  <SmartTextarea value={form.details || ""} onChange={(v) => set("details", v)} className={textareaCls} rows={3} maxLength={4000} />
                   <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.details || "").length} / 4000</span>
                 </div>
               </Field>
               <Field label="Issues / Concerns / Challenges">
                 <div className="relative">
-                  <textarea value={form.issues || ""} onChange={(e) => set("issues", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <SmartTextarea value={form.issues || ""} onChange={(v) => set("issues", v)} className={textareaCls} rows={2} maxLength={4000} />
                   <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.issues || "").length} / 4000</span>
                 </div>
               </Field>
               <Field label="Next Steps and Follow Up Plans">
                 <div className="relative">
-                  <textarea value={form.nextSteps || ""} onChange={(e) => set("nextSteps", e.target.value)} className={textareaCls} rows={2} maxLength={4000} />
+                  <SmartTextarea value={form.nextSteps || ""} onChange={(v) => set("nextSteps", v)} className={textareaCls} rows={2} maxLength={4000} />
                   <span className="absolute bottom-2 right-2 text-[11px] text-icm-text-faint pointer-events-none">{(form.nextSteps || "").length} / 4000</span>
                 </div>
               </Field>

@@ -287,13 +287,16 @@ function SeedDemoDataButton() {
   async function handleSeed() {
     setSeeding(true);
     try {
-      const fn = httpsCallable<object, { individualsUpdated: number; authorizationsSeeded: number }>(
-        fns, "migrateIndividualStates"
-      );
+      const fn = httpsCallable<object, {
+        individualsUpdated: number;
+        individualsClearedBadState: number;
+        authorizationsSeeded: number;
+      }>(fns, "migrateIndividualStates");
       const res = await fn({});
-      const { individualsUpdated, authorizationsSeeded } = res.data;
-      toast.success("Demo data seeded successfully", {
-        description: `${individualsUpdated} individuals updated with state · ${authorizationsSeeded} authorizations created`,
+      const { individualsUpdated, individualsClearedBadState, authorizationsSeeded } = res.data;
+      const fixed = individualsUpdated + individualsClearedBadState;
+      toast.success("State data corrected from enrolled programs", {
+        description: `${fixed} individual${fixed !== 1 ? "s" : ""} updated from program state · ${authorizationsSeeded} authorizations seeded`,
       });
       setDone(true);
       // Reload to reflect new state values

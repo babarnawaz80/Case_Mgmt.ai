@@ -53,21 +53,19 @@ export function stateDisplayLabel(canonical: string): string {
 /**
  * Returns an individual's canonical state FOR COMPLIANCE / ORCHESTRATOR / REPORTING.
  *
- * IMPORTANT: this is the PROGRAM enrollment state — the state the program the
- * individual is enrolled in operates in — NOT their residence address. The
- * residence address (`address_state` / nested `address.state`) can be anywhere
- * and must never drive compliance bucketing.
+ * AUTHORITATIVE SOURCE: the `state` field set when a program is assigned via
+ * Profile → Program → Change Program, OR via New Participant Intake →
+ * State of Enrollment. This is the state the ENROLLED PROGRAM operates in.
  *
- * Priority:
- *   1. `state`          — program enrollment state (set by Change Program / intake)
- *   2. `program_state`  — explicit alias if present
- *   3. `address_state`  — legacy fallback ONLY for older seeded records that were
- *                         backfilled before the program-state field existed.
+ * The residence address (`address_state`, nested `address.state`) is NEVER
+ * used — a person's home can be anywhere and has no compliance meaning.
+ *
+ * `program_state` is an explicit alias accepted for forward-compatibility.
  */
 export function individualState(ind: any): string | null {
   return canonicalState(
-    (ind as any)?.state ||
-    (ind as any)?.program_state ||
-    (ind as any)?.address_state
+    (ind as any)?.state ||        // ← set by Change Program / intake enrollment state
+    (ind as any)?.program_state   // ← explicit alias
+    // NOTE: address_state intentionally NOT included here
   );
 }

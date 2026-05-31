@@ -32,6 +32,7 @@ const LANGUAGES: { code: string; label: string }[] = [
 ];
 
 const REWRITE_ACTIONS: { id: string; label: string; description: string }[] = [
+  { id: "translate",    label: "🌐 Translate to English", description: "Translate any language into English" },
   { id: "improve",      label: "Improve writing",       description: "Tighten phrasing and clarity" },
   { id: "professional", label: "Make more professional", description: "Clinical, audit-ready tone" },
   { id: "concise",      label: "Make concise",           description: "Cut filler, keep meaning" },
@@ -42,6 +43,7 @@ const REWRITE_ACTIONS: { id: string; label: string; description: string }[] = [
 // AI rewrite calls are handled server-side. The frontend must NOT call Gemini directly.
 
 const REWRITE_PROMPTS: Record<string, string> = {
+  translate:    "Translate the following text into English. Preserve all clinical meaning, names, dates, numbers, and details exactly. If the text is already entirely in English, return it unchanged. Return ONLY the English translation — no notes, no explanations, no original-language text.",
   improve:      "Improve the clarity and readability of the following clinical case management note. Fix awkward phrasing, tighten sentences, and ensure professional language. Return ONLY the rewritten text, no explanations.",
   professional: "Rewrite the following text in a professional, clinical case management tone suitable for an official health record. Use third-person where appropriate (e.g. 'the individual' instead of 'he/she'), avoid informal language, and ensure it is audit-ready. Return ONLY the rewritten text, no explanations.",
   concise:      "Make the following clinical note more concise. Remove filler words, redundant phrases, and unnecessary detail while preserving all critical clinical information. Return ONLY the rewritten text, no explanations.",

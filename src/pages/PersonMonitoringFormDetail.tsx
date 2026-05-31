@@ -16,6 +16,7 @@ import { serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import BillingSectionFields from "@/components/billing/BillingSectionFields";
 import { AttestationSection, EMPTY_ATTESTATION, type AttestationValue } from "@/components/icm/AttestationSection";
+import { SmartTextarea } from "@/components/ui/smart-textarea";
 import { createBillingRecord, updateAuthorizationUnits } from "@/hooks/useBillingRecords";
 import { getRateForCode } from "@/hooks/useAuthorizations";
 import { calculateBillingUnits } from "@/services/billingValidation";
@@ -577,7 +578,7 @@ const PersonMonitoringFormDetail = () => {
                         </Field>
                         <div className="md:col-span-2">
                           <Field label="Progress notes">
-                            <textarea disabled={readOnly} value={g.notes} onChange={(e) => updateGoal(g.goalId, { notes: e.target.value })} rows={2} className={textareaClass} />
+                            <SmartTextarea disabled={readOnly} noSmart={readOnly} value={g.notes} onChange={(v) => updateGoal(g.goalId, { notes: v })} rows={2} className={textareaClass} />
                           </Field>
                         </div>
                       </div>
@@ -818,10 +819,11 @@ function YesNoQ({ q, readOnly, onChange }: { q: YesNoAnswer; readOnly?: boolean;
       {q.answer === "Yes" && (
         <div className="mt-2">
           <span className="text-[10.5px] uppercase tracking-wide font-semibold text-icm-text-faint mb-1 block">Please explain</span>
-          <textarea
+          <SmartTextarea
             disabled={readOnly}
+            noSmart={readOnly}
             value={q.explain ?? ""}
-            onChange={(e) => onChange({ explain: e.target.value })}
+            onChange={(v) => onChange({ explain: v })}
             rows={2}
             className={textareaClass}
           />

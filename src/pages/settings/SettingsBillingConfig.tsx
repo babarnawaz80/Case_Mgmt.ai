@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot, query, where, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -732,11 +732,158 @@ function PayersTab({
   );
 }
 
+// ─── Funding Stream types ─────────────────────────────────────────────────────
+
+interface FundingStream {
+  id: string;
+  name: string;
+  program: string;
+  payer: string;
+  codes: string;      // comma-separated service codes
+  unit: string;
+  state: string;
+  status: "Active" | "Inactive";
+  organizationId: string;
+}
+
+type FundingStreamForm = Omit<FundingStream, "id" | "organizationId">;
+
+const EMPTY_FORM: FundingStreamForm = {
+  name: "", program: "", payer: "", codes: "", unit: "15 min", state: "", status: "Active",
+};
+
+const BILLING_UNITS = ["15 min", "30 min", "1 hour", "Half day", "Full day", "Per visit", "Per month", "Per unit"];
+const US_STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"];
+
+// ─── Add / Edit Modal ──────────────────────────────────────────────────────────
+
+function FundingStreamModal({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial?: FundingStream;
+  onClose: () => void;
+  onSave: (form: FundingStreamForm) => Promise<void>;
+}) {
+  const [form, setForm] = useState<FundingStreamForm>(
+    initial ? { name: initial.name, program: initial.program, payer: initial.payer, codes: initial.codes, unit: initial.unit, state: initial.state, status: initial.status } : EMPTY_FORM
+  );
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: keyof FundingStreamForm, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error("Stream name is required."); return; }
+    if (!form.payer.trim()) { toast.error("Payer is required."); return; }
+    setSaving(true);
+    try { await onSave(form); onClose(); }
+    catch (err: any) { toast.error("Failed to save: " + (err?.message ?? err)); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-icm-panel rounded-2xl border border-icm-border shadow-xl p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-manrope font-bold text-[15px] text-icm-text">
+            {initial ? "Edit Funding Stream" : "Add Funding Stream"}
+          </h3>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-icm-bg text-icm-text-dim">✕</button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Stream Name *</label>
+            <input value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Indiana HCBS — CIH Waiver" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Program</label>
+            <input value={form.program} onChange={e => set("program", e.target.value)} placeholder="e.g. Community Integration" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Payer *</label>
+            <input value={form.payer} onChange={e => set("payer", e.target.value)} placeholder="e.g. IHCP, NJ DDD" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent" />
+          </div>
+          <div className="col-span-2 space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Valid Service Codes <span className="normal-case">(comma-separated)</span></label>
+            <input value={form.codes} onChange={e => set("codes", e.target.value)} placeholder="e.g. T2022, T2023, H0038" className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist font-mono focus:outline-none focus:border-icm-accent" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Billing Unit</label>
+            <select value={form.unit} onChange={e => set("unit", e.target.value)} className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent">
+              {BILLING_UNITS.map(u => <option key={u}>{u}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">State</label>
+            <select value={form.state} onChange={e => set("state", e.target.value)} className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent">
+              <option value="">— Select —</option>
+              {US_STATES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10.5px] uppercase tracking-wide font-geist font-semibold text-icm-text-dim">Status</label>
+            <select value={form.status} onChange={e => set("status", e.target.value as "Active" | "Inactive")} className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent">
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button onClick={onClose} className="h-8 px-4 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="h-8 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-50 flex items-center gap-1.5">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {initial ? "Save Changes" : "Add Stream"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── FundingTab ────────────────────────────────────────────────────────────────
+
 function FundingTab() {
-  const rows = [
-    { name: "Indiana HCBS — CIH Waiver", program: "Community Integration and Habilitation", payer: "IHCP", codes: "T2022, T2023", unit: "15 min", state: "Indiana" },
-    { name: "NJ DDD Community Care", program: "DDD Community Care Waiver", payer: "NJ DDD", codes: "T1016, T2022", unit: "15 min", state: "New Jersey" },
-  ];
+  const { userProfile } = useAuth();
+  const orgId = userProfile?.organizationId;
+  const [streams, setStreams] = useState<FundingStream[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<FundingStream | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Load from Firestore
+  useEffect(() => {
+    if (!orgId) { setLoading(false); return; }
+    const q = query(collection(db, "funding_streams"), where("organizationId", "==", orgId));
+    const unsub = onSnapshot(q, snap => {
+      setStreams(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<FundingStream, "id">) })));
+      setLoading(false);
+    }, err => { console.error("[funding_streams]", err); setLoading(false); });
+    return unsub;
+  }, [orgId]);
+
+  const handleAdd = async (form: FundingStreamForm) => {
+    await addDoc(collection(db, "funding_streams"), { ...form, organizationId: orgId, createdAt: serverTimestamp() });
+    toast.success("Funding stream added.");
+  };
+
+  const handleEdit = async (form: FundingStreamForm) => {
+    if (!editing) return;
+    await updateDoc(doc(db, "funding_streams", editing.id), { ...form, updatedAt: serverTimestamp() });
+    toast.success("Funding stream updated.");
+    setEditing(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this funding stream? This cannot be undone.")) return;
+    setDeleting(id);
+    try { await deleteDoc(doc(db, "funding_streams", id)); toast.success("Deleted."); }
+    catch (err: any) { toast.error("Failed to delete: " + (err?.message ?? err)); }
+    finally { setDeleting(null); }
+  };
 
   return (
     <div className="rounded-xl border border-icm-border bg-icm-panel p-4 space-y-3">
@@ -745,37 +892,61 @@ function FundingTab() {
           <p className="font-manrope font-bold text-[14px] text-icm-text">Funding Streams</p>
           <p className="text-[11.5px] font-geist text-icm-text-dim mt-1">Define which service codes are valid under which programs and payers.</p>
         </div>
-        <button onClick={() => toast("Add funding stream")} className="h-8 px-2.5 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700">
-          <Plus className="w-3.5 h-3.5" />Add Funding Stream
+        <button onClick={() => setShowAdd(true)} className="h-8 px-2.5 rounded-lg bg-teal-600 text-white text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700">
+          <Plus className="w-3.5 h-3.5" /> Add Funding Stream
         </button>
       </div>
-      <div className="rounded-xl border border-icm-border overflow-hidden">
-        <table className="w-full text-[12px] font-geist">
-          <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
-            <tr>
-              {["Stream Name", "Program", "Payer", "Valid Service Codes", "Billing Unit", "State", "Status", "Actions"].map((h) => (
-                <th key={h} className="text-left px-3 py-2 font-semibold">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.name} className="border-t border-icm-border">
-                <td className="px-3 py-2 text-icm-text font-semibold">{r.name}</td>
-                <td className="px-3 py-2 text-icm-text-dim">{r.program}</td>
-                <td className="px-3 py-2 text-icm-text-dim">{r.payer}</td>
-                <td className="px-3 py-2 text-icm-text-dim font-mono">{r.codes}</td>
-                <td className="px-3 py-2 text-icm-text-dim">{r.unit}</td>
-                <td className="px-3 py-2 text-icm-text-dim">{r.state}</td>
-                <td className="px-3 py-2"><StatusPill label="Active" tone="green" /></td>
-                <td className="px-3 py-2">
-                  <button onClick={() => toast("Edit funding stream")} className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline">Edit</button>
-                </td>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-6 text-icm-text-dim text-[12px] font-geist justify-center">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+        </div>
+      ) : streams.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-icm-border py-8 text-center">
+          <p className="text-[12.5px] font-geist text-icm-text-dim">No funding streams configured yet.</p>
+          <button onClick={() => setShowAdd(true)} className="mt-2 text-[12px] font-geist font-semibold text-icm-accent hover:underline">
+            + Add your first funding stream
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-icm-border overflow-hidden">
+          <table className="w-full text-[12px] font-geist">
+            <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+              <tr>
+                {["Stream Name", "Program", "Payer", "Valid Service Codes", "Billing Unit", "State", "Status", "Actions"].map(h => (
+                  <th key={h} className="text-left px-3 py-2 font-semibold">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {streams.map(r => (
+                <tr key={r.id} className="border-t border-icm-border hover:bg-icm-bg/40">
+                  <td className="px-3 py-2 text-icm-text font-semibold">{r.name}</td>
+                  <td className="px-3 py-2 text-icm-text-dim">{r.program || "—"}</td>
+                  <td className="px-3 py-2 text-icm-text-dim">{r.payer}</td>
+                  <td className="px-3 py-2 text-icm-text-dim font-mono">{r.codes || "—"}</td>
+                  <td className="px-3 py-2 text-icm-text-dim">{r.unit}</td>
+                  <td className="px-3 py-2 text-icm-text-dim">{r.state || "—"}</td>
+                  <td className="px-3 py-2">
+                    <StatusPill label={r.status} tone={r.status === "Active" ? "green" : "neutral"} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setEditing(r)} className="text-[11.5px] font-geist font-semibold text-icm-accent hover:underline">Edit</button>
+                      <button onClick={() => handleDelete(r.id)} disabled={deleting === r.id} className="text-[11.5px] font-geist font-semibold text-icm-red hover:underline disabled:opacity-50">
+                        {deleting === r.id ? "…" : "Delete"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAdd && <FundingStreamModal onClose={() => setShowAdd(false)} onSave={handleAdd} />}
+      {editing && <FundingStreamModal initial={editing} onClose={() => setEditing(null)} onSave={handleEdit} />}
     </div>
   );
 }

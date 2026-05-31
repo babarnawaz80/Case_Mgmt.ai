@@ -427,6 +427,15 @@ service cloud.firestore {
       allow write: if isCaseManager();
     }
 
+    // ─── Funding Streams (billing config) ────────────────────────────────────
+    match /funding_streams/{id} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isAdmin() && newDocInOrg();
+      allow update: if isAdmin() && ownedByOrg();
+      allow delete: if isAdmin() && ownedByOrg();
+    }
+
     // ─── Programs & States (admin-managed org config) ─────────────────────────
     match /programs/{id} {
       allow list: if isAuth();

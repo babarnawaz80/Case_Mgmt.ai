@@ -1,26 +1,22 @@
+/**
+ * useVoiceSession
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Browser-native voice input/output:
+ *   • SpeechRecognition  — Chrome / Edge / Safari 16.4+
+ *   • SpeechSynthesis    — all modern browsers
+ *
+ * The key fix over the previous version: startListening is stored in a ref so
+ * closures (onend, onerror, setTimeout callbacks) always call the current
+ * version without creating a circular useCallback dependency that Vite/Rollup
+ * turns into a temporal-dead-zone crash after minification.
+ */
+
 import { useState, useRef, useCallback, useEffect } from "react";
 import { auth } from "@/lib/firebase";
 
+const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
+
 export type VoiceState = "idle" | "listening" | "processing" | "speaking" | "error";
-
-const VOICE_PROXY_URL = "wss://us-central1-casemanagement-ai.cloudfunctions.net/voiceProxy";
-
-// PCM16 audio worklet processor (inline as a blob URL)
-const WORKLET_CODE = `
-class PCM16Processor extends AudioWorkletProcessor {
-  process(inputs) {
-    const input = inputs[0]?.[0];
-    if (!input) return true;
-    const pcm = new Int16Array(input.length);
-    for (let i = 0; i < input.length; i++) {
-      pcm[i] = Math.max(-32768, Math.min(32767, Math.round(input[i] * 32767)));
-    }
-    this.port.postMessage(pcm.buffer, [pcm.buffer]);
-    return true;
-  }
-}
-registerProcessor("pcm16-processor", PCM16Processor);
-`;
 
 export interface VoiceTurn {
   role: "user" | "assistant";
@@ -29,263 +25,309 @@ export interface VoiceTurn {
 }
 
 interface UseVoiceSessionOptions {
-  onTranscriptTurn: (turn: VoiceTurn) => void;
+  onFinalTranscript: (text: string) => void;
   onError: (msg: string) => void;
+  onInterimTranscript?: (text: string) => void;
 }
 
-export function useVoiceSession({ onTranscriptTurn, onError }: UseVoiceSessionOptions) {
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+// ─── Browser detection ────────────────────────────────────────────────────────
+
+function isSpeechSupported(): boolean {
+  return !!(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition) &&
+    window.speechSynthesis
+  );
+}
+
+function makeSpeechRecognition(): SpeechRecognition | null {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Ctor = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+  if (!Ctor) return null;
+  const r: SpeechRecognition = new Ctor();
+  // continuous=true keeps the session open so the user can take their time
+  // speaking — it won't cut them off mid-sentence.
+  r.continuous      = true;
+  r.interimResults  = true;
+  r.lang            = "en-US";
+  r.maxAlternatives = 1;
+  return r;
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useVoiceSession({
+  onFinalTranscript,
+  onError,
+  onInterimTranscript,
+}: UseVoiceSessionOptions) {
+  const [voiceState, setVoiceState]   = useState<VoiceState>("idle");
   const [isSupported, setIsSupported] = useState(true);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const playQueueRef = useRef<AudioBuffer[]>([]);
-  const isPlayingRef = useRef(false);
-  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const pendingUserTextRef = useRef("");
-  const pendingAITextRef = useRef("");
-  // Keep a ref to voiceState for use inside closures
-  const voiceStateRef = useRef<VoiceState>("idle");
+  // ── Persistent refs (survive re-renders, safe inside closures) ──────────────
+  const continuousRef       = useRef(false);
+  const isSpeakingRef       = useRef(false);
+  const recognitionRef      = useRef<SpeechRecognition | null>(null);
+  const pendingTextRef      = useRef("");
+
+  // Echo suppression: track the first words of what the AI just said and when
+  // it finished. If the mic hears those same words within 4 seconds, it's room
+  // echo from the speakers — discard it.
+  const lastAIFingerprintRef = useRef("");   // first ~15 chars of last AI response
+  const lastAISpokeMsRef     = useRef(0);    // timestamp when AI finished speaking
+
+  // This ref holds the latest version of startListening so that callbacks
+  // registered inside event handlers always call the current closure without
+  // creating a circular useCallback dependency.
+  const startListeningRef = useRef<() => void>(() => {});
+
+  // Callbacks from props — keep in refs so event handlers don't go stale
+  const onFinalRef   = useRef(onFinalTranscript);
+  const onErrorRef   = useRef(onError);
+  const onInterimRef = useRef(onInterimTranscript);
+  useEffect(() => { onFinalRef.current   = onFinalTranscript; }, [onFinalTranscript]);
+  useEffect(() => { onErrorRef.current   = onError;           }, [onError]);
+  useEffect(() => { onInterimRef.current = onInterimTranscript; }, [onInterimTranscript]);
 
   useEffect(() => {
-    voiceStateRef.current = voiceState;
-  }, [voiceState]);
-
-  useEffect(() => {
-    // Check browser support
-    if (!window.AudioContext || !navigator.mediaDevices?.getUserMedia) {
-      setIsSupported(false);
-    }
+    setIsSupported(isSpeechSupported());
   }, []);
 
-  const stopPlayback = useCallback(() => {
-    currentSourceRef.current?.stop();
-    currentSourceRef.current = null;
-    playQueueRef.current = [];
-    isPlayingRef.current = false;
-  }, []);
+  // ── startListening (no deps — uses refs exclusively) ─────────────────────
+  const startListening = useCallback(() => {
+    if (!continuousRef.current) return;
 
-  const playNextChunk = useCallback(() => {
-    if (!audioContextRef.current || playQueueRef.current.length === 0) {
-      isPlayingRef.current = false;
-      // Auto-return to listening when done speaking
-      setVoiceState("listening");
-      return;
-    }
-    isPlayingRef.current = true;
-    const buffer = playQueueRef.current.shift()!;
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContextRef.current.destination);
-    currentSourceRef.current = source;
-    source.onended = () => playNextChunk();
-    source.start();
-  }, []);
+    const r = makeSpeechRecognition();
+    if (!r) return;
+    recognitionRef.current = r;
 
-  const enqueueAudio = useCallback((pcmData: ArrayBuffer) => {
-    if (!audioContextRef.current) return;
-    // Gemini returns PCM16 @ 24000 Hz mono
-    const samples = new Int16Array(pcmData);
-    const float32 = new Float32Array(samples.length);
-    for (let i = 0; i < samples.length; i++) {
-      float32[i] = samples[i] / 32768;
-    }
-    const buffer = audioContextRef.current.createBuffer(1, float32.length, 24000);
-    buffer.copyToChannel(float32, 0);
-    playQueueRef.current.push(buffer);
-    if (!isPlayingRef.current) {
-      setVoiceState("speaking");
-      playNextChunk();
-    }
-  }, [playNextChunk]);
+    r.onstart = () => setVoiceState("listening");
 
-  const cleanup = useCallback(() => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    workletNodeRef.current?.disconnect();
-    audioContextRef.current?.close();
-    stopPlayback();
-    streamRef.current = null;
-    workletNodeRef.current = null;
-    audioContextRef.current = null;
-  }, [stopPlayback]);
+    r.onresult = (e: SpeechRecognitionEvent) => {
+      let interim = "";
+      let finalText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
 
-  const startSession = useCallback(async () => {
-    if (!isSupported) {
-      onError("Voice chat requires Chrome, Edge, or Safari 16+.");
-      return;
-    }
+      if (finalText.trim()) {
+        const candidate = finalText.trim();
 
-    try {
-      // Request mic permission
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
-      streamRef.current = stream;
+        // ── Echo suppression ────────────────────────────────────────────────
+        // If the mic hears words that match the beginning of what the AI just
+        // said, within 4 seconds of it finishing, it's room echo — drop it.
+        const msSinceSpeaking = Date.now() - lastAISpokeMsRef.current;
+        const fingerprint     = lastAIFingerprintRef.current;
+        const isEcho =
+          msSinceSpeaking < 4000 &&
+          fingerprint.length >= 5 &&
+          candidate.toLowerCase().startsWith(fingerprint);
 
-      // Get auth token
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) {
-        onError("Not signed in.");
-        stream.getTracks().forEach(t => t.stop());
+        if (isEcho) {
+          pendingTextRef.current = "";
+          onInterimRef.current?.("");
+          r.abort(); // restart cleanly
+        } else {
+          // Final result: store it and stop recognition so we can process
+          pendingTextRef.current = candidate;
+          onInterimRef.current?.(candidate);
+          r.abort();
+        }
+      } else {
+        // Interim: just update the live preview in the input box
+        pendingTextRef.current = interim;
+        onInterimRef.current?.(interim);
+      }
+    };
+
+    r.onend = () => {
+      const text = pendingTextRef.current.trim();
+      pendingTextRef.current = "";
+      onInterimRef.current?.("");
+
+      if (text && continuousRef.current) {
+        setVoiceState("processing");
+        onFinalRef.current(text);
+        // speakText() will restart listening after TTS finishes
+      } else if (continuousRef.current && !isSpeakingRef.current) {
+        // Silence/empty/echo-filtered — restart. Use longer gap if AI just spoke
+        // so room echo doesn't get picked up on reopen.
+        const gapMs = (Date.now() - lastAISpokeMsRef.current) < 2000 ? 900 : 300;
+        setTimeout(() => startListeningRef.current(), gapMs);
+      }
+    };
+
+    r.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (!continuousRef.current) return;
+      if (e.error === "no-speech") {
+        const gapMs = (Date.now() - lastAISpokeMsRef.current) < 2000 ? 900 : 300;
+        setTimeout(() => startListeningRef.current(), gapMs);
         return;
       }
-
-      // Open WebSocket
-      const ws = new WebSocket(`${VOICE_PROXY_URL}?token=${token}`);
-      wsRef.current = ws;
-
-      ws.onopen = async () => {
-        setVoiceState("listening");
-
-        // Set up AudioContext + worklet
-        const ctx = new AudioContext({ sampleRate: 16000 });
-        audioContextRef.current = ctx;
-
-        // Load inline worklet
-        const blob = new Blob([WORKLET_CODE], { type: "application/javascript" });
-        const blobUrl = URL.createObjectURL(blob);
-        await ctx.audioWorklet.addModule(blobUrl);
-        URL.revokeObjectURL(blobUrl);
-
-        const source = ctx.createMediaStreamSource(stream);
-        const worklet = new AudioWorkletNode(ctx, "pcm16-processor");
-        workletNodeRef.current = worklet;
-
-        worklet.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            // Send audio chunk to Gemini via proxy
-            const msg = JSON.stringify({
-              realtime_input: {
-                media_chunks: [{
-                  data: btoa(String.fromCharCode(...new Uint8Array(e.data))),
-                  mime_type: "audio/pcm;rate=16000",
-                }],
-              },
-            });
-            ws.send(msg);
-          }
-        };
-
-        source.connect(worklet);
-        worklet.connect(ctx.destination); // needed to keep worklet active
-      };
-
-      ws.onmessage = (event: MessageEvent) => {
-        try {
-          const raw = typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data as ArrayBuffer);
-          const msg = JSON.parse(raw);
-
-          // Handle setup complete
-          if (msg.setupComplete) return;
-
-          // Handle server content
-          const sc = msg.serverContent;
-          if (!sc) return;
-
-          // Extract text transcript
-          const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> =
-            sc.modelTurn?.parts ?? [];
-          for (const part of parts) {
-            if (part.text) {
-              pendingAITextRef.current += part.text;
-            }
-            // Extract audio
-            if (part.inlineData?.mimeType?.startsWith("audio/")) {
-              const binary = atob(part.inlineData.data);
-              const buf = new ArrayBuffer(binary.length);
-              const view = new Uint8Array(buf);
-              for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
-              enqueueAudio(buf);
-            }
-          }
-
-          // Handle user speech transcript
-          const inputTranscript = sc.inputTranscript as { text?: string } | undefined;
-          if (inputTranscript?.text) {
-            pendingUserTextRef.current += inputTranscript.text;
-          }
-
-          // On turn complete: flush text to chat
-          if (sc.turnComplete) {
-            if (pendingUserTextRef.current.trim()) {
-              onTranscriptTurn({ role: "user", text: pendingUserTextRef.current.trim(), isVoice: true });
-              pendingUserTextRef.current = "";
-            }
-            if (pendingAITextRef.current.trim()) {
-              onTranscriptTurn({ role: "assistant", text: pendingAITextRef.current.trim(), isVoice: true });
-              pendingAITextRef.current = "";
-            }
-          }
-        } catch { /* binary or parse error — skip */ }
-      };
-
-      ws.onerror = () => {
-        setVoiceState("error");
-        onError("Voice chat is temporarily unavailable. Try again in a moment.");
-        setTimeout(() => setVoiceState("idle"), 3000);
-      };
-
-      ws.onclose = (event: CloseEvent) => {
-        if (event.code === 1000 && event.reason.includes("timeout")) {
-          onError("Voice session ended after 10 minutes. Tap the mic to start a new one.");
-        } else if (event.code !== 1000 && voiceStateRef.current !== "idle") {
-          onError("Connection lost. Tap mic to reconnect.");
-        }
+      if (e.error === "not-allowed") {
+        onErrorRef.current("Microphone access needed. Enable in browser settings.");
+        continuousRef.current = false;
         setVoiceState("idle");
-        cleanup();
-      };
-    } catch (err: unknown) {
-      const domErr = err as { name?: string };
-      if (domErr.name === "NotAllowedError" || domErr.name === "PermissionDeniedError") {
-        onError("Microphone access needed. Enable in browser settings.");
-      } else if (domErr.name === "NotFoundError") {
-        onError("No microphone found. Please connect a microphone.");
-      } else {
-        onError("Could not access your microphone. Check if another app is using it.");
+        return;
       }
-      setVoiceState("idle");
-    }
-  }, [isSupported, onError, onTranscriptTurn, enqueueAudio, cleanup]);
-
-  const interrupt = useCallback(() => {
-    if (voiceState === "speaking") {
-      stopPlayback();
-      // Send interrupt signal to Gemini
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ client_content: { turn_complete: true } }));
+      if (e.error === "audio-capture") {
+        onErrorRef.current("Could not access your microphone. Check if another app is using it.");
+        continuousRef.current = false;
+        setVoiceState("idle");
+        return;
       }
-      setVoiceState("listening");
-    }
-  }, [voiceState, stopPlayback]);
+      setTimeout(() => startListeningRef.current(), 400);
+    };
 
+    try { r.start(); } catch { /* already started */ }
+  }, []); // ← zero deps: everything accessed via refs
+
+  // Keep the ref in sync
+  useEffect(() => {
+    startListeningRef.current = startListening;
+  }, [startListening]);
+
+  // ── startSession ─────────────────────────────────────────────────────────
+  const startSession = useCallback(() => {
+    if (!isSpeechSupported()) {
+      onErrorRef.current("Voice requires Chrome, Edge, or Safari 16.4+.");
+      return;
+    }
+    continuousRef.current = true;
+    startListeningRef.current();
+  }, []);
+
+  // ── endSession ────────────────────────────────────────────────────────────
   const endSession = useCallback(() => {
-    wsRef.current?.close(1000, "User ended session");
-    cleanup();
+    continuousRef.current = false;
+    recognitionRef.current?.abort();
+    recognitionRef.current  = null;
+    window.speechSynthesis.cancel();
+    isSpeakingRef.current   = false;
+    pendingTextRef.current  = "";
+    onInterimRef.current?.("");
     setVoiceState("idle");
-  }, [cleanup]);
+  }, []);
 
-  const toggleVoice = useCallback(() => {
-    switch (voiceState) {
-      case "idle":
-        startSession();
-        break;
-      case "listening":
-        endSession();
-        break;
-      case "speaking":
-        interrupt();
-        break;
-      default:
-        break;
+  // ── Gemini TTS via Cloud Function ────────────────────────────────────────
+  // Called by speakText — returns true if Gemini audio was played,
+  // false if the caller should fall back to browser SpeechSynthesis.
+  const speakViaGemini = useCallback(async (text: string): Promise<boolean> => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return false;
+
+      const res = await fetch(`${FUNCTIONS_BASE}/api/voice/speak`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ text, voice: "Kore" }),
+        signal:  AbortSignal.timeout(12000), // 12s max
+      });
+
+      if (!res.ok) return false;
+
+      const { audioData, mimeType } = await res.json();
+      if (!audioData) return false;
+
+      // Decode base64 and play via Audio element
+      const binary = atob(audioData);
+      const bytes  = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mimeType ?? "audio/wav" });
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+
+      await new Promise<void>((resolve) => {
+        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.play().catch(() => resolve());
+      });
+
+      return true;
+    } catch {
+      return false;
     }
-  }, [voiceState, startSession, endSession, interrupt]);
+  }, []);
 
-  return { voiceState, isSupported, toggleVoice, endSession, interrupt };
+  // ── speakText: Gemini TTS → browser SpeechSynthesis fallback ─────────────
+  const speakText = useCallback(async (text: string) => {
+    if (!continuousRef.current || !text.trim()) return;
+
+    // ── Stop the mic FIRST to prevent the AI's own voice looping back ────────
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    window.speechSynthesis.cancel();
+
+    isSpeakingRef.current = true;
+    setVoiceState("speaking");
+
+    // Record echo fingerprint: first 15 lowercase chars of what we're about to say
+    const firstWords = text.toLowerCase().replace(/[^a-z\s]/g, "").trim().slice(0, 15);
+    lastAIFingerprintRef.current = firstWords;
+
+    // First 4 sentences
+    const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
+    const spoken    = sentences.slice(0, 4).join(" ").trim();
+
+    // Try Gemini TTS first
+    const usedGemini = await speakViaGemini(spoken);
+
+    if (!usedGemini) {
+      // Fallback: browser SpeechSynthesis (worse quality but always available)
+      const utt = new SpeechSynthesisUtterance(spoken);
+      utt.rate  = 1.05;
+      utt.lang  = "en-US";
+      const voices    = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.lang.startsWith("en") && !v.localService)
+                     ?? voices.find(v => v.lang.startsWith("en"))
+                     ?? null;
+      if (preferred) utt.voice = preferred;
+
+      await new Promise<void>((resolve) => {
+        utt.onend   = () => resolve();
+        utt.onerror = () => resolve();
+        window.speechSynthesis.speak(utt);
+      });
+    }
+
+    isSpeakingRef.current = false;
+    lastAISpokeMsRef.current = Date.now(); // mark when AI finished
+
+    if (continuousRef.current) {
+      // 1200ms gap: gives room echo time to fully die out before mic opens.
+      // The echo filter above provides a second layer of protection.
+      setTimeout(() => startListeningRef.current(), 1200);
+    }
+  }, [speakViaGemini]); // speakViaGemini is stable (zero deps)
+
+  // ── interrupt (stop TTS, go back to listening) ────────────────────────────
+  const interrupt = useCallback(() => {
+    window.speechSynthesis.cancel();
+    isSpeakingRef.current = false;
+    if (continuousRef.current) setTimeout(() => startListeningRef.current(), 100);
+  }, []);
+
+  // ── toggleVoice (main entry point from the mic button) ────────────────────
+  const toggleVoice = useCallback(() => {
+    if (!continuousRef.current) {
+      startSession();
+    } else if (isSpeakingRef.current) {
+      interrupt();
+    } else {
+      endSession();
+    }
+  }, [startSession, interrupt, endSession]);
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      continuousRef.current = false;
+      recognitionRef.current?.abort();
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  return { voiceState, isSupported, toggleVoice, endSession, speakText, interrupt };
 }

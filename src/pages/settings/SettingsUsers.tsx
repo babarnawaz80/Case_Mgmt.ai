@@ -35,8 +35,10 @@ import {
   LogOut,
   ChevronDown,
   Settings,
+  Download,
+  FileUp,
 } from "lucide-react";
-import { ImportWizardModal } from "@/components/ImportWizardModal";
+import { ImportWizardModal, STAFF_FIELDS } from "@/components/ImportWizardModal";
 import { credentialBadge } from "@/data/staffProvider";
 import { cn } from "@/lib/utils";
 import {
@@ -74,6 +76,161 @@ function statusTone(s: UserStatus) {
     case "locked": return "bg-icm-red-soft text-icm-red ring-icm-red/20";
     default: return "bg-icm-bg text-icm-text-dim ring-icm-border";
   }
+}
+
+// ─── Staff template download ──────────────────────────────────────────────────
+
+function downloadStaffTemplate() {
+  const headers = STAFF_FIELDS.map(f => f.key);
+  const labels  = STAFF_FIELDS.map(f => f.label + (f.required ? " *" : ""));
+  const hints   = STAFF_FIELDS.map(f => f.hint ?? "");
+
+  // Example row — one realistic staff record covering every section
+  const example: Record<string, string> = {
+    // Required
+    first_name:              "Sarah",
+    last_name:               "Mitchell",
+    work_email:              "sarah.mitchell@agency.org",
+    // Basic identity
+    preferred_name:          "Sarah",
+    date_of_birth:           "03/15/1985",
+    gender:                  "Female",
+    race_ethnicity:          "White / Non-Hispanic",
+    primary_language:        "English",
+    // Contact
+    personal_email:          "sarah.personal@email.com",
+    work_phone:              "(317) 555-0120",
+    cell_phone:              "(317) 555-0121",
+    address_street:          "456 Oak Street",
+    address_city:            "Indianapolis",
+    address_state:           "IN",
+    address_zip:             "46202",
+    county:                  "Marion",
+    // Employment
+    role:                    "case_manager",
+    job_title:               "Case Manager",
+    department:              "Community Services",
+    employment_type:         "Full-Time",
+    hire_date:               "01/15/2023",
+    termination_date:        "",
+    supervisor_name:         "James Wilson",
+    office_location:         "Indianapolis Main Office",
+    caseload_capacity:       "25",
+    program_assignment:      "Indiana HCBS",
+    states_licensed_in:      "IN",
+    languages_spoken:        "English",
+    areas_of_specialization: "IDD, Behavioral Health",
+    // Credentials
+    credential:              "LCSW",
+    license_number:          "LC12345",
+    license_state:           "IN",
+    license_expiration_date: "12/31/2026",
+    npi_type1:               "1234567890",
+    supervising_provider_npi:"",
+    education_degree:        "Master of Social Work",
+    education_field:         "Social Work",
+    education_school:        "Indiana University",
+    education_grad_year:     "2010",
+    // Compliance & Training
+    background_check_date:   "12/01/2022",
+    hipaa_training_date:     "01/20/2023",
+    mandatory_reporter_date: "01/20/2023",
+    first_aid_expiration:    "06/30/2025",
+    other_certifications:    "CPR, First Aid",
+    // Emergency contact
+    emergency_contact_name:  "Tom Mitchell",
+    emergency_relationship:  "Spouse",
+    emergency_phone:         "(317) 555-0199",
+    emergency_phone2:        "",
+    // System
+    is_active:               "true",
+    send_welcome_email:      "Yes",
+    notes:                   "Transfer from partner agency",
+  };
+
+  const exampleRow = headers.map(h => example[h] ?? "");
+
+  const csvRows = [
+    headers.join(","),
+    labels.map(l => `"${l}"`).join(","),
+    hints.map(h => `"${h}"`).join(","),
+    exampleRow.map(v => `"${v}"`).join(","),
+  ];
+
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "CaseManagementAI_Staff_Import.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─── Staff import split-button dropdown ───────────────────────────────────────
+
+function StaffImportDropdown({ onOpenImport }: { onOpenImport: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex items-stretch rounded-xl border border-icm-border bg-icm-panel overflow-hidden hover:border-icm-border-strong transition-colors">
+        {/* Left: open import wizard */}
+        <button
+          onClick={() => { setOpen(false); onOpenImport(); }}
+          className="h-9 px-3 flex items-center gap-1.5 text-[12px] font-geist font-semibold text-icm-text hover:bg-icm-bg transition-colors"
+        >
+          <Upload className="w-3.5 h-3.5" /> Import users
+        </button>
+        {/* Divider */}
+        <span className="w-px bg-icm-border self-stretch" />
+        {/* Chevron */}
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="h-9 px-2 flex items-center text-icm-text-dim hover:bg-icm-bg hover:text-icm-text transition-colors"
+          aria-label="Import options"
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute right-0 mt-1 w-60 rounded-xl border border-icm-border bg-icm-panel shadow-elevated z-30 py-1 overflow-hidden">
+          <button
+            onClick={() => { setOpen(false); onOpenImport(); }}
+            className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-geist text-icm-text hover:bg-icm-bg flex items-center gap-2.5 transition-colors"
+          >
+            <FileUp className="w-4 h-4 text-icm-text-dim shrink-0" />
+            <div>
+              <p className="font-medium leading-tight">Import from file</p>
+              <p className="text-[11px] text-icm-text-faint mt-0.5">Upload CSV or Excel</p>
+            </div>
+          </button>
+          <div className="h-px bg-icm-border mx-2" />
+          <button
+            onClick={() => { setOpen(false); downloadStaffTemplate(); }}
+            className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-geist text-icm-text hover:bg-icm-bg flex items-center gap-2.5 transition-colors"
+          >
+            <Download className="w-4 h-4 text-icm-text-dim shrink-0" />
+            <div>
+              <p className="font-medium leading-tight">Download template</p>
+              <p className="text-[11px] text-icm-text-faint mt-0.5">CSV with all staff fields + example</p>
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const SettingsUsers = () => {
@@ -425,13 +582,7 @@ const SettingsUsers = () => {
               />
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowImport(true)}
-                className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-semibold hover:border-icm-border-strong transition-colors inline-flex items-center gap-1.5"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                Import users
-              </button>
+              <StaffImportDropdown onOpenImport={() => setShowImport(true)} />
               {userLimit !== null && users.filter(u => u.status === "active").length >= userLimit ? (
                 <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-icm-red/30 bg-icm-red-soft text-icm-red text-[12px] font-geist font-semibold">
                   <span>Seat limit reached ({userLimit}/{userLimit})</span>

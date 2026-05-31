@@ -690,7 +690,7 @@ export function TodaySchedule({ compact, filteredVisits, externalLoading }: Toda
             {/* + Schedule */}
             <button
               onClick={() => setShowModal(true)}
-              className="h-7 px-2.5 rounded-lg bg-icm-accent text-white text-[10.5px] font-geist font-semibold flex items-center gap-1 hover:bg-icm-accent/90 transition-colors whitespace-nowrap"
+              className="h-7 px-2.5 rounded-lg bg-white border border-[#4f46e5] text-[#4f46e5] text-[10.5px] font-geist font-semibold flex items-center gap-1 hover:bg-[#eef2ff] transition-colors whitespace-nowrap"
             >
               <Plus className="w-3 h-3" /> {compact ? "New" : "Schedule"}
             </button>

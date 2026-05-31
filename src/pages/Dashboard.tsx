@@ -228,20 +228,14 @@ function IncidentsCard({ totalOpen, overdue, inReview, critical, closedThisMonth
         <span className="text-[18px] font-medium text-icm-text-dim ml-2">open</span>
       </p>
 
-      {/* 3-chip grid */}
-      <div className="grid grid-cols-3 gap-2 mt-4">
-        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
-          <p className="font-manrope font-bold text-[20px] text-red-600 leading-none">{overdue}</p>
-          <p className="text-[10px] text-icm-text-dim font-geist mt-1">overdue</p>
-        </div>
-        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
-          <p className="font-manrope font-bold text-[20px] text-amber-600 leading-none">{inReview}</p>
-          <p className="text-[10px] text-icm-text-dim font-geist mt-1">in progress</p>
-        </div>
-        <div className="rounded-xl bg-white/70 px-2 py-2.5 text-center">
-          <p className="font-manrope font-bold text-[20px] text-green-600 leading-none">{closedThisMonth}</p>
-          <p className="text-[10px] text-icm-text-dim font-geist mt-1">closed</p>
-        </div>
+      {/* 2-pill row */}
+      <div className="flex items-center gap-2 mt-4">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-geist font-semibold bg-[#dc2626] text-white">
+          {overdue} overdue
+        </span>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-geist font-semibold bg-[#16a34a] text-white">
+          {closedThisMonth} closed
+        </span>
       </div>
 
       {/* Text link */}
@@ -323,42 +317,40 @@ interface HeroMeter {
   iconColor: string;
 }
 
-function HeroMeterCard({ kpi }: { kpi: HeroMeter }) {
-  const Icon = kpi.icon;
+function AttentionCard({ total, attentionCount, highRisk, reviewRisk }: {
+  total: number; attentionCount: number; highRisk: number; reviewRisk: number;
+}) {
+  const t = HERO_TONES.amber;
   return (
     <NavLink
-      to={kpi.to}
-      className={`relative overflow-hidden rounded-2xl ring-1 p-5 group hover:shadow-elevated transition-all block bg-gradient-to-br ${kpi.bgFrom} ${kpi.bgTo} ${kpi.ringColor}`}
+      to="/people?risk=Attention"
+      className={`relative overflow-hidden rounded-2xl ring-1 ${t.ring} ${t.bg} p-5 group hover:shadow-elevated transition-all block`}
     >
       <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center">
-          <Icon className={`w-5 h-5 ${kpi.iconColor}`} />
+        <div className={`w-10 h-10 rounded-xl ${t.iconBg} flex items-center justify-center`}>
+          <Users className="w-5 h-5 text-icm-amber" />
         </div>
       </div>
       <p className="text-[10px] uppercase tracking-wider text-icm-text-dim font-geist font-semibold mt-3">
-        {kpi.label}
+        People Needing Attention
       </p>
-      <div className="flex items-center gap-4 mt-2">
-        <div className="relative shrink-0">
-          <Donut value={kpi.value} size={72} stroke={8} color={kpi.donutColor} />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-mono font-bold text-[13px] text-icm-text">{kpi.centerLabel}</span>
-          </div>
+      <p className="font-manrope text-[40px] font-extrabold leading-none tracking-tight text-icm-text mt-1">
+        {attentionCount}
+      </p>
+      <p className="text-[13px] text-icm-text-dim font-geist mt-1">of {total} total</p>
+      <div className="space-y-1 mt-3">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full shrink-0 bg-[#f59e0b]" />
+          <span className="text-[12px] text-[#6b7280] font-geist">{highRisk} high risk</span>
         </div>
-        <div>
-          <div className="space-y-1">
-            {kpi.subLines.map((line) => (
-              <div key={line.text} className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: line.color }} />
-                <span className="text-[12px] text-icm-text-dim font-geist">{line.text}</span>
-              </div>
-            ))}
-          </div>
-          <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-2 group-hover:gap-2 transition-all">
-            {kpi.cta} <ArrowRight className="w-3 h-3" />
-          </span>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full shrink-0 bg-[#3b82f6]" />
+          <span className="text-[12px] text-[#6b7280] font-geist">{reviewRisk} need review</span>
         </div>
       </div>
+      <span className="inline-flex items-center gap-1 text-[11px] font-geist font-semibold text-icm-accent mt-3 group-hover:gap-2 transition-all">
+        View Watchlist <ArrowRight className="w-3 h-3" />
+      </span>
       <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/30" />
     </NavLink>
   );
@@ -392,25 +384,6 @@ function HeroRow() {
 
   // Card 3 — Billing rendered via dedicated BillingCard component
 
-  // Card 4 — People Needing Attention: amber, two-line breakdown
-  const attention: HeroMeter = {
-    label: "People Needing Attention",
-    value: attentionDenominator > 0 ? (attentionCount / attentionDenominator) * 100 : 0,
-    centerLabel: `${attentionCount}/${attentionDenominator}`,
-    subLines: [
-      { color: "#f59e0b", text: `${highRisk} high risk` },
-      { color: "#3b82f6", text: `${reviewRisk} need review` },
-    ],
-    icon: AlertTriangle,
-    to: "/people?risk=Attention",
-    cta: "View Watchlist",
-    donutColor: "#f59e0b",
-    bgFrom: "from-[hsl(38,100%,97%)]",
-    bgTo:   "to-[hsl(38,90%,93%)]",
-    ringColor: "ring-[hsl(38,80%,80%)]/40",
-    iconColor: "text-icm-amber",
-  };
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {/* Card 1 — Census: horizontal split bar */}
@@ -425,8 +398,13 @@ function HeroRow() {
       />
       {/* Card 3 — Billing */}
       <BillingCard />
-      {/* Card 4 — People Needing Attention: amber ring */}
-      <HeroMeterCard kpi={attention} />
+      {/* Card 4 — People Needing Attention: flat layout, no donut */}
+      <AttentionCard
+        total={attentionDenominator}
+        attentionCount={attentionCount}
+        highRisk={highRisk}
+        reviewRisk={reviewRisk}
+      />
     </div>
   );
 }
@@ -598,13 +576,12 @@ function MyWorkQueue() {
           {!loading && (
             <div className="flex items-center gap-1.5">
               {overdueTasks.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10.5px] font-geist font-semibold bg-[hsl(0,90%,96%)] text-[hsl(var(--icm-red))] px-2 py-0.5 rounded-full">
-                  <AlertTriangle className="w-2.5 h-2.5" />
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-geist font-semibold bg-[#dc2626] text-white">
                   {overdueTasks.length} overdue
                 </span>
               )}
               {todayTasks.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10.5px] font-geist font-semibold bg-[hsl(28,100%,95%)] text-[hsl(var(--icm-amber))] px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-geist font-semibold bg-[hsl(28,90%,56%)] text-white">
                   {todayTasks.length} due today
                 </span>
               )}

@@ -78,6 +78,10 @@ app.post("/api/agents/pcp-renewal/run", runPcpRenewalAgent);
 import { deepgramToken } from "./api/ambient";
 app.post("/api/ambient/deepgram-token", deepgramToken);
 
+// ─── Voice TTS (Gemini audio — much better than browser SpeechSynthesis) ─────
+import { voiceSpeak } from "./api/voiceSpeak";
+app.post("/api/voice/speak", voiceSpeak);
+
 // ─── Intake Form API ──────────────────────────────────────────────────────
 import { intakeRoutes } from "./api/intakeFunctions";
 app.use("/api/intake", intakeRoutes);

@@ -1,13 +1,22 @@
 /**
  * useAuthorizations — hook for fetching authorizations for an individual.
- * Used by note forms for the authorization dropdown.
+ * Used by note forms for the authorization dropdown and the Funding Streams section.
  */
 import { useState, useEffect } from "react";
 import {
   collection, query, where, onSnapshot, type DocumentData,
+  addDoc, updateDoc, doc, serverTimestamp, runTransaction, getDocs, orderBy,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+
+export interface ApprovedServiceCode {
+  serviceCode: string;
+  description: string;
+  rate: number;
+  unit: string;
+  billingRuleId: string;
+}
 
 export interface Authorization {
   id: string;
@@ -15,8 +24,14 @@ export interface Authorization {
   individual_id: string;
   authorization_number: string;
   funding_stream_id: string;
+  /** programId link to /programs/{id} */
+  programId?: string;
+  programName?: string;
   payer_name: string;
   payer_id: string;
+  payerId?: string;
+  /** Full approved service codes with rates (new model) */
+  approvedServiceCodes?: ApprovedServiceCode[];
   service_codes: string[];
   authorized_units: number;
   used_units: number;
@@ -25,8 +40,9 @@ export interface Authorization {
   billing_unit_type: string;
   effective_date: string;
   expiration_date: string;
-  status: "active" | "expired" | "exhausted";
+  status: "active" | "expired" | "exhausted" | "pending" | "cancelled";
   notes?: string;
+  cancelled_at?: unknown;
   created_at?: unknown;
   updated_at?: unknown;
   // Display label
@@ -131,4 +147,113 @@ export type ServiceCodeEntry = typeof SERVICE_CODES_STATIC[number];
 export function getRateForCode(code: string): { rate: number; unitType: string } {
   const match = SERVICE_CODES_STATIC.find(s => s.code === code);
   return { rate: match?.rate ?? 28.5, unitType: match?.unitType ?? "15_min" };
+}
+
+// ── Write helpers ──────────────────────────────────────────────────────────────
+
+export interface CreateAuthorizationInput {
+  individualId: string;
+  orgId: string;
+  programId: string;
+  programName: string;
+  payerId: string;
+  payerName: string;
+  authorizationNumber: string;
+  effectiveDate: string;
+  expirationDate: string;
+  authorizedUnits: number;
+  approvedServiceCodes: ApprovedServiceCode[];
+  notes?: string;
+  createdBy?: string;
+}
+
+export async function createAuthorization(input: CreateAuthorizationInput): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10);
+  const isExpired = input.expirationDate && input.expirationDate < today;
+  const isPending = input.effectiveDate && input.effectiveDate > today;
+  const status = isExpired ? "expired" : isPending ? "pending" : "active";
+
+  const ref = await addDoc(collection(db, "authorizations"), {
+    individual_id: input.individualId,
+    individualId: input.individualId,     // dual-write for compatibility
+    org_id: input.orgId,
+    organizationId: input.orgId,
+    programId: input.programId,
+    programName: input.programName,
+    payer_id: input.payerId,
+    payer_name: input.payerName,
+    authorization_number: input.authorizationNumber,
+    effective_date: input.effectiveDate,
+    expiration_date: input.expirationDate,
+    authorized_units: input.authorizedUnits,
+    used_units: 0,
+    remaining_units: input.authorizedUnits,
+    approvedServiceCodes: input.approvedServiceCodes,
+    service_codes: input.approvedServiceCodes.map(c => c.serviceCode),
+    rate_per_unit: input.approvedServiceCodes[0]?.rate ?? 0,
+    billing_unit_type: "15_min",
+    status,
+    notes: input.notes ?? "",
+    createdBy: input.createdBy ?? "",
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updateAuthorization(authId: string, data: Partial<Authorization>) {
+  await updateDoc(doc(db, "authorizations", authId), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function cancelAuthorization(authId: string) {
+  await updateDoc(doc(db, "authorizations", authId), {
+    status: "cancelled",
+    cancelled_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+/** Increment usedUnits on an authorization inside a Firestore transaction. */
+export async function incrementAuthorizationUnits(authId: string, unitsDelta: number): Promise<void> {
+  const authRef = doc(db, "authorizations", authId);
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(authRef);
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const used = (d.used_units ?? d.usedUnits ?? 0) + unitsDelta;
+    const authorized = d.authorized_units ?? d.authorizedUnits ?? 0;
+    transaction.update(authRef, {
+      used_units: used,
+      remaining_units: Math.max(0, authorized - used),
+      updated_at: serverTimestamp(),
+    });
+  });
+}
+
+/** Get the next suggested auth number for an individual (e.g. "SA-2026-004"). */
+export async function getNextAuthNumber(individualId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `SA-${year}-`;
+  try {
+    const q = query(
+      collection(db, "authorizations"),
+      where("individual_id", "==", individualId),
+      orderBy("created_at", "desc"),
+    );
+    const snap = await getDocs(q);
+    const nums = snap.docs
+      .map(d => {
+        const n = (d.data().authorization_number ?? "") as string;
+        if (!n.startsWith(prefix)) return 0;
+        return parseInt(n.replace(prefix, ""), 10);
+      })
+      .filter(n => !isNaN(n) && n > 0);
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    return `${prefix}${String(next).padStart(3, "0")}`;
+  } catch {
+    return `${prefix}001`;
+  }
 }

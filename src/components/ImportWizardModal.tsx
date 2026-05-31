@@ -145,6 +145,23 @@ export const INDIVIDUAL_FIELDS: SystemField[] = [
 
   // ── Notes ───────────────────────────────────────────────────────────────────
   { key: "notes",                   label: "Intake Notes" },
+
+  // ── Program Enrollment ───────────────────────────────────────────────────────
+  // Mapped to the individual's program enrollment record
+  { key: "enrolled_program",        label: "Enrolled Program Name",      hint: "Must match a configured program name" },
+  { key: "program_service_category",label: "Program Service Category",   hint: "e.g. Medicaid | Case Management" },
+  { key: "program_enrollment_date", label: "Program Enrollment Date",    hint: "YYYY-MM-DD or MM/DD/YYYY" },
+
+  // ── Authorization / Funding Stream ───────────────────────────────────────────
+  // When present, these columns create an authorization record linked to the individual
+  { key: "auth_program_name",       label: "Authorization: Program / Funding Stream", hint: "Name of the funding program for this authorization" },
+  { key: "auth_payer",              label: "Authorization: Payer",       hint: "e.g. IHCP, NJ DDD" },
+  { key: "auth_number",             label: "Authorization: Auth Number", hint: "e.g. SA-2026-001" },
+  { key: "auth_effective_date",     label: "Authorization: Effective Date",   hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "auth_expiration_date",    label: "Authorization: Expiration Date",  hint: "YYYY-MM-DD or MM/DD/YYYY" },
+  { key: "auth_authorized_units",   label: "Authorization: Authorized Units", hint: "Number — e.g. 40" },
+  { key: "auth_service_codes",      label: "Authorization: Service Codes",    hint: "Comma-separated — e.g. T2022,T2023" },
+  { key: "auth_notes",              label: "Authorization: Notes" },
 ];
 
 export const STAFF_FIELDS: SystemField[] = [
@@ -352,6 +369,19 @@ const ALIASES: Record<string, string[]> = {
   emergency_phone2:         ["emergencyphone2","emergency_phone2","ecphone2","emergencyphone2nd","emergencycontactphone2"],
   is_active:                ["isactive","is_active","active","accountactive","activeaccount","accountstatus","staffactive"],
   send_welcome_email:       ["sendwelcomeemail","send_welcome_email","welcomeemail","sendwelcome"],
+  // Program Enrollment
+  enrolled_program:         ["enrolledprogram","enrolled_program","programenrollment","enrolledin","programname","enrolledprogramname"],
+  program_service_category: ["programservicecategory","program_service_category","servicecategory","programcategory","enrollmentcategory"],
+  program_enrollment_date:  ["programenrollmentdate","program_enrollment_date","enrollmentdate","enrolldate","programstartdate","dateenrolled"],
+  // Authorization fields
+  auth_program_name:        ["authprogramname","auth_program_name","fundingstream","funding_stream","authorizationprogram","authprogram","waivername"],
+  auth_payer:               ["authpayer","auth_payer","payer","payername","insurancepayer","medicaidpayer","billto"],
+  auth_number:              ["authnumber","auth_number","authorizationnumber","authorization_number","authnumfunding","sa","authno"],
+  auth_effective_date:      ["autheffectivedate","auth_effective_date","authorizationeffectivedate","authstartdate","authstart","effectivedate"],
+  auth_expiration_date:     ["authexpirationdate","auth_expiration_date","authorizationexpirationdate","authenddate","authexpiry","authexpiration","expirationdate"],
+  auth_authorized_units:    ["authauthorizedunits","auth_authorized_units","authorizedunits","totalunits","approvedunits","authunits","unitscap"],
+  auth_service_codes:       ["authservicecodes","auth_service_codes","servicecodes","procedurecodes","billingcodes","authcodes"],
+  auth_notes:               ["authnotes","auth_notes","authorizationnotes","autorizationnote","fundingstreamsnotes"],
 };
 
 type MatchConfidence = "auto" | "review" | "none";
@@ -574,6 +604,69 @@ async function batchWrite(
     await new Promise(r => setTimeout(r, 0));
   }
   return { success, errors };
+}
+
+// ─── Post-import: create authorization records from imported fields ─────────────
+// Called after individual batch writes complete. For rows that include auth_number
+// (or related auth fields), writes a record to the /authorizations/ collection.
+
+const AUTH_FIELDS = new Set([
+  "auth_program_name","auth_payer","auth_number","auth_effective_date",
+  "auth_expiration_date","auth_authorized_units","auth_service_codes","auth_notes",
+]);
+
+function rowHasAuthData(row: Record<string, string>): boolean {
+  return !!row.auth_number?.trim();
+}
+
+async function writeAuthorizationsForImport(
+  importedRows: Array<{ individualId: string; row: Record<string, string> }>,
+  orgId: string
+): Promise<void> {
+  const authRows = importedRows.filter(({ row }) => rowHasAuthData(row));
+  if (authRows.length === 0) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const authDocs = authRows.map(({ individualId, row }) => {
+    const authEffective = row.auth_effective_date ?? "";
+    const authExpiry    = row.auth_expiration_date ?? "";
+    const isPending  = authEffective > today;
+    const isExpired  = authExpiry && authExpiry < today;
+    const status     = isExpired ? "expired" : isPending ? "pending" : "active";
+
+    const units = row.auth_authorized_units ? parseInt(row.auth_authorized_units, 10) : 0;
+    const codes = row.auth_service_codes
+      ? row.auth_service_codes.split(/[,;|\s]+/).map(c => c.trim()).filter(Boolean)
+      : [];
+
+    return {
+      data: {
+        individual_id:       individualId,
+        individualId:        individualId,   // dual-write
+        organizationId:      orgId,
+        org_id:              orgId,
+        programName:         row.auth_program_name ?? "",
+        payer_name:          row.auth_payer ?? "",
+        authorization_number:row.auth_number ?? "",
+        effective_date:      authEffective,
+        expiration_date:     authExpiry,
+        authorized_units:    isNaN(units) ? 0 : units,
+        used_units:          0,
+        remaining_units:     isNaN(units) ? 0 : units,
+        service_codes:       codes,
+        approvedServiceCodes:codes.map(c => ({ serviceCode: c, description: "", rate: 0, unit: "15 min", billingRuleId: "" })),
+        notes:               row.auth_notes ?? "",
+        status,
+        import_source:       "excel_import",
+      },
+    };
+  });
+
+  try {
+    await batchWrite("authorizations", authDocs, () => {});
+  } catch (err) {
+    console.warn("[ImportWizard] Authorization write failed (non-fatal):", err);
+  }
 }
 
 // ─── Fetch Existing Records ───────────────────────────────────────────────────
@@ -859,6 +952,43 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
       (done) => setImportProgress({ done, total })
     );
 
+    // ── Post-import: write authorization records for individuals ──────────────
+    // For new individual rows that include auth_number, fetch the recently-created
+    // individual docs by medicaid_id + name key, then write authorization records.
+    if (type === "individuals" && success > 0) {
+      try {
+        const newRows = ops
+          .filter(op => !op.docId)   // only new docs, not merges
+          .map(op => op.data as Record<string, string>)
+          .filter(row => rowHasAuthData(row));
+
+        if (newRows.length > 0) {
+          // Fetch the newly-created individual IDs by querying on import_source + name
+          const { getDocs: _getDocs, query: _query, where: _where, collection: _collection } =
+            await import("firebase/firestore");
+          const authPairs: Array<{ individualId: string; row: Record<string, string> }> = [];
+
+          for (const row of newRows) {
+            // Try to find the just-created individual
+            const q = _query(
+              _collection(db, "individuals"),
+              _where("organizationId", "==", orgId),
+              _where("first_name", "==", row.first_name ?? ""),
+              _where("last_name",  "==", row.last_name  ?? ""),
+            );
+            const snap = await _getDocs(q);
+            if (!snap.empty) {
+              authPairs.push({ individualId: snap.docs[0].id, row });
+            }
+          }
+          await writeAuthorizationsForImport(authPairs, orgId);
+        }
+      } catch (err) {
+        console.warn("[ImportWizard] Authorization post-write failed (non-fatal):", err);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     setImporting(false);
     setImportProgress(null);
     setResult({ success, errors, merged, skipped });
@@ -963,6 +1093,12 @@ export function ImportWizardModal({ type, onClose, onComplete }: Props) {
                   <li>Dates: YYYY-MM-DD or MM/DD/YYYY</li>
                   <li>Duplicates are detected automatically before import</li>
                   <li>{type === "individuals" ? 'Use "active", "pending", "transition" for status' : 'Use "admin", "supervisor", "case_manager" for role'}</li>
+                  {type === "individuals" && (
+                    <li>Include <strong>auth_number</strong>, <strong>auth_effective_date</strong>, <strong>auth_expiration_date</strong>, <strong>auth_authorized_units</strong> columns to auto-create authorizations for each individual</li>
+                  )}
+                  {type === "individuals" && (
+                    <li>Include <strong>enrolled_program</strong> and <strong>program_enrollment_date</strong> to set program enrollment at import</li>
+                  )}
                 </ul>
               </div>
             </div>

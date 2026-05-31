@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import {
   doc, getDoc, updateDoc, serverTimestamp, addDoc, collection,
 } from "firebase/firestore";
+import { incrementAuthorizationUnits } from "@/hooks/useAuthorizations";
 import { toast } from "sonner";
 import { writeAudit } from "@/lib/auditService";
 import { createNotification } from "@/hooks/useFirestoreNotifications";
@@ -159,6 +160,15 @@ const SupervisorNoteReview = () => {
           reviewedBy: userProfile?.uid,
           reviewedByName: reviewerName,
         });
+
+        // Increment used units on the linked authorization
+        const authId = noteData.authorizationId ?? noteData.authorization_id;
+        const billedUnits = noteData.billingUnits ?? noteData.units ?? noteData.billed_units ?? 0;
+        if (authId && billedUnits > 0) {
+          incrementAuthorizationUnits(authId, Number(billedUnits)).catch((err) => {
+            console.warn("[SupervisorNoteReview] Failed to update auth units (non-fatal):", err);
+          });
+        }
       }
       if (submittedBy) {
         await createNotification({

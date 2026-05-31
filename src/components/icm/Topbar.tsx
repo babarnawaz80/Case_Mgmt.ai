@@ -296,6 +296,80 @@ function InlineSearch() {
   );
 }
 
+// ─── Help Button with contact popover ────────────────────────────────────────
+function HelpButton() {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative hidden sm:block">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg flex items-center justify-center transition-colors"
+        aria-label="Help"
+      >
+        <HelpCircle className="w-[18px] h-[18px]" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-icm-border bg-icm-panel shadow-2xl z-[9999] overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-icm-border bg-icm-bg/60">
+            <div className="w-7 h-7 rounded-lg bg-icm-accent-soft flex items-center justify-center shrink-0">
+              <HelpCircle className="w-3.5 h-3.5 text-icm-accent" />
+            </div>
+            <p className="font-manrope font-bold text-[13px] text-icm-text">Need help?</p>
+          </div>
+          {/* Body */}
+          <div className="px-4 py-3.5 space-y-3">
+            <p className="text-[12px] font-geist text-icm-text-dim leading-relaxed">
+              Our customer support team is here for you.
+            </p>
+            <div className="space-y-2">
+              <a
+                href="mailto:help@icaremanager.com"
+                className="flex items-center gap-2.5 rounded-xl border border-icm-border bg-white px-3 py-2 hover:border-icm-accent/40 hover:bg-icm-accent-soft/20 transition-colors group"
+              >
+                <span className="text-[13px]">✉️</span>
+                <div>
+                  <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide">Email</p>
+                  <p className="text-[12.5px] font-geist font-semibold text-icm-accent group-hover:underline">
+                    help@icaremanager.com
+                  </p>
+                </div>
+              </a>
+              <a
+                href="tel:+18884264020"
+                className="flex items-center gap-2.5 rounded-xl border border-icm-border bg-white px-3 py-2 hover:border-icm-accent/40 hover:bg-icm-accent-soft/20 transition-colors group"
+              >
+                <span className="text-[13px]">📞</span>
+                <div>
+                  <p className="text-[11px] font-geist font-semibold text-icm-text-dim uppercase tracking-wide">Phone</p>
+                  <p className="text-[12.5px] font-geist font-semibold text-icm-text group-hover:text-icm-accent transition-colors">
+                    888-426-4020
+                  </p>
+                </div>
+              </a>
+            </div>
+            <p className="text-[10.5px] font-geist text-icm-text-faint text-center">
+              Mon – Fri · 8 AM – 6 PM ET
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
   const navigate = useNavigate();
   const { isAdmin, role } = useRole();
@@ -529,12 +603,8 @@ export function ICMTopbar({ title = "iCM Dashboard" }: TopbarProps) {
         {/* Unified Inbox slide-over */}
         <InboxButton />
 
-        <button
-          onClick={() => demoToast("Help & documentation")}
-          className="hidden sm:flex h-9 w-9 rounded-xl text-icm-text-dim hover:text-icm-text hover:bg-icm-bg items-center justify-center transition-colors"
-        >
-          <HelpCircle className="w-[18px] h-[18px]" />
-        </button>
+        {/* Help button with contact popover */}
+        <HelpButton />
 
         <UserMenu />
       </div>

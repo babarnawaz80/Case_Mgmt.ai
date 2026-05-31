@@ -21,6 +21,7 @@ import MentionInput from "@/components/icm/MentionInput";
 import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createBillingRecord } from "@/hooks/useBillingRecords";
+import { useAuthorizations } from "@/hooks/useAuthorizations";
 
 const PersonProgressNoteDetail = () => {
   const { id, noteId } = useParams<{ id: string; noteId: string }>();
@@ -32,6 +33,9 @@ const PersonProgressNoteDetail = () => {
 
   const isNew = noteId === "new";
   const [form, setForm] = useState<ProgressNote | undefined>(undefined);
+
+  // Live authorizations for this individual
+  const { active: activeAuths, loading: authsLoading } = useAuthorizations(id);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAIBanner, setShowAIBanner] = useState(true);
@@ -594,7 +598,19 @@ const PersonProgressNoteDetail = () => {
               <Field label="Service Authorization">
                 <select disabled={isReadOnly} value={form.authorizationId ?? ""} onChange={(e) => update("authorizationId", e.target.value)} className={selectCls}>
                   <option value="">No authorization linked</option>
-                  <option value="SA-2026-001">Authorization #SA-2026-001 · 18 of 40 units remaining</option>
+                  {authsLoading ? (
+                    <option disabled>Loading authorizations…</option>
+                  ) : activeAuths.length === 0 ? (
+                    <option disabled>No active authorizations — add one in the individual's profile</option>
+                  ) : (
+                    activeAuths
+                      .filter(a => !form.serviceCode || a.service_codes.length === 0 || a.service_codes.includes(form.serviceCode))
+                      .map(a => (
+                        <option key={a.id} value={a.id}>
+                          Auth #{a.authorization_number} · {a.programName ?? a.payer_name} · {a.remaining_units} of {a.authorized_units} units remaining
+                        </option>
+                      ))
+                  )}
                 </select>
                 {wouldExceedAuth && (
                   <div className="mt-2 rounded-lg border border-icm-red/20 bg-icm-red-soft px-3 py-2 text-[11.5px] text-icm-red flex items-start gap-2">

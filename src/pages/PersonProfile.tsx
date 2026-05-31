@@ -1609,272 +1609,600 @@ function EnrollProgramModal({
   );
 }
 
-// ---------- Funding Streams (expanded) ----------
-type FundingCard = {
-  name: string;
-  payer: string;
-  authNumber: string;
-  effective: string;
-  expires: string;
-  codes: string[];
-  rate: string;
-  rateUnit: string;
-  used: number;
-  authorized: number;
+// ---------- Funding Streams — live Firestore backend ----------
+
+import type { Authorization, ApprovedServiceCode, CreateAuthorizationInput } from "@/hooks/useAuthorizations";
+import {
+  useAuthorizations, createAuthorization, updateAuthorization,
+  cancelAuthorization, getNextAuthNumber,
+} from "@/hooks/useAuthorizations";
+import { usePrograms, useProgramPayers, useProgramBillingRules } from "@/hooks/usePrograms";
+
+// Status badge styles
+const AUTH_STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
+  active:    { bg: "bg-[#16a34a]", text: "text-white", label: "Active" },
+  expired:   { bg: "bg-[#6b7280]", text: "text-white", label: "Expired" },
+  pending:   { bg: "bg-[#f59e0b]", text: "text-white", label: "Pending" },
+  cancelled: { bg: "bg-[#dc2626]", text: "text-white", label: "Cancelled" },
+  exhausted: { bg: "bg-[#6b7280]", text: "text-white", label: "Exhausted" },
 };
 
 function FundingStreamsSection({ profile }: { profile: ProfileData }) {
-  const { id } = useParams<{ id: string }>();
+  const { id: individualId } = useParams<{ id: string }>();
+  const { userProfile } = useAuth();
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Authorization | null>(null);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
-  const first = profile.funding[0];
-  const cards: FundingCard[] = [
-    {
-      name: "Medicaid Waiver",
-      payer: "IHCP",
-      authNumber: first?.authorizationNumber ?? "SA-2026-001",
-      effective: "01/01/2026",
-      expires: "04/30/2026",
-      codes: ["T2022", "T2023"],
-      rate: "$28.50",
-      rateUnit: "15-min increments",
-      used: first?.usedUnits ?? 0,
-      authorized: first?.authorizedUnits ?? 40,
-    },
-    {
-      name: "Indiana Managed Care — Anthem",
-      payer: "Anthem Indiana",
-      authNumber: "SA-2026-002",
-      effective: "01/01/2026",
-      expires: "06/30/2026",
-      codes: ["T2022"],
-      rate: "$29.10",
-      rateUnit: "15-min increments",
-      used: 12,
-      authorized: 30,
-    },
-  ];
+  const { authorizations, loading } = useAuthorizations(individualId);
+
+  const visible = authorizations.filter(a => showCancelled ? true : a.status !== "cancelled");
+  const cancelledCount = authorizations.filter(a => a.status === "cancelled").length;
+
+  // Last billing record from progress notes
+  const [lastRecord, setLastRecord] = useState<{ type: string; date: string; units: number; code: string; status: string } | null>(null);
+  useEffect(() => {
+    if (!individualId) return;
+    (async () => {
+      try {
+        const q = query(
+          collection(db, "progress_notes"),
+          where("individualId", "==", individualId),
+          orderBy("progressDate", "desc"),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const d = snap.docs[0].data();
+          if (d.service_code || d.serviceCode) {
+            setLastRecord({
+              type: "Progress Note",
+              date: d.progressDate ?? d.created_at?.toDate?.()?.toLocaleDateString?.() ?? "—",
+              units: d.units ?? d.billedUnits ?? 0,
+              code: d.service_code ?? d.serviceCode ?? "",
+              status: d.status ?? d.billing_status ?? "Draft",
+            });
+          }
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, [individualId]);
+
+  const handleCancelConfirm = async (authId: string) => {
+    try {
+      await cancelAuthorization(authId);
+      toast.success("Authorization cancelled.");
+    } catch { toast.error("Failed to cancel authorization."); }
+    setConfirmCancelId(null);
+  };
 
   return (
     <section className="rounded-xl border border-icm-border bg-icm-panel p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-manrope font-bold text-[13.5px] text-icm-text tracking-tight">Funding Streams</h3>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => { setEditTarget(null); setModalOpen(true); }}
           className="h-7 px-2.5 rounded-lg border border-icm-border text-[11px] font-geist font-semibold text-icm-text inline-flex items-center gap-1 hover:bg-icm-bg"
         >
           <Plus className="w-3 h-3" /> Add Authorization
         </button>
       </div>
 
-      <div className="space-y-2">
-        {cards.map((c) => (
-          <FundingStreamCard key={c.authNumber} card={c} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-8 gap-2 text-icm-text-dim">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-[12px] font-geist">Loading authorizations…</span>
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-icm-border py-6 text-center">
+          <p className="text-[12.5px] text-icm-text-dim font-geist">No authorizations on file.</p>
+          <button
+            onClick={() => { setEditTarget(null); setModalOpen(true); }}
+            className="mt-1.5 text-[12px] font-geist font-semibold text-icm-accent hover:underline"
+          >
+            + Add Authorization
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {visible.map((auth) => (
+            <FundingStreamCard
+              key={auth.id}
+              auth={auth}
+              onEdit={() => { setEditTarget(auth); setModalOpen(true); }}
+              onCancel={() => setConfirmCancelId(auth.id)}
+              confirmCancelId={confirmCancelId}
+              onConfirmCancel={handleCancelConfirm}
+              onCancelConfirmDismiss={() => setConfirmCancelId(null)}
+            />
+          ))}
+        </div>
+      )}
 
-      <div className="mt-3 pt-3 border-t border-icm-border flex items-center justify-between flex-wrap gap-2">
-        <p className="text-[11px] text-icm-text-dim font-geist">
-          Last billing record: Progress Note 04/27/2026 · 3 units · T2022 · Pending scrub
-        </p>
+      {/* Show cancelled toggle */}
+      {cancelledCount > 0 && (
         <button
-          onClick={() => (id ? navigate(`/people/${id}?tab=billing`) : navigate("/billing"))}
+          onClick={() => setShowCancelled(s => !s)}
+          className="mt-3 text-[11px] font-geist text-icm-text-faint hover:text-icm-text-dim flex items-center gap-1"
+        >
+          {showCancelled ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+          {showCancelled ? "Hide" : "Show"} {cancelledCount} cancelled authorization{cancelledCount !== 1 ? "s" : ""}
+        </button>
+      )}
+
+      {/* Footer */}
+      <div className="mt-3 pt-3 border-t border-icm-border flex items-center justify-between flex-wrap gap-2">
+        {lastRecord ? (
+          <p className="text-[11px] text-icm-text-dim font-geist">
+            Last billing record: {lastRecord.type} {lastRecord.date} · {lastRecord.units} units · {lastRecord.code} · {lastRecord.status}
+          </p>
+        ) : (
+          <p className="text-[11px] text-icm-text-faint font-geist italic">No billing records yet.</p>
+        )}
+        <button
+          onClick={() => (individualId ? navigate(`/people/${individualId}/authorizations`) : navigate("/billing"))}
           className="text-[11px] font-geist font-semibold text-icm-accent hover:underline inline-flex items-center gap-1"
         >
           View all billing records <ArrowRight className="w-3 h-3" />
         </button>
       </div>
 
-      {modalOpen && <AddAuthorizationModal onClose={() => setModalOpen(false)} />}
+      {(modalOpen || editTarget) && (
+        <AddAuthorizationModal
+          individualId={individualId ?? ""}
+          orgId={userProfile?.organizationId ?? ""}
+          createdBy={userProfile?.email ?? userProfile?.displayName ?? ""}
+          editTarget={editTarget ?? undefined}
+          onClose={() => { setModalOpen(false); setEditTarget(null); }}
+        />
+      )}
     </section>
   );
 }
 
-function FundingStreamCard({ card }: { card: FundingCard }) {
-  const pct = card.authorized === 0 ? 0 : Math.min(100, (card.used / card.authorized) * 100);
-  const capped = card.used >= card.authorized && card.authorized > 0;
-  const approaching = !capped && pct >= 85;
-  const tone = capped ? "bg-icm-red" : approaching ? "bg-icm-amber" : "bg-icm-accent";
-  const remaining = Math.max(0, card.authorized - card.used);
+function FundingStreamCard({
+  auth, onEdit, onCancel, confirmCancelId, onConfirmCancel, onCancelConfirmDismiss,
+}: {
+  auth: Authorization;
+  onEdit: () => void;
+  onCancel: () => void;
+  confirmCancelId: string | null;
+  onConfirmCancel: (id: string) => void;
+  onCancelConfirmDismiss: () => void;
+}) {
+  const pct = auth.authorized_units === 0 ? 0 : Math.min(100, (auth.used_units / auth.authorized_units) * 100);
+  const capped = auth.used_units >= auth.authorized_units && auth.authorized_units > 0;
+  const approaching = !capped && pct >= 80;
+  const overNinety = !capped && pct >= 95;
+  const barColor = capped || overNinety ? "bg-[#dc2626]" : approaching ? "bg-[#f59e0b]" : "bg-icm-accent";
+  const remaining = Math.max(0, auth.authorized_units - auth.used_units);
+
+  // Derive display values
+  const codes = auth.approvedServiceCodes?.length
+    ? auth.approvedServiceCodes.map(c => c.serviceCode)
+    : (auth.service_codes ?? []);
+
+  const primaryCode = auth.approvedServiceCodes?.[0];
+  const hasMultipleRates = (auth.approvedServiceCodes?.length ?? 0) > 1 &&
+    new Set(auth.approvedServiceCodes?.map(c => c.rate)).size > 1;
+  const rateDisplay = hasMultipleRates
+    ? "Multiple rates"
+    : primaryCode
+      ? `$${primaryCode.rate.toFixed(2)} per ${primaryCode.unit}`
+      : `$${auth.rate_per_unit.toFixed(2)} per unit`;
+
+  const badge = AUTH_STATUS_BADGE[auth.status] ?? AUTH_STATUS_BADGE.active;
+  const isCancelled = auth.status === "cancelled";
+  const isConfirming = confirmCancelId === auth.id;
 
   return (
-    <div className="rounded-lg border border-icm-border bg-icm-bg p-3">
-      {/* Line 1 */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <p className="text-[13px] font-semibold text-icm-text">{card.name}</p>
-        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">
-          Active
-        </span>
-        <span className="text-[11.5px] text-icm-text-dim">· {card.payer}</span>
-      </div>
-      {/* Line 2 */}
-      <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">
-        Auth #{card.authNumber} · Effective {card.effective} · Expires {card.expires}
-      </p>
-      {/* Line 3 */}
-      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-        <span className="text-[11px] text-icm-text-dim font-geist">Service codes:</span>
-        {card.codes.map((code) => (
-          <span
-            key={code}
-            className="px-1.5 py-0.5 rounded-md text-[10.5px] font-mono font-semibold bg-icm-border/60 text-icm-text"
+    <div className={cn("rounded-lg border border-icm-border bg-icm-bg p-3 group relative", isCancelled && "opacity-60")}>
+      {/* Hover actions */}
+      {!isCancelled && (
+        <div className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1">
+          <button
+            onClick={onEdit}
+            className="h-6 w-6 rounded flex items-center justify-center text-icm-text-dim hover:text-icm-text hover:bg-icm-border/60 transition-colors"
+            title="Edit"
           >
-            {code}
-          </span>
-        ))}
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onCancel}
+            className="h-6 w-6 rounded flex items-center justify-center text-icm-text-dim hover:text-icm-red hover:bg-icm-red-soft transition-colors"
+            title="Cancel authorization"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Line 1: name + status + payer */}
+      <div className="flex items-center gap-2 flex-wrap pr-16">
+        <p className="text-[13px] font-semibold text-icm-text">{auth.programName ?? auth.payer_name}</p>
+        <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold", badge.bg, badge.text)}>
+          {badge.label}
+        </span>
+        <span className="text-[11.5px] text-icm-text-dim">· {auth.payer_name}</span>
       </div>
-      {/* Line 4 */}
+
+      {/* Line 2: auth # + dates */}
+      <p className="text-[11px] font-mono text-icm-text-dim mt-0.5">
+        Auth #{auth.authorization_number}
+        {auth.effective_date && ` · Effective ${auth.effective_date}`}
+        {auth.expiration_date && ` · Expires ${auth.expiration_date}`}
+      </p>
+
+      {/* Line 3: service code chips */}
+      {codes.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          <span className="text-[11px] text-icm-text-dim font-geist">Service codes:</span>
+          {codes.map((code) => (
+            <span key={code} className="px-1.5 py-0.5 rounded-md text-[10.5px] font-mono font-semibold bg-icm-border/60 text-icm-text">
+              {code}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Line 4: rate */}
       <p className="text-[11.5px] text-icm-text mt-1.5 font-geist">
-        Rate: <span className="font-semibold">{card.rate}</span> per unit ({card.rateUnit})
+        Rate: <span className="font-semibold">{rateDisplay}</span>
       </p>
-      {/* Line 5 */}
-      <div className="h-2 rounded-full bg-icm-border mt-2 overflow-hidden">
-        <div className={cn("h-full", tone)} style={{ width: `${pct}%` }} />
-      </div>
-      <p
-        className={cn(
-          "text-[11.5px] mt-1.5 font-geist",
-          capped ? "text-icm-red font-semibold" : approaching ? "text-icm-amber font-semibold" : "text-icm-text-dim"
-        )}
-      >
-        {capped
-          ? "Authorization cap reached — billing blocked"
-          : approaching
-            ? `Approaching cap — ${remaining} units remaining`
-            : `${card.used} of ${card.authorized} units used this authorization period`}
-      </p>
+
+      {/* Progress bar */}
+      {!isCancelled && (
+        <>
+          <div className="h-2 rounded-full bg-icm-border mt-2 overflow-hidden">
+            <div className={cn("h-full transition-all", barColor)} style={{ width: `${pct}%` }} />
+          </div>
+          <p className={cn("text-[11.5px] mt-1.5 font-geist",
+            capped ? "text-icm-red font-semibold" :
+            overNinety ? "text-icm-red font-semibold" :
+            approaching ? "text-icm-amber font-semibold" : "text-icm-text-dim"
+          )}>
+            {capped
+              ? "Authorization cap reached — billing blocked"
+              : approaching
+                ? `Approaching cap — ${remaining} units remaining`
+                : `${auth.used_units} of ${auth.authorized_units} units used this authorization period`}
+          </p>
+        </>
+      )}
+
+      {/* Inline cancel confirmation */}
+      {isConfirming && (
+        <div className="mt-2 rounded-lg border border-icm-red/30 bg-icm-red-soft px-3 py-2 flex items-center justify-between gap-2">
+          <p className="text-[11.5px] text-icm-red font-geist">Remove this authorization? This cannot be undone.</p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => onConfirmCancel(auth.id)}
+              className="h-6 px-2 rounded text-[11px] font-semibold bg-icm-red text-white hover:bg-icm-red/90"
+            >
+              Cancel Auth
+            </button>
+            <button
+              onClick={onCancelConfirmDismiss}
+              className="h-6 px-2 rounded text-[11px] font-semibold border border-icm-border text-icm-text-dim hover:text-icm-text"
+            >
+              Keep
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
-  const { id } = useParams<{ id: string }>();
-  const STREAMS = [
-    { name: "Indiana HCBS — CIH Waiver", payer: "IHCP" },
-    { name: "Indiana HCBS — Family Supports", payer: "IHCP" },
-    { name: "Indiana Managed Care — Anthem", payer: "Anthem Indiana" },
-    { name: "NJ DDD Community Care", payer: "NJ DDD" },
-  ];
-  const CODES = ["T2022", "T2023", "T1019", "T1016"];
-  const [stream, setStream] = useState(STREAMS[0].name);
-  const [codes, setCodes] = useState<string[]>(["T2022"]);
-  const [authNumber, setAuthNumber] = useState("");
-  const [effectiveDate, setEffectiveDate] = useState("");
-  const [expirationDate, setExpirationDate] = useState("");
-  const [authorizedUnits, setAuthorizedUnits] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const payer = STREAMS.find((s) => s.name === stream)?.payer ?? "";
+function AddAuthorizationModal({
+  individualId, orgId, createdBy, editTarget, onClose,
+}: {
+  individualId: string;
+  orgId: string;
+  createdBy: string;
+  editTarget?: Authorization;
+  onClose: () => void;
+}) {
+  const isEdit = !!editTarget;
 
-  const toggleCode = (c: string) =>
-    setCodes((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+  // Programs from Firestore
+  const { data: programs, loading: programsLoading } = usePrograms(orgId);
+  const activePrograms = programs.filter(p => p.status !== "inactive" && p.active !== false);
+
+  // Selected program state
+  const [selectedProgramId, setSelectedProgramId] = useState(editTarget?.programId ?? "");
+  const { data: payers, loading: payersLoading } = useProgramPayers(selectedProgramId || undefined);
+  const { data: billingRules, loading: rulesLoading } = useProgramBillingRules(selectedProgramId || undefined);
+
+  const activePayers = payers.filter(p => p.status !== "inactive");
+  const activeRules = billingRules.filter(r => r.status !== "inactive");
+
+  // Auto-select first active payer when program changes
+  const [selectedPayerId, setSelectedPayerId] = useState(editTarget?.payerId ?? editTarget?.payer_id ?? "");
+  useEffect(() => {
+    if (activePayers.length === 1 && !selectedPayerId) {
+      setSelectedPayerId(activePayers[0].id);
+    }
+  }, [activePayers, selectedPayerId]);
+
+  // Form fields
+  const [authNumber, setAuthNumber] = useState(editTarget?.authorization_number ?? "");
+  const [effectiveDate, setEffectiveDate] = useState(editTarget?.effective_date ?? "");
+  const [expirationDate, setExpirationDate] = useState(editTarget?.expiration_date ?? "");
+  const [authorizedUnits, setAuthorizedUnits] = useState(
+    editTarget ? String(editTarget.authorized_units) : ""
+  );
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(
+    new Set(editTarget?.approvedServiceCodes?.map(c => c.serviceCode) ?? editTarget?.service_codes ?? [])
+  );
+  const [notes, setNotes] = useState(editTarget?.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-suggest auth number on add
+  useEffect(() => {
+    if (!isEdit && !authNumber && individualId) {
+      getNextAuthNumber(individualId).then(setAuthNumber);
+    }
+  }, [isEdit, individualId, authNumber]);
+
+  const selectedProgram = activePrograms.find(p => p.id === selectedProgramId);
+  const selectedPayer = activePayers.find(p => p.id === selectedPayerId);
+
+  const toggleCode = (code: string) => {
+    setSelectedCodes(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  };
+
+  // Expiration date warning
+  const today = new Date().toISOString().slice(0, 10);
+  const expiredWarning = expirationDate && expirationDate < today;
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!selectedProgramId) e.program = "Select a funding stream.";
+    if (!authNumber.trim()) e.authNumber = "Authorization number is required.";
+    if (!effectiveDate) e.effectiveDate = "Effective date is required.";
+    if (!expirationDate) e.expirationDate = "Expiration date is required.";
+    if (expirationDate && effectiveDate && expirationDate < effectiveDate)
+      e.expirationDate = "Expiration must be after effective date.";
+    if (!authorizedUnits || Number(authorizedUnits) < 1) e.units = "Authorized units must be at least 1.";
+    // Only require a service code selection when billing rules exist for the program.
+    // If no billing rules are configured, skip this check and save with an empty array.
+    if (activeRules.length > 0 && selectedCodes.size === 0) e.codes = "Select at least one service code.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
   const handleSave = async () => {
-    if (!id) return;
+    if (!validate()) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, "authorizations"), {
-        individualId: id,
-        fundingStream: stream,
-        payer,
-        authorizationNumber: authNumber,
-        effectiveDate,
-        expirationDate,
-        authorizedUnits: authorizedUnits ? Number(authorizedUnits) : null,
-        serviceCodes: codes,
-        notes,
-        createdAt: serverTimestamp(),
-      });
-      toast.success("Authorization saved");
+      const approvedServiceCodes: ApprovedServiceCode[] = activeRules
+        .filter(r => selectedCodes.has(r.serviceCode))
+        .map(r => ({
+          serviceCode: r.serviceCode,
+          description: r.description,
+          rate: r.rate,
+          unit: r.unit,
+          billingRuleId: r.id,
+        }));
+
+      if (isEdit && editTarget) {
+        await updateAuthorization(editTarget.id, {
+          programId: selectedProgramId,
+          programName: selectedProgram?.name ?? "",
+          payerId: selectedPayerId,
+          payer_id: selectedPayerId,
+          payer_name: selectedPayer?.payerName ?? "",
+          authorization_number: authNumber.trim(),
+          effective_date: effectiveDate,
+          expiration_date: expirationDate,
+          authorized_units: Number(authorizedUnits),
+          approvedServiceCodes,
+          service_codes: approvedServiceCodes.map(c => c.serviceCode),
+          notes,
+        } as Partial<Authorization>);
+        toast.success("Authorization updated.");
+      } else {
+        await createAuthorization({
+          individualId,
+          orgId,
+          programId: selectedProgramId,
+          programName: selectedProgram?.name ?? "",
+          payerId: selectedPayerId,
+          payerName: selectedPayer?.payerName ?? "",
+          authorizationNumber: authNumber.trim(),
+          effectiveDate,
+          expirationDate,
+          authorizedUnits: Number(authorizedUnits),
+          approvedServiceCodes,
+          notes,
+          createdBy,
+        } as CreateAuthorizationInput);
+        toast.success("Authorization added.");
+      }
       onClose();
-    } catch (err) {
-      console.error("Failed to save authorization:", err);
-      toast.error("Failed to save authorization");
+    } catch (err: any) {
+      toast.error("Failed to save authorization: " + (err?.message ?? err));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-icm-panel rounded-xl border border-icm-border w-full max-w-lg p-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-manrope font-bold text-[14px] text-icm-text">Add Authorization</h3>
-          <button onClick={onClose} className="text-icm-text-dim hover:text-icm-text">
-            <X className="w-4 h-4" />
-          </button>
+          <div>
+            <h3 className="font-manrope font-bold text-[14px] text-icm-text">
+              {isEdit ? "Edit Authorization" : "Add Authorization"}
+            </h3>
+            <p className="text-[11.5px] text-icm-text-dim font-geist mt-0.5">Defines eligibility + rate for a service code.</p>
+          </div>
+          <button onClick={onClose} className="text-icm-text-dim hover:text-icm-text"><X className="w-4 h-4" /></button>
+        </div>
+
+        {/* Info callout */}
+        <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-2 mb-3 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-icm-text-dim shrink-0 mt-0.5" />
+          <p className="text-[11.5px] text-icm-text-dim font-geist">
+            Program & payer confirm who can bill. Rate & unit determine how much. Both are required for claim validation.
+          </p>
         </div>
 
         <div className="space-y-3">
-          <ModalField label="Funding stream">
-            <select className="modal-input" value={stream} onChange={(e) => setStream(e.target.value)}>
-              {STREAMS.map((s) => (
-                <option key={s.name} value={s.name}>{s.name}</option>
-              ))}
-            </select>
+          {/* 1. FUNDING STREAM */}
+          <ModalField label="Funding stream *">
+            {programsLoading ? (
+              <div className="flex items-center gap-2 h-8 text-icm-text-dim text-[12px]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading programs…
+              </div>
+            ) : activePrograms.length === 0 ? (
+              <p className="text-[11.5px] text-icm-amber font-geist">
+                No programs configured. Ask your administrator to set up programs in Admin Settings → States, Programs & Billing.
+              </p>
+            ) : (
+              <>
+                <select
+                  className="modal-input"
+                  value={selectedProgramId}
+                  onChange={(e) => { setSelectedProgramId(e.target.value); setSelectedPayerId(""); setSelectedCodes(new Set()); }}
+                >
+                  <option value="">— Select a program —</option>
+                  {activePrograms.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {errors.program && <p className="text-[11px] text-icm-red mt-0.5">{errors.program}</p>}
+              </>
+            )}
           </ModalField>
 
-          <ModalField label="Payer (auto)">
-            <input className="modal-input" value={payer} readOnly />
-          </ModalField>
-
-          <ModalField label="Authorization number">
-            <input className="modal-input" placeholder="SA-2026-003" value={authNumber} onChange={(e) => setAuthNumber(e.target.value)} />
-          </ModalField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <ModalField label="Effective date">
-              <input className="modal-input" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+          {/* 2. PAYER (AUTO) */}
+          {selectedProgramId && (
+            <ModalField label="Payer (auto)">
+              {payersLoading ? (
+                <div className="flex items-center gap-2 h-8 text-icm-text-dim text-[12px]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading payers…
+                </div>
+              ) : activePayers.length === 0 ? (
+                <input className="modal-input" value="No payers configured for this program" readOnly />
+              ) : activePayers.length === 1 ? (
+                <input className="modal-input" value={activePayers[0].payerName} readOnly />
+              ) : (
+                <select className="modal-input" value={selectedPayerId} onChange={e => setSelectedPayerId(e.target.value)}>
+                  <option value="">— Select payer —</option>
+                  {activePayers.map(p => (
+                    <option key={p.id} value={p.id}>{p.payerName}</option>
+                  ))}
+                </select>
+              )}
             </ModalField>
-            <ModalField label="Expiration date">
-              <input className="modal-input" type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} />
+          )}
+
+          {/* 3. AUTH NUMBER */}
+          <ModalField label="Authorization number *">
+            <input
+              className="modal-input"
+              placeholder="SA-2026-003"
+              value={authNumber}
+              onChange={(e) => setAuthNumber(e.target.value)}
+            />
+            {errors.authNumber && <p className="text-[11px] text-icm-red mt-0.5">{errors.authNumber}</p>}
+          </ModalField>
+
+          {/* 4+5. DATES */}
+          <div className="grid grid-cols-2 gap-3">
+            <ModalField label="Effective date *">
+              <input className="modal-input" type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
+              {errors.effectiveDate && <p className="text-[11px] text-icm-red mt-0.5">{errors.effectiveDate}</p>}
+            </ModalField>
+            <ModalField label="Expiration date *">
+              <input className="modal-input" type="date" value={expirationDate} onChange={e => setExpirationDate(e.target.value)} />
+              {errors.expirationDate && <p className="text-[11px] text-icm-red mt-0.5">{errors.expirationDate}</p>}
+              {expiredWarning && !errors.expirationDate && (
+                <p className="text-[11px] text-icm-amber mt-0.5">This date is in the past — authorization will be created as Expired.</p>
+              )}
             </ModalField>
           </div>
 
-          <ModalField label="Authorized units">
-            <input className="modal-input" type="number" placeholder="40" value={authorizedUnits} onChange={(e) => setAuthorizedUnits(e.target.value)} />
+          {/* 6. AUTHORIZED UNITS */}
+          <ModalField label="Authorized units *">
+            <input
+              className="modal-input"
+              type="number"
+              min={1}
+              placeholder="40"
+              value={authorizedUnits}
+              onChange={e => setAuthorizedUnits(e.target.value)}
+            />
+            {errors.units && <p className="text-[11px] text-icm-red mt-0.5">{errors.units}</p>}
           </ModalField>
 
-          <ModalField label="Service codes">
-            <div className="flex flex-wrap gap-1.5">
-              {CODES.map((c) => {
-                const on = codes.includes(c);
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => toggleCode(c)}
-                    className={cn(
-                      "px-2 py-1 rounded-md text-[11px] font-mono font-semibold border",
-                      on
-                        ? "bg-icm-accent text-white border-icm-accent"
-                        : "bg-icm-bg text-icm-text border-icm-border"
-                    )}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-          </ModalField>
+          {/* 7. SERVICE CODES */}
+          {selectedProgramId && (
+            <ModalField label="Service codes *">
+              {rulesLoading ? (
+                <div className="flex items-center gap-2 text-icm-text-dim text-[12px]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading service codes…
+                </div>
+              ) : activeRules.length === 0 ? (
+                <p className="text-[11.5px] text-icm-text-dim font-geist italic">
+                  No billing rules configured — the authorization will be saved without service codes.
+                  Add billing rules in Admin Settings → States, Programs &amp; Billing.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeRules.map(r => {
+                      const on = selectedCodes.has(r.serviceCode);
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => toggleCode(r.serviceCode)}
+                          title={`${r.description} — $${r.rate} per ${r.unit}`}
+                          className={cn(
+                            "px-2 py-1 rounded-md text-[11px] font-mono font-semibold border transition-colors",
+                            on ? "bg-icm-accent text-white border-icm-accent" : "bg-icm-bg text-icm-text border-icm-border hover:border-icm-accent/40"
+                          )}
+                        >
+                          {r.serviceCode}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedCodes.size > 0 && (
+                    <p className="text-[11px] text-icm-text-dim font-geist mt-1.5">
+                      {Array.from(selectedCodes).map(code => {
+                        const rule = activeRules.find(r => r.serviceCode === code);
+                        return rule ? `${code} — ${rule.description} — $${rule.rate} per ${rule.unit}` : code;
+                      }).join("  ·  ")}
+                    </p>
+                  )}
+                  {errors.codes && <p className="text-[11px] text-icm-red mt-0.5">{errors.codes}</p>}
+                </>
+              )}
+            </ModalField>
+          )}
 
+          {/* 8. NOTES */}
           <ModalField label="Notes">
             <textarea className="modal-input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </ModalField>
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-4">
-          <button
-            onClick={onClose}
-            className="h-8 px-3 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text"
-          >
+          <button onClick={onClose} className="h-8 px-3 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text">
             Cancel
           </button>
           <button
@@ -1883,9 +2211,10 @@ function AddAuthorizationModal({ onClose }: { onClose: () => void }) {
             className="h-8 px-3 rounded-lg bg-icm-text text-icm-panel text-[12px] font-geist font-semibold disabled:opacity-60 flex items-center gap-1.5"
           >
             {saving && <Loader2 className="w-3 h-3 animate-spin" />}
-            Save
+            {isEdit ? "Save Changes" : "Save Authorization"}
           </button>
         </div>
+
         <style>{`.modal-input { width:100%; height:32px; padding:0 8px; border-radius:8px; border:1px solid hsl(var(--icm-border)); background:white; font-size:12px; color:hsl(var(--icm-text)); font-family: inherit; }
         textarea.modal-input { padding:8px; height:auto; }`}</style>
       </div>

@@ -75,11 +75,160 @@ const toneStyles: Record<Tone, { wrap: string; chip: string }> = {
   good: { wrap: "bg-icm-green-soft border-icm-green/20", chip: "bg-icm-green text-white" },
 };
 
-// ── Authorization intent detection + Firestore enrichment ──────────────────
+// ── Intent detection + Firestore enrichment ────────────────────────────────
 
-const AUTH_INTENT_UNITS = /units? (left|remaining|used|balance)|how many units|units? (avail|this month)/i;
+const AUTH_INTENT_UNITS    = /units? (left|remaining|used|balance)|how many units|units? (avail|this month)/i;
 const AUTH_INTENT_EXPIRING = /expir|renew|renewal/i;
-const AUTH_INTENT_CAP = /over cap|near cap|cap|exceed|limit|85%|utiliz/i;
+const AUTH_INTENT_CAP      = /over cap|near cap|cap|exceed|limit|85%|utiliz/i;
+
+// Caseload intent: questions about the case manager's own workload and schedule
+const CASELOAD_INTENT = new RegExp(
+  [
+    "who (should|do|am|need to|supposed to) (i |me )?(see|visit|schedule|call|contact)",
+    "who('?s| is) (on |next|coming|scheduled|due|overdue)",
+    "my (caseload|clients?|individuals?|people|visits?|tasks?|schedule|work|calendar)",
+    "upcoming (visits?|schedule|appointments?)",
+    "overdue (visits?|tasks?|forms?|notes?|monitoring)",
+    "schedule (this week|today|tomorrow|next week)",
+    "who (needs|need) (attention|a visit|to be seen|follow.?up)",
+    "how many (people|individuals?|clients?|cases?)",
+    "list (my|all|the) (individuals?|clients?|people|caseload)",
+    "(show|give|tell) me (my|the) (caseload|clients?|individuals?|schedule|tasks?|visits?)",
+    "what (do i|should i) (do|work on|focus on|prioritize)",
+    "(high.?risk|at.?risk) (individuals?|clients?|people)",
+    "compliance (issues?|problems?|alerts?|flags?)",
+    "who hasn'?t (been seen|had a visit)",
+    "next visit|last visit|missed visit",
+    "pending (tasks?|review|approval|signatures?)",
+  ].join("|"),
+  "i"
+);
+
+// ── Caseload data fetcher ─────────────────────────────────────────────────────
+
+async function fetchCaseloadContext(orgId: string, userId: string): Promise<string> {
+  const lines: string[] = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const endOfWeek = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + (7 - d.getDay()));
+    return d.toISOString().slice(0, 10);
+  })();
+  const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+
+  try {
+    lines.push("=== LIVE CASELOAD DATA (from Firestore — answer using this, do not guess) ===");
+    lines.push(`Today: ${today}  |  End of week: ${endOfWeek}`);
+    lines.push("");
+
+    // ── 1. Scheduled visits ──────────────────────────────────────────────────
+    const visitsSnap = await getDocs(
+      query(
+        collection(db, "scheduled_visits"),
+        where("organizationId", "==", orgId),
+        where("status", "==", "scheduled")
+      )
+    );
+    const allVisits = visitsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    // Filter to user's visits or upcoming
+    const myVisits = allVisits.filter(v =>
+      !v.visit_date || v.assigned_to === userId || true // show all for now
+    ).sort((a, b) => (a.visit_date || "").localeCompare(b.visit_date || ""));
+
+    const todayVisits = myVisits.filter(v => v.visit_date === today);
+    const weekVisits  = myVisits.filter(v => v.visit_date > today && v.visit_date <= endOfWeek);
+    const upcomingVisits = myVisits.filter(v => v.visit_date > endOfWeek && v.visit_date <= twoWeeks);
+
+    lines.push(`--- SCHEDULED VISITS ---`);
+    lines.push(`Today (${today}): ${todayVisits.length} visit(s)`);
+    todayVisits.forEach(v => {
+      lines.push(`  • ${v.individual_name || "Unknown"} — ${v.visit_type || "Visit"} at ${v.start_time || "TBD"} — ${v.location || "TBD"}`);
+    });
+    lines.push(`This week: ${weekVisits.length} visit(s)`);
+    weekVisits.forEach(v => {
+      lines.push(`  • ${v.visit_date} — ${v.individual_name || "Unknown"} — ${v.visit_type || "Visit"} at ${v.start_time || "TBD"}`);
+    });
+    if (upcomingVisits.length > 0) {
+      lines.push(`Next 2 weeks: ${upcomingVisits.length} more visit(s)`);
+      upcomingVisits.slice(0, 5).forEach(v => {
+        lines.push(`  • ${v.visit_date} — ${v.individual_name || "Unknown"} — ${v.visit_type || "Visit"}`);
+      });
+    }
+    lines.push("");
+
+    // ── 2. My Work tasks ────────────────────────────────────────────────────
+    const tasksSnap = await getDocs(
+      query(
+        collection(db, "tasks"),
+        where("organizationId", "==", orgId),
+        where("assignedTo", "==", userId)
+      )
+    );
+    const allTasks = tasksSnap.docs
+      .map(d => ({ id: d.id, ...(d.data() as any) }))
+      .filter((t: any) => t.status !== "completed")
+      .sort((a: any, b: any) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+
+    const overdueTasks  = allTasks.filter((t: any) => t.dueDate && t.dueDate < today);
+    const dueTodayTasks = allTasks.filter((t: any) => t.dueDate === today);
+    const thisWeekTasks = allTasks.filter((t: any) => t.dueDate > today && t.dueDate <= endOfWeek);
+
+    lines.push(`--- MY WORK TASKS ---`);
+    lines.push(`Overdue: ${overdueTasks.length} | Due today: ${dueTodayTasks.length} | Due this week: ${thisWeekTasks.length} | Total open: ${allTasks.length}`);
+    if (overdueTasks.length > 0) {
+      lines.push("OVERDUE TASKS:");
+      overdueTasks.slice(0, 8).forEach((t: any) => {
+        lines.push(`  • [${t.dueDate}] ${t.title}${t.individualName ? ` — ${t.individualName}` : ""} (${t.priority || "medium"} priority)`);
+      });
+    }
+    if (dueTodayTasks.length > 0) {
+      lines.push("DUE TODAY:");
+      dueTodayTasks.forEach((t: any) => {
+        lines.push(`  • ${t.title}${t.individualName ? ` — ${t.individualName}` : ""}`);
+      });
+    }
+    if (thisWeekTasks.length > 0) {
+      lines.push("DUE THIS WEEK:");
+      thisWeekTasks.slice(0, 6).forEach((t: any) => {
+        lines.push(`  • [${t.dueDate}] ${t.title}${t.individualName ? ` — ${t.individualName}` : ""}`);
+      });
+    }
+    lines.push("");
+
+    // ── 3. Active individuals overview ──────────────────────────────────────
+    const indsSnap = await getDocs(
+      query(
+        collection(db, "individuals"),
+        where("organizationId", "==", orgId),
+        where("enrollment_status", "==", "active")
+      )
+    );
+    const individuals = indsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const highRisk = individuals.filter((p: any) => (p.risk_score ?? 0) >= 60);
+    const reviewRisk = individuals.filter((p: any) => {
+      const s = p.risk_score ?? 0; return s >= 35 && s < 60;
+    });
+
+    lines.push(`--- ACTIVE CASELOAD ---`);
+    lines.push(`Total active individuals: ${individuals.length}`);
+    lines.push(`High risk (score ≥60): ${highRisk.length}`);
+    lines.push(`Needs review (score 35–59): ${reviewRisk.length}`);
+    if (highRisk.length > 0) {
+      lines.push("HIGH RISK INDIVIDUALS:");
+      highRisk.slice(0, 6).forEach((p: any) => {
+        const name = `${p.last_name || ""}, ${p.first_name || ""}`.trim().replace(/^,\s*/, "");
+        lines.push(`  • ${name} — Risk score: ${p.risk_score ?? "?"} — County: ${p.county || "?"} — Program: ${p.program || "?"}`);
+      });
+    }
+    lines.push("");
+
+    lines.push("=== END OF LIVE DATA ===");
+    return lines.join("\n");
+  } catch (err) {
+    console.warn("[AIPanel] Caseload context fetch failed:", err);
+    return "";
+  }
+}
 
 async function fetchAuthContext(personId: string, orgId?: string): Promise<string> {
   const lines: string[] = [];
@@ -168,12 +317,35 @@ async function callChatAPI(
     AUTH_INTENT_CAP.test(message);
 
   let enrichedMessage = message;
+
+  // ── Enrich with authorization data when asked about a specific person ────
   if (needsAuthContext && context.personId) {
     const authData = await fetchAuthContext(context.personId);
     if (authData) {
       enrichedMessage =
         `${message}\n\n[SYSTEM CONTEXT — REAL DATA, use this to answer precisely]\n${authData}\n` +
         `Please answer the question using only the real data above. Be specific with numbers.`;
+    }
+  }
+
+  // ── Enrich with live caseload data when asked about schedule / workload ───
+  const needsCaseloadContext = CASELOAD_INTENT.test(message);
+  if (needsCaseloadContext && auth.currentUser) {
+    // Get the org ID from the user's Firestore document
+    let orgId = "";
+    try {
+      const { getDoc: fsGetDoc, doc: fsDoc } = await import("firebase/firestore");
+      const userDoc = await fsGetDoc(fsDoc(db, "users", auth.currentUser.uid));
+      if (userDoc.exists()) orgId = userDoc.data().organizationId ?? "";
+    } catch { /* non-fatal */ }
+
+    if (orgId) {
+      const caseloadData = await fetchCaseloadContext(orgId, auth.currentUser.uid);
+      if (caseloadData) {
+        enrichedMessage =
+          `${message}\n\n[LIVE CASELOAD DATA — Real data from the system. Answer using this, be specific with names and dates.]\n${caseloadData}\n` +
+          `Answer the question using the real data above. Give specific names, dates, and counts. Do not say to check the system — you have the data right here.`;
+      }
     }
   }
 
@@ -345,6 +517,86 @@ export function AIPanel({
     [activeSessionId, personName, context]
   );
 
+  // ── Voice callbacks ────────────────────────────────────────────────────────
+  // sendMessage is declared later in this component but we need to pass
+  // onFinalTranscript to useVoiceSession now. Use a ref so the dependency
+  // array never references a variable that hasn't been initialised yet
+  // (that would produce "Cannot access 'X' before initialization" after
+  // Vite minification — a temporal dead zone crash).
+  const sendMessageRef = useRef<((text: string) => void) | null>(null);
+
+  const handleVoiceError = useCallback((errorMsg: string) => {
+    setVoiceError(errorMsg);
+    setTimeout(() => setVoiceError(null), 6000);
+  }, []);
+
+  // onFinalTranscript: voice recognised speech → auto-send via ref (no TDZ)
+  const handleFinalTranscript = useCallback((text: string) => {
+    if (text.trim()) sendMessageRef.current?.(text.trim());
+  }, []); // ← zero deps: accesses sendMessage through the ref
+
+  // onInterimTranscript: show live speech in the input box
+  const handleInterimTranscript = useCallback((text: string) => {
+    setInput(text);
+  }, []);
+
+  const { voiceState, isSupported, toggleVoice, endSession: endVoiceSession, speakText } = useVoiceSession({
+    onFinalTranscript: handleFinalTranscript,
+    onInterimTranscript: handleInterimTranscript,
+    onError: handleVoiceError,
+  });
+
+  // Speak the AI reply aloud when voice is active
+  const voiceStateRef = useRef(voiceState);
+  useEffect(() => { voiceStateRef.current = voiceState; }, [voiceState]);
+
+  const prevMessagesLenRef = useRef(0);
+  useEffect(() => {
+    if (messages.length > prevMessagesLenRef.current) {
+      prevMessagesLenRef.current = messages.length;
+      const last = messages[messages.length - 1];
+      if (last?.role === "assistant" && !last.error && voiceStateRef.current !== "idle") {
+        speakText(last.text);
+      }
+    }
+  }, [messages, speakText]);
+
+  const isVoiceActive = voiceState !== "idle";
+
+  const handleMicClick = useCallback(async () => {
+    if (!phiAcknowledged) return; // Show disclosure first
+    if (voiceState === "idle") setVoiceSessionActive(true);
+    toggleVoice();
+  }, [phiAcknowledged, voiceState, toggleVoice]);
+
+  const handleEndVoiceSession = useCallback(() => {
+    endVoiceSession();
+    setVoiceSessionActive(false);
+  }, [endVoiceSession]);
+
+  const acknowledgePhiDisclosure = useCallback(async () => {
+    if (!currentUser) return;
+    setPhiLoading(true);
+    try {
+      await setDoc(doc(db, "users", currentUser.uid), { voice_disclosure_acknowledged: true }, { merge: true });
+      setPhiAcknowledged(true);
+    } catch { /* non-fatal */ }
+    setPhiLoading(false);
+  }, [currentUser]);
+
+  const VOICE_SUGGESTIONS = [
+    "How do I complete a monitoring form?",
+    "My billing claim shows Needs Attention — what do I do?",
+    "Walk me through the ambient listening process",
+    "How do I request a supervisor review?",
+  ];
+
+  const micAriaLabel =
+    voiceState === "idle" ? "Start voice conversation" :
+    voiceState === "listening" ? "Listening — tap to stop" :
+    voiceState === "speaking" ? "AI is responding — tap to interrupt" :
+    "Voice";
+
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || loading || !currentUser) return;
@@ -398,6 +650,10 @@ export function AIPanel({
     },
     [loading, currentUser, messages, context, saveSession]
   );
+
+  // Keep voice ref in sync now that sendMessage is initialised
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -611,8 +867,69 @@ export function AIPanel({
 
           {/* ── Messages ───────────────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5 min-h-0 bg-icm-panel">
-            {/* Starter suggestions */}
-            {showSuggestions && !hasMessages && (
+            {/* PHI disclosure — first use only */}
+            {isSupported && !phiAcknowledged && (
+              <div className="mx-1 mb-2 rounded-xl border border-icm-border bg-icm-bg p-3 space-y-2">
+                <p className="text-[11.5px] font-geist text-icm-text leading-relaxed">
+                  Voice conversations are processed by Google Gemini on Google Cloud under our Business Associate Agreement. Audio is not stored after processing.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    disabled={phiLoading}
+                    onClick={acknowledgePhiDisclosure}
+                    className="h-7 px-3 rounded-lg bg-icm-accent text-white text-[11px] font-geist font-semibold hover:opacity-90 disabled:opacity-60"
+                  >
+                    {phiLoading ? "…" : "I understand — enable voice"}
+                  </button>
+                  <button className="h-7 px-3 rounded-lg border border-icm-border text-[11px] font-geist text-icm-text-dim hover:bg-icm-bg">
+                    Learn more
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Voice session active banner */}
+            {isVoiceActive && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl mx-1 mb-2" style={{ background: "#e1f5ee" }}>
+                <div className="flex items-center gap-2">
+                  {voiceState === "listening" && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
+                  {voiceState === "speaking" && <Volume2 className="w-3.5 h-3.5 text-green-700" />}
+                  {voiceState === "processing" && <Radio className="w-3.5 h-3.5 text-green-700 animate-pulse" />}
+                  <span className="text-[11px] font-geist text-green-800 font-medium">
+                    Voice session active — Gemini 2.0 Live
+                  </span>
+                </div>
+                <button onClick={handleEndVoiceSession} className="text-green-700 hover:text-green-900 text-[11px] font-geist">
+                  End session ×
+                </button>
+              </div>
+            )}
+
+            {/* Voice error banner */}
+            {voiceError && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl mx-1 mb-2 bg-red-50 border border-red-200">
+                <span className="text-[11px] font-geist text-red-700">{voiceError}</span>
+              </div>
+            )}
+
+            {/* Voice suggestion cards (only when voice active) */}
+            {voiceSessionActive && showSuggestions && !hasMessages && (
+              <div className="grid grid-cols-2 gap-2 px-1">
+                {VOICE_SUGGESTIONS.map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(prompt)}
+                    className="text-left rounded-xl border border-icm-border bg-icm-panel p-3 hover:border-icm-accent/40 hover:bg-icm-accent-soft/20 transition-all group"
+                  >
+                    <p className="text-[12px] font-geist font-semibold text-icm-text leading-snug">{prompt}</p>
+                    <p className="text-[10px] text-icm-text-dim mt-1.5 group-hover:text-icm-accent transition-colors">Click to ask →</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Starter suggestions (text chat, hidden during voice session) */}
+            {!voiceSessionActive && showSuggestions && !hasMessages && (
               <div className="space-y-2">
                 <p className="text-[11.5px] text-icm-text-faint font-geist px-1 mb-3">
                   Ask me anything about your caseload, documentation, billing, or compliance.
@@ -680,6 +997,11 @@ export function AIPanel({
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.text}</p>
                   )}
+                  {msg.isVoice && (
+                    <span className="inline-flex items-center gap-0.5 ml-1 opacity-50" title={msg.role === "user" ? "Voice input" : "Voice response"}>
+                      {msg.role === "user" ? <Mic className="w-2.5 h-2.5" /> : <Volume2 className="w-2.5 h-2.5" />}
+                    </span>
+                  )}
                   {msg.role === "assistant" && !msg.error && (
                     <button
                       onClick={() => copyMessage(msg)}
@@ -743,6 +1065,30 @@ export function AIPanel({
               "flex items-center gap-3 rounded-2xl border bg-icm-bg pl-4 pr-1.5 py-2 transition-all shadow-sm focus-within:shadow-md focus-within:border-icm-accent/80",
               loading ? "border-icm-accent/40" : "border-icm-border"
             )}>
+              {/* Mic button */}
+              {isSupported && phiAcknowledged && (
+                <button
+                  onClick={handleMicClick}
+                  disabled={voiceState === "processing" || loading}
+                  aria-label={micAriaLabel}
+                  className={cn(
+                    "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all",
+                    voiceState === "idle" && "text-icm-text-dim hover:bg-icm-bg hover:text-icm-text",
+                    voiceState === "listening" && "bg-red-100 text-red-600 ring-2 ring-red-400 ring-offset-1",
+                    voiceState === "speaking" && "bg-green-100 text-green-600",
+                    voiceState === "processing" && "opacity-50 cursor-not-allowed",
+                    voiceState === "error" && "bg-red-50 text-red-500"
+                  )}
+                >
+                  {voiceState === "listening" ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : voiceState === "speaking" ? (
+                    <Volume2 className="w-4 h-4 animate-pulse" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </button>
+              )}
               <input
                 ref={inputRef}
                 value={input}

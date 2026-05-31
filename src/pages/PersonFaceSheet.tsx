@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useRef, useState } from "react";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import {
@@ -7,7 +8,7 @@ import {
   HeartPulse, ClipboardList, Loader2, UserCheck,
   Calendar, BookOpen, Stethoscope, Siren, Scale,
   MessageSquare, CheckSquare, ClipboardCheck, Layers,
-  Star,
+  Star, Download,
 } from "lucide-react";
 import { useIndividual, calcAge, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useProgressNotes } from "@/hooks/useProgressNotes";
@@ -30,6 +31,8 @@ import { useDiagnoses, useMedications, useAllergies } from "@/hooks/useMedicalRe
 const PersonFaceSheet = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const articleRef = useRef<HTMLElement>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const { userProfile } = useAuth();
   const { individual, loading } = useIndividual(id);
 
@@ -110,6 +113,78 @@ const PersonFaceSheet = () => {
       ].filter(Boolean).join(", ")
     : individual.address ?? null;
 
+  async function handleSavePdf() {
+    if (!articleRef.current || !individual) return;
+    setGeneratingPdf(true);
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const el = articleRef.current;
+      // Temporarily expand the element so html2canvas captures the full page
+      const originalMaxHeight = el.style.maxHeight;
+      el.style.maxHeight = "none";
+
+      const canvas = await html2canvas(el, {
+        scale: 2,               // 2× for crisp text
+        useCORS: true,          // allow org logo images
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: 1000,      // fixed width for consistent output
+      });
+
+      el.style.maxHeight = originalMaxHeight;
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: "a4",
+      });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+      const contentW = pageW - margin * 2;
+      const imgH = (canvas.height * contentW) / canvas.width;
+
+      // If taller than one page, split across pages
+      let yPos = margin;
+      let remainingH = imgH;
+      let sourceY = 0;
+
+      while (remainingH > 0) {
+        const sliceH = Math.min(remainingH, pageH - margin * 2);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = Math.ceil((sliceH * canvas.width) / contentW);
+        const ctx = sliceCanvas.getContext("2d");
+        ctx?.drawImage(canvas, 0, sourceY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+        const sliceData = sliceCanvas.toDataURL("image/png");
+
+        pdf.addImage(sliceData, "PNG", margin, yPos, contentW, sliceH);
+        remainingH -= sliceH;
+        sourceY += sliceCanvas.height;
+
+        if (remainingH > 0) {
+          pdf.addPage();
+          yPos = margin;
+        }
+      }
+
+      const filename = `FaceSheet_${individual.last_name}_${individual.first_name}_${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(filename);
+    } catch (err) {
+      console.error("[FaceSheet PDF]", err);
+      // Fallback to browser print dialog
+      window.print();
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
+
   return (
     <ICMShell title="Face Sheet" showAIPanel={false}>
       <div className="space-y-4 max-w-[1000px] mx-auto">
@@ -129,15 +204,27 @@ const PersonFaceSheet = () => {
           <p className="text-[11px] font-mono uppercase tracking-wider text-icm-text-faint">
             Comprehensive snapshot · Pulled live from individual record
           </p>
-          <button
-            onClick={() => window.print()}
-            className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5" /> Print / Save PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSavePdf}
+              disabled={generatingPdf}
+              className="h-9 px-3 rounded-xl bg-icm-accent text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-60"
+            >
+              {generatingPdf
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                : <><Download className="w-3.5 h-3.5" /> Save PDF</>
+              }
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:text-icm-text hover:border-icm-border-strong flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" /> Print
+            </button>
+          </div>
         </div>
 
-        <article className="rounded-xl border border-icm-border bg-icm-panel p-6 sm:p-8 print:border-0 print:shadow-none print:p-0 space-y-0">
+        <article ref={articleRef} className="rounded-xl border border-icm-border bg-icm-panel p-6 sm:p-8 print:border-0 print:shadow-none print:p-0 space-y-0">
           {/* Org letterhead */}
           {userProfile?.organizationId && (
             <OrgPrintHeader

@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { staffDisplayName } from "@/lib/userName";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIndividual, useIndividuals } from "@/hooks/useIndividuals";
 import { useCarePlans } from "@/hooks/useFirestore";
@@ -208,7 +209,7 @@ export function ScheduleVisitModal({ open, onClose, individualId: propIndividual
       setOrgUsers(
         snap.docs.map((d) => ({
           uid: d.id,
-          displayName: d.data().displayName ?? d.data().firstName ?? d.id,
+          displayName: staffDisplayName(d.data(), d.id),
           role: d.data().role ?? "",
         }))
       );

@@ -25,6 +25,7 @@ import { createTask } from "@/hooks/useTasks";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { staffDisplayName } from "@/lib/userName";
 import { toast } from "sonner";
 
 interface ActionItem {
@@ -97,7 +98,7 @@ const PersonMeetingNotesPage = () => {
     const unsub = onSnapshot(q, (snap) => {
       setOrgUsers(snap.docs.map((d) => ({
         uid: d.id,
-        name: d.data().displayName ?? d.data().email ?? "User",
+        name: staffDisplayName(d.data(), d.id),
         role: d.data().role ?? "",
       })));
     }, () => {});

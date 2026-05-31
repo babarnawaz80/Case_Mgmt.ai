@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
-import { ImportWizardModal } from "@/components/ImportWizardModal";
+import { ImportWizardModal, INDIVIDUAL_FIELDS } from "@/components/ImportWizardModal";
 import {
   useIndividuals,
   riskScoreClass,
@@ -46,6 +46,133 @@ import { usePendingDuplicatePairs } from "@/hooks/useDuplicatePairs";
 
 type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending" | "Possible Duplicate";
 type RiskFilter = "All" | "Attention" | "High" | "Review" | "Standard";
+
+// ─── Download Excel template ───────────────────────────────────────────────────
+
+function downloadIndividualTemplate() {
+  // Build header row from INDIVIDUAL_FIELDS
+  const headers = INDIVIDUAL_FIELDS.map(f => f.key);
+  const labels  = INDIVIDUAL_FIELDS.map(f => f.label + (f.required ? " *" : ""));
+  const hints   = INDIVIDUAL_FIELDS.map(f => f.hint ?? "");
+
+  // Example data row using sensible placeholders
+  const example: Record<string, string> = {
+    first_name: "Joseph",
+    last_name: "Brown",
+    preferred_name: "Joe",
+    dob: "01/15/1988",
+    gender: "Male",
+    enrollment_status: "active",
+    medicaid_id: "IN123456789",
+    county: "Carroll",
+    program: "Indiana HCBS",
+    state: "IN",
+    phone: "(317) 555-0100",
+    email: "joseph.brown@email.com",
+    guardian_name: "Mary Brown",
+    guardian_phone: "(317) 555-0101",
+    emergency_contact_name: "Mary Brown",
+    emergency_contact_phone: "(317) 555-0101",
+    auth_number: "SA-2026-001",
+    auth_program_name: "Indiana HCBS",
+    auth_payer: "IHCP",
+    auth_effective_date: "01/01/2026",
+    auth_expiration_date: "12/31/2026",
+    auth_authorized_units: "40",
+    auth_service_codes: "T2022,T2023",
+    enrolled_program: "Indiana HCBS",
+    program_enrollment_date: "01/01/2026",
+  };
+
+  const exampleRow = headers.map(h => example[h] ?? "");
+
+  // Build CSV with 3 header rows: field keys, human labels, hints + example data
+  const csvRows = [
+    headers.join(","),
+    labels.map(l => `"${l}"`).join(","),
+    hints.map(h => `"${h}"`).join(","),
+    exampleRow.map(v => `"${v}"`).join(","),
+  ];
+
+  const csv = csvRows.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "CaseManagementAI_Individual_Import.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─── Import split-button dropdown ─────────────────────────────────────────────
+
+function ImportDropdown({ onOpenImport }: { onOpenImport: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Split button */}
+      <div className="flex items-stretch rounded-xl border border-icm-border bg-icm-panel overflow-hidden hover:border-icm-border-strong transition-colors">
+        {/* Left: open import wizard */}
+        <button
+          onClick={() => { setOpen(false); onOpenImport(); }}
+          className="h-9 px-3.5 flex items-center gap-1.5 text-[12px] font-geist font-medium text-icm-text hover:bg-icm-bg transition-colors"
+        >
+          <FileUp className="w-3.5 h-3.5" /> Import
+        </button>
+        {/* Divider */}
+        <span className="w-px bg-icm-border self-stretch" />
+        {/* Right: chevron opens dropdown */}
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="h-9 px-2 flex items-center text-icm-text-dim hover:bg-icm-bg hover:text-icm-text transition-colors"
+          aria-label="Import options"
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute right-0 mt-1 w-56 rounded-xl border border-icm-border bg-icm-panel shadow-elevated z-30 py-1 overflow-hidden">
+          <button
+            onClick={() => { setOpen(false); onOpenImport(); }}
+            className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-geist text-icm-text hover:bg-icm-bg flex items-center gap-2.5 transition-colors"
+          >
+            <FileUp className="w-4 h-4 text-icm-text-dim shrink-0" />
+            <div>
+              <p className="font-medium leading-tight">Import from file</p>
+              <p className="text-[11px] text-icm-text-faint mt-0.5">Upload CSV or Excel</p>
+            </div>
+          </button>
+          <div className="h-px bg-icm-border mx-2" />
+          <button
+            onClick={() => { setOpen(false); downloadIndividualTemplate(); }}
+            className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-geist text-icm-text hover:bg-icm-bg flex items-center gap-2.5 transition-colors"
+          >
+            <Download className="w-4 h-4 text-icm-text-dim shrink-0" />
+            <div>
+              <p className="font-medium leading-tight">Download template</p>
+              <p className="text-[11px] text-icm-text-faint mt-0.5">CSV with all fields + examples</p>
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PeopleSupported = () => {
   const navigate = useNavigate();
@@ -291,12 +418,8 @@ const PeopleSupported = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowImport(true)}
-              className="h-9 px-3.5 rounded-xl border border-icm-border bg-icm-panel text-icm-text text-[12px] font-geist font-medium flex items-center gap-1.5 hover:border-icm-border-strong transition-colors"
-            >
-              <FileUp className="w-3.5 h-3.5" /> Import
-            </button>
+            <ImportDropdown onOpenImport={() => setShowImport(true)} />
+
             <button
               onClick={() => navigate("/people/new")}
               className="h-9 px-3.5 rounded-xl bg-teal-600 text-white text-[12px] font-geist font-medium flex items-center gap-1.5 hover:bg-teal-700"
@@ -628,23 +751,22 @@ function PersonRow({ person, computedScore, selected, onToggleSelect, onOpen, on
 
   return (
     <div className={`rounded-xl border bg-icm-panel p-4 flex flex-wrap items-center gap-3 sm:gap-4 hover:border-icm-border-strong hover:shadow-elevated transition-all ${selected ? "border-icm-accent/50 bg-icm-accent-soft/20" : "border-icm-border"}`}>
-      {/* Checkbox */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
-        className="shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors hover:border-icm-accent focus:outline-none"
-        style={{ borderColor: selected ? "hsl(var(--icm-accent))" : undefined }}
-        title={selected ? "Deselect" : "Select"}
-      >
-        {selected && <Check className="w-3 h-3 text-icm-accent" />}
-      </button>
-
-      {/* Avatar — shows photo if uploaded, falls back to risk-tinted initials */}
-      <PersonAvatar
-        person={person}
-        size={48}
-        shape="rounded"
-        className="shrink-0"
-      />
+      {/* Checkbox + Avatar — grouped so they never split across lines */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
+          className={`w-4 h-4 rounded border flex items-center justify-center transition-all focus:outline-none ${selected ? "border-icm-accent bg-icm-accent" : "border-icm-border hover:border-icm-accent"}`}
+          title={selected ? "Deselect" : "Select"}
+        >
+          {selected && <Check className="w-2.5 h-2.5 text-white" />}
+        </button>
+        {/* Avatar — shows photo if uploaded, falls back to risk-tinted initials */}
+        <PersonAvatar
+          person={person}
+          size={48}
+          shape="rounded"
+        />
+      </div>
 
       {/* Identity */}
       <div className="min-w-0 flex-1 basis-[60%] sm:basis-auto">

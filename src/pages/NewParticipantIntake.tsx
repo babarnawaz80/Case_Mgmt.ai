@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { canonicalState } from "@/lib/stateUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   collection, addDoc, serverTimestamp, doc, getDoc,
@@ -470,6 +471,11 @@ export default function NewParticipantIntake() {
           state: data.state,
           zip: data.zip,
         },
+        // Flat canonical state field — this is what the AI Orchestrator,
+        // Compliance-by-State, and the state filter read. Derived from the
+        // enrollment state (which determines compliance rules) first, then
+        // the residence state. Canonicalized so "IN" → "Indiana".
+        address_state: canonicalState(data.enrollmentState || data.state) ?? undefined,
         county: data.county,
         residence_type: data.residenceType,
         phone: data.phone,

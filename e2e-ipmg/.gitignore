@@ -1,0 +1,6 @@
+.auth/
+report/
+results.json
+.env.test
+*.txt
+test-results/

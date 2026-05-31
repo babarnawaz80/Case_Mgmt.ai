@@ -1,15 +1,10 @@
 "use strict";
 // migrateIndividualStates.ts
-// Callable migration that sets individual.state from the PROGRAM the individual
-// is enrolled in — not from their residence address.
+// Callable migration — sets individual.state from the PROGRAM the individual
+// is enrolled in (programs collection → state field).
 //
-// Logic:
-//   1. Load all programs for each org → build { programId → state } map
-//   2. For each individual: individual.state = programs[individual.programId].state
-//   3. If individual has no programId → find any active program for that org
-//      (prefer Indiana/Case MGMT for demo) and assign it
-//   4. Canonicalize all values ("IN" → "Indiana")
-//   5. Also seed service_authorizations if missing
+// This is safe to run multiple times (always overwrites).
+// "Seed Demo Data" button on the Orchestrator page calls this.
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -47,152 +42,125 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.migrateIndividualStates = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
-// ─── Canonicalization ─────────────────────────────────────────────────────────
-// Residence-address abbreviations like AZ/CO/MA must NEVER be treated as
-// program states. The STATE_VALID list is the allowed set for program states in
-// this system. Anything outside it is rejected and reassigned to the default.
-const STATE_VALID = new Set([
-    "Indiana", "New Jersey", "Ohio", "Illinois",
-    "California", "Texas", "Virginia", "Maryland",
-    "Minnesota", "Georgia", "Arizona", "Colorado",
-    "Massachusetts", "Oregon", "Pennsylvania", "Michigan",
-    "Florida", "New York", "North Carolina", "Washington",
-]);
-const STATE_CANONICAL = {
-    "IN": "Indiana", "in": "Indiana",
-    "NJ": "New Jersey", "nj": "New Jersey", "new jersey": "New Jersey",
-    "OH": "Ohio", "oh": "Ohio",
-    "IL": "Illinois", "il": "Illinois",
-    "CA": "California", "ca": "California",
-    "TX": "Texas", "tx": "Texas",
-    "VA": "Virginia", "va": "Virginia",
-    "MD": "Maryland", "md": "Maryland",
-    "MN": "Minnesota", "mn": "Minnesota",
-    "GA": "Georgia", "ga": "Georgia",
-    "AZ": "Arizona", "az": "Arizona",
-    "CO": "Colorado", "co": "Colorado",
-    "MA": "Massachusetts", "ma": "Massachusetts",
-    "OR": "Oregon", "or": "Oregon",
+// Full-name canonicalization (IN → Indiana, NJ → New Jersey, etc.)
+const ABBR_TO_NAME = {
+    IN: "Indiana", NJ: "New Jersey", OH: "Ohio",
+    IL: "Illinois", CA: "California", TX: "Texas",
+    VA: "Virginia", MD: "Maryland", MN: "Minnesota",
+    GA: "Georgia", AZ: "Arizona", CO: "Colorado",
+    MA: "Massachusetts", OR: "Oregon", PA: "Pennsylvania",
+    MI: "Michigan", FL: "Florida", NY: "New York",
+    NC: "North Carolina", WA: "Washington",
 };
-function canonicalize(raw) {
+function toFullName(raw) {
     var _a, _b;
     if (!raw || !raw.trim())
         return null;
     const s = raw.trim();
-    const c = (_b = (_a = STATE_CANONICAL[s]) !== null && _a !== void 0 ? _a : STATE_CANONICAL[s.toLowerCase()]) !== null && _b !== void 0 ? _b : s;
-    return STATE_VALID.has(c) ? c : null;
+    return (_b = (_a = ABBR_TO_NAME[s.toUpperCase()]) !== null && _a !== void 0 ? _a : ABBR_TO_NAME[s]) !== null && _b !== void 0 ? _b : (s.length > 2 ? s : null);
 }
-// ─── Main migration ───────────────────────────────────────────────────────────
 exports.migrateIndividualStates = (0, https_1.onCall)({ cors: true, memory: "512MiB", timeoutSeconds: 300 }, async (request) => {
     var _a, _b;
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Must be authenticated.");
     const db = admin.firestore();
-    let updated = 0;
-    let skipped = 0;
-    let cleared = 0; // had wrong address-derived state, now corrected from program
-    // ── Step 1: Load all programs across all orgs ─────────────────────────────
-    // programs collection: { id, organizationId, name, state, code, payer, active }
-    const programsSnap = await db.collection("programs").limit(200).get();
-    // Map: organizationId → array of { id, state, name }
-    const orgProgramMap = {};
-    for (const pDoc of programsSnap.docs) {
-        const p = pDoc.data();
-        const orgId = p.organizationId;
-        const pState = canonicalize(p.state);
-        if (!orgId || !pState)
+    let fixed = 0;
+    let alreadyCorrect = 0;
+    // ── Step 1: Load ALL programs → build { id → fullNameState } ─────────────
+    const programsSnap = await db.collection("programs").limit(300).get();
+    // Map programId → canonical state name
+    const programStateMap = {};
+    // Also map programName (lowercase) → canonical state, as a name-based fallback
+    const programNameStateMap = {};
+    for (const p of programsSnap.docs) {
+        const d = p.data();
+        const pState = toFullName(d.state);
+        if (!pState)
             continue;
-        if (!orgProgramMap[orgId])
-            orgProgramMap[orgId] = [];
-        orgProgramMap[orgId].push({ id: pDoc.id, state: pState, name: (_a = p.name) !== null && _a !== void 0 ? _a : "" });
-    }
-    // ── Step 2: Process all individuals ──────────────────────────────────────
-    const snap = await db.collection("individuals").limit(500).get();
-    // Use batches (max 500 writes each)
-    const batches = [db.batch()];
-    let batchCount = 0;
-    for (const d of snap.docs) {
-        const data = d.data();
-        const orgId = data.organizationId || data.tenantId || "";
-        // ── Resolve program state ────────────────────────────────────────────
-        let programState = null;
-        // Priority 1: individual has a programId → look it up in programs map
-        const programId = data.programId || "";
-        if (programId && orgProgramMap[orgId]) {
-            const prog = orgProgramMap[orgId].find(p => p.id === programId);
-            if (prog)
-                programState = prog.state;
+        programStateMap[p.id] = pState;
+        if (d.name) {
+            programNameStateMap[d.name.toLowerCase().trim()] = pState;
         }
-        // Priority 2: individual has a program name → match by name
-        if (!programState && orgProgramMap[orgId]) {
-            const programName = (data.programName || data.program || "").toLowerCase();
-            if (programName) {
-                const prog = orgProgramMap[orgId].find(p => p.name.toLowerCase().includes(programName) ||
-                    programName.includes(p.name.toLowerCase()));
-                if (prog)
-                    programState = prog.state;
+    }
+    // ── Step 2: Update every individual with the program's state ─────────────
+    const indsSnap = await db.collection("individuals").limit(500).get();
+    const batches = [db.batch()];
+    let writeCount = 0;
+    for (const d of indsSnap.docs) {
+        const data = d.data();
+        // ── Resolve the correct state from program ──────────────────────────
+        let correctState = null;
+        // 1. programId → programs collection (most reliable)
+        if (data.programId && programStateMap[data.programId]) {
+            correctState = programStateMap[data.programId];
+        }
+        // 2. programName → programs collection (name match)
+        if (!correctState) {
+            const pName = (data.programName || data.program || "").toLowerCase().trim();
+            if (pName && programNameStateMap[pName]) {
+                correctState = programNameStateMap[pName];
             }
         }
-        // Priority 3: any active program for this org (prefer Indiana/Case MGMT for demo)
-        if (!programState && orgProgramMap[orgId]) {
-            const fallback = (_b = orgProgramMap[orgId].find(p => p.state === "Indiana")) !== null && _b !== void 0 ? _b : orgProgramMap[orgId][0];
-            if (fallback)
-                programState = fallback.state;
+        // 3. Partial name match (e.g. "Case MGMT" in "Case MGMT - Region 3")
+        if (!correctState) {
+            const pName = (data.programName || data.program || "").toLowerCase().trim();
+            if (pName) {
+                for (const [name, state] of Object.entries(programNameStateMap)) {
+                    if (pName.includes(name) || name.includes(pName)) {
+                        correctState = state;
+                        break;
+                    }
+                }
+            }
         }
-        // Priority 4: absolute fallback — Indiana (demo tenant default)
-        if (!programState)
-            programState = "Indiana";
-        // ── Compare with what's currently stored ────────────────────────────
-        const currentState = data.state || "";
-        const currentCanonical = canonicalize(currentState);
-        if (currentCanonical === programState) {
-            skipped++;
-            continue; // already correct
+        // 4. enrollment_state / enrollmentState field on the individual
+        if (!correctState) {
+            correctState = toFullName(data.enrollment_state || data.enrollmentState);
         }
-        // Current value is wrong (address-derived abbreviation like AZ/CO/MA) or missing
-        if (currentCanonical && currentCanonical !== programState)
-            cleared++;
-        else
-            updated++;
-        if (batchCount >= 490) {
+        // 5. Last resort: Indiana (demo default)
+        if (!correctState) {
+            correctState = "Indiana";
+        }
+        // ── Write only if different ───────────────────────────────────────
+        const current = (_b = (_a = toFullName(data.state)) !== null && _a !== void 0 ? _a : data.state) !== null && _b !== void 0 ? _b : "";
+        if (current === correctState) {
+            alreadyCorrect++;
+            continue;
+        }
+        if (writeCount > 0 && writeCount % 490 === 0) {
             batches.push(db.batch());
-            batchCount = 0;
         }
         batches[batches.length - 1].update(d.ref, {
-            state: programState,
-            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            state: correctState,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        batchCount++;
+        writeCount++;
+        fixed++;
     }
     for (const b of batches)
         await b.commit();
-    // ── Seed service_authorizations ───────────────────────────────────────────
-    const authSeeded = await seedServiceAuthorizations(db);
+    // ── Step 3: Seed service_authorizations if not yet done ───────────────────
+    const authSeeded = await seedServiceAuthorizationsIfNeeded(db);
     return {
         success: true,
-        individualsUpdated: updated,
-        individualsClearedBadState: cleared,
-        individualsSkipped: skipped,
+        individualsFixed: fixed,
+        individualsAlreadyCorrect: alreadyCorrect,
         authorizationsSeeded: authSeeded,
+        programsLoaded: programsSnap.size,
     };
 });
-// ─── Seed service_authorizations (once) ──────────────────────────────────────
-async function seedServiceAuthorizations(db) {
-    const existingSnap = await db.collection("service_authorizations")
-        .where("_seededByMigration", "==", true)
-        .limit(1).get();
-    if (!existingSnap.empty)
+async function seedServiceAuthorizationsIfNeeded(db) {
+    const existing = await db.collection("service_authorizations")
+        .where("_seededByMigration", "==", true).limit(1).get();
+    if (!existing.empty)
         return 0;
-    const indivsSnap = await db.collection("individuals")
-        .where("enrollment_status", "==", "active")
-        .limit(6).get();
-    if (indivsSnap.empty)
+    const inds = await db.collection("individuals")
+        .where("enrollment_status", "==", "active").limit(6).get();
+    if (inds.empty)
         return 0;
     const today = new Date();
-    const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
+    const add = (d, n) => new Date(d.getTime() + n * 86400000);
     const fmt = (d) => d.toISOString().slice(0, 10);
-    const batch = db.batch();
-    let count = 0;
     const templates = [
         { service_name: "Community Integration & Habilitation", units_authorized: 200, units_used: 120, daysOffset: 75 },
         { service_name: "Day Services / Day Habilitation", units_authorized: 180, units_used: 90, daysOffset: 25 },
@@ -201,33 +169,29 @@ async function seedServiceAuthorizations(db) {
         { service_name: "Behavioral Support", units_authorized: 100, units_used: 105, daysOffset: -5 },
         { service_name: "Transportation", units_authorized: 80, units_used: 20, daysOffset: 90 },
     ];
-    indivsSnap.docs.forEach((indDoc, i) => {
-        const ind = indDoc.data();
+    const batch = db.batch();
+    inds.docs.forEach((doc, i) => {
+        const ind = doc.data();
         const orgId = ind.organizationId || ind.tenantId;
-        const tmpl = templates[i % templates.length];
-        const startDate = addDays(today, -180);
-        const endDate = addDays(today, tmpl.daysOffset);
+        const t = templates[i % templates.length];
         const ref = db.collection("service_authorizations").doc();
         batch.set(ref, {
-            individualId: indDoc.id,
+            individualId: doc.id,
             individualName: `${ind.first_name || ""} ${ind.last_name || ""}`.trim(),
-            organizationId: orgId,
-            tenantId: orgId,
-            service_name: tmpl.service_name,
-            auth_number: `AUTH-2026-${100 + i}`,
+            organizationId: orgId, tenantId: orgId,
+            service_name: t.service_name, auth_number: `AUTH-2026-${100 + i}`,
             status: "active",
-            start_date: fmt(startDate), end_date: fmt(endDate),
-            startDate: fmt(startDate), endDate: fmt(endDate),
-            units_authorized: tmpl.units_authorized, units_used: tmpl.units_used,
-            authorizedUnits: tmpl.units_authorized, unitsUsed: tmpl.units_used,
+            start_date: fmt(add(today, -180)), end_date: fmt(add(today, t.daysOffset)),
+            startDate: fmt(add(today, -180)), endDate: fmt(add(today, t.daysOffset)),
+            units_authorized: t.units_authorized, units_used: t.units_used,
+            authorizedUnits: t.units_authorized, unitsUsed: t.units_used,
             funding_source: "Medicaid HCBS Waiver",
             _seededByMigration: true,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        count++;
     });
     await batch.commit();
-    return count;
+    return inds.size;
 }
 //# sourceMappingURL=migrateIndividualStates.js.map

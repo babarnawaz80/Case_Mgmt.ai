@@ -288,18 +288,17 @@ function SeedDemoDataButton() {
     setSeeding(true);
     try {
       const fn = httpsCallable<object, {
-        individualsUpdated: number;
-        individualsClearedBadState: number;
+        individualsFixed: number;
+        individualsAlreadyCorrect: number;
         authorizationsSeeded: number;
+        programsLoaded: number;
       }>(fns, "migrateIndividualStates");
       const res = await fn({});
-      const { individualsUpdated, individualsClearedBadState, authorizationsSeeded } = res.data;
-      const fixed = individualsUpdated + individualsClearedBadState;
-      toast.success("State data corrected from enrolled programs", {
-        description: `${fixed} individual${fixed !== 1 ? "s" : ""} updated from program state · ${authorizationsSeeded} authorizations seeded`,
+      const { individualsFixed, programsLoaded, authorizationsSeeded } = res.data;
+      toast.success("States synced from enrolled programs", {
+        description: `${programsLoaded} programs loaded · ${individualsFixed} individual${individualsFixed !== 1 ? "s" : ""} updated`,
       });
       setDone(true);
-      // Reload to reflect new state values
       setTimeout(() => window.location.reload(), 1500);
     } catch (err: any) {
       toast.error("Seed failed", { description: err?.message });
@@ -308,7 +307,7 @@ function SeedDemoDataButton() {
     }
   }
 
-  if (done) return null;
+  if (done) return null; // hides after reload; button re-appears on fresh load
 
   return (
     <div className="rounded-xl border border-dashed border-icm-border bg-icm-bg/40 px-4 py-2.5 flex items-center gap-3">

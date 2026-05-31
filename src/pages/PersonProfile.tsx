@@ -46,6 +46,8 @@ import { calculateRiskScore } from "@/lib/riskEngine";
 import { getRiskLabel } from "@/lib/formatDate";
 import { canonicalState } from "@/lib/stateUtils";
 
+import { MedicalTab } from "@/components/medical/MedicalTab";
+
 const PersonServiceProviders = lazy(() => import("./PersonServiceProviders"));
 const PersonConsentsTab = lazy(() => import("./PersonConsentsTab"));
 function ConsentsTabWrapper({ individualId, individual }: { individualId: string; individual: any }) {
@@ -730,60 +732,10 @@ function EditableSelect({
 function MedicalInfoTab({ profile, person }: { profile: ProfileData; person: Individual }) {
   return (
     <div className="space-y-4">
-      <Section title="Diagnoses">
-        <DataTable
-          columns={["Code", "Description", "Type", "Added", "By"]}
-          rows={profile.diagnoses.map((d) => [
-            <span key="c" className="font-mono text-icm-text">{d.code}</span>,
-            d.description,
-            d.primary ? (
-              <span className="px-1.5 py-0.5 rounded bg-icm-accent-soft text-icm-accent text-[10px] font-mono font-semibold">Primary</span>
-            ) : (
-              <span className="text-icm-text-dim text-[11px]">Secondary</span>
-            ),
-            d.addedOn,
-            d.addedBy,
-          ])}
-          emptyText="No diagnoses recorded. Primary diagnosis is required for Care Plan."
-          addLabel="Add diagnosis"
-          onAdd={() => demoToast("Add diagnosis")}
-        />
-      </Section>
-
-      <Section title="Medications">
-        <DataTable
-          columns={["Name", "Dosage", "Frequency", "Prescriber", "Start", "Status"]}
-          rows={profile.medications.map((m) => [
-            <span key="n" className="font-semibold">{m.name}</span>,
-            m.dosage,
-            m.frequency,
-            m.prescriber,
-            m.startDate,
-            <MedStatusBadge key="s" status={m.status} />,
-          ])}
-          emptyText="No medications recorded."
-          addLabel="Add medication"
-          onAdd={() => demoToast("Add medication")}
-        />
-        <p className="text-[11px] text-icm-text-faint mt-2 font-geist">
-          Medication records here are reference only. Administration is managed in the eMAR module.
-        </p>
-      </Section>
-
-      <Section title="Allergies">
-        <DataTable
-          columns={["Allergen", "Reaction", "Severity", "Identified"]}
-          rows={profile.allergies.map((a) => [
-            <span key="a" className="font-semibold">{a.allergen}</span>,
-            a.reaction,
-            <SeverityBadge key="s" severity={a.severity} />,
-            a.identifiedOn,
-          ])}
-          emptyText="No allergies recorded."
-          addLabel="Add allergy"
-          onAdd={() => demoToast("Add allergy")}
-        />
-      </Section>
+      <MedicalTab
+        individualId={person.id}
+        individualName={`${person.first_name} ${person.last_name}`}
+      />
 
       <Section title="Health Screenings" onSave={async (data) => {
         await updateIndividual(person.id, {

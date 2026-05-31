@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { AuthorCell } from "@/components/icm/AuthorCell";
 import { useAuth } from "@/contexts/AuthContext";
 import { OrgPrintHeader } from "@/components/icm/OrgPrintHeader";
+import { useDiagnoses, useMedications, useAllergies } from "@/hooks/useMedicalRecords";
 
 const PersonFaceSheet = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +43,17 @@ const PersonFaceSheet = () => {
   const { data: serviceAuths } = useServiceAuthorizations(id);
   const { data: eligVerifs } = useEligibilityVerifications(id);
   const { data: referrals }  = useReferrals(id);
+
+  const { diagnoses: fsDiagnoses } = useDiagnoses(id);
+  const { medications: fsMedications } = useMedications(id);
+  const { allergies: fsAllergies } = useAllergies(id);
+
+  const fsSevereAllergies = fsAllergies.filter(
+    (a) => a.severity === "severe" || a.severity === "life-threatening"
+  );
+  const fsPrimaryDiagnosis = fsDiagnoses.find((d) => d.diagnosis_type === "primary");
+  const fsSecondaryDiagnoses = fsDiagnoses.filter((d) => d.diagnosis_type === "secondary");
+  const fsActiveMeds = fsMedications.filter((m) => m.is_active);
 
   const age            = individual ? calcAge(individual.dob) : null;
   const riskClass      = individual ? riskAvatarClass(individual.risk_score) : "";
@@ -193,6 +205,23 @@ const PersonFaceSheet = () => {
               <p className="text-[10px] text-icm-text-faint font-mono">ID #{individual.id.slice(0, 8)}</p>
             </div>
           </header>
+
+          {/* ── Allergy Alert ───────────────────────────────────────────── */}
+          {fsSevereAllergies.length > 0 && (
+            <div className="rounded-xl border border-red-300 bg-red-50 p-4 mt-5">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-red-800 text-[13px]">ALLERGY ALERT</p>
+                  {fsSevereAllergies.map((a) => (
+                    <p key={a.id} className="text-red-700 text-[12px] mt-0.5">
+                      <span className="font-bold">{a.allergen}</span> ({a.severity}) — {a.reaction}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── High Risk Alert ─────────────────────────────────────────── */}
           {highRisk && (
@@ -426,7 +455,21 @@ const PersonFaceSheet = () => {
           {/* ── Section 5: Clinical / Medical ───────────────────────────── */}
           <Section icon={<HeartPulse className="w-3.5 h-3.5" />} title="Clinical Information">
             <SubHeading>Diagnoses</SubHeading>
-            {(individual.primary_diagnosis ?? individual.diagnosis) ? (
+            {fsPrimaryDiagnosis ? (
+              <div className="rounded-lg border border-icm-border bg-icm-bg/40 p-2.5 mb-2 space-y-1">
+                <div>
+                  <span className="text-[10px] font-mono font-semibold text-icm-text-faint uppercase tracking-wider">Primary — </span>
+                  <span className="text-[11px] font-mono text-icm-accent">{fsPrimaryDiagnosis.icd10_code}</span>
+                  <span className="text-[12.5px] text-icm-text ml-1.5">{fsPrimaryDiagnosis.icd10_description}</span>
+                </div>
+                {fsSecondaryDiagnoses.length > 0 && (
+                  <p className="text-[11px] text-icm-text-dim">
+                    + {fsSecondaryDiagnoses.length} secondary{" "}
+                    {fsSecondaryDiagnoses.length === 1 ? "diagnosis" : "diagnoses"}
+                  </p>
+                )}
+              </div>
+            ) : (individual.primary_diagnosis ?? individual.diagnosis) ? (
               <div className="rounded-lg border border-icm-border bg-icm-bg/40 p-2.5 mb-2 space-y-1">
                 <div>
                   <span className="text-[10px] font-mono font-semibold text-icm-text-faint uppercase tracking-wider">Primary — </span>
@@ -443,11 +486,53 @@ const PersonFaceSheet = () => {
                 )}
               </div>
             ) : (
-              <Empty>No diagnosis on file.</Empty>
+              <p className="text-[11.5px] text-amber-700 font-geist">No primary diagnosis recorded.</p>
+            )}
+
+            <SubHeading>Medications</SubHeading>
+            {fsActiveMeds.length > 0 ? (
+              <div className="space-y-1 mb-2">
+                {fsActiveMeds.slice(0, 5).map((m) => (
+                  <p key={m.id} className="text-[12px] font-geist text-icm-text">
+                    <span className="font-semibold">{m.medication_name}</span>
+                    {m.brand_name ? ` (${m.brand_name})` : ""}{" "}
+                    {m.dosage} — {m.frequency}
+                  </p>
+                ))}
+                {fsActiveMeds.length > 5 && (
+                  <p className="text-[11.5px] text-icm-accent font-geist">
+                    + {fsActiveMeds.length - 5} more medications
+                  </p>
+                )}
+              </div>
+            ) : individual.medications ? (
+              <p className="text-[12px] text-icm-text font-geist mb-2">{individual.medications}</p>
+            ) : (
+              <Empty>No current medications</Empty>
+            )}
+
+            <SubHeading>Allergies</SubHeading>
+            {fsAllergies.length > 0 ? (
+              <div className="space-y-1 mb-3">
+                {fsAllergies.map((a) => (
+                  <div key={a.id} className="flex items-center gap-2">
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      a.severity === "life-threatening" ? "bg-red-100 text-red-700" :
+                      a.severity === "severe"           ? "bg-orange-100 text-orange-700" :
+                      a.severity === "moderate"         ? "bg-amber-100 text-amber-700" :
+                                                          "bg-gray-100 text-gray-600"
+                    }`}>{a.severity.toUpperCase()}</span>
+                    <span className="text-[12px] text-icm-text">{a.allergen}: {a.reaction}</span>
+                  </div>
+                ))}
+              </div>
+            ) : individual.allergies ? (
+              <p className="text-[12px] text-icm-text font-geist mb-3">{individual.allergies}</p>
+            ) : (
+              <p className="text-[12px] text-green-700 font-geist mb-3">No known allergies</p>
             )}
 
             <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1.5">
-              <Row label="Allergies"         value={individual.allergies ?? individual.allergies ?? "—"} />
               <Row label="Primary Physician" value={individual.primary_physician_name ?? "—"} />
               <Row
                 label="Physician Phone"

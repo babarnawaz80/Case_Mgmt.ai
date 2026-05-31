@@ -26,6 +26,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useIndividuals } from "@/hooks/useIndividuals";
+import { COMMON_MEDICATIONS } from "@/data/medicalLookups";
 import { saveProgressNote } from "@/hooks/useProgressNotes";
 import { createTask } from "@/hooks/useTasks";
 import { audit } from "@/lib/auditService";
@@ -651,9 +652,38 @@ ${fullTranscript}`,
               try {
                 const parsed = JSON.parse(jsonMatch[0]);
                 const groups = buildExtractGroups(parsed);
+
+                // Detect medication mentions in narrative/transcript (unchecked by default)
+                const searchText = ((parsed.narrative ?? "") + " " + fullTranscript).toLowerCase();
+                const mentionedMeds = COMMON_MEDICATIONS.filter((med) =>
+                  searchText.includes(med.toLowerCase().split(" ")[0].toLowerCase())
+                ).slice(0, 3);
+                if (mentionedMeds.length > 0) {
+                  groups.push({
+                    id: "medical",
+                    title: "Medical Profile Updates",
+                    icon: ClipboardList,
+                    borderClass: "border-l-teal-500",
+                    bgClass: "bg-teal-50",
+                    destinationModule: "Medical Profile",
+                    items: mentionedMeds.map((med, i) => ({
+                      id: `medical_med_${i}`,
+                      label: "Medication mentioned in session",
+                      value: med,
+                      requiresConfirm: true,
+                    })),
+                  });
+                }
+
                 if (groups.length > 0) {
                   setExtractGroups(groups);
-                  setIncludedItems(new Set(groups.flatMap((g) => g.items.map((i) => i.id))));
+                  // Medical items are unchecked by default; all others are checked
+                  const defaultChecked = new Set(
+                    groups
+                      .filter((g) => g.id !== "medical")
+                      .flatMap((g) => g.items.map((i) => i.id))
+                  );
+                  setIncludedItems(defaultChecked);
                 }
                 if (parsed.narrative) {
                   setSessionNarrative(parsed.narrative);

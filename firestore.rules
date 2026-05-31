@@ -128,6 +128,32 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Medical subcollections — Diagnoses, Medications, Allergies (PHI)
+    // Case Managers can add/edit. Only Supervisors/Admins can soft-delete.
+    match /individuals/{id}/diagnoses/{diagnosisId} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isSupervisor();
+    }
+
+    match /individuals/{id}/medications/{medicationId} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isSupervisor();
+    }
+
+    match /individuals/{id}/allergies/{allergyId} {
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isCaseManager();
+      allow update: if isCaseManager();
+      allow delete: if isSupervisor();
+    }
+
     // ─── Clinical Collections (PHI) ───────────────────────────────────────────
     // Progress Notes
     match /progress_notes/{id} {

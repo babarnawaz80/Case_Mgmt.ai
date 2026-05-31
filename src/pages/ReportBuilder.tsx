@@ -22,7 +22,7 @@ import {
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { writeAudit as mockWriteAudit } from "@/data/supervisor";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { writeAudit } from "@/lib/auditService";
@@ -407,34 +407,55 @@ Return JSON:
     flash("Exported as Excel.");
   }
 
+  const [saving, setSaving] = useState(false);
+
   async function saveReport() {
-    if (!orgId) return;
+    if (!reportName.trim()) {
+      flash("Please enter a report name first.");
+      return;
+    }
+    if (!orgId) {
+      flash("Your profile is still loading — try again in a moment.");
+      return;
+    }
+    setSaving(true);
     try {
       await addDoc(collection(db, "reports"), {
         title: reportName,
         name: reportName,
         type: "ai",
+        prompt,
         content: JSON.stringify({
           selectedFields,
           filters,
           groupBy,
         }),
-        description: `Custom AI report with ${filters.length} filters and ${selectedFields.length} fields.`,
+        selectedFields,
+        filters,
+        groupBy,
+        roleAccess,
+        published,
+        rows: filteredRows.length,
+        description:
+          prompt.trim().slice(0, 140) ||
+          `Custom AI report with ${filters.length} filters and ${selectedFields.length} fields.`,
         category: "Compliance",
         lastRun: "Just now",
-        createdBy: currentUser?.email || "Admin",
+        starred: false,
+        format: "XLSX",
+        createdBy: currentUser?.displayName || currentUser?.email || "You",
         generatedBy: currentUser?.uid || "unknown",
         organizationId: orgId,
         createdAt: serverTimestamp(),
       });
 
-      await writeAudit("draft_saved", "report", "new_report", {
-        reportName,
-      });
+      try {
+        await writeAudit("draft_saved", "report", "new_report", { reportName });
+      } catch { /* audit is non-critical */ }
 
       mockWriteAudit({
         ts: new Date().toISOString(),
-        actor: "Admin (Jordan Reeves)",
+        actor: currentUser?.email || "User",
         action: "report.save",
         report: reportName,
         fields: selectedFields.length,
@@ -443,10 +464,19 @@ Return JSON:
         roleAccess,
       });
 
-      flash("Report saved to My Reports.");
+      flash("Report saved — opening My Reports…");
+      // Navigate back so the user immediately sees the new report in the list
+      setTimeout(() => navigate("/reports"), 700);
     } catch (err: any) {
       console.error("Failed to save report:", err);
-      flash("Failed to save report.");
+      const msg = err?.message ?? String(err);
+      if (msg.includes("permission") || msg.includes("PERMISSION_DENIED")) {
+        flash("Permission denied saving report — contact your administrator.");
+      } else {
+        flash(`Failed to save report: ${msg.slice(0, 80)}`);
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -503,9 +533,13 @@ Return JSON:
           <div className="flex items-center gap-2">
             <button
               onClick={saveReport}
-              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5"
+              disabled={saving}
+              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Save className="w-3.5 h-3.5" /> Save report
+              {saving
+                ? <span className="w-3.5 h-3.5 border-2 border-icm-text-dim/40 border-t-icm-text-dim rounded-full animate-spin" />
+                : <Save className="w-3.5 h-3.5" />}
+              Save report
             </button>
             <button
               onClick={() => setScheduleOpen(true)}

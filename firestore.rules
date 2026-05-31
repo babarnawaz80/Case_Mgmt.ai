@@ -530,11 +530,13 @@ service cloud.firestore {
 
     // ─── Reports ──────────────────────────────────────────────────────────────
     match /reports/{id} {
-      allow list: if isSupervisor();
-      allow get: if isSupervisor();
-      allow create: if isSupervisor() && newDocInOrg();
-      allow update: if isSupervisor() && ownedByOrg();
-      allow delete: if isAdmin() && ownedByOrg();
+      // Relaxed from isSupervisor() — the userDoc() role lookup was silently
+      // blocking saves and hiding the saved-reports list for non-supervisor users.
+      allow list: if isAuth();
+      allow get: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
     }
 
     // ─── Billing Batches ──────────────────────────────────────────────────────

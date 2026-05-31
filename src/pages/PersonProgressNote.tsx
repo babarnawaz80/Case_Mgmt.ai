@@ -119,12 +119,6 @@ const PersonProgressNote = () => {
             <button onClick={newNote} className="h-9 px-3 rounded-xl bg-icm-text text-icm-panel text-[12px] font-geist font-medium hover:opacity-90 inline-flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" /> Add Note
             </button>
-            <button
-              onClick={() => navigate(`/people/${id}/progress-note/new?from=ambient`)}
-              className="h-9 px-3 rounded-xl border border-icm-border bg-icm-panel text-[12px] font-geist font-medium text-icm-text-dim hover:bg-icm-bg inline-flex items-center gap-1.5"
-            >
-              <Mic className="w-3.5 h-3.5" /> Draft from ambient session
-            </button>
           </div>
         </div>
 

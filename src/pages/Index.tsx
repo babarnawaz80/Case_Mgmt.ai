@@ -275,7 +275,7 @@ const Index = () => {
     setActiveIndividualId(p.id);
     // The InlineIndividualSnapshot component handles all fetching + animation internally
     setThread([
-      { role: "user", text: `Individual Snapshot for ${p.first_name} ${p.last_name}` },
+      { role: "user", text: `Person Snapshot for ${p.first_name} ${p.last_name}` },
       { role: "ai", snapshotPersonId: p.id },
     ]);
   }
@@ -957,7 +957,7 @@ const Index = () => {
                     handleSend();
                   }
                 }}
-                placeholder="Ask about individuals, start documentation, or review cases..."
+                placeholder="Ask about people, start documentation, or review cases..."
                 className="w-full bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm min-h-[44px] max-h-[120px]"
                 rows={2}
               />
@@ -1140,7 +1140,7 @@ const Index = () => {
                     className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-medium shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-px transition-all"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    Individual Snapshot
+                    Person Snapshot
                   </button>
                   {snapshotPickerOpen && (
                     <div className="absolute bottom-full right-0 mb-2 w-72 rounded-xl bg-popover border border-border shadow-xl overflow-hidden z-50">

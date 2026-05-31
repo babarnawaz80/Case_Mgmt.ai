@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
 import { PersonAvatar } from "@/components/icm/PersonAvatar";
@@ -35,10 +35,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePendingDuplicatePairs } from "@/hooks/useDuplicatePairs";
 
 type StatusFilter = "All" | "Active" | "Transition" | "Discharged" | "Pending" | "Possible Duplicate";
-type RiskFilter = "All" | "High" | "Review" | "Standard";
+type RiskFilter = "All" | "Attention" | "High" | "Review" | "Standard";
 
 const PeopleSupported = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { userProfile } = useAuth();
   const { individuals, loading, error } = useIndividuals();
   const { openDrawer } = useRiskScore();
@@ -61,7 +62,14 @@ const PeopleSupported = () => {
     });
     return map;
   }, [pendingPairs]);
-  const [risk, setRisk] = useState<RiskFilter>("All");
+  // Initialize from URL (?risk=Attention|High|Review|Standard) so dashboard
+  // cards can deep-link into a pre-filtered watchlist.
+  const initialRisk = ((): RiskFilter => {
+    const r = searchParams.get("risk");
+    if (r === "Attention" || r === "High" || r === "Review" || r === "Standard") return r;
+    return "All";
+  })();
+  const [risk, setRisk] = useState<RiskFilter>(initialRisk);
   const [county, setCounty] = useState("All");
   const [selectedState, setSelectedState] = useState("All");
   const [showImport, setShowImport] = useState(false);
@@ -150,6 +158,7 @@ const PeopleSupported = () => {
       const score = computedScores[p.id] ?? p.risk_score ?? 0;
       const matchRisk =
         risk === "All" ||
+        (risk === "Attention" && score >= 35) ||
         (risk === "High" && score >= 60) ||
         (risk === "Review" && score >= 35 && score < 60) ||
         (risk === "Standard" && score < 35);
@@ -242,7 +251,7 @@ const PeopleSupported = () => {
           <FilterSelect
             value={risk}
             onChange={(v) => setRisk(v as RiskFilter)}
-            options={["All", "High", "Review", "Standard"]}
+            options={["All", "Attention", "High", "Review", "Standard"]}
             label="Compliance Risk"
           />
           <FilterSelect value={county} onChange={setCounty} options={counties} label="County" />

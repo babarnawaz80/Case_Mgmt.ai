@@ -202,6 +202,9 @@ async function geminiProxy(req, res) {
                     systemInstruction: fullSystemPrompt,
                     maxOutputTokens: resolvedMaxTokens,
                     temperature: resolvedTemperature,
+                    // Disable thinking so the token budget produces visible output, not
+                    // internal reasoning that returns an empty response.
+                    thinkingConfig: { thinkingBudget: 0 },
                 },
             });
             const text = (_b = response.text) !== null && _b !== void 0 ? _b : "";

@@ -119,6 +119,12 @@ export async function generateCompletion(
         systemInstruction: systemPrompt,
         maxOutputTokens: maxTokens,
         temperature,
+        // gemini-2.5-flash enables "thinking" by default, which silently spends
+        // the entire maxOutputTokens budget on internal reasoning and returns an
+        // EMPTY response (finishReason: MAX_TOKENS). These are direct
+        // documentation / chat tasks — no extended reasoning needed — so disable
+        // thinking to guarantee the model spends its budget on the visible answer.
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
@@ -126,7 +132,12 @@ export async function generateCompletion(
     const inputTokens: number  = response.usageMetadata?.promptTokenCount     ?? 0;
     const outputTokens: number = response.usageMetadata?.candidatesTokenCount ?? 0;
 
-    console.log(`[AI] OK — model=${modelId} in=${inputTokens} out=${outputTokens}`);
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (!text) {
+      console.warn(`[AI] EMPTY text — model=${modelId} finishReason=${finishReason} in=${inputTokens} out=${outputTokens}`);
+    } else {
+      console.log(`[AI] OK — model=${modelId} in=${inputTokens} out=${outputTokens}`);
+    }
     return { text, inputTokens, outputTokens };
   } catch (err: any) {
     console.error("[AI] Gemini call failed:", err.message);
@@ -159,6 +170,9 @@ export async function* streamCompletion(
       systemInstruction: systemPrompt,
       maxOutputTokens: 2048,
       temperature: 0.7,
+      // Disable thinking — streaming chat should emit visible tokens immediately,
+      // not consume the budget on internal reasoning.
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 

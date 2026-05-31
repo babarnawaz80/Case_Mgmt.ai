@@ -29,6 +29,17 @@ const COUNTY_STATE_MAP: Record<string, string> = {
 // Known NJ last names / first names for heuristic assignment
 const NJ_HINTS = ["Dwight", "Doe"];
 
+// Canonicalize any state variant ("IN", "in", "Indiana") to a single full name.
+const STATE_CANONICAL: Record<string, string> = {
+  "IN": "Indiana", "in": "Indiana", "indiana": "Indiana",
+  "NJ": "New Jersey", "nj": "New Jersey", "new jersey": "New Jersey",
+  "CA": "California", "TX": "Texas", "OH": "Ohio", "IL": "Illinois",
+};
+function canonicalize(raw: string): string {
+  const s = raw.trim();
+  return STATE_CANONICAL[s] ?? STATE_CANONICAL[s.toLowerCase()] ?? s;
+}
+
 export const migrateIndividualStates = onCall(
   { cors: true, memory: "512MiB", timeoutSeconds: 300 },
   async (request) => {
@@ -37,6 +48,7 @@ export const migrateIndividualStates = onCall(
     const db = admin.firestore();
     const batch = db.batch();
     let updated = 0;
+    let normalized = 0;
     let skipped = 0;
 
     // Get all individuals across all orgs (limit 500 for safety)
@@ -46,8 +58,20 @@ export const migrateIndividualStates = onCall(
       const data = d.data();
       const existing = data.address_state;
 
-      // Already has a valid state — skip
-      if (existing && existing.trim()) { skipped++; continue; }
+      // Already has a value — canonicalize it ("IN" → "Indiana") if needed.
+      if (existing && existing.trim()) {
+        const canonical = canonicalize(existing);
+        if (canonical !== existing.trim()) {
+          batch.update(d.ref, {
+            address_state: canonical,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          normalized++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
 
       // Try to infer state from county
       let assignedState: string | null = null;
@@ -91,6 +115,7 @@ export const migrateIndividualStates = onCall(
     return {
       success: true,
       individualsUpdated: updated,
+      individualsNormalized: normalized,
       individualsSkipped: skipped,
       authorizationsSeeded: authSeeded,
     };

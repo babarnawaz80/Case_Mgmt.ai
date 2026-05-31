@@ -50,33 +50,58 @@ export async function seedAssessmentsIfEmpty(
       });
     }
 
-    // ── 2. Find Valentina Cruz's individual ID ────────────────────────────────
-    const valentinasSnap = await getDocs(
+    // ── 2. Pick the demo individual ───────────────────────────────────────────
+    // The rest of the demo (Guardian Portal, Team Meetings, Care Plan approval)
+    // seeds against John Smith — or the first individual in the org if he isn't
+    // present. Match that here so the demo individual's Assessments tile is
+    // populated like every other module. (The old code targeted "Valentina
+    // Cruz", who is only created by a manual console-only function and never
+    // exists in the standard demo org — so no assessment was ever seeded.)
+    let targetDoc: { id: string; data: () => any } | null = null;
+
+    const johnSnap = await getDocs(
       query(
         collection(db, "individuals"),
-        where("first_name", "==", "Valentina"),
+        where("first_name", "==", "John"),
+        where("last_name", "==", "Smith"),
         where("organizationId", "==", orgId),
         limit(1)
       )
     );
+    if (!johnSnap.empty) {
+      targetDoc = johnSnap.docs[0];
+    } else {
+      // Fall back to the first individual in the org
+      const anySnap = await getDocs(
+        query(
+          collection(db, "individuals"),
+          where("organizationId", "==", orgId),
+          limit(1)
+        )
+      );
+      if (!anySnap.empty) targetDoc = anySnap.docs[0];
+    }
 
-    if (!valentinasSnap.empty) {
-      const valentina = valentinasSnap.docs[0];
-      const valId = valentina.id;
+    if (targetDoc) {
+      const targetId = targetDoc.id;
+      const targetData = targetDoc.data();
+      const firstName = targetData.first_name ?? "Individual";
 
-      // Check if Valentina has any assessments
-      const valAssessmentSnap = await getDocs(
+      // Check if the target individual already has any assessments
+      const existingAssessmentSnap = await getDocs(
         query(
           collection(db, "assessments"),
-          where("individual_id", "==", valId),
+          where("individual_id", "==", targetId),
           limit(1)
         )
       );
 
-      if (valAssessmentSnap.empty) {
-        // Seed one completed assessment for Valentina
+      if (existingAssessmentSnap.empty) {
+        // Seed one completed assessment for the demo individual
         await addDoc(collection(db, "assessments"), {
-          individual_id: valId,
+          individual_id: targetId,
+          individualId: targetId,
+          individualName: `${targetData.last_name ?? ""}, ${firstName}`.trim(),
           templateId: "tpl-comp-initial",
           templateVersion: "v2.0",
           date: "01/15/2026",
@@ -86,8 +111,8 @@ export async function seedAssessmentsIfEmpty(
           loc: "Moderate",
           organizationId: orgId,
           answers: [
-            { questionId: "q-name", value: "Valentina" },
-            { questionId: "q-lang", value: "Spanish" },
+            { questionId: "q-name", value: firstName },
+            { questionId: "q-lang", value: "English" },
             { questionId: "q-adl-bath", value: "Supervision" },
             { questionId: "q-adl-dress", value: "Modified Independent" },
             { questionId: "q-adl-eat", value: "Independent" },

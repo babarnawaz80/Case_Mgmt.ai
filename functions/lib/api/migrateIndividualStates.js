@@ -61,21 +61,43 @@ const COUNTY_STATE_MAP = {
 };
 // Known NJ last names / first names for heuristic assignment
 const NJ_HINTS = ["Dwight", "Doe"];
+// Canonicalize any state variant ("IN", "in", "Indiana") to a single full name.
+const STATE_CANONICAL = {
+    "IN": "Indiana", "in": "Indiana", "indiana": "Indiana",
+    "NJ": "New Jersey", "nj": "New Jersey", "new jersey": "New Jersey",
+    "CA": "California", "TX": "Texas", "OH": "Ohio", "IL": "Illinois",
+};
+function canonicalize(raw) {
+    var _a, _b;
+    const s = raw.trim();
+    return (_b = (_a = STATE_CANONICAL[s]) !== null && _a !== void 0 ? _a : STATE_CANONICAL[s.toLowerCase()]) !== null && _b !== void 0 ? _b : s;
+}
 exports.migrateIndividualStates = (0, https_1.onCall)({ cors: true, memory: "512MiB", timeoutSeconds: 300 }, async (request) => {
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Must be authenticated.");
     const db = admin.firestore();
     const batch = db.batch();
     let updated = 0;
+    let normalized = 0;
     let skipped = 0;
     // Get all individuals across all orgs (limit 500 for safety)
     const snap = await db.collection("individuals").limit(500).get();
     for (const d of snap.docs) {
         const data = d.data();
         const existing = data.address_state;
-        // Already has a valid state — skip
+        // Already has a value — canonicalize it ("IN" → "Indiana") if needed.
         if (existing && existing.trim()) {
-            skipped++;
+            const canonical = canonicalize(existing);
+            if (canonical !== existing.trim()) {
+                batch.update(d.ref, {
+                    address_state: canonical,
+                    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                normalized++;
+            }
+            else {
+                skipped++;
+            }
             continue;
         }
         // Try to infer state from county
@@ -114,6 +136,7 @@ exports.migrateIndividualStates = (0, https_1.onCall)({ cors: true, memory: "512
     return {
         success: true,
         individualsUpdated: updated,
+        individualsNormalized: normalized,
         individualsSkipped: skipped,
         authorizationsSeeded: authSeeded,
     };

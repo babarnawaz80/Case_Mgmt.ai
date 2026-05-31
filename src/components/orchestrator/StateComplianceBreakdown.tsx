@@ -3,21 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Individual } from "@/hooks/useIndividuals";
-import { getDocs, query, collection, where, orderBy, limit } from "firebase/firestore";
+import { getDocs, query, collection, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { canonicalState, stateDisplayLabel } from "@/lib/stateUtils";
 
-// ─── State name helpers ───────────────────────────────────────────────────────
-
-const STATE_DISPLAY: Record<string, string> = {
-  "Indiana":    "Indiana (IN)",
-  "IN":         "Indiana (IN)",
-  "New Jersey": "New Jersey (NJ)",
-  "NJ":         "New Jersey (NJ)",
-};
-
-/** Returns a display label for a raw state value */
-function stateLabel(raw: string): string {
-  return STATE_DISPLAY[raw] ?? raw;
+/** Returns a display label for a canonical state value */
+function stateLabel(canonical: string): string {
+  return stateDisplayLabel(canonical);
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,10 +35,9 @@ export function StateComplianceBreakdown({ individuals, selectedState }: Props) 
   const navigate = useNavigate();
   const [engines, setEngines] = useState<Record<string, { name: string; id: string } | null | "loading">>({});
 
-  // Resolve individual's state field (supports both address_state and state)
+  // Resolve individual's state field, canonicalized ("IN"/"Indiana" → "Indiana")
   function indState(ind: Individual): string | null {
-    const s = (ind as any).address_state || (ind as any).state;
-    return s && s.trim() ? s.trim() : null;
+    return canonicalState((ind as any).address_state || (ind as any).state);
   }
 
   // Count individuals with NO valid state
@@ -113,22 +104,31 @@ export function StateComplianceBreakdown({ individuals, selectedState }: Props) 
       const newEngines: Record<string, { name: string; id: string } | null> = {};
       for (const state of states) {
         try {
-          // Primary query: match by state + published status, newest first
-          const snap = await getDocs(
-            query(
-              collection(db, "guidelines_engines"),
-              where("state", "==", state),
-              where("status", "==", "published"),
-              orderBy("effectiveDate", "desc"),
-              limit(1)
-            )
-          );
-          if (!snap.empty) {
-            const d = snap.docs[0];
-            newEngines[state] = { name: d.data().name ?? state, id: d.id };
-          } else {
-            newEngines[state] = null;
+          // Engines may be stored under the full name ("Indiana") OR the
+          // abbreviation ("IN"). Try both. No orderBy (avoids composite-index
+          // requirement) — we sort newest-first client-side instead.
+          const abbrMap: Record<string, string> = { "Indiana": "IN", "New Jersey": "NJ" };
+          const candidates = [state, abbrMap[state]].filter(Boolean) as string[];
+
+          let found: { name: string; id: string } | null = null;
+          for (const candidate of candidates) {
+            const snap = await getDocs(
+              query(
+                collection(db, "guidelines_engines"),
+                where("state", "==", candidate),
+                where("status", "==", "published")
+              )
+            );
+            if (!snap.empty) {
+              // Pick the most recent by effectiveDate (client-side sort)
+              const docs = snap.docs
+                .map(d => ({ id: d.id, ...(d.data() as any) }))
+                .sort((a, b) => String(b.effectiveDate ?? "").localeCompare(String(a.effectiveDate ?? "")));
+              found = { name: docs[0].name ?? candidate, id: docs[0].id };
+              break;
+            }
           }
+          newEngines[state] = found;
         } catch {
           newEngines[state] = null;
         }

@@ -15,7 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useIndividual } from "@/hooks/useIndividuals";
+import { useIndividual, riskAvatarClass, initials } from "@/hooks/useIndividuals";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, addDoc, updateDoc, collection, serverTimestamp } from "firebase/firestore";
@@ -31,6 +31,57 @@ import {
   assessments,
   getTemplate,
 } from "@/data/assessments";
+
+/**
+ * Pre-fill demographic-type questions from the individual's record so the case
+ * manager isn't re-entering known identity data (name, DOB, language, etc.)
+ * when they start an assessment from the person's chart. Matches by question
+ * label keywords. Returns labeled (aiSuggested) answers — editable like any
+ * other pre-fill.
+ */
+function buildDemographicPrefill(
+  template: AssessmentTemplate,
+  ind: any,
+): AssessmentAnswer[] {
+  if (!ind) return [];
+  const fullName = `${ind.first_name ?? ""} ${ind.last_name ?? ""}`.trim();
+  const out: AssessmentAnswer[] = [];
+
+  for (const sec of template.sections) {
+    for (const q of sec.questions) {
+      if (["section_header", "divider", "instructions"].includes(q.type)) continue;
+      const label = (q.label || "").toLowerCase();
+      let value: AssessmentAnswer["value"] | undefined;
+
+      if (label.includes("preferred name")) {
+        value = (ind.preferred_name && String(ind.preferred_name).trim()) || fullName;
+      } else if (label.includes("first name")) {
+        value = ind.first_name;
+      } else if (label.includes("last name")) {
+        value = ind.last_name;
+      } else if (label === "name" || label.includes("legal name") || label.includes("full name")) {
+        value = fullName;
+      } else if (label.includes("date of birth") || label.includes("dob") || label.includes("birth date") || label.includes("birthdate")) {
+        value = ind.dob || ind.date_of_birth || undefined;
+      } else if (label.includes("language")) {
+        value = ind.primary_language || ind.primaryLanguage || "English";
+      } else if (label.includes("gender") || label.includes("sex")) {
+        value = ind.gender || undefined;
+      } else if (label.includes("county")) {
+        value = ind.county || undefined;
+      } else if (label.includes("medicaid") || label.includes("ma id") || label.includes("ma number")) {
+        value = ind.medicaid_id || undefined;
+      } else if (label.includes("race") || label.includes("ethnicity")) {
+        value = ind.race_ethnicity || undefined;
+      }
+
+      if (value != null && value !== "") {
+        out.push({ questionId: q.id, value, aiSuggested: true, aiSource: "Individual profile" } as AssessmentAnswer);
+      }
+    }
+  }
+  return out;
+}
 
 export default function PersonAssessmentForm() {
   // Note: when used as a lead assessment (/leads/:leadId/assessments/new),
@@ -75,9 +126,24 @@ export default function PersonAssessmentForm() {
 
   const initialAnswers: AssessmentAnswer[] = useMemo(() => {
     if (existing) return existing.answers;
-    if (template && usePrefill) return aiPrefillFor(template.id, id ?? "");
-    return [];
-  }, [existing, template, usePrefill, id]);
+    if (!template) return [];
+
+    // Always start from demographic data already on the individual's record so
+    // the case manager doesn't re-enter the person's identity from scratch.
+    const base: AssessmentAnswer[] = individual
+      ? buildDemographicPrefill(template, individual)
+      : [];
+
+    // Layer AI pre-fill on top (overrides demographics for the same question).
+    if (usePrefill) {
+      for (const a of aiPrefillFor(template.id, id ?? "")) {
+        const idx = base.findIndex((b) => b.questionId === a.questionId);
+        if (idx >= 0) base[idx] = a;
+        else base.push(a);
+      }
+    }
+    return base;
+  }, [existing, template, usePrefill, id, individual]);
 
   const [answers, setAnswers] = useState<AssessmentAnswer[]>(initialAnswers);
 
@@ -498,6 +564,31 @@ export default function PersonAssessmentForm() {
           </>
         )}
       </div>
+      {/* Individual identity card — makes it unmistakable whose assessment this is */}
+      {individual && (
+        <div className="max-w-[1200px] mx-auto px-6 pt-4">
+          <div className="rounded-xl border border-icm-border bg-icm-panel p-3 flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-xl border flex items-center justify-center font-mono text-[13px] font-bold ${riskAvatarClass(individual.risk_score)}`}>
+              {initials(individual)}
+            </div>
+            <div className="min-w-0">
+              <p className="font-manrope font-extrabold text-[15px] text-icm-text leading-tight">
+                {individual.last_name}, {individual.first_name}
+                {individual.preferred_name ? (
+                  <span className="font-medium text-icm-text-dim"> ({individual.preferred_name})</span>
+                ) : null}
+              </p>
+              <p className="text-[11.5px] font-mono text-icm-text-dim mt-0.5">
+                {[
+                  individual.gender,
+                  individual.county ? `${individual.county} County` : null,
+                  `ID #${individual.id.slice(0, 8)}`,
+                ].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       {consentBlocked && (
         <div className="mx-4 mt-3 rounded-xl border border-icm-amber/40 bg-icm-amber-soft px-4 py-3 flex items-center gap-2.5">
           <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0" />

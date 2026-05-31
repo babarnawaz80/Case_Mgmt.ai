@@ -8,7 +8,8 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIndividuals, riskTier, riskAvatarClass, initials } from "@/hooks/useIndividuals";
+import { useIndividuals, riskAvatarClass, initials, statusLabel } from "@/hooks/useIndividuals";
+import { calculateRiskScore, loadRiskSettings } from "@/lib/riskEngine";
 import { useIncidentSummary } from "@/hooks/useIncidents";
 import { useTasks, completeTask } from "@/hooks/useTasks";
 import type { Task } from "@/hooks/useTasks";
@@ -300,9 +301,26 @@ function HeroRow() {
   const { individuals } = useIndividuals();
   const census = individuals.length;
   const activeCensus = individuals.filter((p) => p.enrollment_status === "active").length;
-  const highRisk = individuals.filter((p) => riskTier(p.risk_score) === "high").length;
-  const reviewRisk = individuals.filter((p) => riskTier(p.risk_score) === "review").length;
+
+  // Use the SAME computed risk score the People page uses (calculateRiskScore),
+  // and count only the active (non-discharged) caseload — so the dashboard
+  // numbers always match what "View Watchlist" actually shows.
+  const riskSettings = useMemo(() => loadRiskSettings(), []);
+  const activeIndividuals = useMemo(
+    () => individuals.filter((p) => statusLabel(p.enrollment_status) !== "Discharged"),
+    [individuals],
+  );
+  const { highRisk, reviewRisk } = useMemo(() => {
+    let high = 0, review = 0;
+    activeIndividuals.forEach((p) => {
+      const score = calculateRiskScore(p.id, riskSettings, p.risk_score).total;
+      if (score >= 60) high += 1;
+      else if (score >= 35) review += 1;
+    });
+    return { highRisk: high, reviewRisk: review };
+  }, [activeIndividuals, riskSettings]);
   const attentionCount = highRisk + reviewRisk;
+  const attentionDenominator = activeIndividuals.length;
   const incidentSummary = useIncidentSummary();
 
   // Card 3 — Billing (unchanged)
@@ -321,14 +339,14 @@ function HeroRow() {
   // Card 4 — People Needing Attention: amber, two-line breakdown
   const attention: HeroMeter = {
     label: "People Needing Attention",
-    value: census > 0 ? (attentionCount / census) * 100 : 0,
-    centerLabel: `${attentionCount}/${census}`,
+    value: attentionDenominator > 0 ? (attentionCount / attentionDenominator) * 100 : 0,
+    centerLabel: `${attentionCount}/${attentionDenominator}`,
     subLines: [
-      { color: "#f59e0b", text: `${highRisk} compliance risk` },
+      { color: "#f59e0b", text: `${highRisk} high risk` },
       { color: "#3b82f6", text: `${reviewRisk} need review` },
     ],
     icon: AlertTriangle,
-    to: "/people",
+    to: "/people?risk=Attention",
     cta: "View Watchlist",
     donutColor: "#f59e0b",
     bgFrom: "from-[hsl(38,100%,97%)]",
@@ -688,7 +706,7 @@ const ACTIONS: ActionTile[] = [
   { label: "Leads",            icon: Phone,          to: "/leads",                category: "Operations"               },
   { label: "Assigned Staff",   icon: UserCheck,      to: "/settings/users",       category: "Care",          count: 12 },
   { label: "Referrals",        icon: Phone,          to: "/referrals",            category: "Care"                     },
-  { label: "Team",             icon: Heart,          to: "/settings/users",       category: "Care"                     },
+  { label: "Team Meetings",    icon: Users,          to: "/team-meetings",        category: "Care"                     },
   { label: "Authorizations",   icon: FileCheck,      to: "/authorizations",       category: "Care"                     },
 ];
 

@@ -129,7 +129,7 @@ async function checkOrgAIAccess(organizationId) {
 }
 // ─── Non-streaming generation ─────────────────────────────────────────────────
 async function generateCompletion(systemPrompt, userPrompt, context, tier, organizationId, _userId, _feature, options = {}) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     await checkOrgAIAccess(organizationId);
     const modelId = MODELS[tier];
     const maxTokens = (_a = options.maxTokens) !== null && _a !== void 0 ? _a : 4096;
@@ -144,12 +144,24 @@ async function generateCompletion(systemPrompt, userPrompt, context, tier, organ
                 systemInstruction: systemPrompt,
                 maxOutputTokens: maxTokens,
                 temperature,
+                // gemini-2.5-flash enables "thinking" by default, which silently spends
+                // the entire maxOutputTokens budget on internal reasoning and returns an
+                // EMPTY response (finishReason: MAX_TOKENS). These are direct
+                // documentation / chat tasks — no extended reasoning needed — so disable
+                // thinking to guarantee the model spends its budget on the visible answer.
+                thinkingConfig: { thinkingBudget: 0 },
             },
         });
         const text = (_c = response.text) !== null && _c !== void 0 ? _c : "";
         const inputTokens = (_e = (_d = response.usageMetadata) === null || _d === void 0 ? void 0 : _d.promptTokenCount) !== null && _e !== void 0 ? _e : 0;
         const outputTokens = (_g = (_f = response.usageMetadata) === null || _f === void 0 ? void 0 : _f.candidatesTokenCount) !== null && _g !== void 0 ? _g : 0;
-        console.log(`[AI] OK — model=${modelId} in=${inputTokens} out=${outputTokens}`);
+        const finishReason = (_j = (_h = response.candidates) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.finishReason;
+        if (!text) {
+            console.warn(`[AI] EMPTY text — model=${modelId} finishReason=${finishReason} in=${inputTokens} out=${outputTokens}`);
+        }
+        else {
+            console.log(`[AI] OK — model=${modelId} in=${inputTokens} out=${outputTokens}`);
+        }
         return { text, inputTokens, outputTokens };
     }
     catch (err) {
@@ -174,6 +186,9 @@ function streamCompletion(systemPrompt, userPrompt, context, tier, organizationI
                 systemInstruction: systemPrompt,
                 maxOutputTokens: 2048,
                 temperature: 0.7,
+                // Disable thinking — streaming chat should emit visible tokens immediately,
+                // not consume the budget on internal reasoning.
+                thinkingConfig: { thinkingBudget: 0 },
             },
         }));
         try {

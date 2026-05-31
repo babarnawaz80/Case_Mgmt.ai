@@ -21,6 +21,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions as fns } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Database } from "lucide-react";
+import { individualState, stateDisplayLabel } from "@/lib/stateUtils";
 
 // ─── Tab config ────────────────────────────────────────────────────────────────
 
@@ -94,45 +95,26 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
     triggerRun,
   } = useOrchestrator();
 
-  // Friendly display names for states (full name → "Full Name (AB)")
-  const STATE_DISPLAY: Record<string, string> = {
-    "Indiana":      "Indiana (IN)",
-    "IN":           "Indiana (IN)",
-    "New Jersey":   "New Jersey (NJ)",
-    "NJ":           "New Jersey (NJ)",
-    "California":   "California (CA)",
-    "CA":           "California (CA)",
-    "Texas":        "Texas (TX)",
-    "TX":           "Texas (TX)",
-    "Ohio":         "Ohio (OH)",
-    "OH":           "Ohio (OH)",
-    "Illinois":     "Illinois (IL)",
-    "IL":           "Illinois (IL)",
-  };
-
-  // Derive available states from individuals (only known, non-null states)
+  // Derive available states from individuals — canonicalized so "IN" and
+  // "Indiana" collapse into a single bucket (no duplicate dropdown rows).
   const availableStates = useMemo(() => {
     const states = new Set<string>();
     individuals.forEach(ind => {
-      const s = (ind as any).address_state || (ind as any).state;
-      if (s && s.trim()) states.add(s.trim());
+      const s = individualState(ind);
+      if (s) states.add(s);
     });
     return [...states].sort();
   }, [individuals]);
 
-  // Count individuals with no state assigned
+  // Count individuals with no state assigned (canonicalized)
   const unassignedCount = useMemo(() =>
-    individuals.filter(ind => {
-      const s = (ind as any).address_state || (ind as any).state;
-      return !s || !s.trim();
-    }).length,
+    individuals.filter(ind => !individualState(ind)).length,
   [individuals]);
 
-  // Filter individuals by selected state
+  // Filter individuals by selected state (compare on canonical form)
   const filteredIndividuals = useMemo(() =>
     selectedState === "all" ? individuals : individuals.filter(ind => {
-      const s = (ind as any).address_state || (ind as any).state;
-      return s === selectedState;
+      return individualState(ind) === selectedState;
     }), [individuals, selectedState]);
 
   function handleTabChange(tab: TabId) {
@@ -184,7 +166,7 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
                 <option value="all">All States ({individuals.length} individuals)</option>
                 {availableStates.map(s => (
                   <option key={s} value={s}>
-                    {STATE_DISPLAY[s] ?? s} ({individuals.filter(i => ((i as any).address_state || (i as any).state) === s).length})
+                    {stateDisplayLabel(s)} ({individuals.filter(i => individualState(i) === s).length})
                   </option>
                 ))}
               </select>

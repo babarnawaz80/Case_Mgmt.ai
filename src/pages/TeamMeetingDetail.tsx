@@ -31,7 +31,8 @@ import {
 import { collection, onSnapshot, query, where, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-const AmbientListening = lazy(() => import("@/components/ambient/AmbientListening"));
+// Scribe = the same real Deepgram live-transcription flow used by the home page Scribe button.
+const ScribeFlow = lazy(() => import("@/components/ambient/AmbientFlowV2"));
 
 const FUNCTIONS_BASE = "https://us-central1-casemanagement-ai.cloudfunctions.net/api";
 
@@ -329,26 +330,20 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
 
   return (
     <>
-    {/* Ambient session full-screen overlay — mounts over entire screen */}
+    {/* Scribe session — the same real Deepgram live-transcription flow as the home page */}
     {showAmbient && (
-      <div className="fixed inset-0 z-50 bg-white overflow-auto">
-        <Suspense fallback={
-          <div className="flex items-center justify-center h-full gap-2 text-icm-text-dim">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <span className="text-[13px]">Loading ambient session…</span>
-          </div>
-        }>
-          <AmbientListening
-            individualName={meeting.individualName}
-            onBack={() => setShowAmbient(false)}
-            onTranscriptComplete={(text) => {
-              setShowAmbient(false);
-              // Auto-process the transcript — feeds directly into AI extraction
-              processTranscript(text, "ambient_recording");
-            }}
-          />
-        </Suspense>
-      </div>
+      <Suspense fallback={
+        <div className="fixed inset-0 z-50 bg-white flex items-center justify-center gap-2 text-icm-text-dim">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-[13px]">Loading scribe session…</span>
+        </div>
+      }>
+        <ScribeFlow
+          defaultIndividualId={meeting.individualId}
+          defaultIndividualName={meeting.individualName}
+          onClose={() => setShowAmbient(false)}
+        />
+      </Suspense>
     )}
 
     <div className="space-y-4">
@@ -379,15 +374,15 @@ function NoTranscriptState({ meeting, userProfile }: { meeting: TeamMeeting; use
         <div className={`rounded-xl border p-4 ${!consent ? "opacity-50" : "hover:border-icm-accent/40"} border-icm-border bg-icm-panel`}>
           <div className="flex items-center gap-2 mb-1.5">
             <Mic className="w-4 h-4 text-icm-accent" />
-            <span className="text-[12.5px] font-medium text-icm-text">Ambient Recording</span>
+            <span className="text-[12.5px] font-medium text-icm-text">Scribe</span>
           </div>
-          <p className="text-[11.5px] text-icm-text-dim mb-3">Start a live ambient session with real-time transcription.</p>
+          <p className="text-[11.5px] text-icm-text-dim mb-3">Turn on the AI Scribe to listen and transcribe the meeting live.</p>
           <button
             disabled={!consent}
             onClick={() => setShowAmbient(true)}
             className="text-[11.5px] px-3 py-1.5 rounded-md bg-icm-accent text-white hover:bg-icm-accent/90 disabled:opacity-40"
           >
-            Open Ambient Session
+            Start Scribe
           </button>
         </div>
 

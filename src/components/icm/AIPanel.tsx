@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { Sparkles, Send, Loader2, ChevronDown, X, RotateCcw, Copy, Check, Maximize2, Minimize2, Plus, MessageSquare, Trash2, Mic, MicOff, Volume2, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAIPanel } from "@/contexts/AIPanelContext";
 import { useLocation } from "react-router-dom";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc } from "firebase/firestore";
@@ -420,6 +421,7 @@ export function AIPanel({
   const { currentUser } = useAuth();
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
+  const { setOpen: setAIPanelOpen } = useAIPanel();
   const [sessions, setSessions] = useState<any[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -724,8 +726,12 @@ export function AIPanel({
 
   return (
     <aside className={cn(
-      "hidden lg:flex shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full overflow-hidden transition-all duration-300 ease-in-out shadow-elevated z-30",
-      isExpanded ? "w-[720px]" : "w-[360px]"
+      "flex shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full overflow-hidden transition-all duration-300 ease-in-out shadow-elevated",
+      // Mobile: full-screen overlay so the chat is actually usable (was hidden on mobile).
+      "fixed inset-0 z-50 w-full",
+      // Desktop: docked side panel.
+      "lg:static lg:inset-auto lg:z-30",
+      isExpanded ? "lg:w-[720px]" : "lg:w-[360px]"
     )}>
       <div className="flex-1 flex min-h-0 divide-x divide-icm-border h-full overflow-hidden">
         {/* ── Left Pane: Chat History Sidebar (Expanded state only) ── */}
@@ -833,17 +839,27 @@ export function AIPanel({
                   </button>
                 )}
 
-                {/* Expand / Collapse toggle */}
+                {/* Expand / Collapse toggle — desktop only */}
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
                   title={isExpanded ? "Collapse to right" : "Expand to left"}
-                  className="h-7 w-7 flex items-center justify-center rounded-lg text-icm-text-faint hover:text-icm-text hover:bg-icm-bg transition-colors"
+                  className="hidden lg:flex h-7 w-7 items-center justify-center rounded-lg text-icm-text-faint hover:text-icm-text hover:bg-icm-bg transition-colors"
                 >
                   {isExpanded ? (
                     <Minimize2 className="w-3.5 h-3.5" />
                   ) : (
                     <Maximize2 className="w-3.5 h-3.5" />
                   )}
+                </button>
+
+                {/* Close — mobile only (panel is a full-screen overlay on mobile) */}
+                <button
+                  onClick={() => setAIPanelOpen(false)}
+                  title="Close"
+                  aria-label="Close AI panel"
+                  className="lg:hidden h-7 w-7 flex items-center justify-center rounded-lg text-icm-text-faint hover:text-icm-text hover:bg-icm-bg transition-colors"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>

@@ -28,6 +28,7 @@ import {
   Clock,
   Trash2,
   PenSquare,
+  X,
 } from "lucide-react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1024,8 +1025,17 @@ const Index = () => {
                     )}
                   </div>
                   {selectedIndName && (
-                    <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-lg">
+                    <span className="inline-flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 pl-2 pr-1 py-1 rounded-lg">
                       {selectedIndName}
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedIndividualId(null); setActiveIndividualId(null); }}
+                        className="p-0.5 rounded hover:bg-primary/20 transition-colors"
+                        aria-label="Remove selected individual"
+                        title="Remove individual"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
                   )}
                 </div>

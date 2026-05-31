@@ -71,3 +71,21 @@ test.describe('Route crash crawler (admin)', () => {
     });
   }
 });
+
+/**
+ * Unauthenticated entry points. These render BEFORE login, so the
+ * authenticated route crawler never exercised them — which is exactly how a
+ * "React is not defined" crash on the login screen slipped to production.
+ * No auth is injected here on purpose.
+ */
+test.describe('Unauthenticated entry points (no auth)', () => {
+  for (const route of ['/login', '/']) {
+    test(`no crash (no auth): ${route}`, async ({ page }) => {
+      const guard = attachCrashGuard(page);
+      await page.goto(route);
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2500);
+      await guard.assertNoCrash(`${route} (unauthenticated)`);
+    });
+  }
+});

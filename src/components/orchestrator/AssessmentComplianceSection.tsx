@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardCheck, AlertTriangle, CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ClipboardCheck, Loader2 } from "lucide-react";
 import { type Individual } from "@/hooks/useIndividuals";
 import { getDocs, query, collection, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -35,12 +34,10 @@ export function AssessmentComplianceSection({ individuals }: Props) {
         const activeIndividuals = individuals.filter(i => i.enrollment_status === "active");
         const s: AssessmentStats = { onTrack: 0, dueThisMonth: 0, overdue: 0, neverDone: 0 };
 
-        // Load all assessments in one batch
         const allAssessments = await getDocs(
           query(collection(db, "assessments"), where("status", "==", "completed"))
         ).catch(() => ({ docs: [] as any[] }));
 
-        // Build map: individualId → latest completed date
         const latestMap: Record<string, Date> = {};
         for (const d of allAssessments.docs) {
           const a = d.data();
@@ -58,10 +55,8 @@ export function AssessmentComplianceSection({ individuals }: Props) {
             const nextDue = new Date(latest.getTime() + 365 * 24 * 60 * 60 * 1000);
             if (nextDue < today) {
               s.overdue++;
-            } else if (nextDue < thirtyDays) {
+            } else if (nextDue < thirtyDays || latest < thirteenMonthsAgo) {
               s.dueThisMonth++;
-            } else if (latest < thirteenMonthsAgo) {
-              s.dueThisMonth++; // >13 months old, count as due soon
             } else {
               s.onTrack++;
             }
@@ -74,54 +69,57 @@ export function AssessmentComplianceSection({ individuals }: Props) {
     })();
   }, [individuals]);
 
-  const cards = stats ? [
-    { label: "On Track", value: stats.onTrack, icon: CheckCircle2, tone: "green" as const },
-    { label: "Due This Month", value: stats.dueThisMonth, icon: Clock, tone: stats.dueThisMonth > 0 ? "amber" as const : "green" as const },
-    { label: "Overdue", value: stats.overdue, icon: AlertTriangle, tone: stats.overdue > 0 ? "red" as const : "green" as const },
-    { label: "Never Done", value: stats.neverDone, icon: XCircle, tone: stats.neverDone > 0 ? "red" as const : "green" as const },
+  // Compact single-row layout — spec: ~80px total height
+  const cols: { label: string; value: number; color: string }[] = stats ? [
+    { label: "On track",       value: stats.onTrack,      color: stats.onTrack > 0      ? "#16a34a" : "#9ca3af" },
+    { label: "Due this month", value: stats.dueThisMonth, color: stats.dueThisMonth > 0 ? "#d97706" : "#9ca3af" },
+    { label: "Overdue",        value: stats.overdue,      color: stats.overdue > 0      ? "#dc2626" : "#9ca3af" },
+    { label: "Never done",     value: stats.neverDone,    color: stats.neverDone > 0    ? "#dc2626" : "#9ca3af" },
   ] : [];
 
-  const toneClasses: Record<string, { value: string; bg: string; border: string }> = {
-    green: { value: "text-icm-green", bg: "bg-icm-green-soft", border: "border-icm-green/20" },
-    amber: { value: "text-icm-amber", bg: "bg-icm-amber-soft", border: "border-icm-amber/20" },
-    red:   { value: "text-icm-red",   bg: "bg-icm-red-soft",   border: "border-icm-red/20" },
-  };
-
   return (
-    <div className="rounded-xl border border-icm-border bg-icm-panel overflow-hidden">
-      <div className="px-4 py-3 border-b border-icm-border bg-icm-bg/60 flex items-center justify-between">
+    <div
+      className="bg-white overflow-hidden cursor-pointer"
+      style={{ border: "0.5px solid #e5e7eb", borderRadius: 12 }}
+      onClick={() => navigate("/people")}
+    >
+      {/* Header row */}
+      <div
+        className="flex items-center justify-between px-4"
+        style={{ height: 42, borderBottom: "0.5px solid #e5e7eb" }}
+      >
         <div className="flex items-center gap-2">
-          <ClipboardCheck className="w-4 h-4 text-icm-accent" />
-          <p className="font-manrope font-bold text-[14px] text-icm-text">Assessment Compliance</p>
+          <ClipboardCheck style={{ width: 14, height: 14, color: "#6b7280" }} />
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>Assessment compliance</span>
         </div>
-        <p className="text-[11.5px] font-geist text-icm-text-dim">Annual/initial assessment status · updated nightly</p>
+        <span style={{ fontSize: 11, color: "#9ca3af" }}>Annual/initial assessment status · updated nightly</span>
       </div>
 
-      <div className="p-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-6 gap-2 text-icm-text-dim">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-[12px] font-geist">Loading assessment data…</span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {cards.map(({ label, value, icon: Icon, tone }) => {
-              const tc = toneClasses[tone];
-              return (
-                <button
-                  key={label}
-                  onClick={() => navigate("/people")}
-                  className={cn("rounded-xl border p-3 text-left hover:shadow-sm transition-shadow", tc.bg, tc.border)}
-                >
-                  <Icon className={cn("w-4 h-4 mb-2", tc.value)} />
-                  <p className={cn("font-manrope font-extrabold text-[22px] leading-tight", tc.value)}>{value}</p>
-                  <p className="text-[10.5px] font-geist text-icm-text-dim mt-0.5 leading-snug">{label}</p>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* Data row */}
+      {loading ? (
+        <div className="flex items-center justify-center gap-2" style={{ height: 38 }}>
+          <Loader2 style={{ width: 13, height: 13, color: "#9ca3af" }} className="animate-spin" />
+          <span style={{ fontSize: 11, color: "#9ca3af" }}>Loading…</span>
+        </div>
+      ) : (
+        <div className="flex" style={{ height: 38 }}>
+          {cols.map((col, i) => (
+            <div
+              key={col.label}
+              className="flex-1 flex flex-col justify-center"
+              style={{
+                padding: "0 14px",
+                borderRight: i < cols.length - 1 ? "0.5px solid #e5e7eb" : undefined,
+              }}
+            >
+              <span style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.2 }}>{col.label}</span>
+              <span style={{ fontSize: 20, fontWeight: 500, color: col.color, lineHeight: 1.1 }}>
+                {col.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

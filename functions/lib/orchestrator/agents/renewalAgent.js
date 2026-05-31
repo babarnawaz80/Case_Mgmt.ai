@@ -51,7 +51,7 @@ function addDays(d, days) {
     return r;
 }
 async function runRenewalAgent(individual, rulePack, runId, orgId, db, customPrompt) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     const tasks = [];
     const logs = [];
     let draftsCount = 0;
@@ -99,6 +99,9 @@ async function runRenewalAgent(individual, rulePack, runId, orgId, db, customPro
                 ai_draft_id: null,
                 source_agent: "renewal",
                 status: "pending",
+                rule_id: "RENEWAL_ISP_ANNUAL",
+                task_reason: `Annual ISP/PCP renewal is due on ${pcpDueDate} — ${daysUntilPcp} days remain; renewal packet preparation should begin now.`,
+                evidence_checked: "individuals (pcp_due_date, isp_due_date), rule_pack (assessment_frequency_months)",
             });
             logs.push({
                 org_id: orgId,
@@ -127,7 +130,7 @@ async function runRenewalAgent(individual, rulePack, runId, orgId, db, customPro
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
             }
-            catch (_k) {
+            catch (_l) {
                 // Non-fatal
             }
             logs.push({
@@ -163,6 +166,9 @@ async function runRenewalAgent(individual, rulePack, runId, orgId, db, customPro
                 ai_draft_id: null,
                 source_agent: "renewal",
                 status: "pending",
+                rule_id: "RENEWAL_ASSESSMENT_OVERDUE",
+                task_reason: `Annual assessment was due on ${assessmentDueDate} (last completed: ${(_h = individual.last_assessment_date) !== null && _h !== void 0 ? _h : "unknown"}) and is now ${Math.abs(daysUntilAssessment)} days overdue.`,
+                evidence_checked: "individuals (last_assessment_date), rule_pack (assessment_frequency_months)",
             });
             logs.push({
                 org_id: orgId,
@@ -185,13 +191,16 @@ async function runRenewalAgent(individual, rulePack, runId, orgId, db, customPro
                 severity: daysUntilAssessment <= 30 ? "high" : "medium",
                 title: `Annual assessment approaching — ${indName} (${daysUntilAssessment} days)`,
                 description: `Annual assessment due on ${assessmentDueDate}. Schedule within the next ${daysUntilAssessment} days.`,
-                rule_reference: `${(_h = rulePack.state) !== null && _h !== void 0 ? _h : "Indiana"} ${(_j = rulePack.program) !== null && _j !== void 0 ? _j : "DDA Waiver"} — Annual assessment required`,
+                rule_reference: `${(_j = rulePack.state) !== null && _j !== void 0 ? _j : "Indiana"} ${(_k = rulePack.program) !== null && _k !== void 0 ? _k : "DDA Waiver"} — Annual assessment required`,
                 due_date: admin.firestore.Timestamp.fromDate(addDays(new Date(assessmentDueDate), -7)),
                 days_overdue: 0,
                 has_ai_draft: false,
                 ai_draft_id: null,
                 source_agent: "renewal",
                 status: "pending",
+                rule_id: "RENEWAL_ASSESSMENT_APPROACHING",
+                task_reason: `Annual assessment is due on ${assessmentDueDate} — only ${daysUntilAssessment} days remain; scheduling must begin immediately.`,
+                evidence_checked: "individuals (last_assessment_date), rule_pack (assessment_frequency_months)",
             });
             logs.push({
                 org_id: orgId,

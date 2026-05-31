@@ -129,6 +129,7 @@ const SettingsUserDetail = lazyWithRetry(() => import("./pages/settings/Settings
 const RoleEditor = lazyWithRetry(() => import("./pages/settings/RoleEditor"));
 const SettingsOrganization = lazyWithRetry(() => import("./pages/settings/SettingsOrganization"));
 const SettingsPrograms = lazyWithRetry(() => import("./pages/settings/SettingsPrograms"));
+const ProgramConfigure = lazyWithRetry(() => import("./pages/settings/ProgramConfigure"));
 const SettingsAI = lazyWithRetry(() => import("./pages/settings/SettingsAI"));
 const SettingsIntegrations = lazyWithRetry(() => import("./pages/settings/SettingsIntegrations"));
 const SettingsSecurity = lazyWithRetry(() => import("./pages/settings/SettingsSecurity"));
@@ -381,6 +382,8 @@ const App = () => (
             <Route path="/settings/roles" element={<ProtectedRoute requireRole="admin"><SettingsUsers /></ProtectedRoute>} />
             <Route path="/settings/organization" element={<ProtectedRoute requireRole="admin"><SettingsOrganization /></ProtectedRoute>} />
             <Route path="/settings/programs" element={<ProtectedRoute requireRole="admin"><SettingsPrograms /></ProtectedRoute>} />
+            <Route path="/settings/programs/new" element={<ProtectedRoute requireRole="admin"><ProgramConfigure /></ProtectedRoute>} />
+            <Route path="/settings/programs/:programId/configure" element={<ProtectedRoute requireRole="admin"><ProgramConfigure /></ProtectedRoute>} />
             <Route path="/settings/ai" element={<ProtectedRoute requireRole="admin"><SettingsAI /></ProtectedRoute>} />
             <Route path="/settings/risk-score" element={<ProtectedRoute requireRole="admin"><SettingsRiskScore /></ProtectedRoute>} />
             <Route path="/settings/integrations" element={<ProtectedRoute requireRole="admin"><SettingsIntegrations /></ProtectedRoute>} />

@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getProviderPortalInfo = exports.revokeProviderPortalToken = exports.providerPortalUpload = exports.getProviderPortalData = exports.validateProviderSession = exports.verifyProviderOTP = exports.sendProviderOTP = exports.validateProviderToken = exports.generateProviderPortalToken = exports.migrateIndividualStates = exports.scanDocumentOnCreate = exports.detectDuplicatesOnDemand = exports.detectDuplicatesOnCreate = exports.detectDuplicatesScheduled = exports.createGuardianPortalSession = exports.seedTrainingData = exports.checkTrainingExpirations = exports.cleanupExpiredConsents = exports.submitConsentSignature = exports.verifyConsentOTP = exports.sendConsentOTP = exports.checkConsentToken = exports.sendConsentRequest = exports.generateRenewalLetter = exports.seedValentinaDemoData = exports.refinePCP = exports.generatePCP = exports.manualOrchestratorRun = exports.scheduledOrchestrator = exports.sendVisitReminders = exports.dailyAuthRenewalCheck = exports.onAssessmentLeadTransfer = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
+exports.getProviderPortalInfo = exports.revokeProviderPortalToken = exports.providerPortalUpload = exports.getProviderPortalData = exports.validateProviderSession = exports.verifyProviderOTP = exports.sendProviderOTP = exports.validateProviderToken = exports.generateProviderPortalToken = exports.migrateIndividualStates = exports.scanDocumentOnCreate = exports.detectDuplicatesOnDemand = exports.detectDuplicatesOnCreate = exports.detectDuplicatesScheduled = exports.createGuardianPortalSession = exports.seedTrainingData = exports.checkTrainingExpirations = exports.cleanupExpiredConsents = exports.submitConsentSignature = exports.verifyConsentOTP = exports.sendConsentOTP = exports.checkConsentToken = exports.sendConsentRequest = exports.generateRenewalLetter = exports.seedValentinaDemoData = exports.refinePCP = exports.generatePCP = exports.onContactNoteSubmitted = exports.onIncidentReported = exports.onIndividualEnrolled = exports.manualOrchestratorRun = exports.scheduledOrchestrator = exports.sendVisitReminders = exports.dailyAuthRenewalCheck = exports.onAssessmentLeadTransfer = exports.onWorkflowTaskDailyCheck = exports.onNewBillingClaim = exports.api = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const v2_1 = require("firebase-functions/v2");
@@ -120,6 +120,10 @@ Object.defineProperty(exports, "sendVisitReminders", { enumerable: true, get: fu
 var brainOrchestrator_1 = require("./orchestrator/brainOrchestrator");
 Object.defineProperty(exports, "scheduledOrchestrator", { enumerable: true, get: function () { return brainOrchestrator_1.scheduledOrchestrator; } });
 Object.defineProperty(exports, "manualOrchestratorRun", { enumerable: true, get: function () { return brainOrchestrator_1.manualOrchestratorRun; } });
+var orchestratorTriggers_1 = require("./orchestrator/orchestratorTriggers");
+Object.defineProperty(exports, "onIndividualEnrolled", { enumerable: true, get: function () { return orchestratorTriggers_1.onIndividualEnrolled; } });
+Object.defineProperty(exports, "onIncidentReported", { enumerable: true, get: function () { return orchestratorTriggers_1.onIncidentReported; } });
+Object.defineProperty(exports, "onContactNoteSubmitted", { enumerable: true, get: function () { return orchestratorTriggers_1.onContactNoteSubmitted; } });
 // ─── PCP Generation ───────────────────────────────────────────────────────────
 var generatePCP_1 = require("./api/generatePCP");
 Object.defineProperty(exports, "generatePCP", { enumerable: true, get: function () { return generatePCP_1.generatePCP; } });

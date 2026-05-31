@@ -107,6 +107,11 @@ export async function runAuthorizationAgent(
         ai_draft_id: null,
         source_agent: "escalation" as const,
         status: "pending",
+        rule_id: daysUntil < 0 ? "AUTHORIZATION_EXPIRED" : "AUTHORIZATION_EXPIRING",
+        task_reason: daysUntil < 0
+          ? `Service authorization ${authNumber} for ${serviceName} expired ${Math.abs(daysUntil)} days ago on ${endDateRaw} — services may not be billable.`
+          : `Service authorization ${authNumber} for ${serviceName} expires on ${endDateRaw} with only ${daysUntil} days remaining — renewal must be initiated.`,
+        evidence_checked: "service_authorizations (status=Active, end_date, expirationDate, units_authorized, units_used, start_date)",
       });
 
       logs.push({

@@ -79,6 +79,9 @@ export async function runRenewalAgent(
         ai_draft_id: null,
         source_agent: "renewal",
         status: "pending",
+        rule_id: "RENEWAL_ISP_ANNUAL",
+        task_reason: `Annual ISP/PCP renewal is due on ${pcpDueDate} — ${daysUntilPcp} days remain; renewal packet preparation should begin now.`,
+        evidence_checked: "individuals (pcp_due_date, isp_due_date), rule_pack (assessment_frequency_months)",
       });
 
       logs.push({
@@ -146,6 +149,9 @@ export async function runRenewalAgent(
         ai_draft_id: null,
         source_agent: "renewal",
         status: "pending",
+        rule_id: "RENEWAL_ASSESSMENT_OVERDUE",
+        task_reason: `Annual assessment was due on ${assessmentDueDate} (last completed: ${individual.last_assessment_date ?? "unknown"}) and is now ${Math.abs(daysUntilAssessment)} days overdue.`,
+        evidence_checked: "individuals (last_assessment_date), rule_pack (assessment_frequency_months)",
       });
 
       logs.push({
@@ -175,6 +181,9 @@ export async function runRenewalAgent(
         ai_draft_id: null,
         source_agent: "renewal",
         status: "pending",
+        rule_id: "RENEWAL_ASSESSMENT_APPROACHING",
+        task_reason: `Annual assessment is due on ${assessmentDueDate} — only ${daysUntilAssessment} days remain; scheduling must begin immediately.`,
+        evidence_checked: "individuals (last_assessment_date), rule_pack (assessment_frequency_months)",
       });
 
       logs.push({

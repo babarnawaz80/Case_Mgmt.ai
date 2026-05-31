@@ -60,8 +60,8 @@ const Settings = () => {
     },
     {
       icon: Map,
-      title: "Programs & States",
-      description: "Configure programs, service categories, and state-specific requirements.",
+      title: "States, Programs & Billing",
+      description: "Configure programs, provider enrollment, payers, billing rules, and compliance by state.",
       to: "/settings/programs",
       tone: "purple",
       stat: `${programs.length} programs · ${operatingStates.length} states`,
@@ -110,13 +110,7 @@ const Settings = () => {
       to: "/settings/security",
       tone: "red",
     },
-    {
-      icon: CreditCard,
-      title: "Billing Configuration",
-      description: "Configure billing rules, supervisor approval, service codes, and clearinghouse settings.",
-      to: "/settings/billing-config",
-      tone: "green",
-    },
+    // Billing Configuration tile removed — all billing setup now lives inside Programs & States
     {
       icon: Bell,
       title: "Notifications",

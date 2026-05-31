@@ -2,11 +2,16 @@
  * BillingSectionFields — Shared billing fields component used across all note types.
  * Shows: Service Code, Billable Units (live calc), Authorization, Rate display.
  * Only rendered when isBillable = true.
+ *
+ * Service code dropdown is populated from the individual's program's billingRules
+ * subcollection (if available), falling back to SERVICE_CODES_STATIC.
  */
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Sparkles, AlertTriangle, Info } from "lucide-react";
 import { useAuthorizations, SERVICE_CODES_STATIC, getRateForCode } from "@/hooks/useAuthorizations";
 import { calculateBillingUnits } from "@/services/billingValidation";
+import { getDoc, doc, collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface BillingSectionFieldsProps {
   individualId: string;
@@ -26,6 +31,9 @@ interface BillingSectionFieldsProps {
 const inputCls =
   "w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text placeholder:text-icm-text-faint focus:outline-none focus:border-icm-border-strong";
 
+// Lookup type for program-sourced service codes
+interface ProgramServiceCode { code: string; description: string; rate: number; unit: string; }
+
 const BillingSectionFields: React.FC<BillingSectionFieldsProps> = ({
   individualId,
   serviceCode,
@@ -41,11 +49,45 @@ const BillingSectionFields: React.FC<BillingSectionFieldsProps> = ({
 }) => {
   const { forServiceCode, loading: authLoading } = useAuthorizations(individualId);
 
-  // Get rate info for selected code
+  // Load program-scoped service codes for this individual
+  const [programCodes, setProgramCodes] = useState<ProgramServiceCode[]>([]);
+  useEffect(() => {
+    if (!individualId) return;
+    (async () => {
+      try {
+        const indSnap = await getDoc(doc(db, "individuals", individualId));
+        if (!indSnap.exists()) return;
+        const programId = indSnap.data().programId as string | undefined;
+        if (!programId) return;
+        const rulesSnap = await getDocs(collection(db, "programs", programId, "billingRules"));
+        const codes: ProgramServiceCode[] = rulesSnap.docs
+          .filter(d => d.data().status !== "inactive")
+          .map(d => ({
+            code: d.data().serviceCode as string,
+            description: d.data().description as string || "",
+            rate: (d.data().rate as number) ?? 28.5,
+            unit: d.data().unit as string || "15 min",
+          }));
+        if (codes.length > 0) setProgramCodes(codes);
+      } catch { /* fallback to static codes */ }
+    })();
+  }, [individualId]);
+
+  // Use program-scoped codes if available, otherwise fall back to static list
+  const availableCodes = programCodes.length > 0
+    ? programCodes
+    : SERVICE_CODES_STATIC.map(sc => ({ code: sc.code, description: sc.description, rate: sc.rate, unit: "15 min" }));
+
+  // Get rate info — prefer program-scoped rate, fall back to static lookup
   const { rate, unitType } = useMemo(() => {
     if (!serviceCode) return { rate: 28.5, unitType: "15_min" };
+    const programMatch = programCodes.find(c => c.code === serviceCode);
+    if (programMatch) {
+      const unitTypeMap: Record<string, string> = { "15 min": "15_min", "30 min": "30_min", "1 hour": "1hr", "Per visit": "per_visit", "Per day": "per_day" };
+      return { rate: programMatch.rate, unitType: unitTypeMap[programMatch.unit] ?? "15_min" };
+    }
     return getRateForCode(serviceCode);
-  }, [serviceCode]);
+  }, [serviceCode, programCodes]);
 
   // Calculate units live from start/end time
   const unitCalc = useMemo(() => {
@@ -113,7 +155,7 @@ const BillingSectionFields: React.FC<BillingSectionFieldsProps> = ({
               className={inputCls}
             >
               <option value="">Select service code…</option>
-              {SERVICE_CODES_STATIC.map(sc => (
+              {availableCodes.map(sc => (
                 <option key={sc.code} value={sc.code}>
                   {sc.code} — {sc.description}
                 </option>

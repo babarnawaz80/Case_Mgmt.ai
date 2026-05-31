@@ -18,6 +18,8 @@ import {
   AgentPrompts,
   ComplianceFinding,
   OrchestratorSettings,
+  AllPreFilterResults,
+  NotificationDedupSummary,
   DEFAULT_ORCHESTRATOR_SETTINGS,
   DEFAULT_AGENT_PROMPTS,
 } from "./types";
@@ -30,6 +32,14 @@ import { runRenewalAgent } from "./agents/renewalAgent";
 import { runAuthorizationAgent } from "./agents/authorizationAgent";
 import { runAssessmentAgent } from "./agents/assessmentAgent";
 import { clearEngineCache } from "./utilities/getGuidelinesEngine";
+import {
+  preFilterCompliance,
+  preFilterDocumentation,
+  preFilterBilling,
+  preFilterEscalation,
+  preFilterRenewal,
+} from "./preFilters";
+import { runNotificationDeduplication } from "./notificationDedup";
 
 const ORCHESTRATOR_TASKS = "orchestrator_tasks";
 const ORCHESTRATOR_RUNS = "orchestrator_runs";
@@ -137,6 +147,16 @@ async function runOrchestrator(
   let draftsGenerated = 0;
   let escalationsTriggered = 0;
   let complianceScoresUpdated = 0;
+  let tasksWithTraceability = 0;
+  let tasksBlockedMissingTraceability = 0;
+  const preFilterResults: AllPreFilterResults = {
+    compliance: { scanned: 0, passed: 0, skipped: 0 },
+    documentation: { scanned: 0, passed: 0, skipped: 0 },
+    billing: { scanned: 0, passed: 0, skipped: 0 },
+    escalation: { scanned: 0, passed: 0, skipped: 0 },
+    renewal: { scanned: 0, passed: 0, skipped: 0 },
+  };
+  let notificationSummary: NotificationDedupSummary | null = null;
 
   try {
     // Clear engine cache for this run (cache persists per warm instance, clear for fresh run)
@@ -163,8 +183,8 @@ async function runOrchestrator(
           .get();
       } catch (err2) {
         errors.push(`Failed to load individuals: ${(err2 as Error).message}`);
-        await finalizeRun(runRef, "failed", errors, 0, 0, 0, 0, 0);
-        return buildRunResult(runId, orgId, runType, triggeredBy, "failed", 0, 0, 0, 0, 0, errors);
+        await finalizeRun(runRef, "failed", errors, 0, 0, 0, 0, 0, 0, 0, preFilterResults, null);
+        return buildRunResult(runId, orgId, runType, triggeredBy, "failed", 0, 0, 0, 0, 0, 0, 0, preFilterResults, null, errors);
       }
     }
 
@@ -181,67 +201,107 @@ async function runOrchestrator(
         // ── Agent 1: Compliance ───────────────────────────────────────────────
         let complianceResult: AgentResult = { tasks: [], logs: [], compliance_score: 70, drafts_count: 0 };
         if (settings.agents_enabled.compliance) {
-          try {
-            complianceResult = await runComplianceAgent(individual, rulePack, runId, orgId, db);
-            if (complianceResult.compliance_score !== undefined) {
-              complianceScoresUpdated++;
+          preFilterResults.compliance.scanned++;
+          const pfCompliance = await preFilterCompliance(individual, db);
+          if (pfCompliance.passes) {
+            preFilterResults.compliance.passed++;
+            try {
+              complianceResult = await runComplianceAgent(individual, rulePack, runId, orgId, db);
+              if (complianceResult.compliance_score !== undefined) {
+                complianceScoresUpdated++;
+              }
+              // Reconstruct ComplianceFindings from tasks for the documentation agent
+              complianceFindings = complianceResult.tasks.map((t) => ({
+                type: t.task_type as string,
+                severity: (t.severity === "critical" ? "critical" : t.severity === "high" ? "warning" : "info") as "critical" | "warning" | "info",
+                title: t.title,
+                description: t.description,
+                days_overdue: t.days_overdue,
+                rule_reference: t.rule_reference,
+                requires_task: true,
+                requires_draft: t.has_ai_draft,
+              }));
+            } catch (err) {
+              errors.push(`Compliance agent failed for ${individual.id}: ${(err as Error).message}`);
             }
-            // Reconstruct ComplianceFindings from tasks for the documentation agent
-            complianceFindings = complianceResult.tasks.map((t) => ({
-              type: t.task_type as string,
-              severity: (t.severity === "critical" ? "critical" : t.severity === "high" ? "warning" : "info") as "critical" | "warning" | "info",
-              title: t.title,
-              description: t.description,
-              days_overdue: t.days_overdue,
-              rule_reference: t.rule_reference,
-              requires_task: true,
-              requires_draft: t.has_ai_draft,
-            }));
-          } catch (err) {
-            errors.push(`Compliance agent failed for ${individual.id}: ${(err as Error).message}`);
+          } else {
+            preFilterResults.compliance.skipped++;
+            console.log(`[BrainOrchestrator] SKIPPED compliance for ${individual.id}: ${pfCompliance.reason}`);
           }
         }
 
         // ── Agent 2: Documentation ────────────────────────────────────────────
         let docResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
         if (settings.agents_enabled.documentation && complianceFindings.length > 0) {
-          try {
-            docResult = await runDocumentationAgent(individual, complianceFindings, runId, orgId, db, customPrompts.documentation);
-            draftsGenerated += docResult.drafts_count;
-          } catch (err) {
-            errors.push(`Documentation agent failed for ${individual.id}: ${(err as Error).message}`);
+          preFilterResults.documentation.scanned++;
+          const pfDoc = await preFilterDocumentation(individual, db);
+          if (pfDoc.passes) {
+            preFilterResults.documentation.passed++;
+            try {
+              docResult = await runDocumentationAgent(individual, complianceFindings, runId, orgId, db, customPrompts.documentation);
+              draftsGenerated += docResult.drafts_count;
+            } catch (err) {
+              errors.push(`Documentation agent failed for ${individual.id}: ${(err as Error).message}`);
+            }
+          } else {
+            preFilterResults.documentation.skipped++;
+            console.log(`[BrainOrchestrator] SKIPPED documentation for ${individual.id}: ${pfDoc.reason}`);
           }
         }
 
         // ── Agent 3: Billing ──────────────────────────────────────────────────
         let billingResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
         if (settings.agents_enabled.billing) {
-          try {
-            billingResult = await runBillingAgent(individual, runId, orgId, db);
-          } catch (err) {
-            errors.push(`Billing agent failed for ${individual.id}: ${(err as Error).message}`);
+          preFilterResults.billing.scanned++;
+          const pfBilling = await preFilterBilling(individual, db);
+          if (pfBilling.passes) {
+            preFilterResults.billing.passed++;
+            try {
+              billingResult = await runBillingAgent(individual, runId, orgId, db);
+            } catch (err) {
+              errors.push(`Billing agent failed for ${individual.id}: ${(err as Error).message}`);
+            }
+          } else {
+            preFilterResults.billing.skipped++;
+            console.log(`[BrainOrchestrator] SKIPPED billing for ${individual.id}: ${pfBilling.reason}`);
           }
         }
 
         // ── Agent 4: Escalation ───────────────────────────────────────────────
         let escalationResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
         if (settings.agents_enabled.escalation) {
-          try {
-            escalationResult = await runEscalationAgent(individual, runId, orgId, settings, db);
-            escalationsTriggered += escalationResult.tasks.length;
-          } catch (err) {
-            errors.push(`Escalation agent failed for ${individual.id}: ${(err as Error).message}`);
+          preFilterResults.escalation.scanned++;
+          const pfEscalation = await preFilterEscalation(individual, db);
+          if (pfEscalation.passes) {
+            preFilterResults.escalation.passed++;
+            try {
+              escalationResult = await runEscalationAgent(individual, runId, orgId, settings, db);
+              escalationsTriggered += escalationResult.tasks.length;
+            } catch (err) {
+              errors.push(`Escalation agent failed for ${individual.id}: ${(err as Error).message}`);
+            }
+          } else {
+            preFilterResults.escalation.skipped++;
+            console.log(`[BrainOrchestrator] SKIPPED escalation for ${individual.id}: ${pfEscalation.reason}`);
           }
         }
 
         // ── Agent 5: Renewal ──────────────────────────────────────────────────
         let renewalResult: AgentResult = { tasks: [], logs: [], drafts_count: 0 };
         if (settings.agents_enabled.renewal) {
-          try {
-            renewalResult = await runRenewalAgent(individual, rulePack, runId, orgId, db, customPrompts.renewal);
-            draftsGenerated += renewalResult.drafts_count;
-          } catch (err) {
-            errors.push(`Renewal agent failed for ${individual.id}: ${(err as Error).message}`);
+          preFilterResults.renewal.scanned++;
+          const pfRenewal = await preFilterRenewal(individual, db);
+          if (pfRenewal.passes) {
+            preFilterResults.renewal.passed++;
+            try {
+              renewalResult = await runRenewalAgent(individual, rulePack, runId, orgId, db, customPrompts.renewal);
+              draftsGenerated += renewalResult.drafts_count;
+            } catch (err) {
+              errors.push(`Renewal agent failed for ${individual.id}: ${(err as Error).message}`);
+            }
+          } else {
+            preFilterResults.renewal.skipped++;
+            console.log(`[BrainOrchestrator] SKIPPED renewal for ${individual.id}: ${pfRenewal.reason}`);
           }
         }
 
@@ -289,6 +349,24 @@ async function runOrchestrator(
         // ── Write tasks to both orchestrator_tasks and tasks (My Work) ─────────
         for (const task of allTasks) {
           try {
+            // ── Traceability validation ───────────────────────────────────────
+            if (!task.rule_id || task.rule_id.trim() === "") {
+              console.warn(`[BrainOrchestrator] BLOCKED task: missing rule_id for individual ${individual.id}, agent ${task.source_agent}, title: "${task.title}"`);
+              tasksBlockedMissingTraceability++;
+              continue;
+            }
+            if (!task.task_reason || task.task_reason.trim().length < 20) {
+              console.warn(`[BrainOrchestrator] BLOCKED task: task_reason missing or < 20 chars for individual ${individual.id}, rule_id: ${task.rule_id}`);
+              tasksBlockedMissingTraceability++;
+              continue;
+            }
+            if (!task.evidence_checked || task.evidence_checked.trim() === "") {
+              console.warn(`[BrainOrchestrator] BLOCKED task: missing evidence_checked for individual ${individual.id}, rule_id: ${task.rule_id}`);
+              tasksBlockedMissingTraceability++;
+              continue;
+            }
+            tasksWithTraceability++;
+
             // Write to orchestrator_tasks collection
             const orchTaskRef = await db.collection(ORCHESTRATOR_TASKS).add({
               ...task,
@@ -319,6 +397,9 @@ async function runOrchestrator(
                 has_ai_draft: task.has_ai_draft,
                 orchestrator_task_id: orchTaskRef.id,
                 rule_reference: task.rule_reference,
+                rule_id: task.rule_id,
+                task_reason: task.task_reason,
+                evidence_checked: task.evidence_checked,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               });
@@ -354,20 +435,36 @@ async function runOrchestrator(
       }
     }
 
-    // Generate run summary
-    const summary = `Processed ${individualsProcessed} individuals. Created ${tasksCreated} tasks. Generated ${draftsGenerated} AI drafts. Triggered ${escalationsTriggered} escalations. Updated ${complianceScoresUpdated} compliance scores.${errors.length > 0 ? ` ${errors.length} errors.` : ""}`;
+    // ── Run notification deduplication after all agents for all individuals ──
+    try {
+      notificationSummary = await runNotificationDeduplication(runId, orgId, db);
+      console.log(`[BrainOrchestrator] Notification dedup complete: ${JSON.stringify(notificationSummary)}`);
+    } catch (err) {
+      errors.push(`Notification dedup failed: ${(err as Error).message}`);
+    }
 
-    await finalizeRun(runRef, "completed", errors, individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated, summary);
+    // Generate run summary
+    const summary = `Processed ${individualsProcessed} individuals. Created ${tasksCreated} tasks (${tasksBlockedMissingTraceability} blocked for missing traceability). Generated ${draftsGenerated} AI drafts. Triggered ${escalationsTriggered} escalations. Updated ${complianceScoresUpdated} compliance scores.${errors.length > 0 ? ` ${errors.length} errors.` : ""}`;
+
+    await finalizeRun(
+      runRef, "completed", errors,
+      individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated,
+      tasksWithTraceability, tasksBlockedMissingTraceability, preFilterResults, notificationSummary, summary
+    );
 
     console.log(`[BrainOrchestrator] Completed. ${summary}`);
 
-    return buildRunResult(runId, orgId, runType, triggeredBy, "completed", individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated, errors, summary);
+    return buildRunResult(runId, orgId, runType, triggeredBy, "completed", individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated, tasksWithTraceability, tasksBlockedMissingTraceability, preFilterResults, notificationSummary, errors, summary);
   } catch (err) {
     const errMsg = (err as Error).message;
     errors.push(errMsg);
-    await finalizeRun(runRef, "failed", errors, individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated);
+    await finalizeRun(
+      runRef, "failed", errors,
+      individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated,
+      tasksWithTraceability, tasksBlockedMissingTraceability, preFilterResults, notificationSummary
+    );
     console.error(`[BrainOrchestrator] Fatal error for org ${orgId}:`, err);
-    return buildRunResult(runId, orgId, runType, triggeredBy, "failed", individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated, errors);
+    return buildRunResult(runId, orgId, runType, triggeredBy, "failed", individualsProcessed, tasksCreated, draftsGenerated, escalationsTriggered, complianceScoresUpdated, tasksWithTraceability, tasksBlockedMissingTraceability, preFilterResults, notificationSummary, errors);
   }
 }
 
@@ -462,6 +559,10 @@ async function finalizeRun(
   draftsGenerated: number,
   escalationsTriggered: number,
   complianceScoresUpdated: number,
+  tasksWithTraceability: number,
+  tasksBlockedMissingTraceability: number,
+  preFilterResults: AllPreFilterResults,
+  notificationSummary: NotificationDedupSummary | null,
   summary?: string
 ): Promise<void> {
   try {
@@ -473,6 +574,10 @@ async function finalizeRun(
       drafts_generated: draftsGenerated,
       escalations_triggered: escalationsTriggered,
       compliance_scores_updated: complianceScoresUpdated,
+      tasks_with_traceability: tasksWithTraceability,
+      tasks_blocked_missing_traceability: tasksBlockedMissingTraceability,
+      pre_filter_results: preFilterResults,
+      ...(notificationSummary ? { notification_summary: notificationSummary } : {}),
       errors: errors.slice(0, 20), // Cap errors to avoid huge documents
       ...(summary ? { summary } : {}),
     });
@@ -492,6 +597,10 @@ function buildRunResult(
   draftsGenerated: number,
   escalationsTriggered: number,
   complianceScoresUpdated: number,
+  tasksWithTraceability: number,
+  tasksBlockedMissingTraceability: number,
+  preFilterResults: AllPreFilterResults,
+  notificationSummary: NotificationDedupSummary | null,
   errors: string[],
   summary?: string
 ) {
@@ -506,6 +615,10 @@ function buildRunResult(
     drafts_generated: draftsGenerated,
     escalations_triggered: escalationsTriggered,
     compliance_scores_updated: complianceScoresUpdated,
+    tasks_with_traceability: tasksWithTraceability,
+    tasks_blocked_missing_traceability: tasksBlockedMissingTraceability,
+    pre_filter_results: preFilterResults,
+    ...(notificationSummary ? { notification_summary: notificationSummary } : {}),
     errors,
     ...(summary ? { summary } : {}),
   };

@@ -155,6 +155,11 @@ export async function runAssessmentAgent(
         ai_draft_id: null,
         source_agent: "compliance" as const,
         status: "pending",
+        rule_id: overdue ? "ASSESSMENT_OVERDUE" : "ASSESSMENT_DUE_SOON",
+        task_reason: overdue
+          ? `${rule.templateName} for ${indName} is overdue by ${Math.abs(daysUntil)} days (${rule.requirementType} requirement, every ${rule.recurringEveryDays ?? rule.initialDueDays} days).`
+          : `${rule.templateName} for ${indName} is due in ${daysUntil} days (${rule.requirementType} requirement, every ${rule.recurringEveryDays ?? rule.initialDueDays} days).`,
+        evidence_checked: `assessments (individualId, templateId=${rule.templateId}, status=completed, completedAt desc), programs (assessmentSchedule), individuals (programId)`,
       });
 
       logs.push({

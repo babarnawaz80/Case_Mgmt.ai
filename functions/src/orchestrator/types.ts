@@ -87,6 +87,10 @@ export interface OrchestratorTask {
   status: "pending" | "acknowledged" | "in_progress" | "completed" | "dismissed";
   created_at: admin.firestore.FieldValue;
   updated_at: admin.firestore.FieldValue;
+  // ── Traceability fields (required for all tasks) ──────────────────────────
+  rule_id: string;          // Agent name + rule type, e.g. "COMPLIANCE_VISIT_REQUIRED"
+  task_reason: string;      // Plain English with specific data, min 20 chars
+  evidence_checked: string; // Comma-separated list of Firestore data sources checked
 }
 
 export interface OrchestratorRun {
@@ -168,6 +172,48 @@ export const DEFAULT_AGENT_PROMPTS: Omit<AgentPrompts, "updated_at" | "updated_b
 
   renewal: `You are a DD waiver service renewal specialist. Generate renewal packets that anticipate state review committee requirements. Include: justification for continued services, evidence of progress toward current plan goals, changes in support needs, updated risk documentation, and identification of any missing items that could cause renewal denial. Use person-first language throughout. Base all content on the individual's documentation record. Flag any gaps explicitly. Label all output as AI DRAFT — Requires CM Review before submission.`,
 };
+
+// ─── Pre-Filter Result Types ──────────────────────────────────────────────────
+
+export interface PreFilterResult {
+  passes: boolean;
+  reason: string;
+}
+
+export interface AllPreFilterResults {
+  compliance: { scanned: number; passed: number; skipped: number };
+  documentation: { scanned: number; passed: number; skipped: number };
+  billing: { scanned: number; passed: number; skipped: number };
+  escalation: { scanned: number; passed: number; skipped: number };
+  renewal: { scanned: number; passed: number; skipped: number };
+}
+
+// ─── Notification Deduplication Types ────────────────────────────────────────
+
+export interface QueuedNotification {
+  id: string;
+  run_id: string;
+  recipient_id: string;
+  individual_id: string;
+  individual_name: string;
+  recipient_name: string;
+  urgency: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  message: string;
+  agent: string;
+  rule_id: string;
+  task_created?: string;
+  queued_at: admin.firestore.Timestamp;
+  status: "queued" | "delivered" | "consolidated_into";
+  org_id: string;
+}
+
+export interface NotificationDedupSummary {
+  total_queued: number;
+  critical_delivered_immediately: number;
+  delivered_individual: number;
+  delivered_consolidated: number;
+  individuals_affected: number;
+}
 
 export const DEFAULT_ORCHESTRATOR_SETTINGS: OrchestratorSettings = {
   scheduled_run_time: "02:00",

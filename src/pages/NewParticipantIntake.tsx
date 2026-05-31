@@ -38,7 +38,7 @@ import { toast } from "sonner";
 import { canonicalState } from "@/lib/stateUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  collection, addDoc, serverTimestamp, doc, getDoc,
+  collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { writeAudit } from "@/lib/auditService";
@@ -381,17 +381,26 @@ export default function NewParticipantIntake() {
   useEffect(() => {
     if (!userProfile?.organizationId) return;
     setLoadingPrograms(true);
-    getDoc(doc(db, "organizations", userProfile.organizationId))
+    // Load from programs collection (new unified model), fall back to org doc if empty
+    getDocs(query(collection(db, "programs"), where("organizationId", "==", userProfile.organizationId)))
       .then((snap) => {
-        if (snap.exists()) {
-          const d = snap.data();
-          const list = ((d.programs as ProgramSetting[]) ?? []).filter((p) => p.active);
+        if (!snap.empty) {
+          const list: ProgramSetting[] = snap.docs
+            .filter(d => d.data().status !== "inactive" && d.data().active !== false)
+            .map(d => ({ id: d.id, name: d.data().name ?? "", code: d.data().abbreviation ?? d.data().code ?? "", active: true }));
           setOrganizationPrograms(list);
+        } else {
+          // Legacy fallback: org doc programs array
+          return getDoc(doc(db, "organizations", userProfile.organizationId)).then((orgSnap) => {
+            if (orgSnap.exists()) {
+              const d = orgSnap.data();
+              const list = ((d.programs as ProgramSetting[]) ?? []).filter((p) => p.active);
+              setOrganizationPrograms(list);
+            }
+          });
         }
       })
-      .catch((err) => {
-        console.error("Failed to load organization programs:", err);
-      })
+      .catch((err) => { console.error("Failed to load organization programs:", err); })
       .finally(() => setLoadingPrograms(false));
   }, [userProfile?.organizationId]);
 
@@ -1123,14 +1132,24 @@ export default function NewParticipantIntake() {
                   )}
                 </Field>
                 <Field label="Enrolled Program" required>
-                  <Select value={data.enrolledProgram} onValueChange={(v) => update("enrolledProgram", v)}>
+                  <Select
+                    value={data.enrolledProgram}
+                    onValueChange={(v) => {
+                      // v is "id::name" — split to store both programId and name
+                      const [pid, ...rest] = v.split("::");
+                      const pname = rest.join("::");
+                      update("enrolledProgram", pname);
+                      update("programId" as any, pid);
+                      update("programName" as any, pname);
+                    }}
+                  >
                     <SelectTrigger><SelectValue placeholder="Select program…" /></SelectTrigger>
                     <SelectContent>
                       {(organizationPrograms.length > 0
                         ? organizationPrograms.map((p) => ({ id: p.id, label: p.name, code: p.code }))
                         : PROGRAMS.map((p) => ({ id: p.id, label: p.label, code: "" }))
                       ).map((p) => (
-                        <SelectItem key={p.id} value={p.label}>
+                        <SelectItem key={p.id} value={`${p.id}::${p.label}`}>
                           {p.label} {p.code ? `(${p.code})` : ""}
                         </SelectItem>
                       ))}

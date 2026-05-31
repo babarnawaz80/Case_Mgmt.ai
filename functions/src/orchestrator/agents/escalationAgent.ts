@@ -89,7 +89,30 @@ export async function runEscalationAgent(
           ai_draft_id: null,
           source_agent: "escalation",
           status: "pending",
+          rule_id: "ESCALATION_CRITICAL_OVERDUE_TASK",
+          task_reason: `Task "${task.title}" has been overdue for ${daysOverdue} days, exceeding the ${thresholds.critical_alert_days}-day critical escalation threshold — supervisor intervention required immediately.`,
+          evidence_checked: "tasks (individualId, organizationId, status!=completed, source=brain_orchestrator, dueDate)",
         });
+
+        // Queue notification for deduplication
+        try {
+          await db.collection("notification_queue").add({
+            run_id: runId,
+            recipient_id: supervisorUid,
+            individual_id: individual.id,
+            individual_name: indName,
+            recipient_name: supervisorName,
+            urgency: "CRITICAL",
+            message: `CRITICAL ESCALATION: Task "${task.title}" for ${indName} is ${daysOverdue} days overdue. Immediate supervisor intervention required.`,
+            agent: "escalation",
+            rule_id: "ESCALATION_CRITICAL_OVERDUE_TASK",
+            queued_at: admin.firestore.FieldValue.serverTimestamp(),
+            status: "queued",
+            org_id: orgId,
+          });
+        } catch {
+          // Non-fatal
+        }
 
         logs.push({
           org_id: orgId,

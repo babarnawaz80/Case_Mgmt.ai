@@ -38,7 +38,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runBillingAgent = runBillingAgent;
 const admin = __importStar(require("firebase-admin"));
 async function runBillingAgent(individual, runId, orgId, db) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     const tasks = [];
     const logs = [];
     const indName = `${individual.first_name} ${individual.last_name}`;
@@ -78,6 +78,9 @@ async function runBillingAgent(individual, runId, orgId, db) {
                 ai_draft_id: null,
                 source_agent: "billing",
                 status: "pending",
+                rule_id: "BILLING_UNSIGNED_NOTES",
+                task_reason: `${oldUnsigned.length} billable progress note(s) have been in draft/pending_signature status for more than 48 hours and cannot be submitted for billing.`,
+                evidence_checked: "progress_notes (billable=true, status in [draft, pending_signature], createdAt)",
             });
             logs.push({
                 org_id: orgId,
@@ -90,7 +93,7 @@ async function runBillingAgent(individual, runId, orgId, db) {
             });
         }
     }
-    catch (_f) {
+    catch (_h) {
         // Non-fatal — collection may not have the required index
     }
     // ── 2. Expiring service authorizations ──────────────────────────────────────
@@ -129,6 +132,9 @@ async function runBillingAgent(individual, runId, orgId, db) {
                 ai_draft_id: null,
                 source_agent: "billing",
                 status: "pending",
+                rule_id: "BILLING_AUTH_EXPIRY",
+                task_reason: `Service authorization for ${(_e = auth.service_name) !== null && _e !== void 0 ? _e : "services"} (auth #${(_f = auth.auth_number) !== null && _f !== void 0 ? _f : authDoc.id}) expires on ${endDate} — ${daysLeft} days remaining before billing becomes invalid.`,
+                evidence_checked: "service_authorizations (status=active, end_date, expiration_date)",
             });
             logs.push({
                 org_id: orgId,
@@ -136,12 +142,12 @@ async function runBillingAgent(individual, runId, orgId, db) {
                 agent: "billing",
                 action: "AUTHORIZATION_EXPIRING",
                 rule_applied: "Active authorization required for billing",
-                finding: `Auth #${(_e = auth.auth_number) !== null && _e !== void 0 ? _e : authDoc.id} expires on ${endDate} (${daysLeft} days)`,
+                finding: `Auth #${(_g = auth.auth_number) !== null && _g !== void 0 ? _g : authDoc.id} expires on ${endDate} (${daysLeft} days)`,
                 result: `Task created: authorization_expiring — severity: ${daysLeft <= 7 ? "critical" : daysLeft <= 14 ? "high" : "medium"}`,
             });
         }
     }
-    catch (_g) {
+    catch (_j) {
         // Non-fatal
     }
     return { tasks, logs, drafts_count: 0 };

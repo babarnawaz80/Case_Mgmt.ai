@@ -1,22 +1,52 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { SettingsLayout } from "@/components/settings/SettingsLayout";
-import { doc, getDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot, query, where, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot, query, where, serverTimestamp, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, AlertTriangle, ChevronDown, ChevronRight, Loader2, Save } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertTriangle, ChevronDown, ChevronRight, Loader2, Save, MoreHorizontal, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type TabKey = "providerSetup" | "general" | "payers" | "funding" | "rates" | "iddbilling";
+type TabKey = "providerSetup" | "general" | "payers" | "billing_rules" | "iddbilling";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "providerSetup", label: "Provider Setup" },
   { key: "general", label: "General" },
   { key: "payers", label: "Payers" },
-  { key: "funding", label: "Funding Streams" },
-  { key: "rates", label: "Rate Schedules" },
+  { key: "billing_rules", label: "Rates & billing rules" },
   { key: "iddbilling", label: "IDD Billing.AI" },
 ];
+
+// ─── Billing Rules types ───────────────────────────────────────────────────────
+
+interface BillingRule {
+  id: string;
+  serviceCode: string;
+  description: string;
+  program: string;
+  payer: string;
+  state: string;
+  billingUnit: string;
+  rate: number;
+  effectiveDate: string;
+  endDate: string | null;
+  status: "active" | "inactive";
+  organizationId: string;
+  createdAt?: any;
+  updatedAt?: any;
+  createdBy?: string;
+}
+
+type BillingRuleForm = Omit<BillingRule, "id" | "organizationId" | "createdAt" | "updatedAt">;
+
+const EMPTY_RULE: BillingRuleForm = {
+  serviceCode: "", description: "", program: "", payer: "",
+  state: "", billingUnit: "15 min", rate: 0,
+  effectiveDate: "", endDate: null, status: "active", createdBy: "",
+};
+
+const BILLING_UNIT_OPTIONS = ["15 min", "30 min", "1 hour", "Per visit", "Per day", "Per month"];
+const STATE_ABBREVS = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
 interface BillingConfig {
   npi: string;
@@ -198,8 +228,7 @@ const SettingsBillingConfig = () => {
           )}
           {tab === "general" && <GeneralTab />}
           {tab === "payers" && <PayersTab payers={payers} setPayers={setPayers} />}
-          {tab === "funding" && <FundingTab />}
-          {tab === "rates" && <RatesTab />}
+          {tab === "billing_rules" && <BillingRulesTab orgId={orgId ?? ""} />}
           {tab === "iddbilling" && <IddBillingTab orgId={orgId ?? ""} />}
         </>
       )}
@@ -837,6 +866,866 @@ function FundingStreamModal({
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {initial ? "Save Changes" : "Add Stream"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BillingRulesTab ──────────────────────────────────────────────────────────
+
+function BillingRulesTab({ orgId }: { orgId: string }) {
+  const { userProfile } = useAuth();
+  const [rules, setRules] = useState<BillingRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [editing, setEditing] = useState<BillingRule | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [filterState, setFilterState] = useState<string>("All");
+  const [filterStatus, setFilterStatus] = useState<string>("All");
+
+  useEffect(() => {
+    if (!orgId) { setLoading(false); return; }
+    const q = query(collection(db, "billingRules"), where("organizationId", "==", orgId));
+    const unsub = onSnapshot(q, snap => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BillingRule, "id">) }));
+      // Sort: active first, then by serviceCode alphabetically
+      rows.sort((a, b) => {
+        if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+        return a.serviceCode.localeCompare(b.serviceCode);
+      });
+      setRules(rows);
+      setLoading(false);
+    }, err => { console.error("[billingRules]", err); setLoading(false); });
+    return unsub;
+  }, [orgId]);
+
+  const displayed = rules.filter(r => {
+    if (filterState !== "All" && r.state !== filterState) return false;
+    if (filterStatus !== "All" && r.status !== filterStatus) return false;
+    return true;
+  });
+
+  const handleAdd = async (form: BillingRuleForm) => {
+    await addDoc(collection(db, "billingRules"), {
+      ...form, organizationId: orgId,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      createdBy: userProfile?.uid ?? "",
+    });
+    toast.success("Billing rule added.");
+  };
+
+  const handleEdit = async (form: BillingRuleForm) => {
+    if (!editing) return;
+    await updateDoc(doc(db, "billingRules", editing.id), { ...form, updatedAt: serverTimestamp() });
+    toast.success("Billing rule updated.");
+    setEditing(null);
+  };
+
+  const handleDeactivate = async (id: string) => {
+    await updateDoc(doc(db, "billingRules", id), { status: "inactive", updatedAt: serverTimestamp() });
+    toast.success("Billing rule deactivated.");
+    setOpenMenuId(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this billing rule? This cannot be undone.")) return;
+    await deleteDoc(doc(db, "billingRules", id));
+    toast.success("Billing rule deleted.");
+    setOpenMenuId(null);
+  };
+
+  const uniqueStates = Array.from(new Set(rules.map(r => r.state).filter(Boolean))).sort();
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="font-manrope font-bold text-[16px] text-icm-text">Rates & billing rules</p>
+          <p className="text-[12px] font-geist text-icm-text-dim mt-0.5">Define which services are billable, under which programs, at what rate.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="h-8 px-3 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist font-semibold text-icm-text-dim inline-flex items-center gap-1.5 hover:text-icm-text hover:border-icm-border-strong"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Import from CSV
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="h-8 px-3 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-teal-700"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add billing rule
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2">
+        <select value={filterState} onChange={e => setFilterState(e.target.value)}
+          className="h-8 px-2 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none">
+          <option value="All">All States</option>
+          {uniqueStates.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="h-8 px-2 rounded-lg border border-icm-border bg-icm-panel text-[12px] font-geist text-icm-text focus:outline-none">
+          <option value="All">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        {(filterState !== "All" || filterStatus !== "All") && (
+          <button onClick={() => { setFilterState("All"); setFilterStatus("All"); }}
+            className="text-[11.5px] font-geist text-icm-accent hover:underline">Clear filters</button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-8 text-icm-text-dim text-[12px] font-geist justify-center">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+        </div>
+      ) : displayed.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-icm-border py-10 text-center">
+          <p className="text-[13px] font-geist text-icm-text-dim">No billing rules configured yet.</p>
+          <button onClick={() => setShowAdd(true)} className="mt-2 text-[12.5px] font-geist font-semibold text-icm-accent hover:underline">
+            + Add your first billing rule
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-icm-border overflow-hidden">
+          <table className="w-full text-[12px] font-geist">
+            <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+              <tr>
+                {["Service Code","Description","Program","Payer","Rate","Unit","Effective Date","State","Status",""].map((h, i) => (
+                  <th key={i} className={cn("text-left px-3 py-2 font-semibold", i === 9 && "w-8")}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayed.map(r => {
+                const isInactive = r.status === "inactive";
+                return (
+                  <tr key={r.id} className={cn("border-t border-icm-border hover:bg-icm-bg/40", isInactive && "opacity-60")}>
+                    <td className="px-3 py-2.5 font-mono font-bold text-icm-text">{r.serviceCode}</td>
+                    <td className="px-3 py-2.5 text-icm-text">{r.description || "—"}</td>
+                    <td className="px-3 py-2.5 text-icm-text-dim text-[11.5px]">{r.program || "—"}</td>
+                    <td className="px-3 py-2.5 text-icm-text">{r.payer}</td>
+                    <td className="px-3 py-2.5 text-icm-text">${typeof r.rate === "number" ? r.rate.toFixed(2) : r.rate}</td>
+                    <td className="px-3 py-2.5 text-icm-text-dim">{r.billingUnit}</td>
+                    <td className="px-3 py-2.5 text-icm-text-dim">{r.effectiveDate || "—"}</td>
+                    <td className="px-3 py-2.5 text-icm-text-dim">{r.state}</td>
+                    <td className="px-3 py-2.5">
+                      {isInactive
+                        ? <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-bg text-icm-text-dim ring-1 ring-icm-border">Inactive</span>
+                        : <span className="px-1.5 py-0.5 rounded-full text-[10px] font-geist font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">Current</span>
+                      }
+                    </td>
+                    <td className="px-3 py-2.5 relative">
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === r.id ? null : r.id)}
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-icm-bg text-icm-text-dim"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                      {openMenuId === r.id && (
+                        <div className="absolute right-2 top-8 z-20 w-40 rounded-xl border border-icm-border bg-icm-panel shadow-elevated py-1"
+                          onMouseLeave={() => setOpenMenuId(null)}>
+                          <button onClick={() => { setEditing(r); setOpenMenuId(null); }}
+                            className="w-full text-left px-3 py-1.5 text-[12px] font-geist text-icm-text hover:bg-icm-bg flex items-center gap-2">
+                            <Pencil className="w-3.5 h-3.5 text-icm-text-dim" /> Edit
+                          </button>
+                          {!isInactive && (
+                            <button onClick={() => handleDeactivate(r.id)}
+                              className="w-full text-left px-3 py-1.5 text-[12px] font-geist text-icm-text hover:bg-icm-bg flex items-center gap-2">
+                              <svg className="w-3.5 h-3.5 text-icm-text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                              Deactivate
+                            </button>
+                          )}
+                          <button onClick={() => handleDelete(r.id)}
+                            className="w-full text-left px-3 py-1.5 text-[12px] font-geist text-icm-red hover:bg-icm-bg flex items-center gap-2">
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAdd && <BillingRuleModal orgId={orgId} onClose={() => setShowAdd(false)} onSave={handleAdd} existingRules={rules} />}
+      {editing && <BillingRuleModal orgId={orgId} initial={editing} onClose={() => setEditing(null)} onSave={handleEdit} existingRules={rules} />}
+      {showImport && <BillingRulesImportModal orgId={orgId} onClose={() => setShowImport(false)} onImportComplete={() => {}} />}
+    </div>
+  );
+}
+
+// ─── BillingRuleModal ─────────────────────────────────────────────────────────
+
+function BillingRuleModal({
+  orgId, initial, onClose, onSave, existingRules,
+}: {
+  orgId: string;
+  initial?: BillingRule;
+  onClose: () => void;
+  onSave: (form: BillingRuleForm) => Promise<void>;
+  existingRules: BillingRule[];
+}) {
+  const [form, setForm] = useState<BillingRuleForm>(
+    initial
+      ? { serviceCode: initial.serviceCode, description: initial.description, program: initial.program, payer: initial.payer, rate: initial.rate, billingUnit: initial.billingUnit, effectiveDate: initial.effectiveDate, endDate: initial.endDate, state: initial.state, status: initial.status, createdBy: initial.createdBy ?? "" }
+      : { ...EMPTY_RULE }
+  );
+  const [errors, setErrors] = useState<Partial<Record<keyof BillingRuleForm, string>>>({});
+  const [saving, setSaving] = useState(false);
+  const [dupWarning, setDupWarning] = useState(false);
+
+  const set = (k: keyof BillingRuleForm, v: string | number | null) =>
+    setForm(f => ({ ...f, [k]: v }));
+
+  const validate = (): boolean => {
+    const e: Partial<Record<keyof BillingRuleForm, string>> = {};
+    if (!form.serviceCode.trim()) e.serviceCode = "Service code is required.";
+    if (!form.payer.trim()) e.payer = "Payer is required.";
+    if (!form.program.trim()) e.program = "Program is required.";
+    if (!form.state) e.state = "State is required.";
+    if (!form.rate || Number(form.rate) <= 0) e.rate = "Rate must be a positive number.";
+    if (form.effectiveDate && form.endDate && form.endDate < form.effectiveDate) e.endDate = "End date must be after effective date.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    // Duplicate check: warn but don't block
+    if (!initial) {
+      const dup = existingRules.find(r =>
+        r.serviceCode.trim().toUpperCase() === form.serviceCode.trim().toUpperCase() &&
+        r.payer.trim().toLowerCase() === form.payer.trim().toLowerCase() &&
+        r.state === form.state &&
+        r.status === "active"
+      );
+      if (dup && !dupWarning) { setDupWarning(true); return; }
+    }
+    setSaving(true);
+    try {
+      await onSave({ ...form, rate: Number(form.rate) });
+      onClose();
+    } catch (err: any) { toast.error("Failed to save: " + (err?.message ?? err)); }
+    finally { setSaving(false); }
+  };
+
+  const Label = ({ text, required }: { text: string; required?: boolean }) => (
+    <label className="block text-[10.5px] font-geist font-semibold uppercase tracking-wider text-icm-text-dim mb-1">
+      {text}{required && <span className="text-icm-red ml-0.5">*</span>}
+    </label>
+  );
+  const Err = ({ field }: { field: keyof BillingRuleForm }) =>
+    errors[field] ? <p className="text-[10.5px] text-icm-red mt-0.5">{errors[field]}</p> : null;
+  const SectionDivider = ({ title }: { title: string }) => (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="text-[10.5px] font-geist font-bold uppercase tracking-wider text-icm-text-dim">{title}</span>
+      <div className="flex-1 h-px bg-icm-border" />
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-icm-panel rounded-2xl border border-icm-border shadow-xl overflow-y-auto max-h-[90vh]"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-5 space-y-4">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="font-manrope font-bold text-[15px] text-icm-text">
+                {initial ? "Edit billing rule" : "Add billing rule"}
+              </h3>
+              <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">Defines eligibility + rate for a service code.</p>
+            </div>
+            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-icm-bg text-icm-text-dim text-[16px]">✕</button>
+          </div>
+
+          {/* Info callout */}
+          <div className="rounded-lg bg-icm-bg border border-icm-border px-3 py-2.5 flex items-start gap-2">
+            <Info className="w-4 h-4 text-icm-text-dim shrink-0 mt-0.5" />
+            <p className="text-[11.5px] font-geist text-icm-text-dim leading-relaxed">
+              Program &amp; payer confirm who can bill. Rate &amp; unit determine how much. Both are required for claim validation.
+            </p>
+          </div>
+
+          {dupWarning && (
+            <div className="rounded-lg bg-icm-amber-soft border border-icm-amber/30 px-3 py-2.5 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[12px] font-geist font-semibold text-icm-text">Possible duplicate</p>
+                <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">
+                  An active rule with this service code, payer, and state already exists. Save anyway?
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Section 1: Service */}
+          <div className="space-y-3">
+            <div>
+              <Label text="Service code" required />
+              <input value={form.serviceCode} onChange={e => set("serviceCode", e.target.value)} placeholder="e.g. T2022"
+                className={cn("w-full h-9 px-3 rounded-lg border bg-icm-bg text-[12.5px] font-geist font-mono focus:outline-none focus:border-icm-accent", errors.serviceCode ? "border-icm-red" : "border-icm-border")} />
+              <Err field="serviceCode" />
+            </div>
+            <div>
+              <Label text="Description" />
+              <input value={form.description} onChange={e => set("description", e.target.value)} placeholder="e.g. Case management"
+                className="w-full h-9 px-3 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent" />
+            </div>
+          </div>
+
+          {/* Section 2: Eligibility */}
+          <SectionDivider title="Eligibility" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label text="Program" required />
+              <input value={form.program} onChange={e => set("program", e.target.value)} placeholder="e.g. Community Integration"
+                className={cn("w-full h-9 px-3 rounded-lg border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent", errors.program ? "border-icm-red" : "border-icm-border")} />
+              <Err field="program" />
+            </div>
+            <div>
+              <Label text="Payer" required />
+              <input value={form.payer} onChange={e => set("payer", e.target.value)} placeholder="e.g. IHCP, NJ DDD"
+                className={cn("w-full h-9 px-3 rounded-lg border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent", errors.payer ? "border-icm-red" : "border-icm-border")} />
+              <Err field="payer" />
+            </div>
+            <div>
+              <Label text="State" required />
+              <select value={form.state} onChange={e => set("state", e.target.value)}
+                className={cn("w-full h-9 px-2 rounded-lg border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent", errors.state ? "border-icm-red" : "border-icm-border")}>
+                <option value="">— Select —</option>
+                {STATE_ABBREVS.map(s => <option key={s}>{s}</option>)}
+              </select>
+              <Err field="state" />
+            </div>
+            <div>
+              <Label text="Billing unit" />
+              <select value={form.billingUnit} onChange={e => set("billingUnit", e.target.value)}
+                className="w-full h-9 px-2 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent">
+                {BILLING_UNIT_OPTIONS.map(u => <option key={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Section 3: Rate */}
+          <SectionDivider title="Rate" />
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label text="Rate" required />
+              <input type="number" min="0" step="0.01" value={form.rate || ""} onChange={e => set("rate", e.target.value)}
+                placeholder="$0.00"
+                className={cn("w-full h-9 px-3 rounded-lg border bg-icm-bg text-[12.5px] font-geist font-mono focus:outline-none focus:border-icm-accent", errors.rate ? "border-icm-red" : "border-icm-border")} />
+              <Err field="rate" />
+            </div>
+            <div>
+              <Label text="Effective date" />
+              <input type="date" value={form.effectiveDate} onChange={e => set("effectiveDate", e.target.value)}
+                className="w-full h-9 px-2 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent" />
+            </div>
+            <div>
+              <Label text="End date" />
+              <input type="date" value={form.endDate ?? ""} onChange={e => set("endDate", e.target.value || null)}
+                className={cn("w-full h-9 px-2 rounded-lg border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent", errors.endDate ? "border-icm-red" : "border-icm-border")} />
+              <Err field="endDate" />
+            </div>
+          </div>
+
+          {/* Section 4: Status */}
+          <div>
+            <Label text="Status" />
+            <select value={form.status} onChange={e => set("status", e.target.value as "active" | "inactive")}
+              className="w-full h-9 px-2 rounded-lg border border-icm-border bg-icm-bg text-[12.5px] font-geist focus:outline-none focus:border-icm-accent">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button onClick={onClose} className="h-8 px-4 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text">Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              className="h-8 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-50 flex items-center gap-1.5">
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {dupWarning ? "Save anyway" : initial ? "Save changes" : "Save billing rule"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BillingRulesImportModal ──────────────────────────────────────────────────
+
+type ImportStep = 1 | 2 | 3 | 4;
+
+interface CsvRow { [key: string]: string }
+
+const FIELD_OPTIONS = [
+  { key: "serviceCode",    label: "Service code" },
+  { key: "description",   label: "Description" },
+  { key: "program",       label: "Program" },
+  { key: "payer",         label: "Payer" },
+  { key: "rate",          label: "Rate" },
+  { key: "billingUnit",   label: "Billing unit" },
+  { key: "effectiveDate", label: "Effective date" },
+  { key: "endDate",       label: "End date" },
+  { key: "state",         label: "State" },
+  { key: "status",        label: "Status" },
+];
+
+const AUTO_MAP: Record<string, string> = {
+  service_code: "serviceCode", code: "serviceCode", proc_code: "serviceCode", procedure: "serviceCode",
+  description: "description", desc: "description", service_name: "description", name: "description",
+  program: "program", waiver: "program", program_name: "program",
+  payer: "payer", payer_name: "payer", insurance: "payer",
+  rate: "rate", amount: "rate", price: "rate", reimbursement: "rate",
+  unit: "billingUnit", billing_unit: "billingUnit", increment: "billingUnit",
+  effective_date: "effectiveDate", start_date: "effectiveDate", date: "effectiveDate",
+  end_date: "endDate", expiry: "endDate", expiration: "endDate",
+  state: "state", state_code: "state",
+  status: "status", active: "status",
+};
+
+function autoMatch(col: string): string | null {
+  const normalized = col.toLowerCase().trim().replace(/\s+/g, "_");
+  return AUTO_MAP[normalized] ?? null;
+}
+
+interface DupEntry {
+  rowIndex: number;
+  importRow: CsvRow;
+  existing: BillingRule;
+  action: "skip" | "replace" | "import_new";
+}
+
+const TEMPLATE_CSV = `service_code,description,program,payer,rate,unit,effective_date,end_date,state,status
+T2022,Case management,Community Integration,IHCP,28.50,15 min,2024-01-01,,IN,active
+`;
+
+function BillingRulesImportModal({
+  orgId, onClose, onImportComplete,
+}: {
+  orgId: string;
+  onClose: () => void;
+  onImportComplete: () => void;
+}) {
+  const [step, setStep] = useState<ImportStep>(1);
+  const [file, setFile] = useState<File | null>(null);
+  const [rows, setRows] = useState<CsvRow[]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<string, string | null>>({});
+  const [dupEntries, setDupEntries] = useState<DupEntry[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importCount, setImportCount] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const autoMapped = Object.values(mapping).filter(Boolean).length;
+  const unmapped = headers.filter(h => !mapping[h]).length;
+
+  const parseCsv = (text: string): { headers: string[]; rows: CsvRow[] } => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return { headers: [], rows: [] };
+    const hdrs = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+    const dataRows: CsvRow[] = lines.slice(1).map(line => {
+      const vals = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""));
+      return Object.fromEntries(hdrs.map((h, i) => [h, vals[i] ?? ""]));
+    });
+    return { headers: hdrs, rows: dataRows };
+  };
+
+  const handleFile = (f: File) => {
+    setFile(f);
+    const reader = new FileReader();
+    reader.onload = e => {
+      const text = e.target?.result as string;
+      const { headers: hdrs, rows: dataRows } = parseCsv(text);
+      setHeaders(hdrs);
+      setRows(dataRows);
+      const autoMapping: Record<string, string | null> = {};
+      hdrs.forEach(h => { autoMapping[h] = autoMatch(h); });
+      setMapping(autoMapping);
+    };
+    reader.readAsText(f);
+  };
+
+  const resolveRow = (row: CsvRow): Partial<BillingRuleForm> => {
+    const result: any = {};
+    headers.forEach(h => {
+      const field = mapping[h];
+      if (field) result[field] = row[h];
+    });
+    if (result.rate) result.rate = parseFloat(result.rate) || 0;
+    if (!result.status) result.status = "active";
+    if (!result.billingUnit) result.billingUnit = "15 min";
+    return result;
+  };
+
+  const runDuplicateCheck = async () => {
+    const q = query(collection(db, "billingRules"), where("organizationId", "==", orgId));
+    const snap = await getDocs(q);
+    const existing = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BillingRule, "id">) }));
+    const dups: DupEntry[] = [];
+    rows.forEach((row, i) => {
+      const resolved = resolveRow(row);
+      const match = existing.find(r =>
+        r.serviceCode?.toUpperCase() === (resolved.serviceCode ?? "").toUpperCase() &&
+        r.payer?.toLowerCase() === (resolved.payer ?? "").toLowerCase() &&
+        r.state === resolved.state &&
+        r.status === "active"
+      );
+      if (match) dups.push({ rowIndex: i, importRow: row, existing: match, action: "skip" });
+    });
+    setDupEntries(dups);
+    setStep(3);
+  };
+
+  const getDupsMap = () => new Map(dupEntries.map(d => [d.rowIndex, d]));
+
+  const rowsToImport = rows.filter((_, i) => {
+    const dup = getDupsMap().get(i);
+    return !dup || dup.action !== "skip";
+  });
+
+  const handleImport = async () => {
+    setImporting(true);
+    const dupsMap = getDupsMap();
+    let count = 0;
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        const dup = dupsMap.get(i);
+        if (dup?.action === "skip") continue;
+        const resolved = resolveRow(rows[i]);
+        const data = {
+          ...resolved, organizationId: orgId,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        };
+        if (dup?.action === "replace") {
+          await updateDoc(doc(db, "billingRules", dup.existing.id), { ...resolved, updatedAt: serverTimestamp() });
+        } else {
+          await addDoc(collection(db, "billingRules"), data);
+        }
+        count++;
+        if (count % 50 === 0) setImportCount(count);
+      }
+      setImportCount(count);
+      toast.success(`${count} billing rules imported successfully.`);
+      onImportComplete();
+      onClose();
+    } catch (err: any) {
+      toast.error("Import failed: " + (err?.message ?? err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([TEMPLATE_CSV], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "billing_rules_template.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Step indicator styles
+  const StepIndicator = () => (
+    <div className="flex items-center gap-1 mb-5">
+      {[1,2,3,4].map((s, i) => {
+        const labels = ["Upload file","Map fields","Duplicate check","Review & import"];
+        const done = step > s;
+        const active = step === s;
+        return (
+          <React.Fragment key={s}>
+            <div className="flex items-center gap-1.5">
+              <div className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                done ? "bg-icm-green text-white" : active ? "bg-teal-600 text-white" : "border-2 border-icm-border text-icm-text-dim"
+              )}>
+                {done ? "✓" : s}
+              </div>
+              <span className={cn("text-[11px] font-geist whitespace-nowrap", active ? "text-icm-text font-semibold" : "text-icm-text-dim")}>
+                {labels[i]}
+              </span>
+            </div>
+            {i < 3 && <div className="flex-1 h-px bg-icm-border min-w-[8px]" />}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-icm-panel rounded-2xl border border-icm-border shadow-xl overflow-hidden max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-icm-border shrink-0">
+          <div className="flex items-start justify-between mb-1">
+            <div>
+              <h3 className="font-manrope font-bold text-[15px] text-icm-text">Import billing rules</h3>
+              <p className="text-[11.5px] font-geist text-icm-text-dim mt-0.5">Handles large files · Detects duplicates · Batch writes to Firestore</p>
+            </div>
+            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-icm-bg text-icm-text-dim text-[16px]">✕</button>
+          </div>
+          <StepIndicator />
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+
+          {/* ── STEP 1: Upload ── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div
+                className="border-2 border-dashed border-icm-border rounded-xl py-12 flex flex-col items-center gap-3 cursor-pointer hover:border-icm-accent/50 hover:bg-icm-bg/30 transition-colors"
+                onClick={() => fileRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+              >
+                <svg className="w-10 h-10 text-icm-text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <div className="text-center">
+                  <p className="font-manrope font-semibold text-[14px] text-icm-text">Drop your CSV file here</p>
+                  <p className="text-[12px] font-geist text-icm-text-dim mt-0.5">or click to browse — CSV files only, up to 10MB</p>
+                </div>
+                {file && (
+                  <div className="flex items-center gap-2 bg-icm-bg border border-icm-border rounded-lg px-3 py-1.5">
+                    <span className="text-[12px] font-geist font-semibold text-icm-text">{file.name}</span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700">{rows.length} rows</span>
+                  </div>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept=".csv" className="sr-only"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+              <button onClick={downloadTemplate} className="text-[12px] font-geist font-semibold text-icm-accent hover:underline flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Download CSV template
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP 2: Map fields ── */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[12px] font-geist text-icm-text">File: <strong>{file?.name}</strong></span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700">{rows.length} rows</span>
+                <span className="text-[11px] font-geist text-icm-green">✓ {autoMapped} auto-matched</span>
+                {unmapped > 0 && <span className="text-[11px] font-geist text-icm-text-dim">⊗ {unmapped} unmapped</span>}
+              </div>
+              <div className="rounded-xl border border-icm-border overflow-hidden">
+                <table className="w-full text-[12px] font-geist">
+                  <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Excel Column</th>
+                      <th className="w-6" />
+                      <th className="text-left px-3 py-2 font-semibold">System Field</th>
+                      <th className="text-left px-3 py-2 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {headers.map(h => {
+                      const example = rows[0]?.[h] ?? "";
+                      const matched = !!mapping[h];
+                      return (
+                        <tr key={h} className="border-t border-icm-border hover:bg-icm-bg/30">
+                          <td className="px-3 py-2.5">
+                            <div className="font-semibold text-icm-text">{h}</div>
+                            {example && <div className="text-[10.5px] text-icm-text-faint mt-0.5">e.g. {example}</div>}
+                          </td>
+                          <td className="text-center text-icm-text-faint">→</td>
+                          <td className="px-3 py-2.5">
+                            <select value={mapping[h] ?? ""} onChange={e => setMapping(m => ({ ...m, [h]: e.target.value || null }))}
+                              className="w-full h-8 px-2 rounded-lg border border-icm-border bg-icm-bg text-[12px] font-geist focus:outline-none focus:border-icm-accent">
+                              <option value="">— Skip this column —</option>
+                              {FIELD_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {matched
+                              ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-icm-green-soft text-icm-green ring-1 ring-icm-green/20">✓ Auto-matched</span>
+                              : <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-icm-bg text-icm-text-dim ring-1 ring-icm-border">⊗ No match</span>
+                            }
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 3: Duplicate check ── */}
+          {step === 3 && (
+            <div className="space-y-4">
+              {dupEntries.length === 0 ? (
+                <div className="rounded-xl border border-icm-green/30 bg-icm-green-soft/30 py-8 text-center">
+                  <p className="text-[22px] mb-1">✓</p>
+                  <p className="font-manrope font-semibold text-[14px] text-icm-green">No duplicates found.</p>
+                  <p className="text-[12px] font-geist text-icm-text-dim mt-1">Ready to import {rows.length} rules.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-lg bg-icm-amber-soft border border-icm-amber/30 px-3 py-2.5 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-icm-amber shrink-0" />
+                    <p className="text-[12px] font-geist text-icm-text font-semibold">{dupEntries.length} duplicates found. Choose how to handle each.</p>
+                  </div>
+                  <div className="rounded-xl border border-icm-border overflow-hidden">
+                    <table className="w-full text-[12px] font-geist">
+                      <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-semibold">Import Row</th>
+                          <th className="text-left px-3 py-2 font-semibold">Existing Record</th>
+                          <th className="text-left px-3 py-2 font-semibold">Conflict</th>
+                          <th className="text-left px-3 py-2 font-semibold">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dupEntries.map((dup, di) => {
+                          const resolved = resolveRow(dup.importRow);
+                          const rateChanged = Number(resolved.rate) !== dup.existing.rate;
+                          return (
+                            <tr key={di} className="border-t border-icm-border hover:bg-icm-bg/30">
+                              <td className="px-3 py-2.5">
+                                <div className="font-mono font-bold text-icm-text">{resolved.serviceCode} · {resolved.payer} · {resolved.state}</div>
+                                <div className="text-[10.5px] text-icm-text-dim">${resolved.rate} / {resolved.billingUnit}</div>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <div className="font-mono font-bold text-icm-text">{dup.existing.serviceCode} · {dup.existing.payer} · {dup.existing.state}</div>
+                                <div className="text-[10.5px] text-icm-text-dim">${dup.existing.rate} / {dup.existing.billingUnit}</div>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                {rateChanged
+                                  ? <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-icm-amber-soft text-icm-amber ring-1 ring-icm-amber/20">Rate differs</span>
+                                  : <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-icm-bg text-icm-text-dim ring-1 ring-icm-border">Identical</span>
+                                }
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <select value={dup.action}
+                                  onChange={e => setDupEntries(prev => prev.map((d, i) => i === di ? { ...d, action: e.target.value as DupEntry["action"] } : d))}
+                                  className="h-8 px-2 rounded-lg border border-icm-border bg-icm-bg text-[11.5px] font-geist focus:outline-none">
+                                  <option value="skip">Skip (keep existing)</option>
+                                  <option value="replace">Replace existing</option>
+                                  <option value="import_new">Import as new</option>
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── STEP 4: Review & Import ── */}
+          {step === 4 && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-icm-border bg-icm-panel px-4 py-3 text-center">
+                  <p className="font-manrope font-bold text-[26px] text-icm-green">{rowsToImport.length}</p>
+                  <p className="text-[11px] font-geist text-icm-text-dim mt-0.5">Rules to import</p>
+                </div>
+                <div className="rounded-xl border border-icm-border bg-icm-panel px-4 py-3 text-center">
+                  <p className="font-manrope font-bold text-[26px] text-icm-text-dim">{dupEntries.filter(d => d.action === "skip").length}</p>
+                  <p className="text-[11px] font-geist text-icm-text-dim mt-0.5">Skipped (identical)</p>
+                </div>
+                <div className="rounded-xl border border-icm-border bg-icm-panel px-4 py-3 text-center">
+                  <p className="font-manrope font-bold text-[26px] text-icm-amber">{dupEntries.filter(d => d.action === "replace").length}</p>
+                  <p className="text-[11px] font-geist text-icm-text-dim mt-0.5">Duplicates to replace</p>
+                </div>
+              </div>
+
+              {/* Preview table */}
+              <div className="rounded-xl border border-icm-border overflow-hidden max-h-[300px] overflow-y-auto">
+                <table className="w-full text-[12px] font-geist">
+                  <thead className="bg-icm-bg text-icm-text-dim text-[10.5px] uppercase tracking-wider sticky top-0">
+                    <tr>
+                      {["Code","Program","Payer","Rate","State"].map(h => (
+                        <th key={h} className="text-left px-3 py-2 font-semibold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rowsToImport.map((row, i) => {
+                      const r = resolveRow(row);
+                      const missingRequired = !r.serviceCode || !r.payer || !r.rate;
+                      return (
+                        <tr key={i} className={cn("border-t border-icm-border", missingRequired && "bg-icm-red-soft/30")}>
+                          <td className="px-3 py-2 font-mono font-bold text-icm-text">{r.serviceCode || <span className="text-icm-red">Missing!</span>}</td>
+                          <td className="px-3 py-2 text-icm-text-dim text-[11.5px]">{r.program || "—"}</td>
+                          <td className="px-3 py-2">{r.payer || <span className="text-icm-red">Missing!</span>}</td>
+                          <td className="px-3 py-2 font-mono">{r.rate ? `$${Number(r.rate).toFixed(2)}` : <span className="text-icm-red">Missing!</span>}</td>
+                          <td className="px-3 py-2 text-icm-text-dim">{r.state || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {importing && (
+                <div className="flex items-center gap-2 text-[12px] font-geist text-icm-text-dim justify-center py-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                  Importing… {importCount > 0 && `${importCount} written so far`}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-icm-border flex items-center justify-between shrink-0">
+          <button
+            onClick={() => { if (step === 1) onClose(); else setStep((step - 1) as ImportStep); }}
+            className="h-8 px-4 rounded-lg border border-icm-border text-[12px] font-geist font-semibold text-icm-text-dim hover:text-icm-text flex items-center gap-1.5"
+          >
+            {step === 1 ? "Cancel" : "‹ Back"}
+          </button>
+
+          {step === 1 && (
+            <button disabled={!file || rows.length === 0} onClick={() => setStep(2)}
+              className="h-8 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-40">
+              Map fields ›
+            </button>
+          )}
+          {step === 2 && (
+            <button
+              disabled={!Object.values(mapping).some(v => v === "serviceCode") || !Object.values(mapping).some(v => v === "payer")}
+              onClick={runDuplicateCheck}
+              className="h-8 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-40">
+              Check for duplicates ›
+            </button>
+          )}
+          {step === 3 && (
+            <button onClick={() => setStep(4)}
+              className="h-8 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700">
+              Review & import ›
+            </button>
+          )}
+          {step === 4 && (
+            <button onClick={handleImport} disabled={importing || rowsToImport.length === 0}
+              className="h-8 px-4 rounded-lg bg-teal-600 text-white text-[12px] font-geist font-semibold hover:bg-teal-700 disabled:opacity-40 flex items-center gap-1.5">
+              {importing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Import {rowsToImport.length} billing rules
+            </button>
+          )}
         </div>
       </div>
     </div>

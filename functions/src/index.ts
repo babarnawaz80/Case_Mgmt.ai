@@ -99,6 +99,7 @@ export { sendVisitReminders } from "./triggers/visitReminders";
 
 // ─── Brain Orchestrator ───────────────────────────────────────────────────────
 export { scheduledOrchestrator, manualOrchestratorRun } from "./orchestrator/brainOrchestrator";
+export { onIndividualEnrolled, onIncidentReported, onContactNoteSubmitted } from "./orchestrator/orchestratorTriggers";
 
 // ─── PCP Generation ───────────────────────────────────────────────────────────
 export { generatePCP } from "./api/generatePCP";
@@ -128,6 +129,9 @@ export { scanDocumentOnCreate } from "./api/scanDocument";
 
 // ─── One-time data migrations (callable) ──────────────────────────────────────
 export { migrateIndividualStates } from "./api/migrateIndividualStates";
+
+// ─── Voice Proxy (Gemini 2.0 Live API WebSocket proxy) ────────────────────────
+export { voiceProxy } from "./api/voiceProxy";
 
 // ─── Provider Portal (callable functions) ─────────────────────────────────────
 export {

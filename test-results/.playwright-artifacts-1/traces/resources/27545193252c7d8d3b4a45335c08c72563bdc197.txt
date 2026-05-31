@@ -1,0 +1,1 @@
+{"structuredAggregationQuery":{"aggregations":[{"alias":"aggregate_0","count":{}}],"structuredQuery":{"from":[{"collectionId":"progress_notes"}],"where":{"fieldFilter":{"field":{"fieldPath":"individualId"},"op":"EQUAL","value":{"stringValue":"ind-001"}}}}}}

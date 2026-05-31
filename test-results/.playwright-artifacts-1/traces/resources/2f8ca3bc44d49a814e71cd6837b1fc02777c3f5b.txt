@@ -1,0 +1,101 @@
+2230
+[[7,[{
+  "targetChange": {
+    "targetChangeType": "ADD",
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[8,[{
+  "targetChange": {
+    "targetChangeType": "ADD",
+    "targetIds": [
+      1006
+    ]
+  }
+}
+]],[9,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/organizations/org_demo_casemanagement_ai",
+      "fields": {
+        "dailyLimit": {
+          "integerValue": "0"
+        },
+        "perUserLimit": {
+          "integerValue": "0"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-25T19:18:27.080Z"
+        },
+        "credit_balance": {
+          "integerValue": "0"
+        },
+        "ai_paused_at": {
+          "timestampValue": "2026-05-28T05:55:30.644Z"
+        },
+        "id": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "name": {
+          "stringValue": "CaseManagement Demo Org"
+        },
+        "ai_features_enabled": {
+          "booleanValue": false
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-25T19:18:27.080Z"
+        },
+        "total_credits_used": {
+          "integerValue": "2"
+        },
+        "aiPaused": {
+          "booleanValue": false
+        },
+        "creditBalance": {
+          "integerValue": "50000"
+        },
+        "programs": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "HCBS Waiver — Community Integration"
+              },
+              {
+                "stringValue": "HCBS Waiver — Supported Living"
+              },
+              {
+                "stringValue": "HCBS Waiver — Personal Care"
+              }
+            ]
+          }
+        },
+        "primaryState": {
+          "stringValue": "IN"
+        },
+        "lowAlertThresholdPct": {
+          "integerValue": "20"
+        },
+        "aiEnabled": {
+          "booleanValue": true
+        }
+      },
+      "createTime": "2026-05-25T19:18:27.073615Z",
+      "updateTime": "2026-05-28T05:55:30.683054Z"
+    },
+    "targetIds": [
+      1006
+    ]
+  }
+}
+]],[10,[{
+  "targetChange": {
+    "targetIds": [
+      1006
+    ],
+    "resumeToken": "CgkIpZ2RtvrilAM=",
+    "readTime": "2026-05-31T07:01:47.500197Z"
+  }
+}
+]]]

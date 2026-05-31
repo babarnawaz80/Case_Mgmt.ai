@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ICMShell } from "@/components/icm/ICMShell";
 import { Breadcrumbs } from "@/components/icm/Breadcrumbs";
@@ -18,9 +18,10 @@ import { AssessmentComplianceSection } from "@/components/orchestrator/Assessmen
 import { StateComplianceBreakdown } from "@/components/orchestrator/StateComplianceBreakdown";
 import { cn } from "@/lib/utils";
 import { httpsCallable } from "firebase/functions";
-import { functions as fns } from "@/lib/firebase";
+import { functions as fns, db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { Database } from "lucide-react";
+import { Database, PauseCircle, X } from "lucide-react";
 import { individualState, stateDisplayLabel } from "@/lib/stateUtils";
 
 // ─── Tab config ────────────────────────────────────────────────────────────────
@@ -85,6 +86,33 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
   const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(new Set(["overview"]));
   const [selectedState, setSelectedState] = useState("all");
 
+  // ── Orchestrator pause state — reads/writes /config/orchestrator ────────────
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseLoading, setPauseLoading] = useState(false);
+  const [pauseBannerDismissed, setPauseBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "orchestrator"))
+      .then(snap => { if (snap.exists()) setIsPaused(snap.data()?.paused === true); })
+      .catch(() => {});
+  }, []);
+
+  async function togglePause() {
+    if (!isAdmin) return;
+    setPauseLoading(true);
+    const next = !isPaused;
+    try {
+      await setDoc(doc(db, "config", "orchestrator"), { paused: next }, { merge: true });
+      setIsPaused(next);
+      setPauseBannerDismissed(false);
+      toast.success(next ? "Automated runs paused" : "Automated runs resumed");
+    } catch {
+      toast.error("Failed to update orchestrator config");
+    } finally {
+      setPauseLoading(false);
+    }
+  }
+
   // MUST be declared before any useMemo that references `individuals` or `tasks`
   // to avoid "Cannot access before initialization" TDZ errors in the minified bundle.
   const { individuals, loading: individualsLoading } = useIndividuals();
@@ -142,6 +170,23 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
           items={[{ label: "AI Agents", to: "/agents" }, { label: "AI Orchestrator" }]}
         />
 
+        {/* Paused banner — amber, dismissible */}
+        {isPaused && !pauseBannerDismissed && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 flex items-center gap-3">
+            <PauseCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="text-[12.5px] font-geist font-semibold text-amber-800 flex-1">
+              Automated runs are paused. Manual runs via Run Now are still active.
+            </span>
+            <button
+              onClick={() => setPauseBannerDismissed(true)}
+              className="text-amber-500 hover:text-amber-700"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Always-visible header */}
         <SystemStatusHeader
           lastRun={lastRun}
@@ -183,6 +228,25 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
                 <span>{unassignedCount} individual{unassignedCount !== 1 ? "s" : ""} have no state assigned</span>
               </span>
             )}
+          </div>
+        )}
+
+        {/* Admin-only pause toggle */}
+        {isAdmin && (
+          <div className="flex justify-end">
+            <button
+              onClick={togglePause}
+              disabled={pauseLoading}
+              className={cn(
+                "h-7 px-3 rounded-lg text-[11.5px] font-geist font-semibold inline-flex items-center gap-1.5 border transition-all",
+                isPaused
+                  ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                  : "bg-icm-bg border-icm-border text-icm-text-dim hover:text-icm-text"
+              )}
+            >
+              <PauseCircle className="w-3.5 h-3.5" />
+              {isPaused ? "Paused — agents will not run automatically" : "Pause automated runs"}
+            </button>
           </div>
         )}
 

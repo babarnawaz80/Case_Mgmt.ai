@@ -1,0 +1,11 @@
+[{
+  "result": {
+    "aggregateFields": {
+      "aggregate_0": {
+        "integerValue": "3"
+      }
+    }
+  },
+  "readTime": "2026-05-31T07:03:26.864500Z"
+}
+]

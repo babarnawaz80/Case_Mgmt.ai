@@ -39,7 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runAssessmentAgent = runAssessmentAgent;
 const admin = __importStar(require("firebase-admin"));
 async function runAssessmentAgent(individual, runId, orgId, db) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
     const tasks = [];
     const logs = [];
     const today = new Date();
@@ -91,7 +91,7 @@ async function runAssessmentAgent(individual, runId, orgId, db) {
                         .limit(1);
                 snap = await q.get();
             }
-            catch (_m) {
+            catch (_p) {
                 try {
                     // Fallback without ordering
                     snap = await db.collection("assessments")
@@ -100,7 +100,7 @@ async function runAssessmentAgent(individual, runId, orgId, db) {
                         .limit(5)
                         .get();
                 }
-                catch (_o) {
+                catch (_q) {
                     continue;
                 }
             }
@@ -169,6 +169,11 @@ async function runAssessmentAgent(individual, runId, orgId, db) {
                 ai_draft_id: null,
                 source_agent: "compliance",
                 status: "pending",
+                rule_id: overdue ? "ASSESSMENT_OVERDUE" : "ASSESSMENT_DUE_SOON",
+                task_reason: overdue
+                    ? `${rule.templateName} for ${indName} is overdue by ${Math.abs(daysUntil)} days (${rule.requirementType} requirement, every ${(_m = rule.recurringEveryDays) !== null && _m !== void 0 ? _m : rule.initialDueDays} days).`
+                    : `${rule.templateName} for ${indName} is due in ${daysUntil} days (${rule.requirementType} requirement, every ${(_o = rule.recurringEveryDays) !== null && _o !== void 0 ? _o : rule.initialDueDays} days).`,
+                evidence_checked: `assessments (individualId, templateId=${rule.templateId}, status=completed, completedAt desc), programs (assessmentSchedule), individuals (programId)`,
             });
             logs.push({
                 org_id: orgId,
@@ -196,7 +201,7 @@ async function runAssessmentAgent(individual, runId, orgId, db) {
                         createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     });
                 }
-                catch ( /* non-fatal */_p) { /* non-fatal */ }
+                catch ( /* non-fatal */_r) { /* non-fatal */ }
             }
         }
     }

@@ -75,6 +75,9 @@ export async function runComplianceAgent(
       ai_draft_id: null,
       source_agent: "compliance",
       status: "pending",
+      rule_id: "COMPLIANCE_VISIT_REQUIRED",
+      task_reason: `Last face-to-face visit was ${daysSinceVisit} days ago; required every ${rulePack.visit_frequency_months * 30} days — ${visitOverdue} days overdue as of today.`,
+      evidence_checked: "individuals (last_visit_date), monitoring_forms (most recent)",
     });
 
     logs.push({
@@ -154,6 +157,9 @@ export async function runComplianceAgent(
       ai_draft_id: null,
       source_agent: "compliance",
       status: "pending",
+      rule_id: "COMPLIANCE_MONITORING_FORM_OVERDUE",
+      task_reason: `Last monitoring form was ${daysSinceMonitoring} days ago; required every ${rulePack.monitoring_form_frequency_months * 30} days — ${monitoringOverdue} days overdue.`,
+      evidence_checked: "individuals (last_monitoring_form_date), monitoring_forms (most recent by createdAt desc)",
     });
 
     logs.push({
@@ -200,6 +206,9 @@ export async function runComplianceAgent(
         ai_draft_id: null,
         source_agent: "compliance",
         status: "pending",
+        rule_id: "COMPLIANCE_PCP_OVERDUE",
+        task_reason: `Person-Centered Plan due date was ${pcpDueDate} and is now ${Math.abs(daysUntilPcp)} days overdue — immediate renewal required.`,
+        evidence_checked: "individuals (pcp_due_date, isp_due_date)",
       });
 
       logs.push({
@@ -242,6 +251,9 @@ export async function runComplianceAgent(
           ai_draft_id: null,
           source_agent: "compliance",
           status: "pending",
+          rule_id: "COMPLIANCE_PCP_APPROACHING",
+          task_reason: `Person-Centered Plan renewal is due on ${pcpDueDate} — only ${daysUntilPcp} days remain to complete the renewal packet.`,
+          evidence_checked: "individuals (pcp_due_date, isp_due_date)",
         });
 
         logs.push({
@@ -289,6 +301,9 @@ export async function runComplianceAgent(
         ai_draft_id: null,
         source_agent: "compliance",
         status: "pending",
+        rule_id: "COMPLIANCE_MA_REDETERMINATION_OVERDUE",
+        task_reason: `Medicaid redetermination was due on ${individual.ma_redetermination_date} and is ${Math.abs(daysUntilMA)} days overdue — service eligibility at risk.`,
+        evidence_checked: "individuals (ma_redetermination_date)",
       });
     } else if (daysUntilMA <= 60) {
       tasks.push({
@@ -308,6 +323,9 @@ export async function runComplianceAgent(
         ai_draft_id: null,
         source_agent: "compliance",
         status: "pending",
+        rule_id: "COMPLIANCE_MA_REDETERMINATION_APPROACHING",
+        task_reason: `Medicaid redetermination is due on ${individual.ma_redetermination_date} — only ${daysUntilMA} days remain to submit eligibility documentation.`,
+        evidence_checked: "individuals (ma_redetermination_date)",
       });
     }
   }

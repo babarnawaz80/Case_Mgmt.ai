@@ -1,10 +1,11 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { Sparkles, Send, Loader2, ChevronDown, X, RotateCcw, Copy, Check, Maximize2, Minimize2, Plus, MessageSquare, Trash2 } from "lucide-react";
+import { Sparkles, Send, Loader2, ChevronDown, X, RotateCcw, Copy, Check, Maximize2, Minimize2, Plus, MessageSquare, Trash2, Mic, MicOff, Volume2, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc } from "firebase/firestore";
+import { useVoiceSession } from "@/hooks/useVoiceSession";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface ChatMessage {
   text: string;
   ts: number;
   error?: boolean;
+  isVoice?: boolean;
 }
 
 // Context passed to the AI — derived from URL / props
@@ -266,6 +268,20 @@ export function AIPanel({
     personCounty,
     module,
   };
+
+  // ── Voice session state ────────────────────────────────────────────────────
+  const [voiceSessionActive, setVoiceSessionActive] = useState(false);
+  const [phiAcknowledged, setPhiAcknowledged] = useState(false);
+  const [phiLoading, setPhiLoading] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  // Load PHI disclosure status
+  useEffect(() => {
+    if (!currentUser) return;
+    getDoc(doc(db, "users", currentUser.uid))
+      .then(snap => setPhiAcknowledged(snap.data()?.voice_disclosure_acknowledged === true))
+      .catch(() => {});
+  }, [currentUser]);
 
   useEffect(() => {
     try {

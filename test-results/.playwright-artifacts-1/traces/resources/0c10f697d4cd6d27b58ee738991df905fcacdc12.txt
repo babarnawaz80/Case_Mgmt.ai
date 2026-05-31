@@ -1,0 +1,76 @@
+1681
+[[1,[{
+  "targetChange": {
+    "targetChangeType": "ADD",
+    "targetIds": [
+      1002
+    ]
+  }
+}
+]],[2,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/users/UvOyy8fvhyVWPBfuoClZ8XfeNYs1",
+      "fields": {
+        "displayName": {
+          "stringValue": "Platform Admin"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:36:16.927Z"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:41:15.067Z"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "caseload": {
+          "arrayValue": {}
+        },
+        "lastLogin": {
+          "stringValue": "2026-05-30T21:36:09.182Z"
+        },
+        "lastName": {
+          "stringValue": "User"
+        },
+        "role": {
+          "stringValue": "platform_admin"
+        },
+        "email": {
+          "stringValue": "admin@demo.casemanagement.ai"
+        },
+        "firstName": {
+          "stringValue": "Admin"
+        },
+        "uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "isActive": {
+          "booleanValue": true
+        }
+      },
+      "createTime": "2026-05-30T21:21:29.799351Z",
+      "updateTime": "2026-05-30T21:41:15.118070Z"
+    },
+    "targetIds": [
+      1002
+    ]
+  }
+}
+]],[3,[{
+  "targetChange": {
+    "targetChangeType": "CURRENT",
+    "targetIds": [
+      1002
+    ],
+    "resumeToken": "CgkI47DwtfrilAM=",
+    "readTime": "2026-05-31T07:01:46.962019Z"
+  }
+}
+]],[4,[{
+  "targetChange": {
+    "resumeToken": "CgkI47DwtfrilAM=",
+    "readTime": "2026-05-31T07:01:46.962019Z"
+  }
+}
+]]]

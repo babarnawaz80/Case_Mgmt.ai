@@ -752,6 +752,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Voice Sessions (AI voice chat session logs) ──────────────────────────
+    match /voice_sessions/{id} {
+      allow read: if isAuth() && resource.data.user_id == request.auth.uid;
+      allow create: if false;  // Cloud Function only via Admin SDK
+      allow update: if false;  // Cloud Function only
+      allow delete: if isAdmin();
+    }
+
     // ─── Platform Admin — read ALL collections across ALL orgs ───────────────────
     // Platform admins need cross-org visibility for customer support.
     // Write is still restricted per-collection above.

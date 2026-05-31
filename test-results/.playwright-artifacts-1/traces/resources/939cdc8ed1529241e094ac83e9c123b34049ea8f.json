@@ -1,0 +1,27 @@
+{
+  "kind": "identitytoolkit#GetAccountInfoResponse",
+  "users": [
+    {
+      "localId": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1",
+      "email": "admin@demo.casemanagement.ai",
+      "displayName": "Admin User",
+      "passwordHash": "UkVEQUNURUQ=",
+      "emailVerified": true,
+      "passwordUpdatedAt": 1779573005241,
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "displayName": "Admin User",
+          "federatedId": "admin@demo.casemanagement.ai",
+          "email": "admin@demo.casemanagement.ai",
+          "rawId": "admin@demo.casemanagement.ai"
+        }
+      ],
+      "validSince": "1779573005",
+      "disabled": false,
+      "lastLoginAt": "1780196025107",
+      "createdAt": "1779573005241",
+      "lastRefreshAt": "2026-05-31T07:03:42.587884Z"
+    }
+  ]
+}

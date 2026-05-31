@@ -1,0 +1,426 @@
+10962
+[[211,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/service_authorizations/1JrfbzrA3BzXqVgRYttu",
+      "fields": {
+        "notes": {
+          "stringValue": "Authorization in good standing. Units being utilized appropriately per service plan."
+        },
+        "assigned_case_manager_id": {
+          "stringValue": "staff-cm-001"
+        },
+        "units_authorized": {
+          "integerValue": "141"
+        },
+        "individual_id": {
+          "stringValue": "ind-001"
+        },
+        "units_used": {
+          "integerValue": "80"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-05T14:08:12.694Z"
+        },
+        "service_name": {
+          "stringValue": "Supported Living"
+        },
+        "procedure_code": {
+          "stringValue": "T2041"
+        },
+        "end_date": {
+          "stringValue": "2026-11-29"
+        },
+        "start_date": {
+          "stringValue": "2025-11-29"
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Maria Gonzalez"
+        },
+        "billing_period": {
+          "stringValue": "monthly"
+        },
+        "payer": {
+          "stringValue": "IHCP"
+        },
+        "individualName": {
+          "stringValue": "James Mitchell"
+        },
+        "individualId": {
+          "stringValue": "ind-001"
+        },
+        "organizationId": {
+          "stringValue": "demo-org-001"
+        },
+        "auth_number": {
+          "stringValue": "AUTH-86434"
+        },
+        "created_at": {
+          "timestampValue": "2025-11-29T15:08:12.694Z"
+        },
+        "status": {
+          "stringValue": "active"
+        }
+      },
+      "createTime": "2026-05-28T14:08:18.805365Z",
+      "updateTime": "2026-05-28T14:08:18.805365Z"
+    },
+    "targetIds": [
+      1032
+    ]
+  }
+}
+]],[212,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/service_authorizations/1U6EZVnTHkz0GFmY8Lft",
+      "fields": {
+        "updated_at": {
+          "timestampValue": "2026-05-23T14:10:42.811Z"
+        },
+        "units_used": {
+          "integerValue": "259"
+        },
+        "end_date": {
+          "stringValue": "2026-11-29"
+        },
+        "procedure_code": {
+          "stringValue": "T2022"
+        },
+        "service_name": {
+          "stringValue": "Community Integration Habilitation"
+        },
+        "start_date": {
+          "stringValue": "2025-11-29"
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Maria Gonzalez"
+        },
+        "billing_period": {
+          "stringValue": "monthly"
+        },
+        "notes": {
+          "stringValue": "Authorization in good standing. Units being utilized appropriately per service plan."
+        },
+        "units_authorized": {
+          "integerValue": "379"
+        },
+        "assigned_case_manager_id": {
+          "stringValue": "staff-cm-001"
+        },
+        "individual_id": {
+          "stringValue": "ind-001"
+        },
+        "individualId": {
+          "stringValue": "ind-001"
+        },
+        "organizationId": {
+          "stringValue": "demo-org-001"
+        },
+        "auth_number": {
+          "stringValue": "AUTH-14753"
+        },
+        "status": {
+          "stringValue": "active"
+        },
+        "created_at": {
+          "timestampValue": "2025-11-29T15:10:42.811Z"
+        },
+        "payer": {
+          "stringValue": "IHCP"
+        },
+        "individualName": {
+          "stringValue": "James Mitchell"
+        }
+      },
+      "createTime": "2026-05-28T14:10:49.447012Z",
+      "updateTime": "2026-05-28T14:10:49.447012Z"
+    },
+    "targetIds": [
+      1032
+    ]
+  }
+}
+]],[213,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/service_authorizations/arKbohmmI4GGl1YbV0zE",
+      "fields": {
+        "organizationId": {
+          "stringValue": "demo-org-001"
+        },
+        "auth_number": {
+          "stringValue": "AUTH-14987"
+        },
+        "created_at": {
+          "timestampValue": "2025-11-29T15:08:12.694Z"
+        },
+        "status": {
+          "stringValue": "active"
+        },
+        "individualId": {
+          "stringValue": "ind-001"
+        },
+        "payer": {
+          "stringValue": "IHCP"
+        },
+        "individualName": {
+          "stringValue": "James Mitchell"
+        },
+        "start_date": {
+          "stringValue": "2025-11-29"
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Maria Gonzalez"
+        },
+        "billing_period": {
+          "stringValue": "monthly"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-11T14:08:12.694Z"
+        },
+        "units_used": {
+          "integerValue": "271"
+        },
+        "procedure_code": {
+          "stringValue": "T2022"
+        },
+        "end_date": {
+          "stringValue": "2026-11-29"
+        },
+        "service_name": {
+          "stringValue": "Community Integration Habilitation"
+        },
+        "individual_id": {
+          "stringValue": "ind-001"
+        },
+        "notes": {
+          "stringValue": "Authorization in good standing. Units being utilized appropriately per service plan."
+        },
+        "assigned_case_manager_id": {
+          "stringValue": "staff-cm-001"
+        },
+        "units_authorized": {
+          "integerValue": "368"
+        }
+      },
+      "createTime": "2026-05-28T14:08:18.713851Z",
+      "updateTime": "2026-05-28T14:08:18.713851Z"
+    },
+    "targetIds": [
+      1032
+    ]
+  }
+}
+]],[214,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/service_authorizations/ddWo7XgVXILARztjuVzI",
+      "fields": {
+        "service_name": {
+          "stringValue": "Day Habilitation (T2021)"
+        },
+        "unit_type": {
+          "stringValue": "hours"
+        },
+        "used_units": {
+          "integerValue": "270"
+        },
+        "provider": {
+          "stringValue": "County Day Services"
+        },
+        "end_date": {
+          "stringValue": "2026-12-26"
+        },
+        "authorized_units": {
+          "integerValue": "1000"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-25T06:02:17.122Z"
+        },
+        "period": {
+          "stringValue": "Annual"
+        },
+        "authorization_number": {
+          "stringValue": "SA-2026--001-002"
+        },
+        "start_date": {
+          "stringValue": "2026-01-25"
+        },
+        "individual_id": {
+          "stringValue": "ind-001"
+        },
+        "service_code": {
+          "stringValue": "T2021"
+        },
+        "status": {
+          "stringValue": "Active"
+        },
+        "created_at": {
+          "timestampValue": "2026-01-25T06:02:17.122Z"
+        },
+        "individual_name": {
+          "stringValue": "Joseph"
+        },
+        "funding_source": {
+          "stringValue": "Medicaid HCBS Waiver"
+        }
+      },
+      "createTime": "2026-05-25T06:02:17.305688Z",
+      "updateTime": "2026-05-25T06:02:17.305688Z"
+    },
+    "targetIds": [
+      1032
+    ]
+  }
+}
+]],[215,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/service_authorizations/k1HyooVepspM14tVWrPO",
+      "fields": {
+        "status": {
+          "stringValue": "Active"
+        },
+        "created_at": {
+          "timestampValue": "2025-12-26T06:02:17.122Z"
+        },
+        "service_code": {
+          "stringValue": "T2022"
+        },
+        "funding_source": {
+          "stringValue": "Medicaid HCBS Waiver"
+        },
+        "individual_name": {
+          "stringValue": "Joseph"
+        },
+        "start_date": {
+          "stringValue": "2025-12-26"
+        },
+        "authorization_number": {
+          "stringValue": "SA-2026--001-001"
+        },
+        "period": {
+          "stringValue": "Annual"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-25T06:02:17.122Z"
+        },
+        "authorized_units": {
+          "integerValue": "96"
+        },
+        "end_date": {
+          "stringValue": "2026-12-26"
+        },
+        "service_name": {
+          "stringValue": "Case Management (T2022)"
+        },
+        "unit_type": {
+          "stringValue": "hours"
+        },
+        "used_units": {
+          "integerValue": "23"
+        },
+        "provider": {
+          "stringValue": "County Case Management Services"
+        },
+        "individual_id": {
+          "stringValue": "ind-001"
+        }
+      },
+      "createTime": "2026-05-25T06:02:17.232404Z",
+      "updateTime": "2026-05-25T06:02:17.232404Z"
+    },
+    "targetIds": [
+      1032
+    ]
+  }
+}
+]],[216,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/service_authorizations/nj0Od51Hb83IdIMS2gm0",
+      "fields": {
+        "payer": {
+          "stringValue": "IHCP"
+        },
+        "individualName": {
+          "stringValue": "James Mitchell"
+        },
+        "individualId": {
+          "stringValue": "ind-001"
+        },
+        "organizationId": {
+          "stringValue": "demo-org-001"
+        },
+        "auth_number": {
+          "stringValue": "AUTH-45117"
+        },
+        "status": {
+          "stringValue": "active"
+        },
+        "created_at": {
+          "timestampValue": "2025-11-29T15:10:42.811Z"
+        },
+        "notes": {
+          "stringValue": "Authorization in good standing. Units being utilized appropriately per service plan."
+        },
+        "units_authorized": {
+          "integerValue": "183"
+        },
+        "assigned_case_manager_id": {
+          "stringValue": "staff-cm-001"
+        },
+        "individual_id": {
+          "stringValue": "ind-001"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-27T14:10:42.811Z"
+        },
+        "units_used": {
+          "integerValue": "109"
+        },
+        "procedure_code": {
+          "stringValue": "T2041"
+        },
+        "end_date": {
+          "stringValue": "2026-11-29"
+        },
+        "service_name": {
+          "stringValue": "Supported Living"
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Maria Gonzalez"
+        },
+        "start_date": {
+          "stringValue": "2025-11-29"
+        },
+        "billing_period": {
+          "stringValue": "monthly"
+        }
+      },
+      "createTime": "2026-05-28T14:10:49.527506Z",
+      "updateTime": "2026-05-28T14:10:49.527506Z"
+    },
+    "targetIds": [
+      1032
+    ]
+  }
+}
+]],[217,[{
+  "targetChange": {
+    "targetChangeType": "CURRENT",
+    "targetIds": [
+      1032
+    ],
+    "resumeToken": "CgkI0OKvtvrilAM=",
+    "readTime": "2026-05-31T07:01:48.000592Z"
+  }
+}
+]],[218,[{
+  "targetChange": {
+    "resumeToken": "CgkI0OKvtvrilAM=",
+    "readTime": "2026-05-31T07:01:48.000592Z"
+  }
+}
+]]]

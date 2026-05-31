@@ -1,0 +1,1 @@
+{"structuredAggregationQuery":{"aggregations":[{"alias":"aggregate_0","count":{}}],"structuredQuery":{"from":[{"collectionId":"monitoring_forms"}],"where":{"fieldFilter":{"field":{"fieldPath":"individual_id"},"op":"EQUAL","value":{"stringValue":"ind-001"}}}}}}

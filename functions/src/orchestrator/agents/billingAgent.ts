@@ -52,6 +52,9 @@ export async function runBillingAgent(
         ai_draft_id: null,
         source_agent: "billing",
         status: "pending",
+        rule_id: "BILLING_UNSIGNED_NOTES",
+        task_reason: `${oldUnsigned.length} billable progress note(s) have been in draft/pending_signature status for more than 48 hours and cannot be submitted for billing.`,
+        evidence_checked: "progress_notes (billable=true, status in [draft, pending_signature], createdAt)",
       });
 
       logs.push({
@@ -111,6 +114,9 @@ export async function runBillingAgent(
         ai_draft_id: null,
         source_agent: "billing",
         status: "pending",
+        rule_id: "BILLING_AUTH_EXPIRY",
+        task_reason: `Service authorization for ${auth.service_name ?? "services"} (auth #${auth.auth_number ?? authDoc.id}) expires on ${endDate} — ${daysLeft} days remaining before billing becomes invalid.`,
+        evidence_checked: "service_authorizations (status=active, end_date, expiration_date)",
       });
 
       logs.push({

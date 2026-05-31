@@ -1,0 +1,748 @@
+19593
+[[11,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/individuals/6HR4SXaYYTmcIwMNzPdw",
+      "fields": {
+        "monitoring_compliance_pct": {
+          "integerValue": "91"
+        },
+        "last_name": {
+          "stringValue": "Thompson"
+        },
+        "gender": {
+          "stringValue": "Female"
+        },
+        "diagnosis": {
+          "stringValue": "Intellectual Disability (F70), Muscular Dystrophy (G71.00)"
+        },
+        "risk_level": {
+          "stringValue": "medium"
+        },
+        "medicaid_id": {
+          "stringValue": "IN7712984"
+        },
+        "next_visit_date": {
+          "stringValue": "2026-06-02"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "open_tasks": {
+          "integerValue": "2"
+        },
+        "emergency_contact_phone": {
+          "stringValue": "(317) 555-0311"
+        },
+        "first_name": {
+          "stringValue": "Darlene"
+        },
+        "compliance_tier": {
+          "stringValue": "amber"
+        },
+        "pcp_due_date": {
+          "stringValue": "2026-09-27"
+        },
+        "level_of_care": {
+          "stringValue": "Level 2"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-31T02:56:34.572Z"
+        },
+        "county": {
+          "stringValue": "Marion"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:21:30.406Z"
+        },
+        "program": {
+          "stringValue": "HCBS Waiver — Supported Living"
+        },
+        "assigned_case_manager": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "preferred_name": {
+          "stringValue": "Darlene"
+        },
+        "address": {
+          "stringValue": "2210 W. Washington St, Indianapolis, IN 46222"
+        },
+        "orchestrator_last_run": {
+          "timestampValue": "2026-05-31T06:00:40.665Z"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:21:30.406Z"
+        },
+        "emergency_contact_name": {
+          "stringValue": "Roy Thompson (Brother)"
+        },
+        "phone": {
+          "stringValue": "(317) 555-0277"
+        },
+        "dob": {
+          "stringValue": "1985-09-30"
+        },
+        "last_visit_date": {
+          "stringValue": "2026-05-25"
+        },
+        "assigned_case_manager_uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "compliance_score": {
+          "integerValue": "75"
+        },
+        "risk_score": {
+          "integerValue": "48"
+        },
+        "open_incidents": {
+          "integerValue": "0"
+        },
+        "address_state": {
+          "stringValue": "Indiana"
+        },
+        "companion_link_active": {
+          "booleanValue": true
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Admin User"
+        },
+        "enrollment_status": {
+          "stringValue": "active"
+        }
+      },
+      "createTime": "2026-05-30T21:21:30.706031Z",
+      "updateTime": "2026-05-31T06:00:40.685527Z"
+    },
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[12,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/individuals/7KeVY6s8Ol8NT25hT7PL",
+      "fields": {
+        "last_visit_date": {
+          "stringValue": "2026-05-22"
+        },
+        "phone": {
+          "stringValue": "(317) 555-0142"
+        },
+        "dob": {
+          "stringValue": "1978-04-12"
+        },
+        "emergency_contact_name": {
+          "stringValue": "Diane Williams (Sister)"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:21:30.241Z"
+        },
+        "orchestrator_last_run": {
+          "timestampValue": "2026-05-31T06:00:41.280Z"
+        },
+        "address": {
+          "stringValue": "4821 N. College Ave, Indianapolis, IN 46205"
+        },
+        "assigned_case_manager": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "preferred_name": {
+          "stringValue": "Marcus"
+        },
+        "enrollment_status": {
+          "stringValue": "active"
+        },
+        "address_state": {
+          "stringValue": "Indiana"
+        },
+        "companion_link_active": {
+          "booleanValue": false
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Admin User"
+        },
+        "open_incidents": {
+          "integerValue": "1"
+        },
+        "risk_score": {
+          "integerValue": "74"
+        },
+        "compliance_score": {
+          "integerValue": "75"
+        },
+        "assigned_case_manager_uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "open_tasks": {
+          "integerValue": "3"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "emergency_contact_phone": {
+          "stringValue": "(317) 555-0198"
+        },
+        "medicaid_id": {
+          "stringValue": "IN8847231"
+        },
+        "risk_level": {
+          "stringValue": "high"
+        },
+        "diagnosis": {
+          "stringValue": "Intellectual Disability (F70), Hypertension"
+        },
+        "gender": {
+          "stringValue": "Male"
+        },
+        "last_name": {
+          "stringValue": "Williams"
+        },
+        "next_visit_date": {
+          "stringValue": "2026-06-05"
+        },
+        "monitoring_compliance_pct": {
+          "integerValue": "78"
+        },
+        "program": {
+          "stringValue": "HCBS Waiver — Community Integration"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-31T02:56:34.572Z"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:21:30.241Z"
+        },
+        "county": {
+          "stringValue": "Marion"
+        },
+        "level_of_care": {
+          "stringValue": "Level 3"
+        },
+        "pcp_due_date": {
+          "stringValue": "2026-07-14"
+        },
+        "compliance_tier": {
+          "stringValue": "amber"
+        },
+        "first_name": {
+          "stringValue": "Marcus"
+        }
+      },
+      "createTime": "2026-05-30T21:21:30.297183Z",
+      "updateTime": "2026-05-31T06:00:41.294189Z"
+    },
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[13,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/individuals/7bL40BEREPlbbuLMhqNH",
+      "fields": {
+        "first_name": {
+          "stringValue": "Robert"
+        },
+        "compliance_tier": {
+          "stringValue": "amber"
+        },
+        "level_of_care": {
+          "stringValue": "Level 1"
+        },
+        "pcp_due_date": {
+          "stringValue": "2026-12-16"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-31T02:56:34.572Z"
+        },
+        "county": {
+          "stringValue": "Hamilton"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:21:30.713Z"
+        },
+        "program": {
+          "stringValue": "HCBS Waiver — Personal Care"
+        },
+        "monitoring_compliance_pct": {
+          "integerValue": "100"
+        },
+        "diagnosis": {
+          "stringValue": "Multiple Sclerosis (G35), Mobility Impairment (Z74.01)"
+        },
+        "gender": {
+          "stringValue": "Male"
+        },
+        "last_name": {
+          "stringValue": "Castillo"
+        },
+        "medicaid_id": {
+          "stringValue": "IN9023417"
+        },
+        "risk_level": {
+          "stringValue": "low"
+        },
+        "next_visit_date": {
+          "stringValue": "2026-06-17"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "open_tasks": {
+          "integerValue": "1"
+        },
+        "emergency_contact_phone": {
+          "stringValue": "(317) 555-0412"
+        },
+        "assigned_case_manager_uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "compliance_score": {
+          "integerValue": "75"
+        },
+        "risk_score": {
+          "integerValue": "22"
+        },
+        "open_incidents": {
+          "integerValue": "0"
+        },
+        "address_state": {
+          "stringValue": "Indiana"
+        },
+        "companion_link_active": {
+          "booleanValue": false
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Admin User"
+        },
+        "enrollment_status": {
+          "stringValue": "active"
+        },
+        "assigned_case_manager": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "preferred_name": {
+          "stringValue": "Bobby"
+        },
+        "orchestrator_last_run": {
+          "timestampValue": "2026-05-31T06:00:41.784Z"
+        },
+        "address": {
+          "stringValue": "833 Carmel Dr, Carmel, IN 46032"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:21:30.713Z"
+        },
+        "emergency_contact_name": {
+          "stringValue": "Maria Castillo (Mother)"
+        },
+        "phone": {
+          "stringValue": "(317) 555-0389"
+        },
+        "dob": {
+          "stringValue": "1991-02-14"
+        },
+        "last_visit_date": {
+          "stringValue": "2026-05-18"
+        }
+      },
+      "createTime": "2026-05-30T21:21:31.017487Z",
+      "updateTime": "2026-05-31T06:00:41.800202Z"
+    },
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[14,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/individuals/EcLFwOPPKmCChQCoIwKD",
+      "fields": {
+        "open_incidents": {
+          "integerValue": "0"
+        },
+        "address_state": {
+          "stringValue": "Indiana"
+        },
+        "companion_link_active": {
+          "booleanValue": true
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Admin User"
+        },
+        "enrollment_status": {
+          "stringValue": "active"
+        },
+        "assigned_case_manager_uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "compliance_score": {
+          "integerValue": "75"
+        },
+        "risk_score": {
+          "integerValue": "48"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:21:30.355Z"
+        },
+        "emergency_contact_name": {
+          "stringValue": "Roy Thompson (Brother)"
+        },
+        "dob": {
+          "stringValue": "1985-09-30"
+        },
+        "phone": {
+          "stringValue": "(317) 555-0277"
+        },
+        "last_visit_date": {
+          "stringValue": "2026-05-25"
+        },
+        "assigned_case_manager": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "preferred_name": {
+          "stringValue": "Darlene"
+        },
+        "address": {
+          "stringValue": "2210 W. Washington St, Indianapolis, IN 46222"
+        },
+        "orchestrator_last_run": {
+          "timestampValue": "2026-05-31T06:00:42.251Z"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-31T02:56:34.572Z"
+        },
+        "county": {
+          "stringValue": "Marion"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:21:30.355Z"
+        },
+        "program": {
+          "stringValue": "HCBS Waiver — Supported Living"
+        },
+        "first_name": {
+          "stringValue": "Darlene"
+        },
+        "compliance_tier": {
+          "stringValue": "amber"
+        },
+        "pcp_due_date": {
+          "stringValue": "2026-09-27"
+        },
+        "level_of_care": {
+          "stringValue": "Level 2"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "open_tasks": {
+          "integerValue": "2"
+        },
+        "emergency_contact_phone": {
+          "stringValue": "(317) 555-0311"
+        },
+        "monitoring_compliance_pct": {
+          "integerValue": "91"
+        },
+        "diagnosis": {
+          "stringValue": "Intellectual Disability (F70), Muscular Dystrophy (G71.00)"
+        },
+        "gender": {
+          "stringValue": "Female"
+        },
+        "last_name": {
+          "stringValue": "Thompson"
+        },
+        "medicaid_id": {
+          "stringValue": "IN7712984"
+        },
+        "risk_level": {
+          "stringValue": "medium"
+        },
+        "next_visit_date": {
+          "stringValue": "2026-06-02"
+        }
+      },
+      "createTime": "2026-05-30T21:21:30.399679Z",
+      "updateTime": "2026-05-31T06:00:42.272851Z"
+    },
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[15,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/individuals/J2VDa845kazaQI21a7Z5",
+      "fields": {
+        "next_visit_date": {
+          "stringValue": "2026-06-05"
+        },
+        "risk_level": {
+          "stringValue": "high"
+        },
+        "medicaid_id": {
+          "stringValue": "IN8847231"
+        },
+        "diagnosis": {
+          "stringValue": "Intellectual Disability (F70), Hypertension"
+        },
+        "gender": {
+          "stringValue": "Male"
+        },
+        "last_name": {
+          "stringValue": "Williams"
+        },
+        "monitoring_compliance_pct": {
+          "integerValue": "78"
+        },
+        "emergency_contact_phone": {
+          "stringValue": "(317) 555-0198"
+        },
+        "open_tasks": {
+          "integerValue": "3"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "level_of_care": {
+          "stringValue": "Level 3"
+        },
+        "pcp_due_date": {
+          "stringValue": "2026-07-14"
+        },
+        "compliance_tier": {
+          "stringValue": "amber"
+        },
+        "first_name": {
+          "stringValue": "Marcus"
+        },
+        "program": {
+          "stringValue": "HCBS Waiver — Community Integration"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:21:30.303Z"
+        },
+        "county": {
+          "stringValue": "Marion"
+        },
+        "updated_at": {
+          "timestampValue": "2026-05-31T02:56:34.572Z"
+        },
+        "orchestrator_last_run": {
+          "timestampValue": "2026-05-31T06:00:42.716Z"
+        },
+        "address": {
+          "stringValue": "4821 N. College Ave, Indianapolis, IN 46205"
+        },
+        "preferred_name": {
+          "stringValue": "Marcus"
+        },
+        "assigned_case_manager": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "last_visit_date": {
+          "stringValue": "2026-05-22"
+        },
+        "phone": {
+          "stringValue": "(317) 555-0142"
+        },
+        "dob": {
+          "stringValue": "1978-04-12"
+        },
+        "emergency_contact_name": {
+          "stringValue": "Diane Williams (Sister)"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:21:30.303Z"
+        },
+        "risk_score": {
+          "integerValue": "74"
+        },
+        "compliance_score": {
+          "integerValue": "75"
+        },
+        "assigned_case_manager_uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "enrollment_status": {
+          "stringValue": "active"
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Admin User"
+        },
+        "companion_link_active": {
+          "booleanValue": false
+        },
+        "address_state": {
+          "stringValue": "Indiana"
+        },
+        "open_incidents": {
+          "integerValue": "1"
+        }
+      },
+      "createTime": "2026-05-30T21:21:30.320047Z",
+      "updateTime": "2026-05-31T06:00:42.730935Z"
+    },
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[16,[{
+  "documentChange": {
+    "document": {
+      "name": "projects/casemanagement-ai/databases/(default)/documents/individuals/XFkR8vW4jkpU1QBngO0g",
+      "fields": {
+        "updated_at": {
+          "timestampValue": "2026-05-31T02:56:34.572Z"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-05-30T21:21:31.024Z"
+        },
+        "county": {
+          "stringValue": "Hamilton"
+        },
+        "program": {
+          "stringValue": "HCBS Waiver — Personal Care"
+        },
+        "compliance_tier": {
+          "stringValue": "amber"
+        },
+        "first_name": {
+          "stringValue": "Robert"
+        },
+        "level_of_care": {
+          "stringValue": "Level 1"
+        },
+        "pcp_due_date": {
+          "stringValue": "2026-12-16"
+        },
+        "open_tasks": {
+          "integerValue": "1"
+        },
+        "organizationId": {
+          "stringValue": "org_demo_casemanagement_ai"
+        },
+        "emergency_contact_phone": {
+          "stringValue": "(317) 555-0412"
+        },
+        "monitoring_compliance_pct": {
+          "integerValue": "100"
+        },
+        "risk_level": {
+          "stringValue": "low"
+        },
+        "medicaid_id": {
+          "stringValue": "IN9023417"
+        },
+        "last_name": {
+          "stringValue": "Castillo"
+        },
+        "gender": {
+          "stringValue": "Male"
+        },
+        "diagnosis": {
+          "stringValue": "Multiple Sclerosis (G35), Mobility Impairment (Z74.01)"
+        },
+        "next_visit_date": {
+          "stringValue": "2026-06-17"
+        },
+        "open_incidents": {
+          "integerValue": "0"
+        },
+        "enrollment_status": {
+          "stringValue": "active"
+        },
+        "assigned_case_manager_name": {
+          "stringValue": "Admin User"
+        },
+        "companion_link_active": {
+          "booleanValue": false
+        },
+        "address_state": {
+          "stringValue": "Indiana"
+        },
+        "assigned_case_manager_uid": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "risk_score": {
+          "integerValue": "22"
+        },
+        "compliance_score": {
+          "integerValue": "75"
+        },
+        "emergency_contact_name": {
+          "stringValue": "Maria Castillo (Mother)"
+        },
+        "createdAt": {
+          "timestampValue": "2026-05-30T21:21:31.024Z"
+        },
+        "last_visit_date": {
+          "stringValue": "2026-05-18"
+        },
+        "dob": {
+          "stringValue": "1991-02-14"
+        },
+        "phone": {
+          "stringValue": "(317) 555-0389"
+        },
+        "assigned_case_manager": {
+          "stringValue": "UvOyy8fvhyVWPBfuoClZ8XfeNYs1"
+        },
+        "preferred_name": {
+          "stringValue": "Bobby"
+        },
+        "orchestrator_last_run": {
+          "timestampValue": "2026-05-31T06:00:43.218Z"
+        },
+        "address": {
+          "stringValue": "833 Carmel Dr, Carmel, IN 46032"
+        }
+      },
+      "createTime": "2026-05-30T21:21:31.085631Z",
+      "updateTime": "2026-05-31T06:00:43.233610Z"
+    },
+    "targetIds": [
+      1004
+    ]
+  }
+}
+]],[17,[{
+  "targetChange": {
+    "targetChangeType": "CURRENT",
+    "targetIds": [
+      1004
+    ],
+    "resumeToken": "CgkIpZ2RtvrilAM=",
+    "readTime": "2026-05-31T07:01:47.500197Z"
+  }
+}
+]],[18,[{
+  "targetChange": {
+    "resumeToken": "CgkIpZ2RtvrilAM=",
+    "readTime": "2026-05-31T07:01:47.500197Z"
+  }
+}
+]],[19,[{
+  "targetChange": {
+    "targetChangeType": "CURRENT",
+    "targetIds": [
+      1006
+    ],
+    "resumeToken": "CgkIuOaRtvrilAM=",
+    "readTime": "2026-05-31T07:01:47.509560Z"
+  }
+}
+]],[20,[{
+  "targetChange": {
+    "resumeToken": "CgkIuOaRtvrilAM=",
+    "readTime": "2026-05-31T07:01:47.509560Z"
+  }
+}
+]]]

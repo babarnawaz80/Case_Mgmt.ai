@@ -10,7 +10,6 @@ import { HealthMetricsRow } from "@/components/orchestrator/HealthMetricsRow";
 import { AgentActivityFeed } from "@/components/orchestrator/AgentActivityFeed";
 import { RunHistory } from "@/components/orchestrator/RunHistory";
 import { IndividualComplianceGrid } from "@/components/orchestrator/IndividualComplianceGrid";
-import { PromptStudio } from "@/components/orchestrator/PromptStudio";
 import { ForwardComplianceCalendar, buildDeadlines, type Deadline } from "@/components/orchestrator/ForwardComplianceCalendar";
 import { OrchestratorRecommendations } from "@/components/orchestrator/OrchestratorRecommendations";
 import { AuthorizationHealthSection } from "@/components/orchestrator/AuthorizationHealthSection";
@@ -21,7 +20,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions as fns, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { Database, PauseCircle, X } from "lucide-react";
+import { Database, PauseCircle, X, Brain, ArrowRight } from "lucide-react";
 import { individualState, stateDisplayLabel } from "@/lib/stateUtils";
 
 // ─── Tab config ────────────────────────────────────────────────────────────────
@@ -77,13 +76,14 @@ const BrainOrchestrator = () => {
 };
 
 function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab") as TabId | null;
   const validTabs: TabId[] = TABS.map(t => t.id);
   const activeTab: TabId = rawTab && validTabs.includes(rawTab) ? rawTab : "overview";
 
   // Track which tabs have been mounted (for lazy loading)
-  const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(new Set(["overview"]));
+  const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(() => new Set(["overview", activeTab]));
   const [selectedState, setSelectedState] = useState("all");
 
   // ── Orchestrator pause state — reads/writes /config/orchestrator ────────────
@@ -314,9 +314,28 @@ function BrainOrchestratorContent({ isAdmin }: { isAdmin: boolean }) {
               )}
             </div>
 
-            {/* ── Prompt Studio Tab ─────────────────────────────────────── */}
+            {/* ── Prompt Studio Tab — moved to Settings → AI ────────────── */}
             <div className={activeTab === "prompt-studio" ? "p-5" : "hidden"}>
-              {mountedTabs.has("prompt-studio") && <PromptStudio />}
+              {mountedTabs.has("prompt-studio") && (
+                <div className="rounded-xl border border-icm-border bg-icm-bg px-5 py-6 flex flex-col items-center text-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/10 ring-1 ring-indigo-500/20 flex items-center justify-center">
+                    <Brain className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <h3 className="font-manrope font-bold text-[14px] text-icm-text mt-1">Agent setup moved to Settings</h3>
+                  <p className="text-[12px] font-geist text-icm-text-dim max-w-md leading-snug">
+                    Enabling agents and editing their prompts now live together under{" "}
+                    <strong className="text-icm-text">Settings → AI → AI Orchestrator</strong>. Toggle an agent on and
+                    set its prompt in the same place.
+                  </p>
+                  <button
+                    onClick={() => navigate("/settings/ai")}
+                    className="mt-2 h-9 px-4 rounded-xl bg-icm-accent text-white text-[12.5px] font-geist font-semibold inline-flex items-center gap-1.5 hover:bg-icm-accent/90"
+                  >
+                    Go to Settings → AI
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

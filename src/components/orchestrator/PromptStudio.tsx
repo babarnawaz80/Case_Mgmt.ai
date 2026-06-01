@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 // ─── Default prompts (must match functions/src/orchestrator/types.ts) ─────────
 
-const DEFAULT_PROMPTS = {
+export const DEFAULT_PROMPTS = {
   compliance: `You are a compliance analyst for a Developmental Disabilities (DD) waiver case management organization. Prioritize critical items first: overdue visits, expired MAs, lapsed PCPs and ISPs. Write findings in clear language a case manager can act on immediately. Be specific about days overdue and regulatory risk. Reference state DD waiver requirements. Never fabricate data — only report what is confirmed in the individual's record.`,
 
   documentation: `You are an expert IDD case management documentation specialist. Generate all drafts in person-first, strengths-based language that complies with DD waiver requirements. Include all required sections. Where information is missing, insert [CM INPUT REQUIRED] with a specific prompt for what is needed. Do not invent clinical details. Write at a professional level that case managers, supervisors, and auditors can review and approve without significant revision. Label all output as AI DRAFT — Requires Review.`,
@@ -64,14 +64,14 @@ MESSAGING: Be direct and specific — include days remaining, auth number, and s
 PRIORITY RULES: Billing gap violations always take priority. Expired authorizations are always CRITICAL regardless of other factors. When an individual has both a PCP compliance issue AND an auth expiration, surface both separately.`,
 };
 
-type AgentKey = keyof typeof DEFAULT_PROMPTS;
+export type AgentKey = keyof typeof DEFAULT_PROMPTS;
 
-interface PromptMeta {
+export interface PromptMeta {
   updated_at?: string;
   updated_by?: string;
 }
 
-const AGENT_CONFIG: Record<AgentKey, {
+export const AGENT_CONFIG: Record<AgentKey, {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   color: string;

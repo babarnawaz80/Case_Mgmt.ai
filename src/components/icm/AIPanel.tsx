@@ -725,14 +725,22 @@ export function AIPanel({
   const hasMessages = messages.length > 0;
 
   return (
-    <aside className={cn(
-      "flex shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full overflow-hidden transition-all duration-300 ease-in-out shadow-elevated",
-      // Mobile: full-screen overlay so the chat is actually usable (was hidden on mobile).
-      "fixed inset-0 z-50 w-full",
-      // Desktop: docked side panel.
-      "lg:static lg:inset-auto lg:z-30",
-      isExpanded ? "lg:w-[720px]" : "lg:w-[360px]"
-    )}>
+    <aside
+      style={{
+        // On mobile the panel is a full-screen overlay (fixed inset-0), so it must
+        // clear the status bar / home indicator. env() is 0 on non-notch/desktop.
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+      className={cn(
+        "flex shrink-0 border-l border-icm-border bg-icm-panel flex-col h-full overflow-hidden transition-all duration-300 ease-in-out shadow-elevated",
+        // Mobile: full-screen overlay so the chat is actually usable (was hidden on mobile).
+        "fixed inset-0 z-50 w-full",
+        // Desktop: docked side panel.
+        "lg:static lg:inset-auto lg:z-30",
+        isExpanded ? "lg:w-[720px]" : "lg:w-[360px]"
+      )}
+    >
       <div className="flex-1 flex min-h-0 divide-x divide-icm-border h-full overflow-hidden">
         {/* ── Left Pane: Chat History Sidebar (Expanded state only) ── */}
         {isExpanded && (
